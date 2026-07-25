@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
 	return (
@@ -12,6 +13,8 @@ export default function Home() {
 			</nav>
 
 			<h1>Home</h1>
+
+			<Button>Click Me</Button>
 		</main>
 	);
 }
