@@ -1,6 +1,9 @@
 // React Router
 import { useNavigate } from "react-router-dom";
 
+// Dialogs
+import CreateWorkspaceDialog from "@/components/dialogs/CreateWorkspaceDialog";
+
 // ShadCN UI Components
 import { Button } from "@/components/ui/button";
 import {
@@ -67,10 +70,12 @@ export default function Welcome() {
 					</h1>
 
 					<div className="flex flex-wrap justify-center gap-6">
-						<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
-							<FolderPlus className="size-5" />
-							Create Workspace
-						</Button>
+						<CreateWorkspaceDialog>
+							<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
+								<FolderPlus className="size-5" />
+								Create Workspace
+							</Button>
+						</CreateWorkspaceDialog>
 
 						<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
 							<UsersRound className="size-5" />
