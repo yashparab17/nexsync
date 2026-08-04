@@ -1,4 +1,7 @@
+// React Router
 import { useNavigate } from "react-router-dom";
+
+// ShadCN UI Components
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -6,7 +9,13 @@ import {
 	CardTitle,
 	CardDescription,
 } from "@/components/ui/card";
+
+// Lucide Icons
 import { FolderPlus, FolderOpen, UsersRound } from "lucide-react";
+
+// Logos
+import logo from "@/assets/logo.svg";
+import logo_white from "@/assets/logo-white.svg";
 
 export default function Welcome() {
 	const navigate = useNavigate();
@@ -15,8 +24,12 @@ export default function Welcome() {
 		<main className="flex min-h-screen flex-col bg-background p-8">
 			{/* Header */}
 			<header className="relative flex items-center justify-center">
-				<div></div>
-				<h1 className="text-5xl font-bold">Nexsync</h1>
+				<div className="flex items-center gap-3">
+					<img src={logo_white} alt="Nexsync" className="h-12 w-12" />
+
+					<h1 className="text-5xl font-bold">Nexsync</h1>
+				</div>
+
 				<Button
 					variant="ghost"
 					size="icon"
@@ -34,68 +47,79 @@ export default function Welcome() {
 			</div>
 
 			{/* Main Content */}
-			<section className="flex flex-1 flex-col items-center justify-center gap-6">
-				<h1 className="text-2xl font-semibold text-center">
-					Good evening, User.
-				</h1>
-
-				<h1 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-					Quick Actions
-				</h1>
-
-				<div className="flex flex-wrap justify-center gap-6">
-					<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
-						<FolderPlus className="size-5" />
-						Create Workspace
-					</Button>
-
-					<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
-						<UsersRound className="size-5" />
-						Join Workspace
-					</Button>
-
-					<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
-						<FolderOpen className="size-5" />
-						Import Workspace
-					</Button>
+			<section className="relative flex flex-1 flex-col items-center justify-center gap-6">
+				{/* Background Image */}
+				<div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+					<img
+						src={logo}
+						className="w-150 h-150 opacity-[0.1]"
+						alt=""
+					/>
 				</div>
 
-				{/* Recent Workspaces */}
-				<section className="flex w-full flex-col items-center gap-4">
-					<h2 className="text-2xl font-semibold">
-						Recent Workspaces
-					</h2>
+				<div className="relative z-2 flex flex-col items-center gap-6">
+					<h1 className="text-2xl font-semibold text-center">
+						Good evening, User.
+					</h1>
+
+					<h1 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+						Quick Actions
+					</h1>
 
 					<div className="flex flex-wrap justify-center gap-6">
-						<Card className="w-80 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg">
-							<CardHeader>
-								<CardTitle>MSc Project</CardTitle>
+						<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
+							<FolderPlus className="size-5" />
+							Create Workspace
+						</Button>
 
-								<CardDescription>
-									Last opened 2 hours ago
-								</CardDescription>
+						<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
+							<UsersRound className="size-5" />
+							Join Workspace
+						</Button>
 
-								<p className="pt-2 text-sm text-green-500">
-									● Synced
-								</p>
-							</CardHeader>
-						</Card>
-
-						<Card className="w-80 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg">
-							<CardHeader>
-								<CardTitle>Research Project</CardTitle>
-
-								<CardDescription>
-									Last opened 4 hours ago
-								</CardDescription>
-
-								<p className="pt-2 text-sm text-green-500">
-									● Synced
-								</p>
-							</CardHeader>
-						</Card>
+						<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
+							<FolderOpen className="size-5" />
+							Import Workspace
+						</Button>
 					</div>
-				</section>
+
+					{/* Recent Workspaces */}
+					<section className="flex w-full flex-col items-center gap-4">
+						<h2 className="text-2xl font-semibold">
+							Recent Workspaces
+						</h2>
+
+						<div className="flex flex-wrap justify-center gap-6">
+							<Card className="w-80 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg">
+								<CardHeader>
+									<CardTitle>MSc Project</CardTitle>
+
+									<CardDescription>
+										Last opened 2 hours ago
+									</CardDescription>
+
+									<p className="pt-2 text-sm text-green-500">
+										● Synced
+									</p>
+								</CardHeader>
+							</Card>
+
+							<Card className="w-80 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg">
+								<CardHeader>
+									<CardTitle>Research Project</CardTitle>
+
+									<CardDescription>
+										Last opened 4 hours ago
+									</CardDescription>
+
+									<p className="pt-2 text-sm text-green-500">
+										● Synced
+									</p>
+								</CardHeader>
+							</Card>
+						</div>
+					</section>
+				</div>
 			</section>
 
 			{/* Bottom */}
