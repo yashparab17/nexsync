@@ -1,5 +1,5 @@
 // React Router
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom";
 
 // Dialogs
 import CreateWorkspaceDialog from "@/components/dialogs/CreateWorkspaceDialog";
@@ -21,7 +21,7 @@ import logo from "@/assets/logo.svg";
 import logo_white from "@/assets/logo-white.svg";
 
 export default function Welcome() {
-	const navigate = useNavigate();
+	// const navigate = useNavigate();
 
 	return (
 		<main className="flex min-h-screen flex-col bg-background p-8">
