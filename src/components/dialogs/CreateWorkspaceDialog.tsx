@@ -18,8 +18,9 @@ import {
 // Lucide Icons
 import { Folder, FolderOpen, FolderPlus } from "lucide-react";
 
-// Folder Picker (Tauri)
+// Rust Functions
 import { open } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 
 interface CreateWorkspaceDialogProps {
 	children: ReactNode;
@@ -46,20 +47,22 @@ export default function CreateWorkspaceDialog({
 		}
 	};
 
-	const handleCreateWorkspace = () => {
+	const handleCreateWorkspace = async () => {
 		if (!workspaceName.trim()) {
-			alert("Please enter a workspace name.");
 			return;
 		}
 
-		console.log({
-			workspaceName,
-			description,
-			workspacePath,
-		});
+		try {
+			await invoke("create_workspace", {
+				name: workspaceName,
+				description,
+				path: workspacePath,
+			});
 
-		// Later:
-		// invoke("create_workspace", {...})
+			console.log("Workspace created!");
+		} catch (err) {
+			console.error(err);
+		}
 	};
 
 	return (
