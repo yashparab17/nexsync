@@ -4,9 +4,34 @@ use std::path::Path;
 use serde::Serialize;
 
 #[derive(Serialize)]
-struct WorkspaceMetadata {
+struct WorkspaceInfo {
     name: String,
     description: String,
+    id: String,
+}
+
+#[derive(Serialize)]
+struct Settings {
+    theme: String,
+    autosave: bool,
+    sync: bool,
+}
+
+#[derive(Serialize)]
+struct Member {
+    id: String,
+    name: String,
+    role: String,
+}
+
+#[derive(Serialize)]
+struct Members {
+    members: Vec<Member>,
+}
+
+#[derive(Serialize)]
+struct Activity {
+    events: Vec<String>,
 }
 
 #[tauri::command]
@@ -24,31 +49,81 @@ pub fn create_workspace(
     fs::create_dir_all(workspace_path.join(".nexsync"))
         .map_err(|e| e.to_string())?;
 
-    fs::create_dir_all(workspace_path.join("Notes"))
-        .map_err(|e| e.to_string())?;
-
-    fs::create_dir_all(workspace_path.join("Files"))
-        .map_err(|e| e.to_string())?;
-
-    fs::create_dir_all(workspace_path.join("Tasks"))
-        .map_err(|e| e.to_string())?;
-
-    fs::create_dir_all(workspace_path.join("Kanban"))
-        .map_err(|e| e.to_string())?;
-
-    let metadata = WorkspaceMetadata {
+    let workspace = WorkspaceInfo {
         name,
         description,
+        id,
     };
 
-    let json = serde_json::to_string_pretty(&metadata)
-        .map_err(|e| e.to_string())?;
+    let settings = Settings {
+        theme: "dark".to_string(),
+        autosave: true,
+        sync: true,
+    };
+
+    let members = Members {
+        members: vec![
+            Member {
+                id: "owner".to_string(),
+                name: "User".to_string(),
+                role: "Owner".to_string(),
+            }
+        ]
+    };
+
+    let activity = Activity {
+        events: vec![],
+    };
+
+    let workspace_json =
+        serde_json::to_string_pretty(&workspace)
+            .map_err(|e| e.to_string())?;
+
+    let settings_json =
+        serde_json::to_string_pretty(&settings)
+            .map_err(|e| e.to_string())?;
+
+    let members_json =
+        serde_json::to_string_pretty(&members)
+            .map_err(|e| e.to_string())?;
+
+    let activity_json =
+        serde_json::to_string_pretty(&activity)
+            .map_err(|e| e.to_string())?;
 
     fs::write(
         workspace_path.join(".nexsync/workspace.json"),
-        json,
-    )
-    .map_err(|e| e.to_string())?;
+        workspace_json,
+    ).map_err(|e| e.to_string())?;
+
+    fs::write(
+        workspace_path.join(".nexsync/settings.json"),
+        settings_json,
+    ).map_err(|e| e.to_string())?;
+
+    fs::write(
+        workspace_path.join(".nexsync/members.json"),
+        members_json,
+    ).map_err(|e| e.to_string())?;
+
+    fs::write(
+        workspace_path.join(".nexsync/activity.json"),
+        activity_json,
+    ).map_err(|e| e.to_string())?;
+
+    let folders = [
+        "notes",
+        "files",
+        "tasks",
+        "kanban",
+        "editor",
+        "attachments",
+    ];
+
+    for folder in folders {
+        fs::create_dir_all(workspace_path.join(folder))
+            .map_err(|e| e.to_string())?;
+    }
 
     Ok(())
 }
