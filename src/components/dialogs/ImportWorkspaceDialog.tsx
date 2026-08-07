@@ -1,8 +1,12 @@
+// React / React Router
 import { ReactNode, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useWorkspace } from "@/store/WorkspaceContext";
 
-import { open } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
+// Icons
+import { FolderOpen, FolderUp } from "lucide-react";
 
+// Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +20,12 @@ import {
 	DialogFooter,
 } from "@/components/ui/dialog";
 
-import { FolderOpen, FolderUp } from "lucide-react";
+// Types
+import type { WorkspaceInfo } from "@/types/workspace";
+
+// Rust
+import { open } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 
 interface ImportWorkspaceDialogProps {
 	children: ReactNode;
@@ -25,6 +34,8 @@ interface ImportWorkspaceDialogProps {
 export default function ImportWorkspaceDialog({
 	children,
 }: ImportWorkspaceDialogProps) {
+	const navigate = useNavigate();
+	const { setWorkspace } = useWorkspace();
 	const [workspacePath, setWorkspacePath] = useState("");
 	const [error, setError] = useState("");
 
@@ -50,12 +61,17 @@ export default function ImportWorkspaceDialog({
 		}
 
 		try {
-			const workspace = await invoke("import_workspace", {
+			const workspace = await invoke<WorkspaceInfo>("import_workspace", {
 				path: workspacePath,
 			});
 
 			console.log("Workspace imported:", workspace);
+
+			setWorkspace(workspace);
+
+			navigate("/workspace");
 		} catch (error) {
+			console.error("Failed to import workspace:", error);
 			setError(String(error));
 		}
 	};

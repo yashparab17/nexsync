@@ -1,7 +1,10 @@
 // React
 import { useState, type ReactNode } from "react";
 
-// ShadCN UI Components
+// Icons
+import { Folder, FolderOpen, FolderPlus } from "lucide-react";
+
+// Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,10 +18,7 @@ import {
 	DialogFooter,
 } from "@/components/ui/dialog";
 
-// Lucide Icons
-import { Folder, FolderOpen, FolderPlus } from "lucide-react";
-
-// Rust Functions
+// Rust
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 

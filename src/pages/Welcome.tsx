@@ -1,28 +1,27 @@
-// React Router
-// import { useNavigate } from "react-router-dom";
+// React / React Router
+import { useNavigate } from "react-router-dom";
 
-// Dialogs
+// Icons
+import { FolderOpen, FolderPlus, UsersRound } from "lucide-react";
+
+// Components
 import CreateWorkspaceDialog from "@/components/dialogs/CreateWorkspaceDialog";
 import ImportWorkspaceDialog from "@/components/dialogs/ImportWorkspaceDialog";
 
-// ShadCN UI Components
 import { Button } from "@/components/ui/button";
 import {
 	Card,
+	CardDescription,
 	CardHeader,
 	CardTitle,
-	CardDescription,
 } from "@/components/ui/card";
 
-// Lucide Icons
-import { FolderPlus, FolderOpen, UsersRound } from "lucide-react";
-
-// Logos
+// Assets
 import logo from "@/assets/logo.svg";
 import logo_white from "@/assets/logo-white.svg";
 
 export default function Welcome() {
-	// const navigate = useNavigate();
+	const navigate = useNavigate();
 
 	return (
 		<main className="flex min-h-screen flex-col bg-background p-8">
@@ -131,6 +130,9 @@ export default function Welcome() {
 			</section>
 
 			{/* Bottom */}
+			<Button onPress={() => navigate("/workspace")}>
+				Go to Workspace
+			</Button>
 			<footer className="mt-auto space-y-1 pb-4 text-center text-muted-foreground">
 				<p className="text-muted-foreground text-2xl">Nexsync 0.0.1</p>
 				<p className="text-muted-foreground text-xs">

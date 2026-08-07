@@ -1,9 +1,7 @@
-export interface Workspace {
+export interface WorkspaceInfo {
 	id: string;
 	name: string;
 	description: string;
-	path: string;
-	createdAt: string;
-	lastOpened: string;
-	icon?: string;
+	created_at: string;
+	updated_at: string;
 }
