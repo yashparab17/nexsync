@@ -92,6 +92,7 @@ export default function CreateWorkspaceDialog({
 							<div className="border">
 								<Input
 									id="workspace-name"
+									autoComplete="off"
 									placeholder="e.g. MSc Research"
 									className="pl-2"
 									value={workspaceName}
@@ -108,6 +109,7 @@ export default function CreateWorkspaceDialog({
 							<div className="border">
 								<Textarea
 									id="description"
+									autoComplete="off"
 									placeholder="Optional description..."
 									className="pl-2"
 									value={description}
@@ -125,7 +127,7 @@ export default function CreateWorkspaceDialog({
 								<Input
 									readOnly
 									value={workspacePath}
-									className="pl-2"
+									className="border-0 pl-2"
 								/>
 								<Button variant="outline" onPress={pickFolder}>
 									<FolderOpen className="size-4" />

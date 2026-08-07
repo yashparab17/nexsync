@@ -3,6 +3,7 @@
 
 // Dialogs
 import CreateWorkspaceDialog from "@/components/dialogs/CreateWorkspaceDialog";
+import ImportWorkspaceDialog from "@/components/dialogs/ImportWorkspaceDialog";
 
 // ShadCN UI Components
 import { Button } from "@/components/ui/button";
@@ -82,10 +83,12 @@ export default function Welcome() {
 							Join Workspace
 						</Button>
 
-						<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
-							<FolderOpen className="size-5" />
-							Import Workspace
-						</Button>
+						<ImportWorkspaceDialog>
+							<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
+								<FolderOpen className="size-5" />
+								Import Workspace
+							</Button>
+						</ImportWorkspaceDialog>
 					</div>
 
 					{/* Recent Workspaces */}
