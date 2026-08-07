@@ -4,9 +4,13 @@
 // Icons
 import { FolderOpen, FolderPlus, UsersRound } from "lucide-react";
 
+// Hooks
+import { useTheme } from "@/hooks/useTheme";
+
 // Components
 import CreateWorkspaceDialog from "@/components/dialogs/CreateWorkspaceDialog";
 import ImportWorkspaceDialog from "@/components/dialogs/ImportWorkspaceDialog";
+import ThemeToggle from "@/components/elements/ThemeToggle";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,28 +22,34 @@ import {
 
 // Assets
 import logo from "@/assets/logo.svg";
+import logo_black from "@/assets/logo-black.svg";
 import logo_white from "@/assets/logo-white.svg";
 
 export default function Welcome() {
 	// const navigate = useNavigate();
+	const { isDark } = useTheme();
 
 	return (
 		<main className="flex min-h-screen flex-col bg-background p-8">
 			{/* Header */}
 			<header className="relative flex items-center justify-center">
 				<div className="flex items-center gap-3">
-					<img src={logo_white} alt="Nexsync" className="h-12 w-12" />
+					<img
+						src={isDark ? logo_white : logo_black}
+						alt="Nexsync"
+						className="h-12 w-12"
+					/>
 
 					<h1 className="text-5xl font-bold">Nexsync</h1>
 				</div>
 
-				<Button
-					variant="ghost"
-					size="icon"
-					className="absolute right-0"
-				>
-					<UsersRound className="size-8" />
-				</Button>
+				<div className="absolute right-0 flex items-center gap-2">
+					<ThemeToggle />
+
+					<Button variant="ghost" size="icon">
+						<UsersRound className="size-5" />
+					</Button>
+				</div>
 			</header>
 
 			{/* Tagline */}

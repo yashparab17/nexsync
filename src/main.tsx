@@ -6,13 +6,14 @@ import { RouterProvider } from "react-router-dom";
 import { router } from "./routes/router";
 
 import { WorkspaceProvider } from "./store/WorkspaceContext";
-
-document.documentElement.classList.add("dark");
+import { ThemeProvider } from "./store/ThemeContext";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
 	<React.StrictMode>
-		<WorkspaceProvider>
-			<RouterProvider router={router} />
-		</WorkspaceProvider>
+		<ThemeProvider>
+			<WorkspaceProvider>
+				<RouterProvider router={router} />
+			</WorkspaceProvider>
+		</ThemeProvider>
 	</React.StrictMode>,
 );
