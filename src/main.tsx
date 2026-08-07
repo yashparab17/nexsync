@@ -5,7 +5,7 @@ import "./index.css";
 import { RouterProvider } from "react-router-dom";
 import { router } from "./routes/router";
 
-import { WorkspaceProvider } from "./store/WorkspaceContext";
+import { WorkspaceProvider } from "./store/workspace/WorkspaceContext";
 import { ThemeProvider } from "./store/ThemeContext";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

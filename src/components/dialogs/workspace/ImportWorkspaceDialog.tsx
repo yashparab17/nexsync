@@ -1,7 +1,7 @@
 // React / React Router
 import { ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useWorkspace } from "@/store/WorkspaceContext";
+import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
 // Icons
 import { FolderOpen, FolderUp } from "lucide-react";

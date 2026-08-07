@@ -8,8 +8,8 @@ import { FolderOpen, FolderPlus, UsersRound } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 
 // Components
-import CreateWorkspaceDialog from "@/components/dialogs/CreateWorkspaceDialog";
-import ImportWorkspaceDialog from "@/components/dialogs/ImportWorkspaceDialog";
+import CreateWorkspaceDialog from "@/components/dialogs/workspace/CreateWorkspaceDialog";
+import ImportWorkspaceDialog from "@/components/dialogs/workspace/ImportWorkspaceDialog";
 import ThemeToggle from "@/components/elements/ThemeToggle";
 
 import { Button } from "@/components/ui/button";
@@ -21,9 +21,9 @@ import {
 } from "@/components/ui/card";
 
 // Assets
-import logo from "@/assets/logo.svg";
-import logo_black from "@/assets/logo-black.svg";
-import logo_white from "@/assets/logo-white.svg";
+import logo from "@/assets/logos/logo.svg";
+import logo_black from "@/assets/logos/logo-black.svg";
+import logo_white from "@/assets/logos/logo-white.svg";
 
 export default function Welcome() {
 	// const navigate = useNavigate();
