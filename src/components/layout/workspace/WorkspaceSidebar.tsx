@@ -2,8 +2,7 @@
 import type { ElementType } from "react";
 
 // React Router
-import { useNavigate } from "react-router-dom";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 
 // Icons
 import {
@@ -80,14 +79,14 @@ function NavigationItem({ item }: { item: NavigationItem }) {
 			to={item.path}
 			end={item.end}
 			className={({ isActive }) =>
-				`flex w-full items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+				`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
 					isActive ?
 						"bg-primary/10 text-primary"
 					:	"text-foreground hover:bg-muted"
 				}`
 			}
 		>
-			<Icon className="mr-3 size-4" />
+			<Icon className="size-4" />
 			{item.name}
 		</NavLink>
 	);

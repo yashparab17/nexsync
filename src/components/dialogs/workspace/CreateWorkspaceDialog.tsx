@@ -1,5 +1,5 @@
 // React
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 // Icons
 import { Folder, FolderOpen, FolderPlus } from "lucide-react";
@@ -33,8 +33,11 @@ export default function CreateWorkspaceDialog({
 	const [workspaceName, setWorkspaceName] = useState("");
 	const [description, setDescription] = useState("");
 	const [workspacePath, setWorkspacePath] = useState("");
-	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState("");
+
+	// Guards against double-submits without triggering a re-render,
+	// so the button stays visually stable while the workspace is created.
+	const isCreating = useRef(false);
 
 	// Default the storage location to the user's Documents directory.
 	useEffect(() => {
@@ -61,11 +64,11 @@ export default function CreateWorkspaceDialog({
 	};
 
 	const handleCreateWorkspace = async () => {
-		if (!workspaceName.trim()) {
+		if (!workspaceName.trim() || isCreating.current) {
 			return;
 		}
 
-		setIsSubmitting(true);
+		isCreating.current = true;
 		setError("");
 
 		try {
@@ -80,7 +83,7 @@ export default function CreateWorkspaceDialog({
 			console.error(err);
 			setError(String(err));
 		} finally {
-			setIsSubmitting(false);
+			isCreating.current = false;
 		}
 	};
 
@@ -165,8 +168,8 @@ export default function CreateWorkspaceDialog({
 						</h3>
 
 						<div className="flex flex-col items-center gap-4">
-							<div className="flex h-20 w-20 items-center justify-center rounded-xl bg-primary text-5xl">
-								<Folder className="size-8"></Folder>
+							<div className="grid h-20 w-20 place-items-center rounded-xl bg-primary">
+								<Folder className="size-8" />
 							</div>
 
 							<div className="text-center">
@@ -189,18 +192,18 @@ export default function CreateWorkspaceDialog({
 					<Button
 						variant="outline"
 						slot="close"
-						className="cursor-pointer transition-all hover:scale-[1.02] hover:border-primary"
+						className="cursor-pointer hover:scale-[1.02] hover:border-primary"
 					>
 						Cancel
 					</Button>
 
 					<Button
 						onPress={handleCreateWorkspace}
-						isDisabled={!canCreate || isSubmitting}
-						className="cursor-pointer transition-all hover:scale-[1.02] hover:border-primary"
+						isDisabled={!canCreate}
+						className="cursor-pointer hover:scale-[1.02] hover:border-primary"
 					>
 						<FolderPlus className="mr-2 size-4" />
-						{isSubmitting ? "Creating..." : "Create Workspace"}
+						Create Workspace
 					</Button>
 				</DialogFooter>
 			</Dialog>

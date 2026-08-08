@@ -13,14 +13,10 @@ export default function WorkspaceHeader() {
 				<div className="flex w-80 items-center border bg-background">
 					<Input
 						placeholder="Search workspace..."
-						className="border-0 pl-3 focus-visible:ring-0"
+						className="flex-1 border-0 pl-3"
 					/>
 
-					<Button
-						variant="outline"
-						size="icon"
-						className="shrink-0 rounded-none"
-					>
+					<Button variant="outline" size="icon">
 						<Search className="size-4" />
 					</Button>
 				</div>

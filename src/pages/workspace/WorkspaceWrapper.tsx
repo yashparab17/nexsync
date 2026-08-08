@@ -16,7 +16,7 @@ export default function Workspace() {
 	}
 
 	return (
-		<div className="flex h-screen bg-background">
+		<div className="flex h-screen">
 			{/* Sidebar */}
 			<WorkspaceSidebar />
 

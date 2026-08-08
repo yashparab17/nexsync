@@ -1,6 +1,3 @@
-// React / React Router
-// import { useNavigate } from "react-router-dom";
-
 // Icons
 import { FolderOpen, FolderPlus, UsersRound } from "lucide-react";
 
@@ -25,12 +22,19 @@ import logo from "@/assets/logos/logo.svg";
 import logo_black from "@/assets/logos/logo-black.svg";
 import logo_white from "@/assets/logos/logo-white.svg";
 
+const actionButtonClass =
+	"px-8 text-base cursor-pointer hover:scale-[1.02] hover:border-primary";
+
+const recentWorkspaces = [
+	{ name: "MSc Project", lastOpened: "2 hours ago" },
+	{ name: "Research Project", lastOpened: "4 hours ago" },
+];
+
 export default function Welcome() {
-	// const navigate = useNavigate();
 	const { isDark } = useTheme();
 
 	return (
-		<main className="flex min-h-screen flex-col bg-background p-8">
+		<main className="flex min-h-screen flex-col p-8">
 			{/* Header */}
 			<header className="relative flex items-center justify-center">
 				<div className="flex items-center gap-3">
@@ -53,47 +57,41 @@ export default function Welcome() {
 			</header>
 
 			{/* Tagline */}
-			<div className="flex items-center justify-center">
-				<p className="mt-2 text-lg text-muted-foreground">
-					Local-first collaborative workspaces.
-				</p>
-			</div>
+			<p className="mt-2 text-center text-lg text-muted-foreground">
+				Local-first collaborative workspaces.
+			</p>
 
 			{/* Main Content */}
 			<section className="relative flex flex-1 flex-col items-center justify-center gap-6">
 				{/* Background Image */}
 				<div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-					<img
-						src={logo}
-						className="w-150 h-150 opacity-[0.1]"
-						alt=""
-					/>
+					<img src={logo} className="h-150 w-150 opacity-10" alt="" />
 				</div>
 
 				<div className="relative z-2 flex flex-col items-center gap-6">
-					<h1 className="text-2xl font-semibold text-center">
+					<h1 className="text-center text-2xl font-semibold">
 						Good evening, User.
 					</h1>
 
-					<h1 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+					<p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
 						Quick Actions
-					</h1>
+					</p>
 
 					<div className="flex flex-wrap justify-center gap-6">
 						<CreateWorkspaceDialog>
-							<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
+							<Button className={actionButtonClass}>
 								<FolderPlus className="size-5" />
 								Create Workspace
 							</Button>
 						</CreateWorkspaceDialog>
 
-						<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
+						<Button className={actionButtonClass}>
 							<UsersRound className="size-5" />
 							Join Workspace
 						</Button>
 
 						<ImportWorkspaceDialog>
-							<Button className="px-8 py-6 text-base cursor-pointer transition-all hover:scale-[1.02] hover:border-primary">
+							<Button className={actionButtonClass}>
 								<FolderOpen className="size-5" />
 								Import Workspace
 							</Button>
@@ -107,33 +105,24 @@ export default function Welcome() {
 						</h2>
 
 						<div className="flex flex-wrap justify-center gap-6">
-							<Card className="w-80 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg">
-								<CardHeader>
-									<CardTitle>MSc Project</CardTitle>
+							{recentWorkspaces.map(({ name, lastOpened }) => (
+								<Card
+									key={name}
+									className="w-80 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg"
+								>
+									<CardHeader>
+										<CardTitle>{name}</CardTitle>
 
-									<CardDescription>
-										Last opened 2 hours ago
-									</CardDescription>
+										<CardDescription>
+											Last opened {lastOpened}
+										</CardDescription>
 
-									<p className="pt-2 text-sm text-green-500">
-										● Synced
-									</p>
-								</CardHeader>
-							</Card>
-
-							<Card className="w-80 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg">
-								<CardHeader>
-									<CardTitle>Research Project</CardTitle>
-
-									<CardDescription>
-										Last opened 4 hours ago
-									</CardDescription>
-
-									<p className="pt-2 text-sm text-green-500">
-										● Synced
-									</p>
-								</CardHeader>
-							</Card>
+										<p className="pt-2 text-green-500">
+											● Synced
+										</p>
+									</CardHeader>
+								</Card>
+							))}
 						</div>
 					</section>
 				</div>
@@ -141,8 +130,8 @@ export default function Welcome() {
 
 			{/* Bottom */}
 			<footer className="mt-auto space-y-1 pb-4 text-center text-muted-foreground">
-				<p className="text-muted-foreground text-2xl">Nexsync 0.0.1</p>
-				<p className="text-muted-foreground text-xs">
+				<p className="text-2xl">Nexsync 0.0.1</p>
+				<p className="text-xs">
 					Local First • Open Source • Built with Tauri
 				</p>
 			</footer>
