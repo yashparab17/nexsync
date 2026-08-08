@@ -20,12 +20,9 @@ import {
 	DialogFooter,
 } from "@/components/ui/dialog";
 
-// Types
-import type { WorkspaceInfo } from "@/types/workspace";
-
-// Rust
+// Tauri
 import { open } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
+import { importWorkspace } from "@/lib/tauri";
 
 interface ImportWorkspaceDialogProps {
 	children: ReactNode;
@@ -61,9 +58,7 @@ export default function ImportWorkspaceDialog({
 		}
 
 		try {
-			const workspace = await invoke<WorkspaceInfo>("import_workspace", {
-				path: workspacePath,
-			});
+			const workspace = await importWorkspace(workspacePath);
 
 			console.log("Workspace imported:", workspace);
 

@@ -2,16 +2,23 @@ use std::fs;
 use std::path::Path;
 
 use chrono::Utc;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Serialize, serde::Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct WorkspaceInfo {
     pub id: String,
     pub name: String,
     pub description: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Deserialize)]
+pub struct CreateWorkspaceRequest {
+    pub name: String,
+    pub description: String,
+    pub path: String,
 }
 
 #[derive(Serialize)]
@@ -51,27 +58,34 @@ struct History {
     recent_files: Vec<String>,
 }
 
-#[tauri::command]
-pub fn create_workspace(
-    name: String,
-    description: String,
-    path: String,
+/// Writes `value` as pretty JSON to `<workspace_path>/.nexsync/<name>.json`.
+fn write_metadata_json<T: Serialize>(
+    workspace_path: &Path,
+    name: &str,
+    value: &T,
 ) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
 
-    let workspace_path = Path::new(&path).join(&name);
+    fs::write(
+        workspace_path.join(".nexsync").join(format!("{name}.json")),
+        json,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_workspace(request: CreateWorkspaceRequest) -> Result<(), String> {
+    let workspace_path = Path::new(&request.path).join(&request.name);
     let workspace_id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
-    fs::create_dir_all(&workspace_path)
-        .map_err(|e| e.to_string())?;
-
-    fs::create_dir_all(workspace_path.join(".nexsync"))
-        .map_err(|e| e.to_string())?;
+    fs::create_dir_all(&workspace_path).map_err(|e| e.to_string())?;
+    fs::create_dir_all(workspace_path.join(".nexsync")).map_err(|e| e.to_string())?;
 
     let workspace = WorkspaceInfo {
         id: workspace_id,
-        name,
-        description,
+        name: request.name,
+        description: request.description,
         created_at: now.clone(),
         updated_at: now.clone(),
     };
@@ -83,18 +97,14 @@ pub fn create_workspace(
     };
 
     let members = Members {
-        members: vec![
-            Member {
-                id: "owner".to_string(),
-                name: "User".to_string(),
-                role: "Owner".to_string(),
-            }
-        ]
+        members: vec![Member {
+            id: "owner".to_string(),
+            name: "User".to_string(),
+            role: "Owner".to_string(),
+        }],
     };
 
-    let activity = Activity {
-        events: vec![],
-    };
+    let activity = Activity { events: vec![] };
 
     let permissions = Permissions {
         owner: vec![
@@ -103,114 +113,50 @@ pub fn create_workspace(
             "invite".into(),
             "edit".into(),
         ],
-        editor: vec![
-            "edit".into(),
-            "create".into(),
-        ],
-        viewer: vec![
-            "view".into(),
-        ],
+        editor: vec!["edit".into(), "create".into()],
+        viewer: vec!["view".into()],
     };
 
     let history = History {
-        last_opened: now.clone(),
+        last_opened: now,
         recent_files: vec![],
     };
 
-    let workspace_json =
-        serde_json::to_string_pretty(&workspace)
-            .map_err(|e| e.to_string())?;
+    write_metadata_json(&workspace_path, "workspace", &workspace)?;
+    write_metadata_json(&workspace_path, "settings", &settings)?;
+    write_metadata_json(&workspace_path, "members", &members)?;
+    write_metadata_json(&workspace_path, "activity", &activity)?;
+    write_metadata_json(&workspace_path, "permissions", &permissions)?;
+    write_metadata_json(&workspace_path, "history", &history)?;
 
-    let settings_json =
-        serde_json::to_string_pretty(&settings)
-            .map_err(|e| e.to_string())?;
-
-    let members_json =
-        serde_json::to_string_pretty(&members)
-            .map_err(|e| e.to_string())?;
-
-    let activity_json =
-        serde_json::to_string_pretty(&activity)
-            .map_err(|e| e.to_string())?;
-    
-    let permissions_json =
-        serde_json::to_string_pretty(&permissions)
-            .map_err(|e| e.to_string())?;
-
-    let history_json =
-        serde_json::to_string_pretty(&history)
-            .map_err(|e| e.to_string())?;
-
-    fs::write(
-        workspace_path.join(".nexsync/workspace.json"),
-        workspace_json,
-    ).map_err(|e| e.to_string())?;
-
-    fs::write(
-        workspace_path.join(".nexsync/settings.json"),
-        settings_json,
-    ).map_err(|e| e.to_string())?;
-
-    fs::write(
-        workspace_path.join(".nexsync/members.json"),
-        members_json,
-    ).map_err(|e| e.to_string())?;
-
-    fs::write(
-        workspace_path.join(".nexsync/activity.json"),
-        activity_json,
-    ).map_err(|e| e.to_string())?;
-
-    fs::write(
-        workspace_path.join(".nexsync/permissions.json"),
-        permissions_json,
-    ).map_err(|e| e.to_string())?;
-
-    fs::write(
-        workspace_path.join(".nexsync/history.json"),
-        history_json,
-    ).map_err(|e| e.to_string())?;
-
-    let folders = [
-        "notes",
-        "files",
-        "tasks",
-        "kanban",
-        "editor",
-        "assets",
-    ];
+    let folders = ["notes", "files", "tasks", "kanban", "editor", "assets"];
 
     for folder in folders {
-        fs::create_dir_all(workspace_path.join(folder))
-            .map_err(|e| e.to_string())?;
+        fs::create_dir_all(workspace_path.join(folder)).map_err(|e| e.to_string())?;
     }
 
     Ok(())
 }
+
 #[tauri::command]
 pub fn import_workspace(path: String) -> Result<WorkspaceInfo, String> {
-	let workspace_path = Path::new(&path);
+    let workspace_path = Path::new(&path);
 
-	let metadata_path = workspace_path
-		.join(".nexsync")
-		.join("workspace.json");
+    let metadata_path = workspace_path.join(".nexsync").join("workspace.json");
 
-	if !workspace_path.exists() {
-		return Err("The selected folder does not exist.".to_string());
-	}
+    if !workspace_path.exists() {
+        return Err("The selected folder does not exist.".to_string());
+    }
 
-	if !metadata_path.exists() {
-		return Err(
-			"This folder is not a valid Nexsync workspace.".to_string()
-		);
-	}
+    if !metadata_path.exists() {
+        return Err("This folder is not a valid Nexsync workspace.".to_string());
+    }
 
-	let json = fs::read_to_string(&metadata_path)
-		.map_err(|e| format!("Failed to read workspace metadata: {}", e))?;
+    let json = fs::read_to_string(&metadata_path)
+        .map_err(|e| format!("Failed to read workspace metadata: {e}"))?;
 
-	let workspace: WorkspaceInfo =
-		serde_json::from_str(&json)
-			.map_err(|e| format!("Invalid workspace.json: {}", e))?;
+    let workspace: WorkspaceInfo =
+        serde_json::from_str(&json).map_err(|e| format!("Invalid workspace.json: {e}"))?;
 
-	Ok(workspace)
+    Ok(workspace)
 }

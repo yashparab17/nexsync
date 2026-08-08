@@ -1,5 +1,5 @@
 // React
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 // Icons
 import { Folder, FolderOpen, FolderPlus } from "lucide-react";
@@ -18,9 +18,10 @@ import {
 	DialogFooter,
 } from "@/components/ui/dialog";
 
-// Rust
+// Tauri
 import { open } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
+import { documentDir } from "@tauri-apps/api/path";
+import { createWorkspace } from "@/lib/tauri";
 
 interface CreateWorkspaceDialogProps {
 	children: ReactNode;
@@ -31,9 +32,21 @@ export default function CreateWorkspaceDialog({
 }: CreateWorkspaceDialogProps) {
 	const [workspaceName, setWorkspaceName] = useState("");
 	const [description, setDescription] = useState("");
-	const [workspacePath, setWorkspacePath] = useState(
-		"C:\\Users\\User\\Documents\\Nexsync",
-	);
+	const [workspacePath, setWorkspacePath] = useState("");
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [error, setError] = useState("");
+
+	// Default the storage location to the user's Documents directory.
+	useEffect(() => {
+		documentDir()
+			.then((dir) => setWorkspacePath(dir))
+			.catch((err) => {
+				console.error("Failed to resolve Documents directory:", err);
+				setError(
+					"Could not resolve your Documents folder. Please pick a location manually.",
+				);
+			});
+	}, []);
 
 	const pickFolder = async () => {
 		const selected = await open({
@@ -52,8 +65,11 @@ export default function CreateWorkspaceDialog({
 			return;
 		}
 
+		setIsSubmitting(true);
+		setError("");
+
 		try {
-			await invoke("create_workspace", {
+			await createWorkspace({
 				name: workspaceName,
 				description,
 				path: workspacePath,
@@ -62,8 +78,14 @@ export default function CreateWorkspaceDialog({
 			console.log("Workspace created!");
 		} catch (err) {
 			console.error(err);
+			setError(String(err));
+		} finally {
+			setIsSubmitting(false);
 		}
 	};
+
+	const canCreate =
+		workspaceName.trim().length > 0 && workspacePath.length > 0;
 
 	return (
 		<DialogTrigger>
@@ -160,6 +182,8 @@ export default function CreateWorkspaceDialog({
 					</div>
 				</div>
 
+				{error && <p className="text-sm text-destructive">{error}</p>}
+
 				{/* Footer */}
 				<DialogFooter>
 					<Button
@@ -172,10 +196,11 @@ export default function CreateWorkspaceDialog({
 
 					<Button
 						onPress={handleCreateWorkspace}
+						isDisabled={!canCreate || isSubmitting}
 						className="cursor-pointer transition-all hover:scale-[1.02] hover:border-primary"
 					>
 						<FolderPlus className="mr-2 size-4" />
-						Create Workspace
+						{isSubmitting ? "Creating..." : "Create Workspace"}
 					</Button>
 				</DialogFooter>
 			</Dialog>
