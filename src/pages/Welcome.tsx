@@ -1,3 +1,9 @@
+// React
+import { useEffect, useState } from "react";
+
+// React Router
+import { useNavigate } from "react-router-dom";
+
 // Icons
 import { FolderOpen, FolderPlus, UsersRound } from "lucide-react";
 
@@ -17,6 +23,15 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 
+// Tauri
+import { getRecentWorkspaces } from "@/lib/tauri";
+
+// Context
+import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+
+// Types
+import type { WorkspaceInfo } from "@/types/workspace";
+
 // Assets
 import logo from "@/assets/logos/logo.svg";
 import logo_black from "@/assets/logos/logo-black.svg";
@@ -25,13 +40,39 @@ import logo_white from "@/assets/logos/logo-white.svg";
 const actionButtonClass =
 	"px-8 text-base cursor-pointer hover:scale-[1.02] hover:border-primary";
 
-const recentWorkspaces = [
-	{ name: "MSc Project", lastOpened: "2 hours ago" },
-	{ name: "Research Project", lastOpened: "4 hours ago" },
-];
-
 export default function Welcome() {
 	const { isDark } = useTheme();
+	const navigate = useNavigate();
+	const { loadWorkspace: loadWs } = useWorkspace();
+
+	const [recentWorkspaces, setRecentWorkspaces] = useState<WorkspaceInfo[]>(
+		[],
+	);
+	const [loading, setLoading] = useState(true);
+
+	useEffect(() => {
+		loadRecentWorkspaces();
+	}, []);
+
+	const loadRecentWorkspaces = async () => {
+		try {
+			const workspaces = await getRecentWorkspaces();
+			setRecentWorkspaces(workspaces);
+		} catch (err) {
+			console.error("Failed to load recent workspaces:", err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const handleOpenWorkspace = async (workspace: WorkspaceInfo) => {
+		try {
+			await loadWs(workspace.path);
+			navigate("/workspace");
+		} catch (err) {
+			console.error("Failed to open workspace:", err);
+		}
+	};
 
 	return (
 		<main className="flex min-h-screen flex-col p-8">
@@ -104,26 +145,38 @@ export default function Welcome() {
 							Recent Workspaces
 						</h2>
 
-						<div className="flex flex-wrap justify-center gap-6">
-							{recentWorkspaces.map(({ name, lastOpened }) => (
-								<Card
-									key={name}
-									className="w-80 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg"
-								>
-									<CardHeader>
-										<CardTitle>{name}</CardTitle>
+						{loading ?
+							<p className="text-sm text-muted-foreground">
+								Loading recent workspaces…
+							</p>
+						: recentWorkspaces.length === 0 ?
+							<p className="text-sm text-muted-foreground">
+								No recent workspaces. Create or import one to
+								get started.
+							</p>
+						:	<div className="flex flex-wrap justify-center gap-6">
+								{recentWorkspaces.map((ws) => (
+									<Card
+										key={ws.id}
+										className="w-80 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg"
+										onClick={() => handleOpenWorkspace(ws)}
+									>
+										<CardHeader>
+											<CardTitle>{ws.name}</CardTitle>
 
-										<CardDescription>
-											Last opened {lastOpened}
-										</CardDescription>
+											<CardDescription>
+												{ws.description ||
+													"Local Workspace"}
+											</CardDescription>
 
-										<p className="pt-2 text-green-500">
-											● Synced
-										</p>
-									</CardHeader>
-								</Card>
-							))}
-						</div>
+											<p className="pt-2 text-green-500">
+												● Synced
+											</p>
+										</CardHeader>
+									</Card>
+								))}
+							</div>
+						}
 					</section>
 				</div>
 			</section>

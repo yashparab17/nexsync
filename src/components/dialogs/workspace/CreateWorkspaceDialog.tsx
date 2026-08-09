@@ -1,6 +1,9 @@
 // React
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+// React Router
+import { useNavigate } from "react-router-dom";
+
 // Icons
 import { Folder, FolderOpen, FolderPlus } from "lucide-react";
 
@@ -21,7 +24,10 @@ import {
 // Tauri
 import { open } from "@tauri-apps/plugin-dialog";
 import { documentDir } from "@tauri-apps/api/path";
-import { createWorkspace } from "@/lib/tauri";
+import { createWorkspace, addRecentWorkspace } from "@/lib/tauri";
+
+// Context
+import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
 interface CreateWorkspaceDialogProps {
 	children: ReactNode;
@@ -30,6 +36,9 @@ interface CreateWorkspaceDialogProps {
 export default function CreateWorkspaceDialog({
 	children,
 }: CreateWorkspaceDialogProps) {
+	const navigate = useNavigate();
+	const { loadWorkspace } = useWorkspace();
+
 	const [workspaceName, setWorkspaceName] = useState("");
 	const [description, setDescription] = useState("");
 	const [workspacePath, setWorkspacePath] = useState("");
@@ -72,13 +81,19 @@ export default function CreateWorkspaceDialog({
 		setError("");
 
 		try {
-			await createWorkspace({
+			const workspace = await createWorkspace({
 				name: workspaceName,
 				description,
 				path: workspacePath,
 			});
 
-			console.log("Workspace created!");
+			// Register in the app-level recent-workspaces list.
+			await addRecentWorkspace(workspace);
+
+			// Load full metadata into context, then navigate.
+			await loadWorkspace(workspace.path);
+
+			navigate("/workspace");
 		} catch (err) {
 			console.error(err);
 			setError(String(err));

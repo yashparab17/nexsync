@@ -93,8 +93,13 @@ function NavigationItem({ item }: { item: NavigationItem }) {
 }
 
 export default function WorkspaceSidebar() {
-	const { workspace } = useWorkspace();
+	const { workspace, clearWorkspace } = useWorkspace();
 	const navigate = useNavigate();
+
+	const handleBackToWelcome = () => {
+		clearWorkspace();
+		navigate("/");
+	};
 
 	return (
 		<aside className="flex h-full w-64 flex-col border-r bg-muted/20">
@@ -103,7 +108,7 @@ export default function WorkspaceSidebar() {
 				<Button
 					variant="ghost"
 					size="icon"
-					onPress={() => navigate("/")}
+					onPress={handleBackToWelcome}
 					aria-label="Back to welcome"
 				>
 					<ArrowLeft className="size-5" />

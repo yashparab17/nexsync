@@ -9,7 +9,31 @@ import WorkspaceSidebar from "@/components/layout/workspace/WorkspaceSidebar";
 import WorkspaceHeader from "@/components/layout/workspace/WorkspaceHeader";
 
 export default function Workspace() {
-	const { workspace } = useWorkspace();
+	const { workspace, isLoading, error, clearError } = useWorkspace();
+
+	if (isLoading) {
+		return (
+			<div className="flex h-screen items-center justify-center">
+				<p className="text-muted-foreground">Loading workspace…</p>
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<div className="flex h-screen items-center justify-center">
+				<div className="text-center">
+					<p className="text-destructive">{error}</p>
+					<button
+						className="mt-2 text-sm underline"
+						onClick={clearError}
+					>
+						Dismiss
+					</button>
+				</div>
+			</div>
+		);
+	}
 
 	if (!workspace) {
 		return null;

@@ -1,7 +1,8 @@
-// React / React Router
-import { ReactNode, useState } from "react";
+// React
+import { useState, type ReactNode } from "react";
+
+// React Router
 import { useNavigate } from "react-router-dom";
-import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
 // Icons
 import { FolderOpen, FolderUp } from "lucide-react";
@@ -22,7 +23,10 @@ import {
 
 // Tauri
 import { open } from "@tauri-apps/plugin-dialog";
-import { importWorkspace } from "@/lib/tauri";
+import { importWorkspace, addRecentWorkspace } from "@/lib/tauri";
+
+// Context
+import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
 interface ImportWorkspaceDialogProps {
 	children: ReactNode;
@@ -32,7 +36,8 @@ export default function ImportWorkspaceDialog({
 	children,
 }: ImportWorkspaceDialogProps) {
 	const navigate = useNavigate();
-	const { setWorkspace } = useWorkspace();
+	const { loadWorkspace } = useWorkspace();
+
 	const [workspacePath, setWorkspacePath] = useState("");
 	const [error, setError] = useState("");
 
@@ -60,9 +65,11 @@ export default function ImportWorkspaceDialog({
 		try {
 			const workspace = await importWorkspace(workspacePath);
 
-			console.log("Workspace imported:", workspace);
+			// Register in the app-level recent-workspaces list.
+			await addRecentWorkspace(workspace);
 
-			setWorkspace(workspace);
+			// Load full metadata into context, then navigate.
+			await loadWorkspace(workspace.path);
 
 			navigate("/workspace");
 		} catch (error) {

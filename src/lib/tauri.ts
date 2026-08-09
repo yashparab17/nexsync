@@ -5,20 +5,55 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-import type { WorkspaceInfo } from "@/types/workspace";
+import type {
+	WorkspaceInfo,
+	WorkspaceMetadata,
+	CreateWorkspaceRequest,
+	UpdateMetadataRequest,
+} from "@/types/workspace";
 
-export interface CreateWorkspaceRequest {
-	name: string;
-	description: string;
-	path: string;
-}
+// ────────────────────────────
+// Workspace creation / import
+// ────────────────────────────
 
 export function createWorkspace(
 	request: CreateWorkspaceRequest,
-): Promise<void> {
+): Promise<WorkspaceInfo> {
 	return invoke("create_workspace", { request });
 }
 
 export function importWorkspace(path: string): Promise<WorkspaceInfo> {
 	return invoke("import_workspace", { path });
+}
+
+// ────────────────────────────
+// Metadata read / write
+// ────────────────────────────
+
+export function readWorkspaceMetadata(
+	path: string,
+): Promise<WorkspaceMetadata> {
+	return invoke("read_workspace_metadata", { path });
+}
+
+export function writeWorkspaceMetadata(
+	request: UpdateMetadataRequest,
+): Promise<void> {
+	return invoke("write_workspace_metadata", { request });
+}
+
+// ────────────────────────────
+// Recent workspaces registry
+// ────────────────────────────
+
+export function getRecentWorkspaces(): Promise<WorkspaceInfo[]> {
+	return invoke("get_recent_workspaces");
+}
+
+export function addRecentWorkspace(workspace: WorkspaceInfo): Promise<void> {
+	return invoke("add_recent_workspace", { workspace });
+}
+
+export function removeRecentWorkspace(id: string): Promise<void> {
+	return invoke("remove_recent_workspace", { id });
 }
