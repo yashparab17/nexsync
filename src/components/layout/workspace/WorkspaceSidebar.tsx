@@ -96,8 +96,8 @@ export default function WorkspaceSidebar() {
 	const { workspace, clearWorkspace } = useWorkspace();
 	const navigate = useNavigate();
 
-	const handleBackToWelcome = () => {
-		clearWorkspace();
+	const handleBackToWelcome = async () => {
+		await clearWorkspace();
 		navigate("/");
 	};
 

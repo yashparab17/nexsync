@@ -153,6 +153,18 @@ fn registry_path(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, St
     Ok(app_data.join("nexsync").join("workspaces.json"))
 }
 
+/// Returns the path to the last-workspace file in the app-data directory.
+/// This is separate from the registry — it tracks only the single most
+/// recently opened workspace for session restoration.
+fn last_workspace_path(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let app_data = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
+
+    Ok(app_data.join("nexsync").join("last_workspace.json"))
+}
+
 /// Ensures the registry directory exists and returns the registry path.
 fn ensure_registry(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     let path = registry_path(app_handle)?;
@@ -330,6 +342,59 @@ pub fn get_recent_workspaces(app_handle: tauri::AppHandle) -> Result<Vec<Workspa
         serde_json::from_str(&json).map_err(|e| format!("Invalid workspaces registry: {e}"))?;
 
     Ok(workspaces)
+}
+
+/// Returns the most recently opened workspace from `last_workspace.json`.
+/// Returns `None` if the file doesn't exist or the workspace path is invalid.
+#[tauri::command]
+pub fn get_last_workspace(app_handle: tauri::AppHandle) -> Result<Option<WorkspaceInfo>, String> {
+    let path = last_workspace_path(&app_handle)?;
+
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let json = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+
+    let workspace: WorkspaceInfo =
+        serde_json::from_str(&json).map_err(|e| format!("Invalid last_workspace.json: {e}"))?;
+
+    // Verify the workspace directory still exists.
+    if !Path::new(&workspace.path).exists() {
+        return Ok(None);
+    }
+
+    Ok(Some(workspace))
+}
+
+/// Sets the most recently opened workspace in `last_workspace.json`.
+#[tauri::command]
+pub fn set_last_workspace(
+    app_handle: tauri::AppHandle,
+    workspace: WorkspaceInfo,
+) -> Result<(), String> {
+    let path = last_workspace_path(&app_handle)?;
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let json = serde_json::to_string_pretty(&workspace).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Clears the last-workspace file so the app opens to the Welcome page.
+#[tauri::command]
+pub fn clear_last_workspace(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let path = last_workspace_path(&app_handle)?;
+
+    if path.exists() {
+        fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
 }
 
 /// Adds or updates a workspace in the recent-workspaces registry.

@@ -12,6 +12,9 @@ pub fn run() {
             commands::workspace::read_workspace_metadata,
             commands::workspace::write_workspace_metadata,
             commands::workspace::get_recent_workspaces,
+            commands::workspace::get_last_workspace,
+            commands::workspace::set_last_workspace,
+            commands::workspace::clear_last_workspace,
             commands::workspace::add_recent_workspace,
             commands::workspace::remove_recent_workspace,
         ])

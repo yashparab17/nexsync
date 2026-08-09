@@ -57,3 +57,19 @@ export function addRecentWorkspace(workspace: WorkspaceInfo): Promise<void> {
 export function removeRecentWorkspace(id: string): Promise<void> {
 	return invoke("remove_recent_workspace", { id });
 }
+
+// ────────────────────────────
+// Last workspace (session restoration)
+// ────────────────────────────
+
+export function getLastWorkspace(): Promise<WorkspaceInfo | null> {
+	return invoke("get_last_workspace");
+}
+
+export function setLastWorkspace(workspace: WorkspaceInfo): Promise<void> {
+	return invoke("set_last_workspace", { workspace });
+}
+
+export function clearLastWorkspace(): Promise<void> {
+	return invoke("clear_last_workspace");
+}

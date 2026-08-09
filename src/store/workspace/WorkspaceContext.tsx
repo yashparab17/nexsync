@@ -4,6 +4,7 @@ import {
 	useContext,
 	useState,
 	useCallback,
+	useEffect,
 	type ReactNode,
 } from "react";
 
@@ -18,7 +19,13 @@ import type {
 } from "@/types/workspace";
 
 // Tauri
-import { readWorkspaceMetadata, writeWorkspaceMetadata } from "@/lib/tauri";
+import {
+	readWorkspaceMetadata,
+	writeWorkspaceMetadata,
+	addRecentWorkspace,
+	setLastWorkspace,
+	clearLastWorkspace,
+} from "@/lib/tauri";
 
 interface WorkspaceContextType {
 	// Core state
@@ -31,7 +38,7 @@ interface WorkspaceContextType {
 	setWorkspace: (workspace: WorkspaceInfo) => void;
 	loadWorkspace: (path: string) => Promise<void>;
 	saveWorkspace: () => Promise<void>;
-	clearWorkspace: () => void;
+	clearWorkspace: () => Promise<void>;
 
 	// Metadata updaters (mutate local state; call saveWorkspace to persist)
 	updateSettings: (settings: Partial<Settings>) => void;
@@ -61,8 +68,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
 		try {
 			const meta = await readWorkspaceMetadata(path);
+
+			// Update last_opened timestamp on load.
+			meta.history.last_opened = new Date().toISOString();
+
 			setMetadata(meta);
 			setWorkspace(meta.workspace);
+
+			// Update the app-level registries:
+			// 1. Add to recent workspaces list (for the Welcome page)
+			// 2. Set as the last opened workspace (for session restoration)
+			await addRecentWorkspace(meta.workspace);
+			await setLastWorkspace(meta.workspace);
 		} catch (err) {
 			setError(String(err));
 			setMetadata(null);
@@ -92,12 +109,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		setWorkspace(ws);
 	}, []);
 
-	// ── Clear everything ──
-	const clearWorkspace = useCallback(() => {
+	// ── Clear everything (saves first, then clears last-workspace tracking) ──
+	const clearWorkspace = useCallback(async () => {
+		if (metadata) {
+			await saveWorkspace();
+		}
+		// Clear the last-workspace file so the app opens to Welcome
+		// on next startup instead of re-opening this workspace.
+		await clearLastWorkspace();
 		setWorkspace(null);
 		setMetadata(null);
 		setError(null);
-	}, []);
+	}, [metadata, saveWorkspace]);
 
 	// ── Metadata updaters ──
 	const updateSettings = useCallback((settings: Partial<Settings>) => {
@@ -153,6 +176,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 	}, []);
 
 	const clearError = useCallback(() => setError(null), []);
+
+	// ── Auto-save on window close ──
+	useEffect(() => {
+		const handleBeforeUnload = () => {
+			if (metadata) {
+				// Fire-and-forget: the browser/Tauri will wait for
+				// sendBeacon or the page will be unloaded anyway.
+				saveWorkspace();
+			}
+		};
+
+		window.addEventListener("beforeunload", handleBeforeUnload);
+		return () =>
+			window.removeEventListener("beforeunload", handleBeforeUnload);
+	}, [metadata, saveWorkspace]);
 
 	return (
 		<WorkspaceContext.Provider

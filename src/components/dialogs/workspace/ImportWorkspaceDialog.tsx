@@ -23,7 +23,7 @@ import {
 
 // Tauri
 import { open } from "@tauri-apps/plugin-dialog";
-import { importWorkspace, addRecentWorkspace } from "@/lib/tauri";
+import { importWorkspace } from "@/lib/tauri";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -65,10 +65,10 @@ export default function ImportWorkspaceDialog({
 		try {
 			const workspace = await importWorkspace(workspacePath);
 
-			// Register in the app-level recent-workspaces list.
-			await addRecentWorkspace(workspace);
-
-			// Load full metadata into context, then navigate.
+			// loadWorkspace handles:
+			// - Loading full metadata into context
+			// - Adding to recent workspaces registry
+			// - Setting as last workspace for session restoration
 			await loadWorkspace(workspace.path);
 
 			navigate("/workspace");
