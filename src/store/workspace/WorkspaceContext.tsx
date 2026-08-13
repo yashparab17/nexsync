@@ -12,16 +12,19 @@ import {
 import type {
 	WorkspaceInfo,
 	WorkspaceMetadata,
+	WorkspaceStats,
 	Settings,
 	Members,
 	Permissions,
 	History,
+	ActivityEvent,
 } from "@/types/workspace";
 
 // Tauri
 import {
 	readWorkspaceMetadata,
 	writeWorkspaceMetadata,
+	getWorkspaceStats,
 	addRecentWorkspace,
 	setLastWorkspace,
 	clearLastWorkspace,
@@ -31,6 +34,7 @@ interface WorkspaceContextType {
 	// Core state
 	workspace: WorkspaceInfo | null;
 	metadata: WorkspaceMetadata | null;
+	stats: WorkspaceStats | null;
 	isLoading: boolean;
 	error: string | null;
 
@@ -39,11 +43,17 @@ interface WorkspaceContextType {
 	loadWorkspace: (path: string) => Promise<void>;
 	saveWorkspace: () => Promise<void>;
 	clearWorkspace: () => Promise<void>;
+	refreshStats: () => Promise<void>;
 
 	// Metadata updaters (mutate local state; call saveWorkspace to persist)
 	updateSettings: (settings: Partial<Settings>) => void;
 	updateMembers: (members: Members) => void;
-	addActivityEvent: (action: string, detail: string) => void;
+	addActivityEvent: (
+		action: string,
+		detail: string,
+		target?: string,
+		targetType?: string,
+	) => void;
 	updatePermissions: (permissions: Permissions) => void;
 	updateHistory: (history: Partial<History>) => void;
 
@@ -58,6 +68,7 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
 	const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
 	const [metadata, setMetadata] = useState<WorkspaceMetadata | null>(null);
+	const [stats, setStats] = useState<WorkspaceStats | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -67,12 +78,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		setError(null);
 
 		try {
-			const meta = await readWorkspaceMetadata(path);
+			const [meta, nextStats] = await Promise.all([
+				readWorkspaceMetadata(path),
+				getWorkspaceStats(path),
+			]);
 
 			// Update last_opened timestamp on load.
 			meta.history.last_opened = new Date().toISOString();
 
 			setMetadata(meta);
+			setStats(nextStats);
 			setWorkspace(meta.workspace);
 
 			// Update the app-level registries:
@@ -83,6 +98,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			setError(String(err));
 			setMetadata(null);
+			setStats(null);
 			setWorkspace(null);
 		} finally {
 			setIsLoading(false);
@@ -109,6 +125,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		setWorkspace(ws);
 	}, []);
 
+	// ── Refresh the dashboard stats from disk ──
+	const refreshStats = useCallback(async () => {
+		if (!workspace) return;
+
+		try {
+			const nextStats = await getWorkspaceStats(workspace.path);
+			setStats(nextStats);
+		} catch (err) {
+			setError(String(err));
+		}
+	}, [workspace]);
+
 	// ── Clear everything (saves first, then clears last-workspace tracking) ──
 	const clearWorkspace = useCallback(async () => {
 		if (metadata) {
@@ -119,6 +147,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		await clearLastWorkspace();
 		setWorkspace(null);
 		setMetadata(null);
+		setStats(null);
 		setError(null);
 	}, [metadata, saveWorkspace]);
 
@@ -140,23 +169,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
-	const addActivityEvent = useCallback((action: string, detail: string) => {
-		setMetadata((prev) => {
-			if (!prev) return prev;
-			const event = {
-				id: crypto.randomUUID(),
-				timestamp: new Date().toISOString(),
-				action,
-				detail,
-			};
-			return {
-				...prev,
-				activity: {
-					events: [event, ...prev.activity.events],
-				},
-			};
-		});
-	}, []);
+	const addActivityEvent = useCallback(
+		(
+			action: string,
+			detail: string,
+			target?: string,
+			targetType?: string,
+		) => {
+			setMetadata((prev) => {
+				if (!prev) return prev;
+				const event: ActivityEvent = {
+					id: crypto.randomUUID(),
+					timestamp: new Date().toISOString(),
+					action,
+					detail,
+					...(target !== undefined && { target }),
+					...(targetType !== undefined && {
+						target_type: targetType,
+					}),
+				};
+				return {
+					...prev,
+					activity: {
+						events: [event, ...prev.activity.events],
+					},
+				};
+			});
+		},
+		[],
+	);
 
 	const updatePermissions = useCallback((permissions: Permissions) => {
 		setMetadata((prev) => {
@@ -197,12 +238,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 			value={{
 				workspace,
 				metadata,
+				stats,
 				isLoading,
 				error,
 				setWorkspace: handleSetWorkspace,
 				loadWorkspace,
 				saveWorkspace,
 				clearWorkspace,
+				refreshStats,
 				updateSettings,
 				updateMembers,
 				addActivityEvent,

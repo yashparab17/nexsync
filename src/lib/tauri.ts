@@ -8,6 +8,8 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
 	WorkspaceInfo,
 	WorkspaceMetadata,
+	WorkspaceFile,
+	WorkspaceStats,
 	CreateWorkspaceRequest,
 	UpdateMetadataRequest,
 } from "@/types/workspace";
@@ -40,6 +42,48 @@ export function writeWorkspaceMetadata(
 	request: UpdateMetadataRequest,
 ): Promise<void> {
 	return invoke("write_workspace_metadata", { request });
+}
+
+// ────────────────────────────
+// Feature-scoped JSON (per-feature state files)
+// ────────────────────────────
+
+/**
+ * Reads a single feature-scoped JSON file from `<workspace>/.nexsync/<name>.json`.
+ * Returns `null` if the file does not exist. Use this for feature state that
+ * should persist independently of the core metadata blob (e.g. tasks, kanban).
+ */
+export async function readWorkspaceJson<T>(
+	path: string,
+	name: string,
+): Promise<T | null> {
+	return (await invoke("read_workspace_json", { path, name })) as T | null;
+}
+
+/**
+ * Writes a single feature-scoped JSON file to `<workspace>/.nexsync/<name>.json`.
+ */
+export function writeWorkspaceJson(
+	path: string,
+	name: string,
+	data: unknown,
+): Promise<void> {
+	return invoke("write_workspace_json", { path, name, data });
+}
+
+// ────────────────────────────
+// Filesystem / dashboard
+// ────────────────────────────
+
+export function listWorkspaceFiles(
+	path: string,
+	subdir: string,
+): Promise<WorkspaceFile[]> {
+	return invoke("list_workspace_files", { path, subdir });
+}
+
+export function getWorkspaceStats(path: string): Promise<WorkspaceStats> {
+	return invoke("get_workspace_stats", { path });
 }
 
 // ────────────────────────────

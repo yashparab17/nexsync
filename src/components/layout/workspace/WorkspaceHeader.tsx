@@ -1,3 +1,6 @@
+// React Router
+import { useNavigate } from "react-router-dom";
+
 // Icons
 import { Search, Settings } from "lucide-react";
 
@@ -6,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function WorkspaceHeader() {
+	const navigate = useNavigate();
+
 	return (
 		<header className="relative flex h-16 shrink-0 items-center border-b px-6">
 			{/* Search */}
@@ -24,7 +29,12 @@ export default function WorkspaceHeader() {
 
 			{/* Right Actions */}
 			<div className="ml-auto">
-				<Button variant="ghost" size="icon">
+				<Button
+					variant="ghost"
+					size="icon"
+					onPress={() => navigate("/workspace/settings")}
+					aria-label="Open workspace settings"
+				>
 					<Settings className="size-5" />
 				</Button>
 			</div>

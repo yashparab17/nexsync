@@ -45,6 +45,10 @@ export interface ActivityEvent {
 	timestamp: string;
 	action: string;
 	detail: string;
+	/** Optional workspace-relative path for deep-linking (e.g. `/files/notes/a.md`). */
+	target?: string;
+	/** Optional entity type for the target (e.g. `file`, `task`, `note`). */
+	target_type?: string;
 }
 
 export interface Activity {
@@ -60,6 +64,29 @@ export interface Permissions {
 export interface History {
 	last_opened: string;
 	recent_files: string[];
+}
+
+// ────────────────────────────
+// Filesystem / dashboard types
+// ────────────────────────────
+
+/** A single file or folder entry inside a workspace content subdirectory. */
+export interface WorkspaceFile {
+	name: string;
+	/** Workspace-relative path, e.g. `/files/notes/a.md`. */
+	path: string;
+	is_dir: boolean;
+	size: number;
+	modified_at: string;
+}
+
+/** Aggregate statistics shown on the workspace Dashboard. */
+export interface WorkspaceStats {
+	files: number;
+	assets: number;
+	tasks: number;
+	kanban_cards: number;
+	members: number;
 }
 
 // ────────────────────────────

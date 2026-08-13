@@ -70,6 +70,12 @@ pub struct ActivityEvent {
     pub timestamp: String,
     pub action: String,
     pub detail: String,
+    /// Optional workspace-relative path for deep-linking (e.g. `/files/notes/a.md`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+    /// Optional entity type for the target (e.g. `file`, `task`, `note`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_type: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -83,6 +89,30 @@ pub struct Permissions {
 pub struct History {
     pub last_opened: String,
     pub recent_files: Vec<String>,
+}
+
+// ────────────────────────────
+// Dashboard / filesystem structs
+// ────────────────────────────
+
+/// A single entry (file or folder) inside a workspace subdirectory.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct WorkspaceFile {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub size: u64,
+    pub modified_at: String,
+}
+
+/// Aggregate statistics for the Dashboard stat cards.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct WorkspaceStats {
+    pub files: usize,
+    pub assets: usize,
+    pub tasks: usize,
+    pub kanban_cards: usize,
+    pub members: usize,
 }
 
 // ────────────────────────────
@@ -143,6 +173,20 @@ fn read_metadata_json<T: for<'de> Deserialize<'de>>(
     Ok(Some(value))
 }
 
+/// Validates a metadata file name to prevent path traversal. Only allows
+/// alphanumeric characters, dashes, and underscores — no separators or dots.
+fn validate_metadata_name(name: &str) -> Result<(), String> {
+    if name.is_empty()
+        || name.len() > 64
+        || !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(format!("Invalid metadata file name: {name}"));
+    }
+    Ok(())
+}
+
 /// Returns the path to the workspace registry file in the app-data directory.
 fn registry_path(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     let app_data = app_handle
@@ -174,6 +218,20 @@ fn ensure_registry(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, 
     }
 
     Ok(path)
+}
+
+/// Validates that `subdir` is one of the known workspace content folders.
+/// This prevents path traversal (no separators, dots, or absolute paths).
+fn validate_subdir(subdir: &str) -> Result<(), String> {
+    const ALLOWED: &[&str] = &[
+        "notes", "files", "assets", "tasks", "kanban", "editor",
+    ];
+
+    if ALLOWED.contains(&subdir) {
+        Ok(())
+    } else {
+        Err(format!("Invalid workspace subdirectory: {subdir}"))
+    }
 }
 
 // ────────────────────────────
@@ -325,6 +383,147 @@ pub fn write_workspace_metadata(request: UpdateMetadataRequest) -> Result<(), St
     write_metadata_json(workspace_path, "history", &request.metadata.history)?;
 
     Ok(())
+}
+
+/// Reads a single feature-scoped JSON file from `<workspace>/.nexsync/<name>.json`.
+/// Returns `null` if the file does not exist. The `name` is validated to
+/// prevent path traversal. This lets individual features (tasks, kanban,
+/// files, etc.) persist their own state without rewriting the whole metadata
+/// blob.
+#[tauri::command]
+pub fn read_workspace_json(path: String, name: String) -> Result<Option<serde_json::Value>, String> {
+    validate_metadata_name(&name)?;
+
+    let workspace_path = Path::new(&path);
+
+    if !workspace_path.exists() {
+        return Err("The workspace path does not exist.".to_string());
+    }
+
+    read_metadata_json(workspace_path, &name)
+}
+
+/// Writes a single feature-scoped JSON file to `<workspace>/.nexsync/<name>.json`.
+/// The `name` is validated to prevent path traversal.
+#[tauri::command]
+pub fn write_workspace_json(
+    path: String,
+    name: String,
+    data: serde_json::Value,
+) -> Result<(), String> {
+    validate_metadata_name(&name)?;
+
+    let workspace_path = Path::new(&path);
+
+    fs::create_dir_all(workspace_path.join(".nexsync")).map_err(|e| e.to_string())?;
+
+    write_metadata_json(workspace_path, &name, &data)
+}
+
+/// Lists files and folders inside a workspace content subdirectory
+/// (e.g. `notes`, `files`, `assets`, `tasks`, `kanban`). Returns them as
+/// flat, non-recursive entries for the current level. The `subdir` is
+/// validated to prevent path traversal.
+#[tauri::command]
+pub fn list_workspace_files(path: String, subdir: String) -> Result<Vec<WorkspaceFile>, String> {
+    validate_subdir(&subdir)?;
+
+    let dir = Path::new(&path).join(&subdir);
+
+    if !dir.exists() {
+        return Ok(vec![]);
+    }
+
+    let entries = fs::read_dir(&dir).map_err(|e| format!("Failed to list {subdir}: {e}"))?;
+
+    let mut files = vec![];
+
+    for entry in entries {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let file_name = entry.file_name().to_string_lossy().to_string();
+        let metadata = entry
+            .metadata()
+            .map_err(|e| format!("Failed to read metadata for {file_name}: {e}"))?;
+
+        let modified_at = metadata
+            .modified()
+            .ok()
+            .map(|t| {
+                let dt: chrono::DateTime<Utc> = t.into();
+                dt.to_rfc3339()
+            })
+            .unwrap_or_default();
+
+        files.push(WorkspaceFile {
+            name: file_name.clone(),
+            path: format!("/{subdir}/{file_name}"),
+            is_dir: metadata.is_dir(),
+            size: metadata.len(),
+            modified_at,
+        });
+    }
+
+    // Folders first, then files — each sorted alphabetically.
+    files.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name)));
+
+    Ok(files)
+}
+
+/// Computes aggregate statistics for the Dashboard. Counts files/assets by
+/// scanning the workspace content folders, and reads task/kanban/member
+/// counts from the feature-scoped metadata files when present.
+#[tauri::command]
+pub fn get_workspace_stats(path: String) -> Result<WorkspaceStats, String> {
+    let workspace_path = Path::new(&path);
+
+    if !workspace_path.exists() {
+        return Err("The workspace path does not exist.".to_string());
+    }
+
+    let count_entries = |subdir: &str| -> usize {
+        let dir = workspace_path.join(subdir);
+        match fs::read_dir(&dir) {
+            Ok(entries) => entries.filter_map(Result::ok).filter(|e| e.path().is_file()).count(),
+            Err(_) => 0,
+        }
+    };
+
+    // Task / kanban card counts from feature-scoped JSON.
+    let tasks_json: Option<serde_json::Value> =
+        read_metadata_json(workspace_path, "tasks").unwrap_or(None);
+    let task_count = tasks_json
+        .as_ref()
+        .and_then(|v| v.get("tasks"))
+        .and_then(|v| v.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+
+    let kanban_json: Option<serde_json::Value> =
+        read_metadata_json(workspace_path, "kanban").unwrap_or(None);
+    let kanban_count = kanban_json
+        .as_ref()
+        .and_then(|v| v.get("columns"))
+        .and_then(|v| v.as_array())
+        .map(|cols| {
+            cols.iter()
+                .filter_map(|c| c.get("cards"))
+                .filter_map(|c| c.as_array())
+                .map(|a| a.len())
+                .sum()
+        })
+        .unwrap_or(0);
+
+    let members_json: Option<Members> =
+        read_metadata_json(workspace_path, "members").unwrap_or(None);
+    let member_count = members_json.map(|m| m.members.len()).unwrap_or(0);
+
+    Ok(WorkspaceStats {
+        files: count_entries("files") + count_entries("notes") + count_entries("editor"),
+        assets: count_entries("assets"),
+        tasks: task_count,
+        kanban_cards: kanban_count,
+        members: member_count,
+    })
 }
 
 /// Returns the list of recently opened workspaces from the app-level registry.

@@ -37,23 +37,29 @@ import logo from "@/assets/logos/logo.svg";
 import logo_black from "@/assets/logos/logo-black.svg";
 import logo_white from "@/assets/logos/logo-white.svg";
 
-const actionButtonClass =
-	"px-8 text-base cursor-pointer hover:scale-[1.02] hover:border-primary";
-
 export default function Welcome() {
+	// Hooks
 	const { isDark } = useTheme();
 	const navigate = useNavigate();
+
+	// Workspace
 	const { loadWorkspace: loadWs } = useWorkspace();
 
+	// States
 	const [recentWorkspaces, setRecentWorkspaces] = useState<WorkspaceInfo[]>(
 		[],
 	);
 	const [loading, setLoading] = useState(true);
 
+	// Styles
+	const actionButtonClass =
+		"px-8 text-base cursor-pointer hover:scale-[1.02] hover:border-primary";
+
 	useEffect(() => {
 		loadRecentWorkspaces();
 	}, []);
 
+	// Handlers
 	const loadRecentWorkspaces = async () => {
 		try {
 			const workspaces = await getRecentWorkspaces();
@@ -74,6 +80,7 @@ export default function Welcome() {
 		}
 	};
 
+	// Render
 	return (
 		<main className="flex min-h-screen flex-col p-8">
 			{/* Header */}
