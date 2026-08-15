@@ -10,6 +10,9 @@ import { getLastWorkspace } from "@/lib/tauri";
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
+// Hooks
+import { useErrorLog } from "@/hooks/useErrorLog";
+
 /**
  * On app startup, checks whether a workspace was previously open.
  * If one is found (and its directory still exists on disk), it is loaded
@@ -26,6 +29,7 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
  */
 export default function WorkspaceLoader({ children }: { children: ReactNode }) {
 	const { loadWorkspace, workspace } = useWorkspace();
+	const logError = useErrorLog();
 	const [ready, setReady] = useState(false);
 	const hasRestored = useRef(false);
 
@@ -39,7 +43,7 @@ export default function WorkspaceLoader({ children }: { children: ReactNode }) {
 				const last = await getLastWorkspace();
 
 				if (last && !workspace) {
-					await loadWorkspace(last.path);
+					await loadWorkspace(last);
 					router.navigate("/workspace", { replace: true });
 				}
 			} catch (err) {
@@ -47,13 +51,14 @@ export default function WorkspaceLoader({ children }: { children: ReactNode }) {
 				// or the registry doesn't exist, just fall through to the
 				// Welcome page.
 				console.error("Failed to restore last workspace:", err);
+				logError(err, { source: "startup" });
 			} finally {
 				setReady(true);
 			}
 		};
 
 		checkLastWorkspace();
-	}, [loadWorkspace, workspace]);
+	}, [loadWorkspace, workspace, logError]);
 
 	if (!ready) {
 		return (

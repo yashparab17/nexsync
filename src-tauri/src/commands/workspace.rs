@@ -116,6 +116,33 @@ pub struct WorkspaceStats {
 }
 
 // ────────────────────────────
+// Error logging
+// ────────────────────────────
+
+/// A single entry in the app-level error log (`errors.jsonl`).
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ErrorRecord {
+    pub timestamp: String,
+    pub message: String,
+    pub source: String,
+    // Workspace path if the error is tied to one (optional for future use).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+/// Returns the path to the app-level error log in the app-data directory.
+fn error_log_path(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let app_data = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
+
+    Ok(app_data.join("nexsync").join("errors.jsonl"))
+}
+
+// ────────────────────────────
 // Request structs
 // ────────────────────────────
 
@@ -234,9 +261,44 @@ fn validate_subdir(subdir: &str) -> Result<(), String> {
     }
 }
 
+/// Returns `true` if `path` points to a valid Nexsync workspace directory —
+/// i.e. the folder exists and contains its `.nexsync/workspace.json` metadata
+/// file. Used to prune stale entries from the recent-workspaces registry.
+fn is_valid_workspace(path: &str) -> bool {
+    let dir = Path::new(path);
+    dir.is_dir() && dir.join(".nexsync").join("workspace.json").exists()
+}
+
 // ────────────────────────────
 // Tauri commands
 // ────────────────────────────
+
+/// Appends a single error record to the app-level error log.
+/// The log is JSONL — one compact JSON object per line — so writes are
+/// cheap appends and the file stays human-readable.
+#[tauri::command]
+pub fn log_error(app_handle: tauri::AppHandle, entry: ErrorRecord) -> Result<(), String> {
+    let path = error_log_path(&app_handle)?;
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let mut line = serde_json::to_string(&entry).map_err(|e| e.to_string())?;
+    line.push('\n');
+
+    // Append-only — use OpenOptions so we never clobber existing entries.
+    use std::io::Write;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| e.to_string())?;
+    file.write_all(line.as_bytes())
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
 
 /// Creates a new workspace on disk with all default metadata files.
 #[tauri::command]
@@ -527,6 +589,10 @@ pub fn get_workspace_stats(path: String) -> Result<WorkspaceStats, String> {
 }
 
 /// Returns the list of recently opened workspaces from the app-level registry.
+///
+/// Stale entries whose directory no longer exists (or is no longer a valid
+/// Nexsync workspace) are pruned, and the cleaned list is persisted back to
+/// the registry so it self-heals on every load.
 #[tauri::command]
 pub fn get_recent_workspaces(app_handle: tauri::AppHandle) -> Result<Vec<WorkspaceInfo>, String> {
     let registry = ensure_registry(&app_handle)?;
@@ -537,8 +603,18 @@ pub fn get_recent_workspaces(app_handle: tauri::AppHandle) -> Result<Vec<Workspa
 
     let json = fs::read_to_string(&registry).map_err(|e| e.to_string())?;
 
-    let workspaces: Vec<WorkspaceInfo> =
+    let mut workspaces: Vec<WorkspaceInfo> =
         serde_json::from_str(&json).map_err(|e| format!("Invalid workspaces registry: {e}"))?;
+
+    // Prune entries pointing to deleted/invalid workspace directories.
+    let before = workspaces.len();
+    workspaces.retain(|w| is_valid_workspace(&w.path));
+
+    // Persist the cleaned list only if something was removed.
+    if workspaces.len() != before {
+        let cleaned = serde_json::to_string_pretty(&workspaces).map_err(|e| e.to_string())?;
+        fs::write(&registry, cleaned).map_err(|e| e.to_string())?;
+    }
 
     Ok(workspaces)
 }

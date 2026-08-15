@@ -90,6 +90,23 @@ export interface WorkspaceStats {
 }
 
 // ────────────────────────────
+// Error log
+// ────────────────────────────
+
+/** A single entry appended to the app-level error log (`errors.jsonl`). */
+export interface ErrorRecord {
+	timestamp: string;
+	/** Short, human-readable summary of what failed. */
+	message: string;
+	/** Categorizes where the error originated (e.g. `workspace_load`). */
+	source: string;
+	/** Workspace path if the error is tied to one (optional for future use). */
+	workspace?: string;
+	/** Optional structured detail (e.g. a stack trace). */
+	detail?: string;
+}
+
+// ────────────────────────────
 // Request types
 // ────────────────────────────
 

@@ -10,9 +10,22 @@ import type {
 	WorkspaceMetadata,
 	WorkspaceFile,
 	WorkspaceStats,
+	ErrorRecord,
 	CreateWorkspaceRequest,
 	UpdateMetadataRequest,
 } from "@/types/workspace";
+
+// ────────────────────────────
+// Error logging
+// ────────────────────────────
+
+/**
+ * Appends an entry to the app-level error log (`errors.jsonl`).
+ * Fire-and-forget: callers should never block the UI on this.
+ */
+export function logError(entry: ErrorRecord): Promise<void> {
+	return invoke("log_error", { entry });
+}
 
 // ────────────────────────────
 // Workspace creation / import

@@ -9,6 +9,7 @@ import { FolderOpen, FolderPlus, UsersRound } from "lucide-react";
 
 // Hooks
 import { useTheme } from "@/hooks/useTheme";
+import { useErrorLog } from "@/hooks/useErrorLog";
 
 // Components
 import CreateWorkspaceDialog from "@/components/dialogs/workspace/CreateWorkspaceDialog";
@@ -44,6 +45,7 @@ export default function Welcome() {
 
 	// Workspace
 	const { loadWorkspace: loadWs } = useWorkspace();
+	const logError = useErrorLog();
 
 	// States
 	const [recentWorkspaces, setRecentWorkspaces] = useState<WorkspaceInfo[]>(
@@ -66,6 +68,7 @@ export default function Welcome() {
 			setRecentWorkspaces(workspaces);
 		} catch (err) {
 			console.error("Failed to load recent workspaces:", err);
+			logError(err, { source: "recent_load" });
 		} finally {
 			setLoading(false);
 		}
@@ -73,10 +76,15 @@ export default function Welcome() {
 
 	const handleOpenWorkspace = async (workspace: WorkspaceInfo) => {
 		try {
-			await loadWs(workspace.path);
+			await loadWs(workspace);
 			navigate("/workspace");
 		} catch (err) {
+			// The load failed (e.g. the folder was deleted). loadWorkspace
+			// already set the error + failedWorkspace state, so the global
+			// ErrorDialog will surface it. Stay on Welcome and refresh the
+			// recent list — get_recent_workspaces prunes invalid entries.
 			console.error("Failed to open workspace:", err);
+			loadRecentWorkspaces();
 		}
 	};
 

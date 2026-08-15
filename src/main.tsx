@@ -8,13 +8,16 @@ import { router } from "./routes/router";
 import { WorkspaceProvider } from "./store/workspace/WorkspaceContext";
 import { ThemeProvider } from "./store/ThemeContext";
 import WorkspaceLoader from "./components/WorkspaceLoader";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
 	<React.StrictMode>
 		<ThemeProvider>
 			<WorkspaceProvider>
 				<WorkspaceLoader>
-					<RouterProvider router={router} />
+					<ErrorBoundary>
+						<RouterProvider router={router} />
+					</ErrorBoundary>
 				</WorkspaceLoader>
 			</WorkspaceProvider>
 		</ThemeProvider>

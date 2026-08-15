@@ -9,7 +9,7 @@ import WorkspaceSidebar from "@/components/layout/workspace/WorkspaceSidebar";
 import WorkspaceHeader from "@/components/layout/workspace/WorkspaceHeader";
 
 export default function Workspace() {
-	const { workspace, isLoading, error, clearError } = useWorkspace();
+	const { workspace, isLoading } = useWorkspace();
 
 	if (isLoading) {
 		return (
@@ -19,22 +19,7 @@ export default function Workspace() {
 		);
 	}
 
-	if (error) {
-		return (
-			<div className="flex h-screen items-center justify-center">
-				<div className="text-center">
-					<p className="text-destructive">{error}</p>
-					<button
-						className="mt-2 text-sm underline"
-						onClick={clearError}
-					>
-						Dismiss
-					</button>
-				</div>
-			</div>
-		);
-	}
-
+	// Errors are surfaced by the global <ErrorDialog /> in App.tsx.
 	if (!workspace) {
 		return null;
 	}

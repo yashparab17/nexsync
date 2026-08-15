@@ -91,7 +91,7 @@ export default function CreateWorkspaceDialog({
 			// - Loading full metadata into context
 			// - Adding to recent workspaces registry
 			// - Setting as last workspace for session restoration
-			await loadWorkspace(workspace.path);
+			await loadWorkspace(workspace);
 
 			navigate("/workspace");
 		} catch (err) {

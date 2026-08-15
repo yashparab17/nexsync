@@ -30,6 +30,9 @@ import {
 	clearLastWorkspace,
 } from "@/lib/tauri";
 
+// Hooks
+import { useErrorLog } from "@/hooks/useErrorLog";
+
 interface WorkspaceContextType {
 	// Core state
 	workspace: WorkspaceInfo | null;
@@ -37,10 +40,12 @@ interface WorkspaceContextType {
 	stats: WorkspaceStats | null;
 	isLoading: boolean;
 	error: string | null;
+	/** The workspace that failed to load, if any (used by the error dialog). */
+	failedWorkspace: WorkspaceInfo | null;
 
 	// Actions
 	setWorkspace: (workspace: WorkspaceInfo) => void;
-	loadWorkspace: (path: string) => Promise<void>;
+	loadWorkspace: (workspace: WorkspaceInfo) => Promise<void>;
 	saveWorkspace: () => Promise<void>;
 	clearWorkspace: () => Promise<void>;
 	refreshStats: () => Promise<void>;
@@ -67,45 +72,60 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
 	const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
+	const logError = useErrorLog();
 	const [metadata, setMetadata] = useState<WorkspaceMetadata | null>(null);
 	const [stats, setStats] = useState<WorkspaceStats | null>(null);
+	const [failedWorkspace, setFailedWorkspace] =
+		useState<WorkspaceInfo | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	// ── Load full workspace metadata from disk ──
-	const loadWorkspace = useCallback(async (path: string) => {
-		setIsLoading(true);
-		setError(null);
+	// Takes the full WorkspaceInfo (not just a path) so that, on failure, the
+	// caller's workspace identity is preserved for the error dialog's friendly
+	// message. Errors are re-thrown so callers know the load failed and can
+	// avoid navigating into a broken workspace.
+	const loadWorkspace = useCallback(
+		async (ws: WorkspaceInfo) => {
+			setIsLoading(true);
+			setError(null);
+			setFailedWorkspace(null);
 
-		try {
-			const [meta, nextStats] = await Promise.all([
-				readWorkspaceMetadata(path),
-				getWorkspaceStats(path),
-			]);
+			try {
+				const [meta, nextStats] = await Promise.all([
+					readWorkspaceMetadata(ws.path),
+					getWorkspaceStats(ws.path),
+				]);
 
-			// Update last_opened timestamp on load.
-			meta.history.last_opened = new Date().toISOString();
+				// Update last_opened timestamp on load.
+				meta.history.last_opened = new Date().toISOString();
 
-			setMetadata(meta);
-			setStats(nextStats);
-			setWorkspace(meta.workspace);
+				setMetadata(meta);
+				setStats(nextStats);
+				setWorkspace(meta.workspace);
 
-			// Update the app-level registries:
-			// 1. Add to recent workspaces list (for the Welcome page)
-			// 2. Set as the last opened workspace (for session restoration)
-			await addRecentWorkspace(meta.workspace);
-			await setLastWorkspace(meta.workspace);
-		} catch (err) {
-			setError(String(err));
-			setMetadata(null);
-			setStats(null);
-			setWorkspace(null);
-		} finally {
-			setIsLoading(false);
-		}
-	}, []);
+				// Update the app-level registries:
+				// 1. Add to recent workspaces list (for the Welcome page)
+				// 2. Set as the last opened workspace (for session restoration)
+				await addRecentWorkspace(meta.workspace);
+				await setLastWorkspace(meta.workspace);
+			} catch (err) {
+				setError(String(err));
+				setFailedWorkspace(ws);
+				setMetadata(null);
+				setStats(null);
+				setWorkspace(null);
+				logError(err, { source: "workspace_load", workspace: ws.path });
+				// Re-throw so callers can react (e.g. skip navigation).
+				throw err;
+			} finally {
+				setIsLoading(false);
+			}
+		},
+		[logError],
+	);
 
-	// ── Persist all metadata to disk ──
+	// ── Save all metadata to disk ──
 	const saveWorkspace = useCallback(async () => {
 		if (!metadata) return;
 
@@ -117,8 +137,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 			setError(null);
 		} catch (err) {
 			setError(String(err));
+			logError(err, {
+				source: "workspace_save",
+				workspace: metadata.workspace.path,
+			});
 		}
-	}, [metadata]);
+	}, [metadata, logError]);
 
 	// ── Set workspace from an already-loaded WorkspaceInfo ──
 	const handleSetWorkspace = useCallback((ws: WorkspaceInfo) => {
@@ -134,8 +158,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 			setStats(nextStats);
 		} catch (err) {
 			setError(String(err));
+			logError(err, {
+				source: "workspace_stats",
+				workspace: workspace.path,
+			});
 		}
-	}, [workspace]);
+	}, [workspace, logError]);
 
 	// ── Clear everything (saves first, then clears last-workspace tracking) ──
 	const clearWorkspace = useCallback(async () => {
@@ -148,6 +176,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		setWorkspace(null);
 		setMetadata(null);
 		setStats(null);
+		setFailedWorkspace(null);
 		setError(null);
 	}, [metadata, saveWorkspace]);
 
@@ -216,7 +245,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
-	const clearError = useCallback(() => setError(null), []);
+	const clearError = useCallback(() => {
+		setError(null);
+		setFailedWorkspace(null);
+	}, []);
 
 	// ── Auto-save on window close ──
 	useEffect(() => {
@@ -241,6 +273,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 				stats,
 				isLoading,
 				error,
+				failedWorkspace,
 				setWorkspace: handleSetWorkspace,
 				loadWorkspace,
 				saveWorkspace,

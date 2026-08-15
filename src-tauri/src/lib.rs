@@ -15,6 +15,7 @@ pub fn run() {
             commands::workspace::write_workspace_json,
             commands::workspace::list_workspace_files,
             commands::workspace::get_workspace_stats,
+            commands::workspace::log_error,
             commands::workspace::get_recent_workspaces,
             commands::workspace::get_last_workspace,
             commands::workspace::set_last_workspace,

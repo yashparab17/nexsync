@@ -17,6 +17,9 @@ import {
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
+// Assets
+import logo from "@/assets/logos/logo.svg";
+
 // ─── helpers ─────────────────────────────────────────────
 
 /**
@@ -50,14 +53,9 @@ interface StatCardProps {
  * A clickable stat card that deep-links into the corresponding workspace
  * section (Files, Assets, Tasks, Members) so counts become shortcuts.
  */
-function StatCard({ label, value, to, icon }: StatCardProps) {
-	const navigate = useNavigate();
-
+function StatCard({ label, value, icon }: StatCardProps) {
 	return (
-		<Card
-			className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-primary"
-			onClick={() => navigate(to)}
-		>
+		<Card>
 			<CardContent className="flex items-center justify-between py-5">
 				<div>
 					<p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -78,7 +76,6 @@ export default function WorkspaceDashboard() {
 	const navigate = useNavigate();
 
 	const activity = metadata?.activity.events ?? [];
-	const recentFiles = metadata?.history.recent_files ?? [];
 
 	const quickActions = [
 		{
@@ -96,15 +93,13 @@ export default function WorkspaceDashboard() {
 			icon: Upload,
 			onClick: () => navigate("/workspace/assets"),
 		},
-		{
-			label: "Members",
-			icon: UsersRound,
-			onClick: () => navigate("/workspace/members"),
-		},
 	];
 
 	return (
 		<div className="space-y-6">
+			<div className="pointer-events-none absolute inset-0 flex items-center justify-center z-[-1]">
+				<img src={logo} className="h-150 w-150 opacity-10" alt="" />
+			</div>
 			{/* Header */}
 			<div>
 				<h1 className="text-2xl font-semibold">Dashboard</h1>
@@ -162,7 +157,7 @@ export default function WorkspaceDashboard() {
 				/>
 			</div>
 
-			<div className="grid gap-6 lg:grid-cols-2">
+			<div>
 				{/* Recent Activity */}
 				<Card>
 					<CardHeader>
@@ -193,37 +188,6 @@ export default function WorkspaceDashboard() {
 										</div>
 										<span className="shrink-0 text-xs text-muted-foreground">
 											{formatRelative(event.timestamp)}
-										</span>
-									</li>
-								))}
-							</ul>
-						}
-					</CardContent>
-				</Card>
-
-				{/* Recent Files */}
-				<Card>
-					<CardHeader>
-						<CardTitle>Recent Files</CardTitle>
-						<CardDescription>
-							Files you've opened recently.
-						</CardDescription>
-					</CardHeader>
-					<CardContent>
-						{recentFiles.length === 0 ?
-							<p className="text-sm text-muted-foreground">
-								No recent files. Open something from the Files
-								page.
-							</p>
-						:	<ul className="space-y-3">
-								{recentFiles.slice(0, 6).map((file) => (
-									<li
-										key={file}
-										className="flex items-center gap-3 text-sm"
-									>
-										<FilePlus className="size-4 shrink-0 text-primary/60" />
-										<span className="truncate font-medium">
-											{file.split("/").pop()}
 										</span>
 									</li>
 								))}
