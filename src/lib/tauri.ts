@@ -95,6 +95,68 @@ export function listWorkspaceFiles(
 	return invoke("list_workspace_files", { path, subdir });
 }
 
+/** Creates a new empty file. `relPath` is the parent directory (e.g. `files/docs`). */
+export function createWorkspaceFile(
+	path: string,
+	relPath: string,
+	name: string,
+): Promise<void> {
+	return invoke("create_workspace_item", {
+		path,
+		relPath,
+		name,
+		isDir: false,
+	});
+}
+
+/** Creates a new folder. `relPath` is the parent directory. */
+export function createWorkspaceFolder(
+	path: string,
+	relPath: string,
+	name: string,
+): Promise<void> {
+	return invoke("create_workspace_item", {
+		path,
+		relPath,
+		name,
+		isDir: true,
+	});
+}
+
+/** Reads the text contents of a workspace file. */
+export function readWorkspaceFile(
+	path: string,
+	relPath: string,
+): Promise<string> {
+	return invoke("read_workspace_file", { path, relPath });
+}
+
+/** Writes text contents to a workspace file. */
+export function writeWorkspaceFile(
+	path: string,
+	relPath: string,
+	content: string,
+): Promise<void> {
+	return invoke("write_workspace_file", { path, relPath, content });
+}
+
+/** Permanently deletes a workspace file or folder (folders are recursive). */
+export function deleteWorkspaceItem(
+	path: string,
+	relPath: string,
+): Promise<void> {
+	return invoke("delete_workspace_item", { path, relPath });
+}
+
+/** Renames a workspace file or folder. */
+export function renameWorkspaceItem(
+	path: string,
+	relPath: string,
+	newName: string,
+): Promise<void> {
+	return invoke("rename_workspace_item", { path, relPath, newName });
+}
+
 export function getWorkspaceStats(path: string): Promise<WorkspaceStats> {
 	return invoke("get_workspace_stats", { path });
 }

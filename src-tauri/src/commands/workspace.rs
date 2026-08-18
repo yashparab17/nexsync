@@ -247,18 +247,56 @@ fn ensure_registry(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, 
     Ok(path)
 }
 
-/// Validates that `subdir` is one of the known workspace content folders.
-/// This prevents path traversal (no separators, dots, or absolute paths).
-fn validate_subdir(subdir: &str) -> Result<(), String> {
-    const ALLOWED: &[&str] = &[
+/// Validates a workspace-relative path for safe filesystem access.
+/// The first segment must be a known content folder, and each remaining
+/// segment must be a valid folder/file name (no traversal, separators,
+/// or Windows drive-letter syntax).
+fn validate_workspace_rel_path(rel_path: &str) -> Result<(), String> {
+    const ALLOWED_ROOTS: &[&str] = &[
         "notes", "files", "assets", "tasks", "kanban", "editor",
     ];
 
-    if ALLOWED.contains(&subdir) {
-        Ok(())
-    } else {
-        Err(format!("Invalid workspace subdirectory: {subdir}"))
+    let rel_path = rel_path.trim_matches('/');
+
+    if rel_path.is_empty() {
+        return Err("The path cannot be empty.".into());
     }
+
+    let segments: Vec<&str> = rel_path.split('/').collect();
+
+    // The first segment must be a known content root.
+    if !ALLOWED_ROOTS.contains(&segments[0]) {
+        return Err(format!("Invalid workspace path: {rel_path}"));
+    }
+
+    // Every segment (including the root) must be a clean name.
+    for segment in &segments {
+        if segment.is_empty()
+            || *segment == "."
+            || *segment == ".."
+            || segment.contains('\\')
+            || segment.contains(':')
+        {
+            return Err(format!("Invalid path segment: {segment}"));
+        }
+    }
+
+    Ok(())
+}
+
+/// Validates a single file/folder name for create/rename operations.
+/// Names cannot contain path separators or traversal entries.
+fn validate_workspace_item_name(name: &str) -> Result<(), String> {
+    if name.is_empty()
+        || name == "."
+        || name == ".."
+        || name.contains('/')
+        || name.contains('\\')
+        || name.contains(':')
+    {
+        return Err(format!("Invalid item name: {name}"));
+    }
+    Ok(())
 }
 
 /// Returns `true` if `path` points to a valid Nexsync workspace directory —
@@ -482,21 +520,21 @@ pub fn write_workspace_json(
     write_metadata_json(workspace_path, &name, &data)
 }
 
-/// Lists files and folders inside a workspace content subdirectory
-/// (e.g. `notes`, `files`, `assets`, `tasks`, `kanban`). Returns them as
-/// flat, non-recursive entries for the current level. The `subdir` is
+/// Lists files and folders inside a workspace content subdirectory.
+/// Supports nested paths (e.g. `files/notes/2024`). Returns flat,
+/// non-recursive entries for the current level. The relative path is
 /// validated to prevent path traversal.
 #[tauri::command]
 pub fn list_workspace_files(path: String, subdir: String) -> Result<Vec<WorkspaceFile>, String> {
-    validate_subdir(&subdir)?;
+    validate_workspace_rel_path(&subdir)?;
 
-    let dir = Path::new(&path).join(&subdir);
+    let dir = Path::new(&path).join(subdir.trim_matches('/'));
 
     if !dir.exists() {
         return Ok(vec![]);
     }
 
-    let entries = fs::read_dir(&dir).map_err(|e| format!("Failed to list {subdir}: {e}"))?;
+    let entries = fs::read_dir(&dir).map_err(|e| format!("Failed to list directory: {e}"))?;
 
     let mut files = vec![];
 
@@ -518,7 +556,10 @@ pub fn list_workspace_files(path: String, subdir: String) -> Result<Vec<Workspac
 
         files.push(WorkspaceFile {
             name: file_name.clone(),
-            path: format!("/{subdir}/{file_name}"),
+            path: format!(
+                "/{}/{file_name}",
+                subdir.trim_matches('/')
+            ),
             is_dir: metadata.is_dir(),
             size: metadata.len(),
             modified_at,
@@ -529,6 +570,122 @@ pub fn list_workspace_files(path: String, subdir: String) -> Result<Vec<Workspac
     files.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name)));
 
     Ok(files)
+}
+
+/// Creates a new empty file or folder inside a workspace content directory.
+/// `rel_path` is the parent directory (e.g. `files` or `files/notes`),
+/// `name` is the new item's name, and `is_dir` selects file vs. folder.
+#[tauri::command]
+pub fn create_workspace_item(
+    path: String,
+    rel_path: String,
+    name: String,
+    is_dir: bool,
+) -> Result<(), String> {
+    validate_workspace_rel_path(&rel_path)?;
+    validate_workspace_item_name(&name)?;
+
+    let base = Path::new(&path).join(rel_path.trim_matches('/'));
+    let target = base.join(&name);
+
+    if target.exists() {
+        return Err(format!("An item named `{name}` already exists here."));
+    }
+
+    if is_dir {
+        fs::create_dir_all(&target).map_err(|e| e.to_string())?;
+    } else {
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        fs::write(&target, "").map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+/// Reads the text contents of a workspace file.
+/// `rel_path` must be a workspace-relative path to a file.
+/// Binary files (e.g. images) cannot be read as text and return an error.
+#[tauri::command]
+pub fn read_workspace_file(path: String, rel_path: String) -> Result<String, String> {
+    validate_workspace_rel_path(&rel_path)?;
+
+    let file_path = Path::new(&path).join(rel_path.trim_matches('/'));
+
+    if !file_path.is_file() {
+        return Err(format!("Not a file: /{rel_path}"));
+    }
+
+    fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {e}"))
+}
+
+/// Writes text contents to a workspace file, creating parent directories
+/// as needed. `rel_path` must be a workspace-relative path to a file.
+#[tauri::command]
+pub fn write_workspace_file(path: String, rel_path: String, content: String) -> Result<(), String> {
+    validate_workspace_rel_path(&rel_path)?;
+
+    let file_path = Path::new(&path).join(rel_path.trim_matches('/'));
+
+    if let Some(parent) = file_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    fs::write(&file_path, content).map_err(|e| format!("Failed to write file: {e}"))
+}
+
+/// Permanently deletes a workspace file or folder. Folder deletion is
+/// recursive, so the frontend should always confirm before calling this.
+/// `rel_path` must be a workspace-relative path to an existing item.
+#[tauri::command]
+pub fn delete_workspace_item(path: String, rel_path: String) -> Result<(), String> {
+    validate_workspace_rel_path(&rel_path)?;
+
+    let target = Path::new(&path).join(rel_path.trim_matches('/'));
+
+    if !target.exists() {
+        return Err(format!("Item not found: /{rel_path}"));
+    }
+
+    if target.is_dir() {
+        fs::remove_dir_all(&target).map_err(|e| e.to_string())?;
+    } else {
+        fs::remove_file(&target).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+/// Renames a workspace file or folder. The new name must be a clean
+/// single segment (no separators). `rel_path` is the item's current
+/// workspace-relative path.
+#[tauri::command]
+pub fn rename_workspace_item(
+    path: String,
+    rel_path: String,
+    new_name: String,
+) -> Result<(), String> {
+    validate_workspace_rel_path(&rel_path)?;
+    validate_workspace_item_name(&new_name)?;
+
+    let target = Path::new(&path).join(rel_path.trim_matches('/'));
+    let new_path = target
+        .parent()
+        .ok_or("Invalid item path.")?
+        .join(&new_name);
+
+    if !target.exists() {
+        return Err(format!("Item not found: /{rel_path}"));
+    }
+
+    if new_path.exists() {
+        return Err(format!("An item named `{new_name}` already exists here."));
+    }
+
+    fs::rename(&target, &new_path).map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 /// Computes aggregate statistics for the Dashboard. Counts files/assets by

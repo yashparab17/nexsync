@@ -16,7 +16,8 @@ export type ErrorSource =
 	| "startup"
 	| "recent_load"
 	| "dialog"
-	| "render";
+	| "render"
+	| "files";
 
 interface ErrorContext {
 	source: ErrorSource;
