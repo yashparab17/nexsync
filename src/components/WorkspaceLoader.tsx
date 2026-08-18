@@ -50,6 +50,7 @@ export default function WorkspaceLoader({ children }: { children: ReactNode }) {
 				// If Tauri isn't available (e.g. running in a plain browser)
 				// or the registry doesn't exist, just fall through to the
 				// Welcome page.
+				console.error("Failed to restore last workspace:", err);
 				logError(err, { source: "startup" });
 			} finally {
 				setReady(true);

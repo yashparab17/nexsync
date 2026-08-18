@@ -91,81 +91,8 @@ export function writeWorkspaceJson(
 export function listWorkspaceFiles(
 	path: string,
 	subdir: string,
-	relativePath = "",
 ): Promise<WorkspaceFile[]> {
-	return invoke("list_files", { path, subdir, relativePath });
-}
-
-export function readWorkspaceFile(
-	path: string,
-	subdir: string,
-	relativePath: string,
-): Promise<number[]> {
-	return invoke("read_workspace_file", { path, subdir, relativePath });
-}
-
-export function writeWorkspaceFile(
-	path: string,
-	subdir: string,
-	relativePath: string,
-	contents: number[],
-): Promise<void> {
-	return invoke("write_workspace_file", {
-		path,
-		subdir,
-		relativePath,
-		contents,
-	});
-}
-
-export function createWorkspaceFolder(
-	path: string,
-	subdir: string,
-	relativePath: string,
-): Promise<void> {
-	return invoke("create_workspace_folder", { path, subdir, relativePath });
-}
-
-export function deleteWorkspaceEntry(
-	path: string,
-	subdir: string,
-	relativePath: string,
-): Promise<void> {
-	return invoke("delete_workspace_entry", { path, subdir, relativePath });
-}
-
-export function renameWorkspaceEntry(
-	path: string,
-	subdir: string,
-	oldRelativePath: string,
-	newRelativePath: string,
-): Promise<void> {
-	return invoke("rename_workspace_entry", {
-		path,
-		subdir,
-		oldRelativePath,
-		newRelativePath,
-	});
-}
-
-export function importFilesIntoWorkspace(
-	path: string,
-	subdir: string,
-	relativePath: string,
-): Promise<string[]> {
-	return invoke("import_files_into_workspace", {
-		path,
-		subdir,
-		relativePath,
-	});
-}
-
-export function exportWorkspaceFile(
-	path: string,
-	subdir: string,
-	relativePath: string,
-): Promise<void> {
-	return invoke("export_workspace_file", { path, subdir, relativePath });
+	return invoke("list_workspace_files", { path, subdir });
 }
 
 export function getWorkspaceStats(path: string): Promise<WorkspaceStats> {

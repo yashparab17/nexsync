@@ -6,10 +6,6 @@ use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use uuid::Uuid;
 
-pub(crate) const WORKSPACE_SUBDIRS: &[&str] = &[
-    "notes", "files", "assets", "tasks", "kanban", "editor",
-];
-
 // ────────────────────────────
 // Core data structures
 // ────────────────────────────
@@ -168,7 +164,6 @@ pub struct UpdateMetadataRequest {
 // ────────────────────────────
 
 /// Writes `value` as pretty JSON to `<workspace_path>/.nexsync/<name>.json`.
-/// The write is atomic: it first writes to a temporary file and then renames it.
 fn write_metadata_json<T: Serialize>(
     workspace_path: &Path,
     name: &str,
@@ -176,13 +171,11 @@ fn write_metadata_json<T: Serialize>(
 ) -> Result<(), String> {
     let json = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
 
-    let file_path = workspace_path.join(".nexsync").join(format!("{name}.json"));
-    let tmp_path = file_path.with_extension("json.tmp");
-
-    fs::write(&tmp_path, json).map_err(|e| e.to_string())?;
-    fs::rename(&tmp_path, &file_path).map_err(|e| e.to_string())?;
-
-    Ok(())
+    fs::write(
+        workspace_path.join(".nexsync").join(format!("{name}.json")),
+        json,
+    )
+    .map_err(|e| e.to_string())
 }
 
 /// Reads and deserialises `<workspace_path>/.nexsync/<name>.json`.
@@ -257,7 +250,11 @@ fn ensure_registry(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, 
 /// Validates that `subdir` is one of the known workspace content folders.
 /// This prevents path traversal (no separators, dots, or absolute paths).
 fn validate_subdir(subdir: &str) -> Result<(), String> {
-    if WORKSPACE_SUBDIRS.contains(&subdir) {
+    const ALLOWED: &[&str] = &[
+        "notes", "files", "assets", "tasks", "kanban", "editor",
+    ];
+
+    if ALLOWED.contains(&subdir) {
         Ok(())
     } else {
         Err(format!("Invalid workspace subdirectory: {subdir}"))
@@ -356,7 +353,7 @@ pub fn create_workspace(request: CreateWorkspaceRequest) -> Result<WorkspaceInfo
     write_metadata_json(&workspace_path, "permissions", &permissions)?;
     write_metadata_json(&workspace_path, "history", &history)?;
 
-    let folders = WORKSPACE_SUBDIRS;
+    let folders = ["notes", "files", "tasks", "kanban", "editor", "assets"];
 
     for folder in folders {
         fs::create_dir_all(workspace_path.join(folder)).map_err(|e| e.to_string())?;
@@ -555,7 +552,7 @@ pub fn get_workspace_stats(path: String) -> Result<WorkspaceStats, String> {
 
     // Task / kanban card counts from feature-scoped JSON.
     let tasks_json: Option<serde_json::Value> =
-        read_metadata_json(workspace_path, "tasks").ok().flatten();
+        read_metadata_json(workspace_path, "tasks").unwrap_or(None);
     let task_count = tasks_json
         .as_ref()
         .and_then(|v| v.get("tasks"))
@@ -564,7 +561,7 @@ pub fn get_workspace_stats(path: String) -> Result<WorkspaceStats, String> {
         .unwrap_or(0);
 
     let kanban_json: Option<serde_json::Value> =
-        read_metadata_json(workspace_path, "kanban").ok().flatten();
+        read_metadata_json(workspace_path, "kanban").unwrap_or(None);
     let kanban_count = kanban_json
         .as_ref()
         .and_then(|v| v.get("columns"))
@@ -579,7 +576,7 @@ pub fn get_workspace_stats(path: String) -> Result<WorkspaceStats, String> {
         .unwrap_or(0);
 
     let members_json: Option<Members> =
-        read_metadata_json(workspace_path, "members").ok().flatten();
+        read_metadata_json(workspace_path, "members").unwrap_or(None);
     let member_count = members_json.map(|m| m.members.len()).unwrap_or(0);
 
     Ok(WorkspaceStats {

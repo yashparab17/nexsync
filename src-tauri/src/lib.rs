@@ -22,14 +22,6 @@ pub fn run() {
             commands::workspace::clear_last_workspace,
             commands::workspace::add_recent_workspace,
             commands::workspace::remove_recent_workspace,
-            commands::files::list_files,
-            commands::files::read_workspace_file,
-            commands::files::write_workspace_file,
-            commands::files::create_workspace_folder,
-            commands::files::delete_workspace_entry,
-            commands::files::rename_workspace_entry,
-            commands::files::import_files_into_workspace,
-            commands::files::export_workspace_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

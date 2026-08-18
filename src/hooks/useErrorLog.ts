@@ -16,12 +16,7 @@ export type ErrorSource =
 	| "startup"
 	| "recent_load"
 	| "dialog"
-	| "render"
-	| "files_list"
-	| "files_upload"
-	| "files_delete"
-	| "files_rename"
-	| "files_create";
+	| "render";
 
 interface ErrorContext {
 	source: ErrorSource;
