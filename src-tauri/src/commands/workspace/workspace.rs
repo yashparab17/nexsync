@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::database::WorkspaceDb;
 use crate::commands::path_utils::resolve_workspace_path;
 use crate::commands::validation::validate_member_role;
+use crate::commands::config::validate_allowed_root;
 use super::helpers::get_workspace_id;
 use super::loaders::{load_activity, load_history, load_permissions};
 use super::models::{CreateWorkspaceRequest, History, Permissions, WorkspaceInfo, WorkspaceMetadata, UpdateMetadataRequest, Members, Member, Settings};
@@ -16,7 +17,10 @@ use super::models::{CreateWorkspaceRequest, History, Permissions, WorkspaceInfo,
 // ────────────────────────────
 
 #[tauri::command]
-pub fn create_workspace(request: CreateWorkspaceRequest) -> Result<WorkspaceInfo, String> {
+pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRequest) -> Result<WorkspaceInfo, String> {
+    // C3 FIX: Validate that the requested workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &request.path)?;
+    
     let workspace_path = Path::new(&request.path).join(&request.name);
     let workspace_id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
@@ -131,12 +135,23 @@ pub fn create_workspace(request: CreateWorkspaceRequest) -> Result<WorkspaceInfo
 }
 
 #[tauri::command]
-pub fn import_workspace(path: String) -> Result<WorkspaceInfo, String> {
-    let _canonical_path = resolve_workspace_path(&path, ".")?;
+pub fn import_workspace(app_handle: tauri::AppHandle, path: String) -> Result<WorkspaceInfo, String> {
+    // C3 FIX: Validate that the imported workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &path)?;
+    
     let workspace_path = Path::new(&path);
     if !workspace_path.exists() {
         return Err("The selected folder does not exist.".to_string());
     }
+            // C3 FIX: Verify that an existing .nexsync directory exists before importing
+            // This prevents accidentally converting arbitrary folders into workspaces
+            let nexsync_dir = workspace_path.join(".nexsync");
+            if !nexsync_dir.exists() {
+                return Err("Invalid workspace: No '.nexsync' directory found. \
+                Please create a new workspace or select an existing Nexsync workspace folder."
+                    .to_string()
+                );
+            }
     let db = WorkspaceDb::open(&path)?;
     let workspace: WorkspaceInfo = db
         .conn
@@ -163,7 +178,10 @@ pub fn import_workspace(path: String) -> Result<WorkspaceInfo, String> {
 // ────────────────────────────
 
 #[tauri::command]
-pub fn read_workspace_metadata(path: String) -> Result<WorkspaceMetadata, String> {
+pub fn read_workspace_metadata(app_handle: tauri::AppHandle, path: String) -> Result<WorkspaceMetadata, String> {
+    // Validate that the workspace path is within allowed roots for read operations too
+    validate_allowed_root(&app_handle, &path)?;
+    
     let _canonical_path = resolve_workspace_path(&path, ".")?;
     let workspace_path = Path::new(&path);
     if !workspace_path.exists() {
@@ -234,7 +252,10 @@ pub fn read_workspace_metadata(path: String) -> Result<WorkspaceMetadata, String
 }
 
 #[tauri::command]
-pub fn write_workspace_metadata(request: UpdateMetadataRequest) -> Result<(), String> {
+pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMetadataRequest) -> Result<(), String> {
+    // Validate that the workspace path is within allowed roots before writing
+    validate_allowed_root(&app_handle, &request.path)?;
+    
     let _canonical_path = resolve_workspace_path(&request.path, ".")?;
     let db = WorkspaceDb::open(&request.path)?;
     let metadata = &request.metadata;
@@ -340,7 +361,10 @@ pub fn write_workspace_metadata(request: UpdateMetadataRequest) -> Result<(), St
 // ────────────────────────────
 
 #[tauri::command]
-pub fn get_workspace_stats(path: String) -> Result<super::models::WorkspaceStats, String> {
+pub fn get_workspace_stats(app_handle: tauri::AppHandle, path: String) -> Result<super::models::WorkspaceStats, String> {
+    // Validate that the workspace path is within allowed roots before stats
+    validate_allowed_root(&app_handle, &path)?;
+    
     let _canonical_path = resolve_workspace_path(&path, ".")?;
     let workspace_path = Path::new(&path);
     if !workspace_path.exists() {

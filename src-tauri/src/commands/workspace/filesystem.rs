@@ -3,6 +3,8 @@ use std::fs;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
+use crate::commands::config::validate_allowed_root;
+
 use super::helpers::{validate_workspace_item_name, validate_workspace_rel_path};
 
 /// A single entry (file or folder) inside a workspace subdirectory.
@@ -20,7 +22,10 @@ pub struct WorkspaceFile {
 // ────────────────────────────
 
 #[tauri::command]
-pub fn list_workspace_files(path: String, subdir: String) -> Result<Vec<WorkspaceFile>, String> {
+pub fn list_workspace_files(app_handle: tauri::AppHandle, path: String, subdir: String) -> Result<Vec<WorkspaceFile>, String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &path)?;
+    
     validate_workspace_rel_path(&subdir)?;
     let dir = crate::commands::path_utils::resolve_workspace_path(&path, &subdir)?;
     if !dir.exists() {
@@ -59,11 +64,15 @@ pub fn list_workspace_files(path: String, subdir: String) -> Result<Vec<Workspac
 
 #[tauri::command]
 pub fn create_workspace_item(
+    app_handle: tauri::AppHandle,
     path: String,
     rel_path: String,
     name: String,
     is_dir: bool,
 ) -> Result<(), String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &path)?;
+    
     validate_workspace_rel_path(&rel_path)?;
     validate_workspace_item_name(&name)?;
     let base = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
@@ -83,7 +92,10 @@ pub fn create_workspace_item(
 }
 
 #[tauri::command]
-pub fn read_workspace_file(path: String, rel_path: String) -> Result<String, String> {
+pub fn read_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<String, String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &path)?;
+    
     validate_workspace_rel_path(&rel_path)?;
     let file_path = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
     if !file_path.is_file() {
@@ -93,7 +105,10 @@ pub fn read_workspace_file(path: String, rel_path: String) -> Result<String, Str
 }
 
 #[tauri::command]
-pub fn write_workspace_file(path: String, rel_path: String, content: String) -> Result<(), String> {
+pub fn write_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path: String, content: String) -> Result<(), String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &path)?;
+    
     validate_workspace_rel_path(&rel_path)?;
     let file_path = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
     if let Some(parent) = file_path.parent() {
@@ -103,7 +118,10 @@ pub fn write_workspace_file(path: String, rel_path: String, content: String) -> 
 }
 
 #[tauri::command]
-pub fn delete_workspace_item(path: String, rel_path: String) -> Result<(), String> {
+pub fn delete_workspace_item(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<(), String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &path)?;
+    
     validate_workspace_rel_path(&rel_path)?;
     let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
     if !target.exists() {
@@ -119,10 +137,14 @@ pub fn delete_workspace_item(path: String, rel_path: String) -> Result<(), Strin
 
 #[tauri::command]
 pub fn rename_workspace_item(
+    app_handle: tauri::AppHandle,
     path: String,
     rel_path: String,
     new_name: String,
 ) -> Result<(), String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &path)?;
+    
     validate_workspace_rel_path(&rel_path)?;
     validate_workspace_item_name(&new_name)?;
     let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;

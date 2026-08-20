@@ -1,5 +1,7 @@
 use chrono::Utc;
 
+use crate::commands::config::validate_allowed_root;
+
 use super::helpers::get_workspace_id;
 use super::models::{KanbanCard, KanbanColumn, KanbanCardRequest, KanbanColumnRequest, MoveCardRequest, TaskIdRequest};
 
@@ -8,7 +10,10 @@ use super::models::{KanbanCard, KanbanColumn, KanbanCardRequest, KanbanColumnReq
 // ────────────────────────────
 
 #[tauri::command]
-pub fn get_kanban(path: String) -> Result<Vec<KanbanColumn>, String> {
+pub fn get_kanban(app_handle: tauri::AppHandle, path: String) -> Result<Vec<KanbanColumn>, String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &path)?;
+    
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&path, ".")?;
     let db = crate::database::WorkspaceDb::open(&path)?;
     let ws_id: String = get_workspace_id(&db)?;
@@ -59,7 +64,10 @@ pub fn get_kanban(path: String) -> Result<Vec<KanbanColumn>, String> {
 }
 
 #[tauri::command]
-pub fn create_kanban_column(request: KanbanColumnRequest) -> Result<KanbanColumn, String> {
+pub fn create_kanban_column(app_handle: tauri::AppHandle, request: KanbanColumnRequest) -> Result<KanbanColumn, String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &request.path)?;
+    
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open(&request.path)?;
     let col = request.column;
@@ -75,7 +83,10 @@ pub fn create_kanban_column(request: KanbanColumnRequest) -> Result<KanbanColumn
 }
 
 #[tauri::command]
-pub fn create_kanban_card(request: KanbanCardRequest) -> Result<KanbanCard, String> {
+pub fn create_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardRequest) -> Result<KanbanCard, String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &request.path)?;
+    
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open(&request.path)?;
     let card = request.card;
@@ -95,7 +106,10 @@ pub fn create_kanban_card(request: KanbanCardRequest) -> Result<KanbanCard, Stri
 }
 
 #[tauri::command]
-pub fn update_kanban_card(request: KanbanCardRequest) -> Result<(), String> {
+pub fn update_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardRequest) -> Result<(), String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &request.path)?;
+    
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open(&request.path)?;
     let card = request.card;
@@ -116,7 +130,10 @@ pub fn update_kanban_card(request: KanbanCardRequest) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn move_kanban_card(request: MoveCardRequest) -> Result<(), String> {
+pub fn move_kanban_card(app_handle: tauri::AppHandle, request: MoveCardRequest) -> Result<(), String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &request.path)?;
+    
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open(&request.path)?;
     let ws_id = get_workspace_id(&db)?;
@@ -131,7 +148,10 @@ pub fn move_kanban_card(request: MoveCardRequest) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn delete_kanban_column(request: TaskIdRequest) -> Result<(), String> {
+pub fn delete_kanban_column(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Result<(), String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &request.path)?;
+    
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open(&request.path)?;
     let ws_id = get_workspace_id(&db)?;
@@ -145,7 +165,10 @@ pub fn delete_kanban_column(request: TaskIdRequest) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn delete_kanban_card(request: TaskIdRequest) -> Result<(), String> {
+pub fn delete_kanban_card(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Result<(), String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &request.path)?;
+    
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open(&request.path)?;
     let ws_id = get_workspace_id(&db)?;

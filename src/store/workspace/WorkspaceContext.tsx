@@ -301,3 +301,11 @@ export function useWorkspace() {
 
 	return context;
 }
+
+/** Helper to get the current session ID from the workspace context */
+export function getCurrentWorkspaceSession(): string | undefined {
+	const { workspace } = useWorkspace();
+	// session ID is derived from the workspace path for simplicity in this single-user setup
+	// In a multi-user setup, this would be a proper session token
+	return workspace?.id;
+}

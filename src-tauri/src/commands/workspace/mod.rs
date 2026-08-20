@@ -9,7 +9,6 @@ pub mod kanban;
 pub mod error_log;
 
 // Re-exports for backward compatibility (public API)
-// pub use models::*; // Removed for cleaner namespace
 pub use workspace::*;
 pub use filesystem::*;
 pub use registry::*;

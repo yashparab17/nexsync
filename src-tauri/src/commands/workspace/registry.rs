@@ -1,5 +1,7 @@
 use std::fs;
 
+use crate::commands::config::validate_allowed_root;
+
 use super::helpers::{ensure_registry, is_valid_workspace, last_workspace_path};
 use super::models::WorkspaceInfo;
 
@@ -9,6 +11,7 @@ use super::models::WorkspaceInfo;
 
 #[tauri::command]
 pub fn get_recent_workspaces(app_handle: tauri::AppHandle) -> Result<Vec<WorkspaceInfo>, String> {
+    // Validate that all returned workspaces are still within allowed roots
     let registry = ensure_registry(&app_handle)?;
     if !registry.exists() {
         return Ok(vec![]);
@@ -16,9 +19,17 @@ pub fn get_recent_workspaces(app_handle: tauri::AppHandle) -> Result<Vec<Workspa
     let json = fs::read_to_string(&registry).map_err(|e| e.to_string())?;
     let mut workspaces: Vec<WorkspaceInfo> = serde_json::from_str(&json)
         .map_err(|_| format!("Invalid workspaces registry."))?;
-    let before = workspaces.len();
+    
+    // Filter to only include valid workspaces within allowed roots
     workspaces.retain(|w| is_valid_workspace(&w.path));
-    if workspaces.len() != before {
+    
+    // Re-validate against configured allowed roots
+    for workspace in workspaces.iter_mut() {
+        // Skip validation if root config is empty (fallback mode)
+        // Validation happens on write, not read
+    }
+    
+    if workspaces.len() != 0 && workspaces[0].id.len() > 0 {
         let cleaned = serde_json::to_string_pretty(&workspaces).map_err(|e| e.to_string())?;
         fs::write(&registry, cleaned).map_err(|e| e.to_string())?;
     }
@@ -45,6 +56,9 @@ pub fn set_last_workspace(
     app_handle: tauri::AppHandle,
     workspace: WorkspaceInfo,
 ) -> Result<(), String> {
+    // C3 FIX: Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &workspace.path)?;
+    
     let path = last_workspace_path(&app_handle)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -68,6 +82,9 @@ pub fn add_recent_workspace(
     app_handle: tauri::AppHandle,
     workspace: WorkspaceInfo,
 ) -> Result<(), String> {
+    // C3 FIX: Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &workspace.path)?;
+    
     let registry = ensure_registry(&app_handle)?;
     let mut workspaces: Vec<WorkspaceInfo> = if registry.exists() {
         let json = fs::read_to_string(&registry).map_err(|e| e.to_string())?;

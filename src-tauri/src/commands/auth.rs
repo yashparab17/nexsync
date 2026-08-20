@@ -1,0 +1,249 @@
+//! Security Module (C1): Workspace Authorization & Session Management
+//! 
+//! Provides authentication and authorization for Tauri commands:
+//! - Workspace sessions track which workspaces are currently "open"
+//! - Each session has a unique token that must be passed to mutating commands
+//! - Roles (owner, editor, viewer) control what actions users can perform
+//! 
+//! Since Tauri apps don't have traditional HTTP sessions, we maintain
+//! a global registry of active workspace sessions in memory.
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use uuid::Uuid;
+
+/// Global workspace session registry (thread-safe)
+pub type SessionRegistry = Arc<Mutex<HashMap<String, WorkspaceSession>>>;
+
+/// A workspace session represents an opened workspace with its permissions
+#[derive(Debug, Clone)]
+pub struct WorkspaceSession {
+    /// Unique session ID (UUID token for IPC calls)
+    pub session_id: String,
+    /// Absolute path to the workspace root
+    pub workspace_path: String,
+    /// Current user's role within this workspace
+    pub user_role: UserRole,
+    /// When the session was created
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// User roles for RBAC (Role-Based Access Control)
+#[derive(Debug, Clone, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "snake_case")]
+pub enum UserRole {
+    Owner,
+    Editor,
+    Viewer,
+}
+
+impl UserRole {
+    /// Check if this role can perform file creation
+    pub fn can_create(&self) -> bool {
+        matches!(self, UserRole::Owner | UserRole::Editor)
+    }
+
+    /// Check if this role can perform file deletion
+    pub fn can_delete(&self) -> bool {
+        matches!(self, UserRole::Owner)
+    }
+
+    /// Check if this role can invite new members
+    pub fn can_invite(&self) -> bool {
+        matches!(self, UserRole::Owner)
+    }
+
+    /// Check if this role can read/view content
+    pub fn can_view(&self) -> bool {
+        // All authenticated users can view
+        true
+    }
+
+    /// Check if this role can modify settings/metadata
+    pub fn can_edit_metadata(&self) -> bool {
+        matches!(self, UserRole::Owner | UserRole::Editor)
+    }
+}
+
+impl Default for UserRole {
+    fn default() -> Self {
+        UserRole::Viewer
+    }
+}
+
+/// Create a new workspace session with a unique token
+pub fn create_session(workspace_path: &str, user_role: UserRole) -> String {
+    let session_id = Uuid::new_v4().to_string();
+    let session = WorkspaceSession {
+        session_id: session_id.clone(),
+        workspace_path: workspace_path.to_string(),
+        user_role,
+        created_at: chrono::Utc::now(),
+    };
+    
+    SESSION_REGISTRY.lock()
+        .expect("Failed to acquire lock on session registry")
+        .insert(session_id.clone(), session);
+    
+    session_id
+}
+
+/// Get a workspace session by its token
+pub fn get_session(session_id: &str) -> Option<WorkspaceSession> {
+    SESSION_REGISTRY.lock()
+        .expect("Failed to acquire lock on session registry")
+        .get(session_id)
+        .cloned()
+}
+
+/// Remove a session (called when closing workspace or logging out)
+pub fn remove_session(session_id: &str) -> bool {
+    SESSION_REGISTRY.lock()
+        .expect("Failed to acquire lock on session registry")
+        .remove(session_id)
+        .is_some()
+}
+
+/// Validate that a session exists and belongs to the specified workspace path
+pub fn validate_session_for_path(session_id: &str, workspace_path: &str) -> Result<WorkspaceSession, String> {
+    let session = get_session(session_id)
+        .ok_or_else(|| format!("Invalid or expired session token"))?;
+    
+    if session.workspace_path != workspace_path {
+        return Err(format!(
+            "Session token '{}' does not match workspace '{}'",
+            session_id, workspace_path
+        ));
+    }
+    
+    Ok(session)
+}
+
+/// Get or create a session for the given workspace path
+/// For local-first apps where single-user mode is assumed, creates owner role by default
+pub fn get_or_create_session(workspace_path: &str) -> String {
+    // In production, this would verify existing session first
+    // For now, create a new session with owner privileges (single-user mode)
+    create_session(workspace_path, UserRole::Owner)
+}
+
+/// Initialize the session registry (call once at app startup)
+pub fn init() {
+    if SESSION_REGISTRY.lock().is_err() {
+        eprintln!("Warning: Session registry already initialized");
+    }
+}
+
+// The global session registry - stored as static to be accessible from any thread
+lazy_static::lazy_static! {
+    pub static ref SESSION_REGISTRY: SessionRegistry = Arc::new(Mutex::new(HashMap::new()));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tauri Commands for Session Management
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn create_workspace_session(workspace_path: String) -> Result<String, String> {
+    // Session will be created with Owner role for single-user mode
+    // In multi-user mode, this would authenticate first and then create with appropriate role
+    let session_id = create_session(&workspace_path, UserRole::Owner);
+    Ok(session_id)
+}
+
+#[tauri::command]
+pub fn close_workspace_session(session_id: String) -> Result<(), String> {
+    if !remove_session(&session_id) {
+        return Err(format!("Session '{}' not found", session_id));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_current_session_info(app_handle: tauri::AppHandle, session_id: String) -> Result<Option<SessionInfo>, String> {
+    let session = get_session(&session_id)
+        .ok_or_else(|| format!("Invalid or expired session token"))?;
+    
+    Ok(Some(SessionInfo {
+        session_id: session.session_id.clone(),
+        workspace_path: session.workspace_path,
+        user_role: session.user_role.to_string(),
+        created_at: session.created_at.to_rfc3339(),
+    }))
+}
+
+/// Session info returned to frontend
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct SessionInfo {
+    pub session_id: String,
+    pub workspace_path: String,
+    pub user_role: String,
+    pub created_at: String,
+}
+
+/// Error code for missing session
+pub const ERROR_MISSING_SESSION: &str = "Missing authentication token. Please call create_workspace_session first.";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_and_get_session() {
+        init();
+        let session_id = create_session("/tmp/test-workspace", UserRole::Editor);
+        
+        let session = get_session(&session_id);
+        assert!(session.is_some());
+        
+        let s = session.unwrap();
+        assert_eq!(s.workspace_path, "/tmp/test-workspace");
+        assert_eq!(s.user_role, UserRole::Editor);
+    }
+
+    #[test]
+    fn test_remove_session() {
+        init();
+        let session_id = create_session("/tmp/test-workspace", UserRole::Viewer);
+        
+        let removed = remove_session(&session_id);
+        assert!(removed);
+        
+        let session = get_session(&session_id);
+        assert!(session.is_none());
+    }
+
+    #[test]
+    fn test_validate_session_for_path() {
+        init();
+        let workspace_path = "/tmp/test-workspace".to_string();
+        let session_id = create_session(&workspace_path, UserRole::Owner);
+        
+        // Should succeed
+        let result = validate_session_for_path(&session_id, &workspace_path);
+        assert!(result.is_ok());
+        
+        // Should fail with wrong path
+        let bad_result = validate_session_for_path(&session_id, "/tmp/wrong-path");
+        assert!(bad_result.is_err());
+    }
+
+    #[test]
+    fn test_role_permissions() {
+        assert!(UserRole::Owner.can_create());
+        assert!(UserRole::Editor.can_create());
+        assert!(!UserRole::Viewer.can_create());
+        
+        assert!(UserRole::Owner.can_delete());
+        assert!(!UserRole::Editor.can_delete());
+        assert!(!UserRole::Viewer.can_delete());
+        
+        assert!(UserRole::Owner.can_invite());
+        assert!(!UserRole::Editor.can_invite());
+        assert!(!UserRole::Viewer.can_invite());
+        
+        assert!(UserRole::Owner.can_view());
+        assert!(UserRole::Editor.can_view());
+        assert!(UserRole::Viewer.can_view());
+    }
+}

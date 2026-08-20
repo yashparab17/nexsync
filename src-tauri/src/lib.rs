@@ -9,6 +9,17 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            // Session management (C1: Authentication)
+            commands::auth::create_workspace_session,
+            commands::auth::close_workspace_session,
+            commands::auth::get_current_session_info,
+            
+            // Config management (C3: Allowed roots configuration)
+            commands::config::load_config_cmd,
+            commands::config::save_config_cmd,
+            commands::config::validate_allowed_root_cmd,
+            
+            // Workspace commands
             commands::workspace::create_workspace,
             commands::workspace::import_workspace,
             commands::workspace::read_workspace_metadata,

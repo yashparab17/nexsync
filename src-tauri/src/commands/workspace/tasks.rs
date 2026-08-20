@@ -1,3 +1,5 @@
+use crate::commands::config::validate_allowed_root;
+
 use super::helpers::get_workspace_id;
 use super::models::{Task, TaskIdRequest, TaskRequest};
 use crate::commands::validation::{validate_task_priority, validate_task_status};
@@ -7,7 +9,10 @@ use crate::commands::validation::{validate_task_priority, validate_task_status};
 // ────────────────────────────
 
 #[tauri::command]
-pub fn get_tasks(path: String) -> Result<Vec<Task>, String> {
+pub fn get_tasks(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Task>, String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &path)?;
+    
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&path, ".")?;
     let db = crate::database::WorkspaceDb::open(&path)?;
     let ws_id: String = get_workspace_id(&db)?;
@@ -39,7 +44,10 @@ pub fn get_tasks(path: String) -> Result<Vec<Task>, String> {
 }
 
 #[tauri::command]
-pub fn create_task(request: TaskRequest) -> Result<Task, String> {
+pub fn create_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result<Task, String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &request.path)?;
+    
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     validate_task_status(&request.task.status)?;
     validate_task_priority(&request.task.priority)?;
@@ -61,7 +69,10 @@ pub fn create_task(request: TaskRequest) -> Result<Task, String> {
 }
 
 #[tauri::command]
-pub fn update_task(request: TaskRequest) -> Result<(), String> {
+pub fn update_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result<(), String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &request.path)?;
+    
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     validate_task_status(&request.task.status)?;
     validate_task_priority(&request.task.priority)?;
@@ -84,7 +95,10 @@ pub fn update_task(request: TaskRequest) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn delete_task(request: TaskIdRequest) -> Result<(), String> {
+pub fn delete_task(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Result<(), String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &request.path)?;
+    
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open(&request.path)?;
     let ws_id = get_workspace_id(&db)?;
