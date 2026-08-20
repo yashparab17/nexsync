@@ -1,5 +1,5 @@
 // React Router
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -10,6 +10,7 @@ import WorkspaceHeader from "@/components/layout/workspace/WorkspaceHeader";
 
 export default function Workspace() {
 	const { workspace, isLoading } = useWorkspace();
+	const navigate = useNavigate();
 
 	if (isLoading) {
 		return (
@@ -21,6 +22,11 @@ export default function Workspace() {
 
 	// Errors are surfaced by the global <ErrorDialog /> in App.tsx.
 	if (!workspace) {
+		// Defensive redirect: if no workspace is loaded and we're on /workspace,
+		// redirect to Welcome to avoid blank pages.
+		if (window.location.pathname === "/workspace") {
+			navigate("/", { replace: true });
+		}
 		return null;
 	}
 

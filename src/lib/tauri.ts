@@ -13,6 +13,14 @@ import type {
 	ErrorRecord,
 	CreateWorkspaceRequest,
 	UpdateMetadataRequest,
+	Task,
+	KanbanColumn,
+	KanbanCard,
+	TaskRequest,
+	TaskIdRequest,
+	KanbanColumnRequest,
+	KanbanCardRequest,
+	MoveCardRequest,
 } from "@/types/workspace";
 
 // ────────────────────────────
@@ -58,30 +66,59 @@ export function writeWorkspaceMetadata(
 }
 
 // ────────────────────────────
-// Feature-scoped JSON (per-feature state files)
+// Task commands
 // ────────────────────────────
 
-/**
- * Reads a single feature-scoped JSON file from `<workspace>/.nexsync/<name>.json`.
- * Returns `null` if the file does not exist. Use this for feature state that
- * should persist independently of the core metadata blob (e.g. tasks, kanban).
- */
-export async function readWorkspaceJson<T>(
-	path: string,
-	name: string,
-): Promise<T | null> {
-	return (await invoke("read_workspace_json", { path, name })) as T | null;
+export function getTasks(path: string): Promise<Task[]> {
+	return invoke("get_tasks", { path });
 }
 
-/**
- * Writes a single feature-scoped JSON file to `<workspace>/.nexsync/<name>.json`.
- */
-export function writeWorkspaceJson(
-	path: string,
-	name: string,
-	data: unknown,
-): Promise<void> {
-	return invoke("write_workspace_json", { path, name, data });
+export function createTask(request: TaskRequest): Promise<Task> {
+	return invoke("create_task", { request });
+}
+
+export function updateTask(request: TaskRequest): Promise<void> {
+	return invoke("update_task", { request });
+}
+
+export function deleteTask(request: TaskIdRequest): Promise<void> {
+	return invoke("delete_task", { request });
+}
+
+// ────────────────────────────
+// Kanban commands
+// ────────────────────────────
+
+export function getKanban(path: string): Promise<KanbanColumn[]> {
+	return invoke("get_kanban", { path });
+}
+
+export function createKanbanColumn(
+	request: KanbanColumnRequest,
+): Promise<KanbanColumn> {
+	return invoke("create_kanban_column", { request });
+}
+
+export function createKanbanCard(
+	request: KanbanCardRequest,
+): Promise<KanbanCard> {
+	return invoke("create_kanban_card", { request });
+}
+
+export function updateKanbanCard(request: KanbanCardRequest): Promise<void> {
+	return invoke("update_kanban_card", { request });
+}
+
+export function moveKanbanCard(request: MoveCardRequest): Promise<void> {
+	return invoke("move_kanban_card", { request });
+}
+
+export function deleteKanbanColumn(request: TaskIdRequest): Promise<void> {
+	return invoke("delete_kanban_column", { request });
+}
+
+export function deleteKanbanCard(request: TaskIdRequest): Promise<void> {
+	return invoke("delete_kanban_card", { request });
 }
 
 // ────────────────────────────

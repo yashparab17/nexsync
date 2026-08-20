@@ -1,5 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod commands;
+mod database;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -11,8 +12,6 @@ pub fn run() {
             commands::workspace::import_workspace,
             commands::workspace::read_workspace_metadata,
             commands::workspace::write_workspace_metadata,
-            commands::workspace::read_workspace_json,
-            commands::workspace::write_workspace_json,
             commands::workspace::list_workspace_files,
             commands::workspace::create_workspace_item,
             commands::workspace::read_workspace_file,
@@ -27,6 +26,17 @@ pub fn run() {
             commands::workspace::clear_last_workspace,
             commands::workspace::add_recent_workspace,
             commands::workspace::remove_recent_workspace,
+            commands::workspace::get_tasks,
+            commands::workspace::create_task,
+            commands::workspace::update_task,
+            commands::workspace::delete_task,
+            commands::workspace::get_kanban,
+            commands::workspace::create_kanban_column,
+            commands::workspace::create_kanban_card,
+            commands::workspace::update_kanban_card,
+            commands::workspace::move_kanban_card,
+            commands::workspace::delete_kanban_column,
+            commands::workspace::delete_kanban_card,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

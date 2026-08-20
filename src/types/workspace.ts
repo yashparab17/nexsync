@@ -120,3 +120,70 @@ export interface UpdateMetadataRequest {
 	path: string;
 	metadata: WorkspaceMetadata;
 }
+
+// ────────────────────────────
+// Task & Kanban types
+// ────────────────────────────
+
+export type TaskStatus = "todo" | "in_progress" | "done";
+export type TaskPriority = "low" | "medium" | "high";
+
+export interface Task {
+	id: string;
+	title: string;
+	description: string;
+	status: TaskStatus;
+	priority: TaskPriority;
+	due_date?: string;
+	assignee_id?: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface KanbanColumn {
+	id: string;
+	title: string;
+	position: number;
+	cards: KanbanCard[];
+}
+
+export interface KanbanCard {
+	id: string;
+	title: string;
+	description: string;
+	column_id: string;
+	position: number;
+	created_at: string;
+	updated_at: string;
+}
+
+// ────────────────────────────
+// Task / Kanban request types
+// ────────────────────────────
+
+export interface TaskRequest {
+	path: string;
+	task: Task;
+}
+
+export interface TaskIdRequest {
+	path: string;
+	id: string;
+}
+
+export interface KanbanColumnRequest {
+	path: string;
+	column: KanbanColumn;
+}
+
+export interface KanbanCardRequest {
+	path: string;
+	card: KanbanCard;
+}
+
+export interface MoveCardRequest {
+	path: string;
+	card_id: string;
+	column_id: string;
+	position: number;
+}

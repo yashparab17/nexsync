@@ -2,9 +2,8 @@ export default function WorkspaceSettings() {
 	return (
 		<div>
 			<h1 className="text-2xl font-semibold">Settings</h1>
-
-			<p className="mt-2 text-muted-foreground">
-				Workspace settings will appear here.
+			<p className="mt-1 text-sm text-muted-foreground">
+				Settings will appear here.
 			</p>
 		</div>
 	);
