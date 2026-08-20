@@ -1941,6 +1941,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "libsodium-sys"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b779387cd56adfbc02ea4a668e704f729be8d6a6abd2c27ca5ee537849a92fd"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+ "walkdir",
+]
+
+[[package]]
 name = "libsqlite3-sys"
 version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2087,6 +2099,8 @@ name = "nexsync"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "libc",
+ "libsodium-sys",
  "rusqlite",
  "serde",
  "serde_json",
