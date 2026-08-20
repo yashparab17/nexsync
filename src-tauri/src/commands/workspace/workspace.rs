@@ -21,7 +21,7 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
     // C3 FIX: Validate that the requested workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
-    let workspace_path = Path::new(&request.path).join(&request.name);
+let workspace_path = Path::new(&request.path).join(&request.name);
     let workspace_id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
@@ -139,19 +139,18 @@ pub fn import_workspace(app_handle: tauri::AppHandle, path: String) -> Result<Wo
     // C3 FIX: Validate that the imported workspace path is within allowed roots
     validate_allowed_root(&app_handle, &path)?;
     
-    let workspace_path = Path::new(&path);
+let workspace_path = Path::new(&path);
     if !workspace_path.exists() {
         return Err("The selected folder does not exist.".to_string());
     }
-            // C3 FIX: Verify that an existing .nexsync directory exists before importing
-            // This prevents accidentally converting arbitrary folders into workspaces
-            let nexsync_dir = workspace_path.join(".nexsync");
-            if !nexsync_dir.exists() {
-                return Err("Invalid workspace: No '.nexsync' directory found. \
-                Please create a new workspace or select an existing Nexsync workspace folder."
-                    .to_string()
-                );
-            }
+    // C3 FIX: Require existing .nexsync; don't auto-create
+    let nexsync_dir = workspace_path.join(".nexsync");
+    if !nexsync_dir.exists() {
+        return Err("Invalid workspace: No '.nexsync' directory found. \
+        Please select an existing Nexsync workspace folder."
+            .to_string()
+        );
+    }
     let db = WorkspaceDb::open(&path)?;
     let workspace: WorkspaceInfo = db
         .conn
@@ -183,7 +182,7 @@ pub fn read_workspace_metadata(app_handle: tauri::AppHandle, path: String) -> Re
     validate_allowed_root(&app_handle, &path)?;
     
     let _canonical_path = resolve_workspace_path(&path, ".")?;
-    let workspace_path = Path::new(&path);
+let workspace_path = Path::new(&path);
     if !workspace_path.exists() {
         return Err("The workspace path does not exist.".to_string());
     }
@@ -261,6 +260,18 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
     let metadata = &request.metadata;
     let tx = db.conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
+    // H3 FIX: Validate overall metadata size before persisting
+    const MAX_METADATA_SIZE: usize = 1024 * 1024; // 1 MB
+    let metadata_json = serde_json::to_string(&metadata)
+        .map_err(|e| format!("Failed to serialize metadata: {}", e))?;
+    if metadata_json.len() > MAX_METADATA_SIZE {
+        return Err(format!(
+            "Metadata too large ({} bytes). Maximum allowed is {} bytes.",
+            metadata_json.len(),
+            MAX_METADATA_SIZE
+        ));
+    }
+
     tx.execute(
         "INSERT OR REPLACE INTO workspace (id, name, description, path, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -322,6 +333,17 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
         .map_err(|e| e.to_string())?;
     }
 
+    // H3 FIX: Limit activity event count to prevent unbounded growth
+    const MAX_ACTIVITY_EVENTS: usize = 500;
+    let activity_events = &metadata.activity.events;
+    if activity_events.len() > MAX_ACTIVITY_EVENTS {
+        return Err(format!(
+            "Too many activity events ({}). Maximum allowed is {}.",
+            activity_events.len(),
+            MAX_ACTIVITY_EVENTS
+        ));
+    }
+
     let recent_files_json = serde_json::to_string(&metadata.history.recent_files).unwrap_or_default();
     tx.execute(
         "INSERT OR REPLACE INTO history (workspace_id, last_opened, recent_files) VALUES (?1, ?2, ?3)",
@@ -333,9 +355,14 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
     )
     .map_err(|e| e.to_string())?;
 
-    tx.execute("DELETE FROM activity_events WHERE workspace_id = ?1", [&metadata.workspace.id])
-        .map_err(|e| e.to_string())?;
-    for e in &metadata.activity.events {
+    // H3 FIX: Prune old activity events to keep only the most recent ones
+    tx.execute(
+        "DELETE FROM activity_events WHERE id NOT IN (SELECT id FROM activity_events ORDER BY timestamp DESC LIMIT ?)",
+        [MAX_ACTIVITY_EVENTS as i64],
+    )
+    .map_err(|e| e.to_string())?;
+
+    for e in activity_events {
         tx.execute(
             "INSERT INTO activity_events (id, workspace_id, timestamp, action, detail, target, target_type)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",

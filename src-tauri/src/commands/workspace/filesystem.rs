@@ -5,7 +5,10 @@ use serde::Serialize;
 
 use crate::commands::config::validate_allowed_root;
 
-use super::helpers::{validate_workspace_item_name, validate_workspace_rel_path};
+use super::helpers::{validate_workspace_item_name, validate_workspace_rel_path_with_roots};
+
+/// Maximum file size for write_workspace_file (10 MB)
+const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
 
 /// A single entry (file or folder) inside a workspace subdirectory.
 #[derive(Serialize, Clone, Debug)]
@@ -22,11 +25,15 @@ pub struct WorkspaceFile {
 // ────────────────────────────
 
 #[tauri::command]
-pub fn list_workspace_files(app_handle: tauri::AppHandle, path: String, subdir: String) -> Result<Vec<WorkspaceFile>, String> {
+pub fn list_workspace_files(
+    app_handle: tauri::AppHandle,
+    path: String,
+    subdir: String,
+) -> Result<Vec<WorkspaceFile>, String> {
     // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &path)?;
-    
-    validate_workspace_rel_path(&subdir)?;
+
+    validate_workspace_rel_path_with_roots(&subdir, &["notes", "files", "assets", "tasks", "kanban", "editor"])?;
     let dir = crate::commands::path_utils::resolve_workspace_path(&path, &subdir)?;
     if !dir.exists() {
         return Ok(vec![]);
@@ -72,8 +79,8 @@ pub fn create_workspace_item(
 ) -> Result<(), String> {
     // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &path)?;
-    
-    validate_workspace_rel_path(&rel_path)?;
+
+    validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "tasks", "kanban", "editor", "assets"])?;
     validate_workspace_item_name(&name)?;
     let base = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
     let target = base.join(&name);
@@ -86,6 +93,11 @@ pub fn create_workspace_item(
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
+        if target.metadata().map(|m| m.len() as u64).unwrap_or(0) > MAX_FILE_SIZE {
+            return Err(format!(
+                "File size too large for pre-creation check."
+            ));
+        }
         fs::write(&target, "").map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -95,44 +107,38 @@ pub fn create_workspace_item(
 pub fn read_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<String, String> {
     // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &path)?;
+
+    validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "assets", "tasks", "kanban", "editor"])?;
+    let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
     
-    validate_workspace_rel_path(&rel_path)?;
-    let file_path = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
-    if !file_path.is_file() {
-        return Err(format!("Not a file: /{rel_path}"));
+    if !target.exists() {
+        return Err(format!("File not found: /{rel_path}"));
     }
-    fs::read_to_string(&file_path).map_err(|_| format!("Failed to read file."))
+    if target.is_dir() {
+        return Err(format!("Path is a directory, not a file: /{rel_path}"));
+    }
+
+    fs::read_to_string(&target).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn write_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path: String, content: String) -> Result<(), String> {
     // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &path)?;
+
+    validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "assets", "tasks", "kanban", "editor"])?;
+    let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
     
-    validate_workspace_rel_path(&rel_path)?;
-    let file_path = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
-    if let Some(parent) = file_path.parent() {
+    if content.len() as u64 > MAX_FILE_SIZE {
+        return Err(format!("File too large ({} bytes), maximum is {} bytes.", content.len(), MAX_FILE_SIZE));
+    }
+
+    // Ensure parent directory exists
+    if let Some(parent) = target.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    fs::write(&file_path, content).map_err(|_| format!("Failed to write file."))
-}
 
-#[tauri::command]
-pub fn delete_workspace_item(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<(), String> {
-    // Validate that the workspace path is within allowed roots
-    validate_allowed_root(&app_handle, &path)?;
-    
-    validate_workspace_rel_path(&rel_path)?;
-    let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
-    if !target.exists() {
-        return Err(format!("Item not found: /{rel_path}"));
-    }
-    if target.is_dir() {
-        fs::remove_dir_all(&target).map_err(|e| e.to_string())?;
-    } else {
-        fs::remove_file(&target).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    fs::write(&target, content.as_bytes()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -144,12 +150,15 @@ pub fn rename_workspace_item(
 ) -> Result<(), String> {
     // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &path)?;
-    
-    validate_workspace_rel_path(&rel_path)?;
-    validate_workspace_item_name(&new_name)?;
+
+    validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "tasks", "kanban", "editor", "assets"])?;
     let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
     let parent = target.parent().ok_or("Invalid item path.")?;
     let new_path = parent.join(&new_name);
+
+    // H1 FIX: Validate that the new path still stays within the workspace
+    validate_allowed_root(&app_handle, new_path.to_string_lossy().as_ref())?;
+
     if !target.exists() {
         return Err(format!("Item not found: /{rel_path}"));
     }
@@ -157,5 +166,23 @@ pub fn rename_workspace_item(
         return Err(format!("An item named `{new_name}` already exists here."));
     }
     fs::rename(&target, &new_path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_workspace_item(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<(), String> {
+    // Validate that the workspace path is within allowed roots
+    validate_allowed_root(&app_handle, &path)?;
+
+    validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "tasks", "kanban", "editor", "assets"])?;
+    let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
+    if !target.exists() {
+        return Err(format!("Item not found: /{rel_path}"));
+    }
+    if target.is_dir() {
+        fs::remove_dir_all(&target).map_err(|e| e.to_string())?;
+    } else {
+        fs::remove_file(&target).map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
