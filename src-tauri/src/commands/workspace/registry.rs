@@ -20,16 +20,10 @@ pub fn get_recent_workspaces(app_handle: tauri::AppHandle) -> Result<Vec<Workspa
     let mut workspaces: Vec<WorkspaceInfo> = serde_json::from_str(&json)
         .map_err(|_| format!("Invalid workspaces registry."))?;
     
-    // Filter to only include valid workspaces within allowed roots
-    workspaces.retain(|w| is_valid_workspace(&w.path));
+    // M2 FIX: Filter to only include valid workspaces within allowed roots
+    workspaces.retain(|w| is_valid_workspace(&w.path) && validate_allowed_root(&app_handle, &w.path).is_ok());
     
-    // Re-validate against configured allowed roots
-    for workspace in workspaces.iter_mut() {
-        // Skip validation if root config is empty (fallback mode)
-        // Validation happens on write, not read
-    }
-    
-    if workspaces.len() != 0 && workspaces[0].id.len() > 0 {
+    if !workspaces.is_empty() && !workspaces[0].id.is_empty() {
         let cleaned = serde_json::to_string_pretty(&workspaces).map_err(|e| e.to_string())?;
         fs::write(&registry, cleaned).map_err(|e| e.to_string())?;
     }
@@ -45,7 +39,12 @@ pub fn get_last_workspace(app_handle: tauri::AppHandle) -> Result<Option<Workspa
     let json = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let workspace: WorkspaceInfo = serde_json::from_str(&json)
         .map_err(|_| format!("Invalid last_workspace.json."))?;
-    if !std::path::Path::new(&workspace.path).exists() {
+    
+    // M2 FIX: Validate that last workspace still exists, is valid, and is in allowed roots
+    if !std::path::Path::new(&workspace.path).exists()
+        || !is_valid_workspace(&workspace.path)
+        || validate_allowed_root(&app_handle, &workspace.path).is_err()
+    {
         return Ok(None);
     }
     Ok(Some(workspace))

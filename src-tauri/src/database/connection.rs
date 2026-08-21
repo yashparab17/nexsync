@@ -73,4 +73,35 @@ impl WorkspaceDb {
 
 		Ok(db)
 	}
+
+	/// Opens an existing workspace database without creating missing files or directories.
+	/// Fails if the database file does not already exist.
+	pub fn open_existing(workspace_path: &str) -> Result<Self, String> {
+		let workspace = std::path::Path::new(workspace_path);
+		let db_file = db_path(workspace);
+
+		if !db_file.is_file() {
+			return Err(format!("Workspace database not found at {}", db_file.display()));
+		}
+
+		let flags = OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_FULL_MUTEX;
+		let conn = Connection::open_with_flags(&db_file, flags).map_err(|e| e.to_string())?;
+
+		conn.execute_batch(
+			"PRAGMA journal_mode = WAL;
+			 PRAGMA foreign_keys = ON;
+			 PRAGMA synchronous = NORMAL;",
+		)
+		.map_err(|e| e.to_string())?;
+
+		let db = Self {
+			conn,
+			workspace_path: workspace.to_path_buf(),
+		};
+
+		// Ensure schema is up to date
+		crate::database::schema::init_schema(&db.conn).map_err(|e| e.to_string())?;
+
+		Ok(db)
+	}
 }

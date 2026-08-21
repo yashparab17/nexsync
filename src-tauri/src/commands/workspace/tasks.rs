@@ -14,7 +14,7 @@ pub fn get_tasks(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Task>
     validate_allowed_root(&app_handle, &path)?;
     
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&path, ".")?;
-    let db = crate::database::WorkspaceDb::open(&path)?;
+    let db = crate::database::WorkspaceDb::open_existing(&path)?;
     let ws_id: String = get_workspace_id(&db)?;
     let tasks: Vec<Task> = db
         .conn
@@ -51,7 +51,7 @@ pub fn create_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     validate_task_status(&request.task.status)?;
     validate_task_priority(&request.task.priority)?;
-    let db = crate::database::WorkspaceDb::open(&request.path)?;
+    let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let task = request.task;
     let ws_id = get_workspace_id(&db)?;
     db.conn.execute(
@@ -76,7 +76,7 @@ pub fn update_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     validate_task_status(&request.task.status)?;
     validate_task_priority(&request.task.priority)?;
-    let db = crate::database::WorkspaceDb::open(&request.path)?;
+    let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let task = request.task;
     let ws_id = get_workspace_id(&db)?;
     db.conn
@@ -100,7 +100,7 @@ pub fn delete_task(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Resu
     validate_allowed_root(&app_handle, &request.path)?;
     
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
-    let db = crate::database::WorkspaceDb::open(&request.path)?;
+    let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let ws_id = get_workspace_id(&db)?;
     db.conn
         .execute(

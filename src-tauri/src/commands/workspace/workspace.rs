@@ -139,19 +139,20 @@ pub fn import_workspace(app_handle: tauri::AppHandle, path: String) -> Result<Wo
     // C3 FIX: Validate that the imported workspace path is within allowed roots
     validate_allowed_root(&app_handle, &path)?;
     
-let workspace_path = Path::new(&path);
+    let workspace_path = Path::new(&path);
     if !workspace_path.exists() {
         return Err("The selected folder does not exist.".to_string());
     }
-    // C3 FIX: Require existing .nexsync; don't auto-create
+    // C3 / M3 FIX: Require existing .nexsync and nexsync.db; don't auto-create
     let nexsync_dir = workspace_path.join(".nexsync");
-    if !nexsync_dir.exists() {
-        return Err("Invalid workspace: No '.nexsync' directory found. \
+    let nexsync_db = nexsync_dir.join("nexsync.db");
+    if !nexsync_dir.exists() || !nexsync_db.is_file() {
+        return Err("Invalid workspace: No valid '.nexsync/nexsync.db' found. \
         Please select an existing Nexsync workspace folder."
             .to_string()
         );
     }
-    let db = WorkspaceDb::open(&path)?;
+    let db = WorkspaceDb::open_existing(&path)?;
     let workspace: WorkspaceInfo = db
         .conn
         .query_row(
@@ -182,11 +183,11 @@ pub fn read_workspace_metadata(app_handle: tauri::AppHandle, path: String) -> Re
     validate_allowed_root(&app_handle, &path)?;
     
     let _canonical_path = resolve_workspace_path(&path, ".")?;
-let workspace_path = Path::new(&path);
+    let workspace_path = Path::new(&path);
     if !workspace_path.exists() {
         return Err("The workspace path does not exist.".to_string());
     }
-    let db = WorkspaceDb::open(&path)?;
+    let db = WorkspaceDb::open_existing(&path)?;
     let tx = db.conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
     let workspace: WorkspaceInfo = tx
@@ -255,8 +256,11 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
     // Validate that the workspace path is within allowed roots before writing
     validate_allowed_root(&app_handle, &request.path)?;
     
-    let _canonical_path = resolve_workspace_path(&request.path, ".")?;
-    let db = WorkspaceDb::open(&request.path)?;
+    // M4 FIX: Canonicalize path before storing to prevent divergence
+    let canonical_path = resolve_workspace_path(&request.path, ".")?;
+    let canonical_path_str = canonical_path.to_string_lossy().to_string();
+
+    let db = WorkspaceDb::open_existing(&request.path)?;
     let metadata = &request.metadata;
     let tx = db.conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
@@ -279,7 +283,7 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
             &metadata.workspace.id,
             &metadata.workspace.name,
             &metadata.workspace.description,
-            &metadata.workspace.path,
+            &canonical_path_str,
             &metadata.workspace.created_at,
             &metadata.workspace.updated_at,
         ],
@@ -363,6 +367,21 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
     .map_err(|e| e.to_string())?;
 
     for e in activity_events {
+        // M1 FIX: Validate and sanitize activity event fields
+        if e.action.len() > 64 || e.detail.len() > 1024 {
+            return Err("Activity event action or detail exceeds maximum allowed length.".to_string());
+        }
+        if let Some(target) = &e.target {
+            if target.len() > 512 || target.contains("..") || target.contains('\0') {
+                return Err("Invalid or potentially unsafe activity target path.".to_string());
+            }
+        }
+        if let Some(target_type) = &e.target_type {
+            if target_type.len() > 64 {
+                return Err("Activity event target_type exceeds maximum allowed length.".to_string());
+            }
+        }
+
         tx.execute(
             "INSERT INTO activity_events (id, workspace_id, timestamp, action, detail, target, target_type)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -406,7 +425,7 @@ pub fn get_workspace_stats(app_handle: tauri::AppHandle, path: String) -> Result
         }
     };
 
-    let db = WorkspaceDb::open(&path)?;
+    let db = WorkspaceDb::open_existing(&path)?;
     let ws_id: String = get_workspace_id(&db)?;
 
     let task_count: i64 = db

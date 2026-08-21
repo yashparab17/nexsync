@@ -160,7 +160,7 @@ pub fn close_workspace_session(session_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn get_current_session_info(app_handle: tauri::AppHandle, session_id: String) -> Result<Option<SessionInfo>, String> {
+pub fn get_current_session_info(_app_handle: tauri::AppHandle, session_id: String) -> Result<Option<SessionInfo>, String> {
     let session = get_session(&session_id)
         .ok_or_else(|| format!("Invalid or expired session token"))?;
     

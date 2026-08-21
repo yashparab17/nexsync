@@ -10,10 +10,23 @@ pub(crate) fn workspace_db_path(workspace_path: &Path) -> std::path::PathBuf {
 }
 
 /// Returns the workspace id from the SQLite DB.
+/// Ensures exactly one workspace record exists in the database.
 pub(crate) fn get_workspace_id(db: &WorkspaceDb) -> Result<String, String> {
-    db.conn
-        .query_row("SELECT id FROM workspace LIMIT 1", [], |r| r.get(0))
-        .map_err(|e| e.to_string())
+    let mut stmt = db
+        .conn
+        .prepare("SELECT id FROM workspace")
+        .map_err(|e| e.to_string())?;
+    let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
+
+    if let Some(row) = rows.next().map_err(|e| e.to_string())? {
+        let id: String = row.get(0).map_err(|e| e.to_string())?;
+        if rows.next().map_err(|e| e.to_string())?.is_some() {
+            return Err("Database integrity error: Multiple workspace records found in database.".to_string());
+        }
+        Ok(id)
+    } else {
+        Err("Workspace database does not contain a workspace record.".to_string())
+    }
 }
 
 /// Verify that the workspace_id matches the one in the given workspace DB.

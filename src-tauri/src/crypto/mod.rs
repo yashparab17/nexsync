@@ -3,6 +3,12 @@
 use libc::size_t;
 use libsodium_sys::{crypto_secretbox_KEYBYTES, crypto_secretbox_NONCEBYTES, crypto_secretbox_MACBYTES};
 
+/// Maximum allowed data size for encryption/decryption (100 MB).
+pub const MAX_DATA_SIZE: usize = 100 * 1024 * 1024;
+
+/// Maximum allowed buffer length for random byte generation (64 MB).
+pub const MAX_RANDOM_BYTES: usize = 64 * 1024 * 1024;
+
 /// Initialize libsodium. Should be called once at application startup.
 pub fn init() -> Result<(), String> {
     unsafe {
@@ -22,13 +28,16 @@ pub fn generate_key() -> [u8; crypto_secretbox_KEYBYTES as usize] {
     key
 }
 
-/// Generates cryptographically secure random bytes.
-pub fn random_bytes(len: usize) -> Vec<u8> {
+/// Generates cryptographically secure random bytes with upper bound check.
+pub fn random_bytes(len: usize) -> Result<Vec<u8>, String> {
+    if len > MAX_RANDOM_BYTES {
+        return Err(format!("Requested random byte length ({len}) exceeds maximum allowed ({MAX_RANDOM_BYTES})"));
+    }
     let mut buf = vec![0u8; len];
     unsafe {
         libsodium_sys::randombytes_buf(buf.as_mut_ptr() as *mut _, len as size_t);
     }
-    buf
+    Ok(buf)
 }
 
 /// Encrypts data using libsodium's secretbox (authenticated encryption).
@@ -37,6 +46,9 @@ pub fn encrypt(data: &[u8], key: &[u8; crypto_secretbox_KEYBYTES as usize]) -> R
     if data.is_empty() {
         return Err("Data cannot be empty".to_string());
     }
+    if data.len() > MAX_DATA_SIZE {
+        return Err(format!("Data length ({}) exceeds maximum limit ({} bytes)", data.len(), MAX_DATA_SIZE));
+    }
 
     let mut nonce = [0u8; crypto_secretbox_NONCEBYTES as usize];
     unsafe {
@@ -44,7 +56,7 @@ pub fn encrypt(data: &[u8], key: &[u8; crypto_secretbox_KEYBYTES as usize]) -> R
     }
 
     let mac_len = crypto_secretbox_MACBYTES as usize;
-    let total_len = mac_len + data.len();
+    let total_len = mac_len.checked_add(data.len()).ok_or_else(|| "Ciphertext length overflow".to_string())?;
     let mut ciphertext = vec![0u8; total_len];
 
     unsafe {
@@ -67,8 +79,12 @@ pub fn encrypt(data: &[u8], key: &[u8; crypto_secretbox_KEYBYTES as usize]) -> R
 
 /// Decrypts data encrypted with [`encrypt`].
 pub fn decrypt(encrypted_data: &[u8], key: &[u8; crypto_secretbox_KEYBYTES as usize]) -> Result<Vec<u8>, String> {
-    if encrypted_data.len() < (crypto_secretbox_NONCEBYTES + crypto_secretbox_MACBYTES) as usize {
+    let min_len = (crypto_secretbox_NONCEBYTES + crypto_secretbox_MACBYTES) as usize;
+    if encrypted_data.len() < min_len {
         return Err("Encrypted data too short".to_string());
+    }
+    if encrypted_data.len() > MAX_DATA_SIZE + min_len {
+        return Err(format!("Encrypted data length exceeds maximum allowed limit"));
     }
 
     let nonce_start = 0;
@@ -122,7 +138,10 @@ mod tests {
 
     #[test]
     fn test_random_bytes() {
-        let bytes = random_bytes(32);
+        let bytes = random_bytes(32).expect("Random bytes should succeed");
         assert_eq!(bytes.len(), 32);
+
+        let too_large = random_bytes(MAX_RANDOM_BYTES + 1);
+        assert!(too_large.is_err(), "Random bytes above limit should fail");
     }
 }

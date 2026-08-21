@@ -45,9 +45,18 @@ pub fn list_workspace_files(
     for entry in entries {
         let entry = entry.map_err(|e| e.to_string())?;
         let file_name = entry.file_name().to_string_lossy().to_string();
+        
+        // L5 FIX: Use symlink_metadata to avoid unknowingly following arbitrary external symlinks
         let metadata = entry
-            .metadata()
+            .path()
+            .symlink_metadata()
             .map_err(|_| format!("Failed to read metadata for {file_name}."))?;
+        
+        // Skip symlinks that point outside or could be unsafe
+        if metadata.is_symlink() {
+            continue;
+        }
+
         let modified_at = metadata
             .modified()
             .ok()
@@ -118,6 +127,12 @@ pub fn read_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path:
         return Err(format!("Path is a directory, not a file: /{rel_path}"));
     }
 
+    // L7 FIX: Guard against reading excessively large files into memory
+    let file_len = target.metadata().map(|m| m.len()).unwrap_or(0);
+    if file_len > MAX_FILE_SIZE {
+        return Err(format!("File too large to read ({} bytes), maximum is {} bytes.", file_len, MAX_FILE_SIZE));
+    }
+
     fs::read_to_string(&target).map_err(|e| e.to_string())
 }
 
@@ -152,6 +167,7 @@ pub fn rename_workspace_item(
     validate_allowed_root(&app_handle, &path)?;
 
     validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "tasks", "kanban", "editor", "assets"])?;
+    validate_workspace_item_name(&new_name)?;
     let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
     let parent = target.parent().ok_or("Invalid item path.")?;
     let new_path = parent.join(&new_name);
