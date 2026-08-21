@@ -4,7 +4,6 @@
 // sync and type-safe.
 
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWorkspaceSession } from "@/store/workspace/WorkspaceContext";
 
 import type {
 	WorkspaceInfo,
@@ -25,19 +24,37 @@ import type {
 } from "@/types/workspace";
 
 // ────────────────────────────
-// Helpers
+// Session Token State
 // ────────────────────────────
 
-function withSession<T>(fn: (sessionId: string) => Promise<T>): Promise<T> {
-	const session = getCurrentWorkspaceSession();
-	if (!session) {
-		return Promise.reject(
-			new Error(
-				"No active workspace session. Please open a workspace first.",
-			),
-		);
-	}
-	return fn(session);
+let activeSessionToken: string | null = null;
+
+export function setActiveSessionToken(token: string | null) {
+	activeSessionToken = token;
+}
+
+export function getActiveSessionToken(): string | null {
+	return activeSessionToken;
+}
+
+// ────────────────────────────
+// Session Management Commands (auth)
+// ────────────────────────────
+
+export function createWorkspaceSession(
+	workspacePath: string,
+): Promise<string> {
+	return invoke("create_workspace_session", { workspacePath });
+}
+
+export function closeWorkspaceSession(sessionId: string): Promise<void> {
+	return invoke("close_workspace_session", { sessionId });
+}
+
+export function getCurrentSessionInfo(
+	sessionId: string,
+): Promise<{ sessionId: string; workspacePath: string; userRole: string; createdAt: string } | null> {
+	return invoke("get_current_session_info", { sessionId });
 }
 
 // ────────────────────────────
@@ -53,131 +70,100 @@ export function logError(entry: ErrorRecord): Promise<void> {
 }
 
 // ────────────────────────────
-// Workspace creation / import (C1: session required)
+// Workspace creation / import (Bootstrap operations)
 // ────────────────────────────
 
 export function createWorkspace(
 	request: CreateWorkspaceRequest,
 ): Promise<WorkspaceInfo> {
-	return withSession((sessionId) =>
-		invoke("create_workspace", { request, sessionId }),
-	);
+	return invoke("create_workspace", { request });
 }
 
 export function importWorkspace(path: string): Promise<WorkspaceInfo> {
-	return withSession((sessionId) =>
-		invoke("import_workspace", { path, sessionId }),
-	);
+	return invoke("import_workspace", { path });
 }
 
 // ────────────────────────────
-// Metadata read / write (C1: session required)
+// Metadata read / write
 // ────────────────────────────
 
 export function readWorkspaceMetadata(
 	path: string,
 ): Promise<WorkspaceMetadata> {
-	return withSession((sessionId) =>
-		invoke("read_workspace_metadata", { path, sessionId }),
-	);
+	return invoke("read_workspace_metadata", { path });
 }
 
 export function writeWorkspaceMetadata(
 	request: UpdateMetadataRequest,
 ): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("write_workspace_metadata", { request, sessionId }),
-	);
+	return invoke("write_workspace_metadata", { request });
 }
 
 // ────────────────────────────
-// Task commands (C1: session required)
+// Task commands
 // ────────────────────────────
 
 export function getTasks(path: string): Promise<Task[]> {
-	return withSession((sessionId) => invoke("get_tasks", { path, sessionId }));
+	return invoke("get_tasks", { path });
 }
 
 export function createTask(request: TaskRequest): Promise<Task> {
-	return withSession((sessionId) =>
-		invoke("create_task", { request, sessionId }),
-	);
+	return invoke("create_task", { request });
 }
 
 export function updateTask(request: TaskRequest): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("update_task", { request, sessionId }),
-	);
+	return invoke("update_task", { request });
 }
 
 export function deleteTask(request: TaskIdRequest): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("delete_task", { request, sessionId }),
-	);
+	return invoke("delete_task", { request });
 }
 
 // ────────────────────────────
-// Kanban commands (C1: session required)
+// Kanban commands
 // ────────────────────────────
 
 export function getKanban(path: string): Promise<KanbanColumn[]> {
-	return withSession((sessionId) =>
-		invoke("get_kanban", { path, sessionId }),
-	);
+	return invoke("get_kanban", { path });
 }
 
 export function createKanbanColumn(
 	request: KanbanColumnRequest,
 ): Promise<KanbanColumn> {
-	return withSession((sessionId) =>
-		invoke("create_kanban_column", { request, sessionId }),
-	);
+	return invoke("create_kanban_column", { request });
 }
 
-// Slightly different: card creation needs column context
 export function createKanbanCard(
 	request: KanbanCardRequest,
 ): Promise<KanbanCard> {
-	return withSession((sessionId) =>
-		invoke("create_kanban_card", { request, sessionId }),
-	);
+	return invoke("create_kanban_card", { request });
 }
 
 export function updateKanbanCard(request: KanbanCardRequest): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("update_kanban_card", { request, sessionId }),
-	);
+	return invoke("update_kanban_card", { request });
 }
 
 export function moveKanbanCard(request: MoveCardRequest): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("move_kanban_card", { request, sessionId }),
-	);
+	return invoke("move_kanban_card", { request });
 }
 
 export function deleteKanbanColumn(request: TaskIdRequest): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("delete_kanban_column", { request, sessionId }),
-	);
+	return invoke("delete_kanban_column", { request });
 }
 
 export function deleteKanbanCard(request: TaskIdRequest): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("delete_kanban_card", { request, sessionId }),
-	);
+	return invoke("delete_kanban_card", { request });
 }
 
 // ────────────────────────────
-// Filesystem / dashboard (C1: session required)
+// Filesystem / dashboard
 // ────────────────────────────
 
 export function listWorkspaceFiles(
 	path: string,
 	subdir: string,
 ): Promise<WorkspaceFile[]> {
-	return withSession((sessionId) =>
-		invoke("list_workspace_files", { path, subdir, sessionId }),
-	);
+	return invoke("list_workspace_files", { path, subdir });
 }
 
 /** Creates a new empty file. `relPath` is the parent directory (e.g. `files/docs`). */
@@ -186,15 +172,12 @@ export function createWorkspaceFile(
 	relPath: string,
 	name: string,
 ): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("create_workspace_item", {
-			path,
-			relPath,
-			name,
-			isDir: false,
-			sessionId,
-		}),
-	);
+	return invoke("create_workspace_item", {
+		path,
+		relPath,
+		name,
+		isDir: false,
+	});
 }
 
 /** Creates a new folder. `relPath` is the parent directory. */
@@ -203,15 +186,12 @@ export function createWorkspaceFolder(
 	relPath: string,
 	name: string,
 ): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("create_workspace_item", {
-			path,
-			relPath,
-			name,
-			isDir: true,
-			sessionId,
-		}),
-	);
+	return invoke("create_workspace_item", {
+		path,
+		relPath,
+		name,
+		isDir: true,
+	});
 }
 
 /** Reads the text contents of a workspace file. */
@@ -219,9 +199,7 @@ export function readWorkspaceFile(
 	path: string,
 	relPath: string,
 ): Promise<string> {
-	return withSession((sessionId) =>
-		invoke("read_workspace_file", { path, relPath, sessionId }),
-	);
+	return invoke("read_workspace_file", { path, relPath });
 }
 
 /** Writes text contents to a workspace file. */
@@ -230,9 +208,7 @@ export function writeWorkspaceFile(
 	relPath: string,
 	content: string,
 ): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("write_workspace_file", { path, relPath, content, sessionId }),
-	);
+	return invoke("write_workspace_file", { path, relPath, content });
 }
 
 /** Permanently deletes a workspace file or folder (folders are recursive). */
@@ -240,9 +216,7 @@ export function deleteWorkspaceItem(
 	path: string,
 	relPath: string,
 ): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("delete_workspace_item", { path, relPath, sessionId }),
-	);
+	return invoke("delete_workspace_item", { path, relPath });
 }
 
 /** Renames a workspace file or folder. */
@@ -251,37 +225,27 @@ export function renameWorkspaceItem(
 	relPath: string,
 	newName: string,
 ): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("rename_workspace_item", { path, relPath, newName, sessionId }),
-	);
+	return invoke("rename_workspace_item", { path, relPath, newName });
 }
 
 export function getWorkspaceStats(path: string): Promise<WorkspaceStats> {
-	return withSession((sessionId) =>
-		invoke("get_workspace_stats", { path, sessionId }),
-	);
+	return invoke("get_workspace_stats", { path });
 }
 
 // ────────────────────────────
-// Recent workspaces registry (C1: session required for consistency)
+// Recent workspaces registry (Bootstrap operations)
 // ────────────────────────────
 
 export function getRecentWorkspaces(): Promise<WorkspaceInfo[]> {
-	return withSession((sessionId) =>
-		invoke("get_recent_workspaces", { sessionId }),
-	);
+	return invoke("get_recent_workspaces");
 }
 
 export function addRecentWorkspace(workspace: WorkspaceInfo): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("add_recent_workspace", { workspace, sessionId }),
-	);
+	return invoke("add_recent_workspace", { workspace });
 }
 
 export function removeRecentWorkspace(id: string): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("remove_recent_workspace", { id, sessionId }),
-	);
+	return invoke("remove_recent_workspace", { id });
 }
 
 // ────────────────────────────
@@ -289,19 +253,13 @@ export function removeRecentWorkspace(id: string): Promise<void> {
 // ────────────────────────────
 
 export function getLastWorkspace(): Promise<WorkspaceInfo | null> {
-	return withSession((sessionId) =>
-		invoke("get_last_workspace", { sessionId }),
-	);
+	return invoke("get_last_workspace");
 }
 
 export function setLastWorkspace(workspace: WorkspaceInfo): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("set_last_workspace", { workspace, sessionId }),
-	);
+	return invoke("set_last_workspace", { workspace });
 }
 
 export function clearLastWorkspace(): Promise<void> {
-	return withSession((sessionId) =>
-		invoke("clear_last_workspace", { sessionId }),
-	);
+	return invoke("clear_last_workspace");
 }

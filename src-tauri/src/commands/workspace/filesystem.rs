@@ -172,8 +172,13 @@ pub fn rename_workspace_item(
     let parent = target.parent().ok_or("Invalid item path.")?;
     let new_path = parent.join(&new_name);
 
-    // H1 FIX: Validate that the new path still stays within the workspace
-    validate_allowed_root(&app_handle, new_path.to_string_lossy().as_ref())?;
+    // M5 / H1 FIX: Validate that the new path strictly stays within the workspace
+    let canonical_workspace = std::path::Path::new(&path)
+        .canonicalize()
+        .map_err(|e| format!("Failed to canonicalize workspace path: {}", e))?;
+    if !parent.starts_with(&canonical_workspace) && parent != canonical_workspace {
+        return Err("Path traversal detected: renamed item escapes workspace directory".to_string());
+    }
 
     if !target.exists() {
         return Err(format!("Item not found: /{rel_path}"));

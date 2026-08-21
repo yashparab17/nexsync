@@ -8,7 +8,7 @@ use crate::database::WorkspaceDb;
 use crate::commands::path_utils::resolve_workspace_path;
 use crate::commands::validation::validate_member_role;
 use crate::commands::config::validate_allowed_root;
-use super::helpers::get_workspace_id;
+use super::helpers::{get_workspace_id, validate_workspace_item_name};
 use super::loaders::{load_activity, load_history, load_permissions};
 use super::models::{CreateWorkspaceRequest, History, Permissions, WorkspaceInfo, WorkspaceMetadata, UpdateMetadataRequest, Members, Member, Settings};
 
@@ -18,10 +18,17 @@ use super::models::{CreateWorkspaceRequest, History, Permissions, WorkspaceInfo,
 
 #[tauri::command]
 pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRequest) -> Result<WorkspaceInfo, String> {
-    // C3 FIX: Validate that the requested workspace path is within allowed roots
+    // C6 FIX: Validate workspace name against traversal sequences and illegal characters
+    validate_workspace_item_name(&request.name)?;
+
+    // C3 FIX: Validate that the requested workspace parent path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
-let workspace_path = Path::new(&request.path).join(&request.name);
+    let workspace_path = Path::new(&request.path).join(&request.name);
+    
+    // C6 FIX: Ensure the combined workspace path remains within allowed roots
+    validate_allowed_root(&app_handle, workspace_path.to_string_lossy().as_ref())?;
+
     let workspace_id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
@@ -383,7 +390,7 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
         }
 
         tx.execute(
-            "INSERT INTO activity_events (id, workspace_id, timestamp, action, detail, target, target_type)
+            "INSERT OR REPLACE INTO activity_events (id, workspace_id, timestamp, action, detail, target, target_type)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             rusqlite::params![
                 &e.id,

@@ -16,27 +16,19 @@ pub struct NexsyncConfig {
 
 impl Default for NexsyncConfig {
     fn default() -> Self {
-        // By default, allow user's Documents and Desktop folders on most platforms
-        let mut defaults = vec![
-            "Documents".to_string(),
-            "Desktop".to_string(),
-        ];
+        let mut defaults = Vec::new();
 
-        // Add platform-specific defaults
-        #[cfg(windows)]
-        {
-            defaults.extend_from_slice(&["My Documents".to_string(), "Documents".to_string()]);
+        if let Some(doc_dir) = dirs::document_dir() {
+            defaults.push(doc_dir.to_string_lossy().to_string());
+        }
+        if let Some(desk_dir) = dirs::desktop_dir() {
+            defaults.push(desk_dir.to_string_lossy().to_string());
         }
 
-        #[cfg(target_os = "macos")]
-        {
-            defaults.push("~/Documents".to_string());
-        }
-
-        #[cfg(not(any(windows, target_os = "macos", unix)))]
-        {
-            // Unknown platform - start with minimal safe defaults
-            defaults.clear();
+        if defaults.is_empty() {
+            if let Some(home_dir) = dirs::home_dir() {
+                defaults.push(home_dir.to_string_lossy().to_string());
+            }
         }
 
         Self {
@@ -82,8 +74,44 @@ pub fn load_config(app_handle: &tauri::AppHandle) -> Result<NexsyncConfig, Strin
         .map_err(|e| format!("Failed to parse config file: {}", e))
 }
 
+/// Validate that an allowed root candidate is safe and not a system directory or root volume
+fn validate_root_candidate(root: &str) -> Result<PathBuf, String> {
+    let path = expand_and_resolve(root)?;
+    if !path.is_absolute() {
+        return Err(format!("Allowed root path '{}' must be absolute.", root));
+    }
+
+    let path_str = path.to_string_lossy();
+    // Reject system root directories
+    if path_str == "/" || path_str == "\\" || path_str.ends_with(":\\") || path_str.ends_with(":/") {
+        return Err(format!("Root directory '{}' cannot be configured as a workspace root.", root));
+    }
+
+    #[cfg(windows)]
+    {
+        let lower = path_str.to_lowercase();
+        if lower.starts_with("c:\\windows") || lower.starts_with("c:\\program files") || lower.starts_with("c:\\program files (x86)") {
+            return Err("System directories cannot be added as allowed workspace roots.".to_string());
+        }
+    }
+
+    #[cfg(unix)]
+    {
+        if path_str.starts_with("/etc") || path_str.starts_with("/usr") || path_str.starts_with("/var") || path_str.starts_with("/bin") || path_str.starts_with("/sbin") {
+            return Err("System directories cannot be added as allowed workspace roots.".to_string());
+        }
+    }
+
+    Ok(path)
+}
+
 /// Save the configuration to disk.
 pub fn save_config(app_handle: &tauri::AppHandle, config: &NexsyncConfig) -> Result<(), String> {
+    // Validate each root in the incoming configuration
+    for root in &config.allowed_workspace_roots {
+        validate_root_candidate(root)?;
+    }
+
     ensure_config_dir(app_handle)?;
     let config_file = config_path(app_handle)?;
     

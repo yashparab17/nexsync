@@ -68,6 +68,14 @@ pub fn create_kanban_column(app_handle: tauri::AppHandle, request: KanbanColumnR
     // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
+    // M6 FIX: Enforce bounds on Kanban column
+    if request.column.title.is_empty() || request.column.title.len() > 128 {
+        return Err("Kanban column title must be between 1 and 128 characters.".to_string());
+    }
+    if request.column.id.len() > 64 {
+        return Err("Column ID exceeds maximum allowed length.".to_string());
+    }
+
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let col = request.column;
@@ -87,6 +95,17 @@ pub fn create_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
     // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
+    // M6 FIX: Enforce bounds on Kanban card
+    if request.card.title.is_empty() || request.card.title.len() > 256 {
+        return Err("Kanban card title must be between 1 and 256 characters.".to_string());
+    }
+    if request.card.description.len() > 32768 {
+        return Err("Kanban card description cannot exceed 32 KB.".to_string());
+    }
+    if request.card.id.len() > 64 || request.card.column_id.len() > 64 {
+        return Err("Card ID or column ID exceeds maximum allowed length.".to_string());
+    }
+
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let card = request.card;
@@ -110,6 +129,17 @@ pub fn update_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
     // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
+    // M6 FIX: Enforce bounds on Kanban card
+    if request.card.title.is_empty() || request.card.title.len() > 256 {
+        return Err("Kanban card title must be between 1 and 256 characters.".to_string());
+    }
+    if request.card.description.len() > 32768 {
+        return Err("Kanban card description cannot exceed 32 KB.".to_string());
+    }
+    if request.card.id.len() > 64 || request.card.column_id.len() > 64 {
+        return Err("Card ID or column ID exceeds maximum allowed length.".to_string());
+    }
+
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let card = request.card;

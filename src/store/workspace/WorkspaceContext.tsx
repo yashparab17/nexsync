@@ -28,6 +28,8 @@ import {
 	addRecentWorkspace,
 	setLastWorkspace,
 	clearLastWorkspace,
+	setActiveSessionToken,
+	getActiveSessionToken,
 } from "@/lib/tauri";
 
 // Hooks
@@ -103,6 +105,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 				setMetadata(meta);
 				setStats(nextStats);
 				setWorkspace(meta.workspace);
+				setActiveSessionToken(meta.workspace.id);
 
 				// Update the app-level registries:
 				// 1. Add to recent workspaces list (for the Welcome page)
@@ -115,6 +118,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 				setMetadata(null);
 				setStats(null);
 				setWorkspace(null);
+				setActiveSessionToken(null);
 				logError(err, { source: "workspace_load", workspace: ws.path });
 				// Re-throw so callers can react (e.g. skip navigation).
 				throw err;
@@ -173,6 +177,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		// Clear the last-workspace file so the app opens to Welcome
 		// on next startup instead of re-opening this workspace.
 		await clearLastWorkspace();
+		setActiveSessionToken(null);
 		setWorkspace(null);
 		setMetadata(null);
 		setStats(null);
@@ -302,10 +307,7 @@ export function useWorkspace() {
 	return context;
 }
 
-/** Helper to get the current session ID from the workspace context */
-export function getCurrentWorkspaceSession(): string | undefined {
-	const { workspace } = useWorkspace();
-	// session ID is derived from the workspace path for simplicity in this single-user setup
-	// In a multi-user setup, this would be a proper session token
-	return workspace?.id;
+/** Helper to get the current session ID from the active session state */
+export function getCurrentWorkspaceSession(): string | null {
+	return getActiveSessionToken();
 }

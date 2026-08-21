@@ -50,6 +50,8 @@ pub fn get_last_workspace(app_handle: tauri::AppHandle) -> Result<Option<Workspa
     Ok(Some(workspace))
 }
 
+const MAX_RECENT_WORKSPACES: usize = 20;
+
 #[tauri::command]
 pub fn set_last_workspace(
     app_handle: tauri::AppHandle,
@@ -58,6 +60,10 @@ pub fn set_last_workspace(
     // C3 FIX: Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &workspace.path)?;
     
+    if workspace.name.len() > 256 || workspace.description.len() > 1024 || workspace.path.len() > 1024 {
+        return Err("Workspace metadata exceeds maximum field length.".to_string());
+    }
+
     let path = last_workspace_path(&app_handle)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -84,6 +90,10 @@ pub fn add_recent_workspace(
     // C3 FIX: Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &workspace.path)?;
     
+    if workspace.name.len() > 256 || workspace.description.len() > 1024 || workspace.path.len() > 1024 {
+        return Err("Workspace metadata exceeds maximum field length.".to_string());
+    }
+
     let registry = ensure_registry(&app_handle)?;
     let mut workspaces: Vec<WorkspaceInfo> = if registry.exists() {
         let json = fs::read_to_string(&registry).map_err(|e| e.to_string())?;
@@ -93,6 +103,7 @@ pub fn add_recent_workspace(
     };
     workspaces.retain(|w| w.id != workspace.id);
     workspaces.insert(0, workspace);
+    workspaces.truncate(MAX_RECENT_WORKSPACES);
     let json = serde_json::to_string_pretty(&workspaces).map_err(|e| e.to_string())?;
     fs::write(&registry, json).map_err(|e| e.to_string())?;
     Ok(())

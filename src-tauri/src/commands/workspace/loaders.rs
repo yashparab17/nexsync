@@ -46,7 +46,8 @@ pub(crate) fn load_activity(tx: &Transaction, workspace_id: &str) -> Result<Acti
         .prepare(
             "SELECT id, timestamp, action, detail, target, target_type
              FROM activity_events WHERE workspace_id = ?1
-             ORDER BY timestamp DESC",
+             ORDER BY timestamp DESC
+             LIMIT 500",
         )
         .map_err(|e| e.to_string())?;
     let events: Vec<ActivityEvent> = stmt

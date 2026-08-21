@@ -34,19 +34,44 @@ pub fn resolve_workspace_path(workspace_path: &str, rel_path: &str) -> Result<Pa
     // Build the full path lexically first
     let full_path_lexical = canonical_workspace.join(rel_path);
     
-    // CRITICAL FIX: Re-canonicalize the joined path to resolve any intermediate symlinks
-    // and catch cases where join() created a path outside the workspace via symlink escape
-    let full_path_canonicalized = full_path_lexical.canonicalize()
-        .map_err(|e| format!("Failed to canonicalize target path: {}", e))?;
-    
-    // Ensure the canonicalized full path is strictly within the workspace
-    // Use strict comparison - the workspace itself is not considered inside itself
-    if !full_path_canonicalized.starts_with(&canonical_workspace) && 
-       full_path_canonicalized != canonical_workspace {
-        return Err("Path traversal detected: target resolves outside workspace".to_string());
+    // If the path already exists, canonicalize directly and check containment
+    if let Ok(full_path_canonicalized) = full_path_lexical.canonicalize() {
+        if !full_path_canonicalized.starts_with(&canonical_workspace) && 
+           full_path_canonicalized != canonical_workspace {
+            return Err("Path traversal detected: target resolves outside workspace".to_string());
+        }
+        return Ok(full_path_canonicalized);
     }
-    
-    Ok(full_path_canonicalized)
+
+    // For non-existent paths (e.g. creating/writing a new file), canonicalize the closest
+    // existing ancestor directory to verify it stays within workspace boundaries.
+    let mut ancestor = full_path_lexical.as_path();
+    let mut trailing_components = Vec::new();
+
+    while !ancestor.exists() {
+        if let Some(file_name) = ancestor.file_name() {
+            trailing_components.push(file_name);
+        }
+        match ancestor.parent() {
+            Some(p) => ancestor = p,
+            None => return Err("Invalid path structure for target file".to_string()),
+        }
+    }
+
+    let canonical_ancestor = ancestor.canonicalize()
+        .map_err(|e| format!("Failed to canonicalize ancestor directory: {}", e))?;
+
+    if !canonical_ancestor.starts_with(&canonical_workspace) && canonical_ancestor != canonical_workspace {
+        return Err("Path traversal detected: ancestor directory resolves outside workspace".to_string());
+    }
+
+    // Reconstruct the resolved path from the canonical ancestor and safe trailing components
+    let mut resolved = canonical_ancestor;
+    for component in trailing_components.into_iter().rev() {
+        resolved = resolved.join(component);
+    }
+
+    Ok(resolved)
 }
 
 /// Validates a relative path component before joining to prevent various injection attacks
@@ -166,5 +191,18 @@ mod tests {
     fn test_invalid_root_rejected() {
         let result = resolve_workspace_path("/tmp/workspace", "malicious/path.txt");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_non_existent_file_path() {
+        let temp_dir = std::env::temp_dir().join(format!("nexsync_test_{}", uuid::Uuid::new_v4()));
+        let files_dir = temp_dir.join("files");
+        fs::create_dir_all(&files_dir).expect("create test dirs");
+
+        let workspace_str = temp_dir.to_string_lossy().to_string();
+        let result = resolve_workspace_path(&workspace_str, "files/new_uncreated_file.txt");
+        assert!(result.is_ok());
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }

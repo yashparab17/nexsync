@@ -51,6 +51,18 @@ pub fn create_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     validate_task_status(&request.task.status)?;
     validate_task_priority(&request.task.priority)?;
+
+    // M6 FIX: Enforce bounds on task fields
+    if request.task.title.is_empty() || request.task.title.len() > 256 {
+        return Err("Task title must be between 1 and 256 characters.".to_string());
+    }
+    if request.task.description.len() > 32768 {
+        return Err("Task description cannot exceed 32 KB.".to_string());
+    }
+    if request.task.id.len() > 64 {
+        return Err("Task ID exceeds maximum allowed length.".to_string());
+    }
+
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let task = request.task;
     let ws_id = get_workspace_id(&db)?;
@@ -76,6 +88,18 @@ pub fn update_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     validate_task_status(&request.task.status)?;
     validate_task_priority(&request.task.priority)?;
+
+    // M6 FIX: Enforce bounds on task fields
+    if request.task.title.is_empty() || request.task.title.len() > 256 {
+        return Err("Task title must be between 1 and 256 characters.".to_string());
+    }
+    if request.task.description.len() > 32768 {
+        return Err("Task description cannot exceed 32 KB.".to_string());
+    }
+    if request.task.id.len() > 64 {
+        return Err("Task ID exceeds maximum allowed length.".to_string());
+    }
+
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let task = request.task;
     let ws_id = get_workspace_id(&db)?;
