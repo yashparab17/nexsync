@@ -1,3 +1,4 @@
+// Workspace Kanban board view
 export default function WorkspaceKanban() {
 	return (
 		<div>

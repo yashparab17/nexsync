@@ -1,12 +1,4 @@
-//! Security Module (C1): Workspace Authorization & Session Management
-//! 
-//! Provides authentication and authorization for Tauri commands:
-//! - Workspace sessions track which workspaces are currently "open"
-//! - Each session has a unique token that must be passed to mutating commands
-//! - Roles (owner, editor, viewer) control what actions users can perform
-//! 
-//! Since Tauri apps don't have traditional HTTP sessions, we maintain
-//! a global registry of active workspace sessions in memory.
+//! Workspace authorization and in-memory session management.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -28,15 +20,18 @@ pub struct WorkspaceSession {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// User roles for RBAC (Role-Based Access Control)
-#[derive(Debug, Clone, PartialEq, Eq, strum::Display)]
+/// User roles for role-based access control
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, strum::Display, Default)]
 #[strum(serialize_all = "snake_case")]
 pub enum UserRole {
     Owner,
     Editor,
+    #[default]
     Viewer,
 }
 
+#[allow(dead_code)]
 impl UserRole {
     /// Check if this role can perform file creation
     pub fn can_create(&self) -> bool {
@@ -55,19 +50,12 @@ impl UserRole {
 
     /// Check if this role can read/view content
     pub fn can_view(&self) -> bool {
-        // All authenticated users can view
         true
     }
 
     /// Check if this role can modify settings/metadata
     pub fn can_edit_metadata(&self) -> bool {
         matches!(self, UserRole::Owner | UserRole::Editor)
-    }
-}
-
-impl Default for UserRole {
-    fn default() -> Self {
-        UserRole::Viewer
     }
 }
 
@@ -96,7 +84,7 @@ pub fn get_session(session_id: &str) -> Option<WorkspaceSession> {
         .cloned()
 }
 
-/// Remove a session (called when closing workspace or logging out)
+/// Remove a session when closing a workspace
 pub fn remove_session(session_id: &str) -> bool {
     SESSION_REGISTRY.lock()
         .expect("Failed to acquire lock on session registry")
@@ -105,9 +93,10 @@ pub fn remove_session(session_id: &str) -> bool {
 }
 
 /// Validate that a session exists and belongs to the specified workspace path
+#[allow(dead_code)]
 pub fn validate_session_for_path(session_id: &str, workspace_path: &str) -> Result<WorkspaceSession, String> {
     let session = get_session(session_id)
-        .ok_or_else(|| format!("Invalid or expired session token"))?;
+        .ok_or_else(|| "Invalid or expired session token".to_string())?;
     
     if session.workspace_path != workspace_path {
         return Err(format!(
@@ -120,21 +109,19 @@ pub fn validate_session_for_path(session_id: &str, workspace_path: &str) -> Resu
 }
 
 /// Get or create a session for the given workspace path
-/// For local-first apps where single-user mode is assumed, creates owner role by default
+#[allow(dead_code)]
 pub fn get_or_create_session(workspace_path: &str) -> String {
-    // In production, this would verify existing session first
-    // For now, create a new session with owner privileges (single-user mode)
     create_session(workspace_path, UserRole::Owner)
 }
 
-/// Initialize the session registry (call once at app startup)
+/// Initialize the session registry
 pub fn init() {
     if SESSION_REGISTRY.lock().is_err() {
         eprintln!("Warning: Session registry already initialized");
     }
 }
 
-// The global session registry - stored as static to be accessible from any thread
+// Global thread-safe session map
 lazy_static::lazy_static! {
     pub static ref SESSION_REGISTRY: SessionRegistry = Arc::new(Mutex::new(HashMap::new()));
 }
@@ -143,14 +130,14 @@ lazy_static::lazy_static! {
 // Tauri Commands for Session Management
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Creates a new workspace session token
 #[tauri::command]
 pub fn create_workspace_session(workspace_path: String) -> Result<String, String> {
-    // Session will be created with Owner role for single-user mode
-    // In multi-user mode, this would authenticate first and then create with appropriate role
     let session_id = create_session(&workspace_path, UserRole::Owner);
     Ok(session_id)
 }
 
+/// Closes an active workspace session token
 #[tauri::command]
 pub fn close_workspace_session(session_id: String) -> Result<(), String> {
     if !remove_session(&session_id) {
@@ -159,10 +146,11 @@ pub fn close_workspace_session(session_id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Retrieves active session details for frontend authorization
 #[tauri::command]
 pub fn get_current_session_info(_app_handle: tauri::AppHandle, session_id: String) -> Result<Option<SessionInfo>, String> {
     let session = get_session(&session_id)
-        .ok_or_else(|| format!("Invalid or expired session token"))?;
+        .ok_or_else(|| "Invalid or expired session token".to_string())?;
     
     Ok(Some(SessionInfo {
         session_id: session.session_id.clone(),
@@ -182,6 +170,7 @@ pub struct SessionInfo {
 }
 
 /// Error code for missing session
+#[allow(dead_code)]
 pub const ERROR_MISSING_SESSION: &str = "Missing authentication token. Please call create_workspace_session first.";
 
 #[cfg(test)]

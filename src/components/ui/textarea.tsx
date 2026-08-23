@@ -1,11 +1,12 @@
-import * as React from "react"
+import * as React from "react";
 import {
   composeRenderProps,
   TextArea as TextareaPrimitive,
-} from "react-aria-components"
+} from "react-aria-components";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
+// Multi-line text area input component
 function Textarea({
   className,
   ...props
@@ -21,7 +22,7 @@ function Textarea({
       )}
       {...props}
     />
-  )
+  );
 }
 
-export { Textarea }
+export { Textarea };

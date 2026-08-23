@@ -1,16 +1,15 @@
-use std::path::Path;
+//! Helper functions for workspace database access, registry management, and path validation.
 
+use std::path::Path;
 use crate::database::WorkspaceDb;
 use tauri::Manager;
 
-/// Returns the path to the workspace SQLite database file:
-/// `<workspace_path>/.nexsync/nexsync.db`
+/// Returns the path to the workspace SQLite database file: `<workspace_path>/.nexsync/nexsync.db`
 pub(crate) fn workspace_db_path(workspace_path: &Path) -> std::path::PathBuf {
     workspace_path.join(".nexsync").join("nexsync.db")
 }
 
-/// Returns the workspace id from the SQLite DB.
-/// Ensures exactly one workspace record exists in the database.
+/// Returns the unique workspace id from the SQLite database
 pub(crate) fn get_workspace_id(db: &WorkspaceDb) -> Result<String, String> {
     let mut stmt = db
         .conn
@@ -29,7 +28,8 @@ pub(crate) fn get_workspace_id(db: &WorkspaceDb) -> Result<String, String> {
     }
 }
 
-/// Verify that the workspace_id matches the one in the given workspace DB.
+/// Verify that the workspace_id matches the one in the given workspace DB
+#[allow(dead_code)]
 pub(crate) fn verify_workspace_id(db: &WorkspaceDb, workspace_id: &str) -> Result<(), String> {
     let db_id: String = db
         .conn
@@ -38,11 +38,11 @@ pub(crate) fn verify_workspace_id(db: &WorkspaceDb, workspace_id: &str) -> Resul
     if db_id == workspace_id {
         Ok(())
     } else {
-        Err("Workspace ID mismatch - operation targets wrong workspace".into())
+        Err("Workspace ID mismatch - operation targets wrong workspace".to_string())
     }
 }
 
-/// Returns the path to the workspace registry file in the app-data directory.
+/// Returns the path to the workspace registry file in the app-data directory
 pub(crate) fn registry_path(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     let app_data = app_handle
         .path()
@@ -51,7 +51,7 @@ pub(crate) fn registry_path(app_handle: &tauri::AppHandle) -> Result<std::path::
     Ok(app_data.join("nexsync").join("workspaces.json"))
 }
 
-/// Returns the path to the last-workspace file in the app-data directory.
+/// Returns the path to the last-workspace file in the app-data directory
 pub(crate) fn last_workspace_path(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     let app_data = app_handle
         .path()
@@ -60,7 +60,7 @@ pub(crate) fn last_workspace_path(app_handle: &tauri::AppHandle) -> Result<std::
     Ok(app_data.join("nexsync").join("last_workspace.json"))
 }
 
-/// Ensures the registry directory exists and returns the registry path.
+/// Ensures the registry directory exists and returns the registry path
 pub(crate) fn ensure_registry(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     let path = registry_path(app_handle)?;
     if let Some(parent) = path.parent() {
@@ -69,44 +69,31 @@ pub(crate) fn ensure_registry(app_handle: &tauri::AppHandle) -> Result<std::path
     Ok(path)
 }
 
-/// Validates a workspace-relative path for safe filesystem access.
+/// Validates a workspace-relative path for safe filesystem access
+#[allow(dead_code)]
 pub(crate) fn validate_workspace_rel_path(rel_path: &str) -> Result<(), String> {
-const ALLOWED_ROOTS: &[&str] = &["notes", "files", "assets", "tasks", "kanban", "editor"];
-    let rel_path = rel_path.trim_matches('/');
-    if rel_path.is_empty() {
-        return Err("The path cannot be empty.".into());
-    }
-    let segments: Vec<&str> = rel_path.split('/').collect();
-    if !ALLOWED_ROOTS.contains(&segments[0]) {
-        return Err(format!("Invalid workspace path: {rel_path}"));
-    }
-    for segment in &segments {
-        if segment.is_empty()
-            || *segment == "."
-            || *segment == ".."
-            || segment.contains('\\')
-            || segment.contains(':')
-        {
-            return Err(format!("Invalid path segment: {segment}"));
-        }
-    }
-    Ok(())
+    const ALLOWED_ROOTS: &[&str] = &["notes", "files", "assets", "tasks", "kanban", "editor"];
+    validate_workspace_rel_path_with_roots(rel_path, ALLOWED_ROOTS)
 }
 
-/// Validates a workspace-relative path for safe filesystem access (stricter version with allowed roots).
+/// Validates a workspace-relative path for safe filesystem access with specified roots
 pub(crate) fn validate_workspace_rel_path_with_roots(rel_path: &str, allowed_roots: &[&str]) -> Result<(), String> {
     let rel_path = rel_path.trim_matches('/');
     if rel_path.is_empty() {
-        return Err("The path cannot be empty.".into());
+        return Err("The path cannot be empty.".to_string());
     }
-    let segments: Vec<&str> = rel_path.split('/').collect();
-    if !allowed_roots.contains(&segments[0]) {
+    let mut segments = rel_path.split('/');
+    let first = segments.next().unwrap_or("");
+    if !allowed_roots.contains(&first) {
         return Err(format!("Invalid workspace path: {rel_path}"));
     }
-    for segment in &segments {
+    if first.contains('\\') || first.contains(':') {
+        return Err(format!("Invalid path segment: {first}"));
+    }
+    for segment in segments {
         if segment.is_empty()
-            || *segment == "."
-            || *segment == ".."
+            || segment == "."
+            || segment == ".."
             || segment.contains('\\')
             || segment.contains(':')
         {
@@ -116,7 +103,7 @@ pub(crate) fn validate_workspace_rel_path_with_roots(rel_path: &str, allowed_roo
     Ok(())
 }
 
-/// Validates a single file/folder name for create/rename operations.
+/// Validates a single file or folder name for create and rename operations
 pub(crate) fn validate_workspace_item_name(name: &str) -> Result<(), String> {
     if name.is_empty()
         || name == "."
@@ -130,7 +117,7 @@ pub(crate) fn validate_workspace_item_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Returns `true` if `path` points to a valid Nexsync workspace directory.
+/// Returns true if path points to an existing valid Nexsync workspace
 pub(crate) fn is_valid_workspace(path: &str) -> bool {
     let dir = Path::new(path);
     if !dir.is_dir() {
@@ -139,7 +126,7 @@ pub(crate) fn is_valid_workspace(path: &str) -> bool {
     workspace_db_path(dir).exists()
 }
 
-/// Returns the path to the app-level error log in the app-data directory.
+/// Returns the path to the app-level error log in the app-data directory
 pub(crate) fn error_log_path(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     let app_data = app_handle
         .path()

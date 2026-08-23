@@ -8,10 +8,12 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import WorkspaceSidebar from "@/components/layout/workspace/WorkspaceSidebar";
 import WorkspaceHeader from "@/components/layout/workspace/WorkspaceHeader";
 
+// Shell layout for all workspace sub-routes
 export default function Workspace() {
 	const { workspace, isLoading } = useWorkspace();
 	const navigate = useNavigate();
 
+	// Show loader while workspace data is being fetched
 	if (isLoading) {
 		return (
 			<div className="flex h-screen items-center justify-center">
@@ -20,10 +22,8 @@ export default function Workspace() {
 		);
 	}
 
-	// Errors are surfaced by the global <ErrorDialog /> in App.tsx.
+	// Defensive redirect to Welcome if no workspace is active
 	if (!workspace) {
-		// Defensive redirect: if no workspace is loaded and we're on /workspace,
-		// redirect to Welcome to avoid blank pages.
 		if (window.location.pathname === "/workspace") {
 			navigate("/", { replace: true });
 		}
@@ -35,7 +35,7 @@ export default function Workspace() {
 			{/* Sidebar */}
 			<WorkspaceSidebar />
 
-			{/* Main area */}
+			{/* Main content area */}
 			<div className="flex min-w-0 flex-1 flex-col">
 				{/* Header */}
 				<WorkspaceHeader />

@@ -29,6 +29,7 @@ interface NavigationItem {
 	end?: boolean;
 }
 
+// Workspace feature navigation links
 const navigation: NavigationItem[] = [
 	{
 		name: "Dashboard",
@@ -58,6 +59,7 @@ const navigation: NavigationItem[] = [
 	},
 ];
 
+// Bottom workspace navigation links
 const bottomNavigation: NavigationItem[] = [
 	{
 		name: "Members",
@@ -71,6 +73,7 @@ const bottomNavigation: NavigationItem[] = [
 	},
 ];
 
+// Sidebar navigation link component
 function NavigationItem({ item }: { item: NavigationItem }) {
 	const Icon = item.icon;
 
@@ -92,10 +95,12 @@ function NavigationItem({ item }: { item: NavigationItem }) {
 	);
 }
 
+// Left sidebar navigation bar for workspace views
 export default function WorkspaceSidebar() {
 	const { workspace, clearWorkspace } = useWorkspace();
 	const navigate = useNavigate();
 
+	// Unload workspace and return to Welcome view
 	const handleBackToWelcome = async () => {
 		await clearWorkspace();
 		navigate("/");

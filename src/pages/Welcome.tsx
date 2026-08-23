@@ -24,7 +24,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 
-// Tauri
+// Tauri IPC
 import { getRecentWorkspaces } from "@/lib/tauri";
 
 // Context
@@ -38,30 +38,32 @@ import logo from "@/assets/logos/logo.svg";
 import logo_black from "@/assets/logos/logo-black.svg";
 import logo_white from "@/assets/logos/logo-white.svg";
 
+// Welcome landing page with recent workspaces and quick actions
 export default function Welcome() {
 	// Hooks
 	const { isDark } = useTheme();
 	const navigate = useNavigate();
 
-	// Workspace
+	// Workspace state & logging
 	const { loadWorkspace: loadWs } = useWorkspace();
 	const logError = useErrorLog();
 
-	// States
+	// Local states
 	const [recentWorkspaces, setRecentWorkspaces] = useState<WorkspaceInfo[]>(
 		[],
 	);
 	const [loading, setLoading] = useState(true);
 
-	// Styles
+	// Shared button styling
 	const actionButtonClass =
 		"px-8 text-base cursor-pointer hover:scale-[1.02] hover:border-primary";
 
+	// Load recent workspaces on mount
 	useEffect(() => {
 		loadRecentWorkspaces();
 	}, []);
 
-	// Handlers
+	// Fetch recent workspaces from backend registry
 	const loadRecentWorkspaces = async () => {
 		try {
 			const workspaces = await getRecentWorkspaces();
@@ -74,21 +76,17 @@ export default function Welcome() {
 		}
 	};
 
+	// Open selected workspace and navigate to dashboard
 	const handleOpenWorkspace = async (workspace: WorkspaceInfo) => {
 		try {
 			await loadWs(workspace);
 			navigate("/workspace");
 		} catch (err) {
-			// The load failed (e.g. the folder was deleted). loadWorkspace
-			// already set the error + failedWorkspace state, so the global
-			// ErrorDialog will surface it. Stay on Welcome and refresh the
-			// recent list — get_recent_workspaces prunes invalid entries.
 			console.error("Failed to open workspace:", err);
 			loadRecentWorkspaces();
 		}
 	};
 
-	// Render
 	return (
 		<main className="flex min-h-screen flex-col p-8">
 			{/* Header */}
@@ -133,6 +131,7 @@ export default function Welcome() {
 						Quick Actions
 					</p>
 
+					{/* Action Buttons */}
 					<div className="flex flex-wrap justify-center gap-6">
 						<CreateWorkspaceDialog>
 							<Button className={actionButtonClass}>
@@ -196,7 +195,7 @@ export default function Welcome() {
 				</div>
 			</section>
 
-			{/* Bottom */}
+			{/* Footer */}
 			<footer className="mt-auto space-y-1 pb-4 text-center text-muted-foreground">
 				<p className="text-2xl">Nexsync 0.0.1</p>
 				<p className="text-xs">

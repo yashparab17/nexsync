@@ -1,19 +1,39 @@
+import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
 
 import App from "@/App";
-
 import Welcome from "@/pages/Welcome";
-import Settings from "@/pages/Settings";
-import Unavailable from "@/pages/Unavailable";
 import Workspace from "@/pages/workspace/WorkspaceWrapper";
 import WorkspaceDashboard from "@/pages/workspace/WorkspaceDashboard";
-import WorkspaceFiles from "@/pages/workspace/WorkspaceFiles";
-import WorkspaceAssets from "@/pages/workspace/WorkspaceAssets";
-import WorkspaceTasks from "@/pages/workspace/WorkspaceTasks";
-import WorkspaceKanban from "@/pages/workspace/WorkspaceKanban";
-import WorkspaceMembers from "@/pages/workspace/WorkspaceMembers";
-import WorkspaceSettings from "@/pages/workspace/WorkspaceSettings";
 
+// Lazy-load sub-routes for optimized bundle splitting
+const WorkspaceFiles = lazy(() => import("@/pages/workspace/WorkspaceFiles"));
+const WorkspaceAssets = lazy(() => import("@/pages/workspace/WorkspaceAssets"));
+const WorkspaceTasks = lazy(() => import("@/pages/workspace/WorkspaceTasks"));
+const WorkspaceKanban = lazy(() => import("@/pages/workspace/WorkspaceKanban"));
+const WorkspaceMembers = lazy(() => import("@/pages/workspace/WorkspaceMembers"));
+const WorkspaceSettings = lazy(() => import("@/pages/workspace/WorkspaceSettings"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const Unavailable = lazy(() => import("@/pages/Unavailable"));
+
+// Suspense fallback wrapper for lazy-loaded route components
+function RouteSuspense({ children }: { children: React.ReactNode }) {
+	return (
+		<Suspense
+			fallback={
+				<div className="flex h-64 items-center justify-center">
+					<p className="text-xs tracking-widest text-muted-foreground uppercase">
+						Loading…
+					</p>
+				</div>
+			}
+		>
+			{children}
+		</Suspense>
+	);
+}
+
+// Application client-side router definition
 export const router = createBrowserRouter([
 	{
 		path: "/",
@@ -37,38 +57,70 @@ export const router = createBrowserRouter([
 					},
 					{
 						path: "files",
-						element: <WorkspaceFiles />,
+						element: (
+							<RouteSuspense>
+								<WorkspaceFiles />
+							</RouteSuspense>
+						),
 					},
 					{
 						path: "assets",
-						element: <WorkspaceAssets />,
+						element: (
+							<RouteSuspense>
+								<WorkspaceAssets />
+							</RouteSuspense>
+						),
 					},
 					{
 						path: "tasks",
-						element: <WorkspaceTasks />,
+						element: (
+							<RouteSuspense>
+								<WorkspaceTasks />
+							</RouteSuspense>
+						),
 					},
 					{
 						path: "kanban",
-						element: <WorkspaceKanban />,
+						element: (
+							<RouteSuspense>
+								<WorkspaceKanban />
+							</RouteSuspense>
+						),
 					},
 					{
 						path: "members",
-						element: <WorkspaceMembers />,
+						element: (
+							<RouteSuspense>
+								<WorkspaceMembers />
+							</RouteSuspense>
+						),
 					},
 					{
 						path: "settings",
-						element: <WorkspaceSettings />,
+						element: (
+							<RouteSuspense>
+								<WorkspaceSettings />
+							</RouteSuspense>
+						),
 					},
 				],
 			},
 			{
 				path: "settings",
-				element: <Settings />,
+				element: (
+					<RouteSuspense>
+						<Settings />
+					</RouteSuspense>
+				),
 			},
 		],
 	},
 	{
 		path: "*",
-		element: <Unavailable />,
+		element: (
+			<RouteSuspense>
+				<Unavailable />
+			</RouteSuspense>
+		),
 	},
 ]);

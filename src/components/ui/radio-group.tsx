@@ -4,10 +4,11 @@ import {
   Radio as RadioPrimitive,
   type RadioGroupProps,
   type RadioProps,
-} from "react-aria-components"
+} from "react-aria-components";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
+// Radio group wrapper component
 function RadioGroup({ className, ...props }: RadioGroupProps) {
   return (
     <RadioGroupPrimitive
@@ -15,9 +16,10 @@ function RadioGroup({ className, ...props }: RadioGroupProps) {
       className={cn("grid w-full gap-3", className)}
       {...props}
     />
-  )
+  );
 }
 
+// Individual radio button option
 function RadioGroupItem({ className, children, ...props }: RadioProps) {
   return (
     <RadioPrimitive
@@ -42,7 +44,7 @@ function RadioGroupItem({ className, children, ...props }: RadioProps) {
         </>
       ))}
     </RadioPrimitive>
-  )
+  );
 }
 
-export { RadioGroup, RadioGroupItem }
+export { RadioGroup, RadioGroupItem };

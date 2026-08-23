@@ -36,7 +36,7 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 // Hooks
 import { useErrorLog } from "@/hooks/useErrorLog";
 
-// Tauri
+// Tauri IPC
 import {
 	createWorkspaceFile,
 	createWorkspaceFolder,
@@ -50,9 +50,11 @@ import {
 // Types
 import type { WorkspaceFile } from "@/types/workspace";
 
-// ─── helpers ─────────────────────────────────────────────
+// ────────────────────────────
+// Helpers
+// ────────────────────────────
 
-/** Formats a byte count into a compact human-readable string. */
+// Formats a byte count into a human-readable size string
 function formatSize(bytes: number): string {
 	if (bytes === 0) return "Empty";
 	if (bytes < 1024) return `${bytes} B`;
@@ -60,7 +62,7 @@ function formatSize(bytes: number): string {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Formats an ISO-8601 timestamp as a locale date + time. */
+// Formats an ISO-8601 timestamp as a locale date and time
 function formatDate(iso: string): string {
 	if (!iso) return "—";
 	const date = new Date(iso);
@@ -74,72 +76,74 @@ function formatDate(iso: string): string {
 	});
 }
 
-/** Strips the leading `/` and returns a relative path (e.g. `/files/a.md` → `files/a.md`). */
+// Strips leading slash from entry path (e.g. /files/a.md -> files/a.md)
 function toRelPath(entryPath: string): string {
 	return entryPath.replace(/^\/+/, "");
 }
 
-/** Joins the current directory with a name to form a backend-safe relative path. */
+// Joins directory and file name into a relative path
 function joinRelPath(currentDir: string, name: string): string {
 	return currentDir ? `${currentDir}/${name}` : name;
 }
 
-/** Splits a directory path into breadcrumb segments (excluding the root `files`). */
+// Splits current directory into breadcrumb segments
 function getBreadcrumbs(currentDir: string): string[] {
 	return currentDir ? currentDir.split("/") : [];
 }
 
-/** Returns the parent directory path for a given relative path. */
+// Gets the parent directory of a relative path
 function getParentDir(relPath: string): string {
 	const parts = relPath.split("/");
 	parts.pop();
 	return parts.join("/");
 }
 
-// ─── name dialog (shared by create + rename) ─────────────
+// ────────────────────────────
+// Name Dialog State
+// ────────────────────────────
 
 interface NameDialogState {
 	mode: "create" | "rename";
 	kind: "file" | "folder";
-	/** The item being renamed (only for rename mode). */
 	item?: WorkspaceFile;
 	value: string;
 }
 
-// ─── main component ──────────────────────────────────────
+// ────────────────────────────
+// Main component
+// ────────────────────────────
 
+// File manager page for browsing, creating, editing, and deleting files
 export default function WorkspaceFiles() {
 	const { workspace, refreshStats, addActivityEvent } = useWorkspace();
 	const logError = useErrorLog();
 
 	const workspacePath = workspace?.path ?? "";
 
-	// ── Navigation state ──
+	// Navigation state
 	const [currentDir, setCurrentDir] = useState("");
 	const [entries, setEntries] = useState<WorkspaceFile[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 
-	// ── File viewer/editor state ──
+	// File editor state
 	const [openFilePath, setOpenFilePath] = useState<string | null>(null);
 	const [openFileContent, setOpenFileContent] = useState("");
 	const [isFileLoading, setIsFileLoading] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-	// ── Dialog state ──
+	// Modal dialog state
 	const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
 	const [nameError, setNameError] = useState<string | null>(null);
 	const [isNameSubmitting, setIsNameSubmitting] = useState(false);
 	const [deleteItem, setDeleteItem] = useState<WorkspaceFile | null>(null);
 	const [isDeleting, setIsDeleting] = useState(false);
 
-	// ── File listing ──
-
+	// Load directory entries from backend
 	const loadEntries = useCallback(async () => {
 		if (!workspacePath) return;
 		setIsLoading(true);
 		try {
-			// `files` is the root of this feature's content folder.
 			const relDir = currentDir ? `files/${currentDir}` : "files";
 			const next = await listWorkspaceFiles(workspacePath, relDir);
 			setEntries(next);
@@ -154,24 +158,23 @@ export default function WorkspaceFiles() {
 		}
 	}, [workspacePath, currentDir, logError]);
 
+	// Fetch entries on directory change
 	useEffect(() => {
 		void loadEntries();
 	}, [loadEntries]);
 
+	// Navigate into a sub-directory
 	const navigateToDir = useCallback((dir: string) => {
 		setCurrentDir(dir);
 	}, []);
 
-	// ── File open / save ──
-
+	// Read file contents from backend and open editor modal
 	const handleOpenEntry = useCallback(
 		async (entry: WorkspaceFile) => {
 			if (!workspacePath || entry.is_dir) return;
 
 			const relPath = toRelPath(entry.path);
 
-			// Discard unsaved changes silently? The dialog is the guard;
-			// opening a new file simply replaces the current one.
 			setIsFileLoading(true);
 			try {
 				const content = await readWorkspaceFile(workspacePath, relPath);
@@ -190,6 +193,7 @@ export default function WorkspaceFiles() {
 		[workspacePath, logError],
 	);
 
+	// Save modified file contents to backend
 	const handleSaveFile = useCallback(async () => {
 		if (!workspacePath || !openFilePath) return;
 
@@ -207,7 +211,6 @@ export default function WorkspaceFiles() {
 				`/${openFilePath}`,
 				"file",
 			);
-			// Refresh listing to pick up the new modified time.
 			void loadEntries();
 		} catch (err) {
 			logError(err, {
@@ -226,25 +229,20 @@ export default function WorkspaceFiles() {
 		logError,
 	]);
 
+	// Close open file editor
 	const handleCloseFile = useCallback(() => {
-		if (hasUnsavedChanges) {
-			// Confirmation happens in the dialog footer button.
-			setOpenFilePath(null);
-			setOpenFileContent("");
-			setHasUnsavedChanges(false);
-			return;
-		}
 		setOpenFilePath(null);
 		setOpenFileContent("");
-	}, [hasUnsavedChanges]);
+		setHasUnsavedChanges(false);
+	}, []);
 
-	// ── Create / rename ──
-
+	// Open dialog to create file or folder
 	const openCreateDialog = useCallback((kind: "file" | "folder") => {
 		setNameDialog({ mode: "create", kind, value: "" });
 		setNameError(null);
 	}, []);
 
+	// Open dialog to rename an existing item
 	const openRenameDialog = useCallback((item: WorkspaceFile) => {
 		setNameDialog({
 			mode: "rename",
@@ -255,6 +253,7 @@ export default function WorkspaceFiles() {
 		setNameError(null);
 	}, []);
 
+	// Submit creation or renaming request to backend
 	const handleNameSubmit = useCallback(async () => {
 		const dialog = nameDialog;
 		if (!dialog || !workspacePath) return;
@@ -290,7 +289,7 @@ export default function WorkspaceFiles() {
 					);
 				}
 
-				// Auto-open newly created files so the user can start typing.
+				// Auto-open created file in editor
 				if (dialog.kind === "file") {
 					const newPath = `files/${joinRelPath(currentDir, name)}`;
 					setIsFileLoading(true);
@@ -316,7 +315,6 @@ export default function WorkspaceFiles() {
 					dialog.item.is_dir ? "folder" : "file",
 				);
 
-				// If the open file was renamed, update the editor path.
 				if (openFilePath === relPath) {
 					const newRelPath = `${getParentDir(relPath)}/${name}`;
 					setOpenFilePath(newRelPath);
@@ -346,8 +344,7 @@ export default function WorkspaceFiles() {
 		logError,
 	]);
 
-	// ── Delete ──
-
+	// Delete item permanently from disk
 	const handleDelete = useCallback(async () => {
 		if (!deleteItem || !workspacePath) return;
 
@@ -363,7 +360,6 @@ export default function WorkspaceFiles() {
 				deleteItem.is_dir ? "folder" : "file",
 			);
 
-			// If the deleted item was the open file, close the editor.
 			if (openFilePath === relPath) {
 				setOpenFilePath(null);
 				setOpenFileContent("");
@@ -391,8 +387,7 @@ export default function WorkspaceFiles() {
 		logError,
 	]);
 
-	// ── Breadcrumb rendering ──
-
+	// Construct breadcrumbs
 	const breadcrumbs = getBreadcrumbs(currentDir);
 	const crumbs = [
 		{ label: "Files", dir: "" },
@@ -401,8 +396,6 @@ export default function WorkspaceFiles() {
 			dir: breadcrumbs.slice(0, i + 1).join("/"),
 		})),
 	];
-
-	// ── Render ──
 
 	return (
 		<div className="space-y-6">
@@ -415,6 +408,7 @@ export default function WorkspaceFiles() {
 					</p>
 				</div>
 
+				{/* Toolbar Actions */}
 				<div className="flex gap-2">
 					<Button
 						variant="outline"
@@ -472,7 +466,7 @@ export default function WorkspaceFiles() {
 				))}
 			</nav>
 
-			{/* Content */}
+			{/* File Listing Table */}
 			{isLoading ?
 				<div className="flex items-center justify-center py-16">
 					<Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -535,7 +529,7 @@ export default function WorkspaceFiles() {
 											{formatDate(entry.modified_at)}
 										</span>
 
-										{/* Actions (visible on hover/focus) */}
+										{/* Row actions */}
 										<div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
 											<Button
 												variant="ghost"
@@ -566,7 +560,7 @@ export default function WorkspaceFiles() {
 				</div>
 			}
 
-			{/* ── File viewer / editor dialog ── */}
+			{/* File Editor Modal */}
 			<Dialog
 				isOpen={openFilePath !== null}
 				onOpenChange={(isOpen) => {
@@ -644,7 +638,7 @@ export default function WorkspaceFiles() {
 				)}
 			</Dialog>
 
-			{/* ── Create / rename dialog ── */}
+			{/* Create / Rename Dialog */}
 			<Dialog
 				isOpen={nameDialog !== null}
 				onOpenChange={(isOpen) => {
@@ -741,7 +735,7 @@ export default function WorkspaceFiles() {
 				)}
 			</Dialog>
 
-			{/* ── Delete confirmation dialog ── */}
+			{/* Delete Confirmation Dialog */}
 			<Dialog
 				isOpen={deleteItem !== null}
 				onOpenChange={(isOpen) => {

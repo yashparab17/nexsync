@@ -1,3 +1,4 @@
+// Workspace configuration and settings view
 export default function WorkspaceSettings() {
 	return (
 		<div>

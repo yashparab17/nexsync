@@ -1,5 +1,6 @@
-use crate::commands::config::validate_allowed_root;
+//! Task CRUD commands backed by SQLite.
 
+use crate::commands::config::validate_allowed_root;
 use super::helpers::get_workspace_id;
 use super::models::{Task, TaskIdRequest, TaskRequest};
 use crate::commands::validation::{validate_task_priority, validate_task_status};
@@ -8,9 +9,9 @@ use crate::commands::validation::{validate_task_priority, validate_task_status};
 // Tauri commands — Task CRUD
 // ────────────────────────────
 
+/// Fetches all tasks for the workspace
 #[tauri::command]
 pub fn get_tasks(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Task>, String> {
-    // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &path)?;
     
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&path, ".")?;
@@ -43,16 +44,16 @@ pub fn get_tasks(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Task>
     Ok(tasks)
 }
 
+/// Creates a new task in the workspace database
 #[tauri::command]
 pub fn create_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result<Task, String> {
-    // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     validate_task_status(&request.task.status)?;
     validate_task_priority(&request.task.priority)?;
 
-    // M6 FIX: Enforce bounds on task fields
+    // Enforce field bounds
     if request.task.title.is_empty() || request.task.title.len() > 256 {
         return Err("Task title must be between 1 and 256 characters.".to_string());
     }
@@ -80,16 +81,15 @@ pub fn create_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
     Ok(task)
 }
 
+/// Updates an existing task in the workspace database
 #[tauri::command]
 pub fn update_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result<(), String> {
-    // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     validate_task_status(&request.task.status)?;
     validate_task_priority(&request.task.priority)?;
 
-    // M6 FIX: Enforce bounds on task fields
     if request.task.title.is_empty() || request.task.title.len() > 256 {
         return Err("Task title must be between 1 and 256 characters.".to_string());
     }
@@ -118,9 +118,9 @@ pub fn update_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
     Ok(())
 }
 
+/// Deletes a task by ID from the workspace database
 #[tauri::command]
 pub fn delete_task(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Result<(), String> {
-    // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;

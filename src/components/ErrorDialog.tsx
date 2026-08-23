@@ -20,14 +20,7 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 // Hooks
 import { useErrorLog } from "@/hooks/useErrorLog";
 
-/**
- * Global error popup. Rendered once at the app root so it can surface errors
- * from anywhere (Welcome, startup restore, or inside a workspace).
- *
- * The message is deliberately friendly: if a workspace failed to load, we tell
- * the user the folder may have moved or been deleted, and that it will be
- * removed from Recent automatically (the backend prunes invalid entries).
- */
+// Global error popup dialog rendered at app root
 export default function ErrorDialog() {
 	const { error, clearError, workspace, failedWorkspace } = useWorkspace();
 	const logError = useErrorLog();
@@ -35,10 +28,7 @@ export default function ErrorDialog() {
 
 	const isWorkspaceError = !!failedWorkspace;
 
-	// Record the dialog display as the canonical log entry. Individual error
-	// raises (load/save/startup) already log at their source, so non-workspace
-	// errors (which aren't logged elsewhere) are captured here. Using an effect
-	// avoids re-logging on every re-render while the dialog is open.
+	// Log non-workspace runtime errors when dialog opens
 	useEffect(() => {
 		if (error && !isWorkspaceError) {
 			logError(error, { source: "dialog" });
@@ -46,16 +36,15 @@ export default function ErrorDialog() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [error]);
 
+	// Clear error and redirect to Welcome if no workspace loaded
 	const handleDismiss = () => {
 		clearError();
-		// If a workspace load failed, there's nothing valid to show — go home.
 		if (!workspace) {
 			navigate("/");
 		}
 	};
 
-	// If the error relates to a failed workspace load, show a contextual
-	// message that references the workspace by name.
+	// Determine contextual dialog title and description
 	const title =
 		isWorkspaceError ?
 			`We couldn't open "${failedWorkspace.name}"`

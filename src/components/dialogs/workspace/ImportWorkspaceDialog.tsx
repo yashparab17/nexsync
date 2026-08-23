@@ -21,7 +21,7 @@ import {
 	DialogFooter,
 } from "@/components/ui/dialog";
 
-// Tauri
+// Tauri API
 import { open } from "@tauri-apps/plugin-dialog";
 import { importWorkspace } from "@/lib/tauri";
 
@@ -32,6 +32,7 @@ interface ImportWorkspaceDialogProps {
 	children: ReactNode;
 }
 
+// Dialog modal for importing an existing Nexsync workspace from disk
 export default function ImportWorkspaceDialog({
 	children,
 }: ImportWorkspaceDialogProps) {
@@ -41,6 +42,7 @@ export default function ImportWorkspaceDialog({
 	const [workspacePath, setWorkspacePath] = useState("");
 	const [error, setError] = useState("");
 
+	// Open folder picker to choose existing workspace directory
 	const pickWorkspace = async () => {
 		setError("");
 
@@ -54,6 +56,7 @@ export default function ImportWorkspaceDialog({
 		}
 	};
 
+	// Import workspace from selected path and load into context
 	const handleImportWorkspace = async () => {
 		setError("");
 
@@ -64,13 +67,7 @@ export default function ImportWorkspaceDialog({
 
 		try {
 			const workspace = await importWorkspace(workspacePath);
-
-			// loadWorkspace handles:
-			// - Loading full metadata into context
-			// - Adding to recent workspaces registry
-			// - Setting as last workspace for session restoration
 			await loadWorkspace(workspace);
-
 			navigate("/workspace");
 		} catch (error) {
 			console.error("Failed to import workspace:", error);

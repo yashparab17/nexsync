@@ -1,7 +1,8 @@
 // ────────────────────────────
-// Core types
+// Core workspace types
 // ────────────────────────────
 
+// Top-level workspace identity
 export interface WorkspaceInfo {
 	id: string;
 	name: string;
@@ -11,6 +12,7 @@ export interface WorkspaceInfo {
 	updated_at: string;
 }
 
+// Complete workspace metadata state
 export interface WorkspaceMetadata {
 	workspace: WorkspaceInfo;
 	settings: Settings;
@@ -24,63 +26,70 @@ export interface WorkspaceMetadata {
 // Individual metadata types
 // ────────────────────────────
 
+// User preferences for workspace
 export interface Settings {
 	theme: string;
 	autosave: boolean;
 	sync: boolean;
 }
 
+// Workspace collaborator
 export interface Member {
 	id: string;
 	name: string;
 	role: string;
 }
 
+// List of workspace collaborators
 export interface Members {
 	members: Member[];
 }
 
+// Workspace audit trail event
 export interface ActivityEvent {
 	id: string;
 	timestamp: string;
 	action: string;
 	detail: string;
-	/** Optional workspace-relative path for deep-linking (e.g. `/files/notes/a.md`). */
+	// Optional workspace-relative path for deep-linking
 	target?: string;
-	/** Optional entity type for the target (e.g. `file`, `task`, `note`). */
+	// Optional entity type for target (e.g. file, task, note)
 	target_type?: string;
 }
 
+// Workspace activity history
 export interface Activity {
 	events: ActivityEvent[];
 }
 
+// Role-based permissions map
 export interface Permissions {
 	owner: string[];
 	editor: string[];
 	viewer: string[];
 }
 
+// Workspace access history
 export interface History {
 	last_opened: string;
 	recent_files: string[];
 }
 
 // ────────────────────────────
-// Filesystem / dashboard types
+// Filesystem & Dashboard types
 // ────────────────────────────
 
-/** A single file or folder entry inside a workspace content subdirectory. */
+// File or folder entry in workspace directory
 export interface WorkspaceFile {
 	name: string;
-	/** Workspace-relative path, e.g. `/files/notes/a.md`. */
+	// Workspace-relative path (e.g. /files/notes/a.md)
 	path: string;
 	is_dir: boolean;
 	size: number;
 	modified_at: string;
 }
 
-/** Aggregate statistics shown on the workspace Dashboard. */
+// Summary metrics displayed on workspace dashboard
 export interface WorkspaceStats {
 	files: number;
 	assets: number;
@@ -90,32 +99,30 @@ export interface WorkspaceStats {
 }
 
 // ────────────────────────────
-// Error log
+// Error logging types
 // ────────────────────────────
 
-/** A single entry appended to the app-level error log (`errors.jsonl`). */
+// App-level error record stored in errors.jsonl
 export interface ErrorRecord {
 	timestamp: string;
-	/** Short, human-readable summary of what failed. */
 	message: string;
-	/** Categorizes where the error originated (e.g. `workspace_load`). */
 	source: string;
-	/** Workspace path if the error is tied to one (optional for future use). */
 	workspace?: string;
-	/** Optional structured detail (e.g. a stack trace). */
 	detail?: string;
 }
 
 // ────────────────────────────
-// Request types
+// Request payload types
 // ────────────────────────────
 
+// Payload for creating a new workspace
 export interface CreateWorkspaceRequest {
 	name: string;
 	description: string;
 	path: string;
 }
 
+// Payload for updating workspace metadata
 export interface UpdateMetadataRequest {
 	path: string;
 	metadata: WorkspaceMetadata;
@@ -128,6 +135,7 @@ export interface UpdateMetadataRequest {
 export type TaskStatus = "todo" | "in_progress" | "done";
 export type TaskPriority = "low" | "medium" | "high";
 
+// Task item model
 export interface Task {
 	id: string;
 	title: string;
@@ -140,6 +148,7 @@ export interface Task {
 	updated_at: string;
 }
 
+// Kanban column containing ordered cards
 export interface KanbanColumn {
 	id: string;
 	title: string;
@@ -147,6 +156,7 @@ export interface KanbanColumn {
 	cards: KanbanCard[];
 }
 
+// Kanban card item
 export interface KanbanCard {
 	id: string;
 	title: string;
@@ -158,29 +168,34 @@ export interface KanbanCard {
 }
 
 // ────────────────────────────
-// Task / Kanban request types
+// Task & Kanban requests
 // ────────────────────────────
 
+// Request to create or update a task
 export interface TaskRequest {
 	path: string;
 	task: Task;
 }
 
+// Request referencing a task or item by ID
 export interface TaskIdRequest {
 	path: string;
 	id: string;
 }
 
+// Request to create a kanban column
 export interface KanbanColumnRequest {
 	path: string;
 	column: KanbanColumn;
 }
 
+// Request to create or update a kanban card
 export interface KanbanCardRequest {
 	path: string;
 	card: KanbanCard;
 }
 
+// Request to move a card to a different column or index
 export interface MoveCardRequest {
 	path: string;
 	card_id: string;

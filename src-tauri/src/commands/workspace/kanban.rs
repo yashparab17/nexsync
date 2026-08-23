@@ -1,7 +1,7 @@
+//! Kanban board columns and cards CRUD commands.
+
 use chrono::Utc;
-
 use crate::commands::config::validate_allowed_root;
-
 use super::helpers::get_workspace_id;
 use super::models::{KanbanCard, KanbanColumn, KanbanCardRequest, KanbanColumnRequest, MoveCardRequest, TaskIdRequest};
 
@@ -9,9 +9,9 @@ use super::models::{KanbanCard, KanbanColumn, KanbanCardRequest, KanbanColumnReq
 // Tauri commands — Kanban CRUD
 // ────────────────────────────
 
+/// Fetches all Kanban columns and their ordered cards
 #[tauri::command]
 pub fn get_kanban(app_handle: tauri::AppHandle, path: String) -> Result<Vec<KanbanColumn>, String> {
-    // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &path)?;
     
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&path, ".")?;
@@ -63,12 +63,11 @@ pub fn get_kanban(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Kanb
     Ok(columns)
 }
 
+/// Creates a new Kanban column
 #[tauri::command]
 pub fn create_kanban_column(app_handle: tauri::AppHandle, request: KanbanColumnRequest) -> Result<KanbanColumn, String> {
-    // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
-    // M6 FIX: Enforce bounds on Kanban column
     if request.column.title.is_empty() || request.column.title.len() > 128 {
         return Err("Kanban column title must be between 1 and 128 characters.".to_string());
     }
@@ -90,12 +89,11 @@ pub fn create_kanban_column(app_handle: tauri::AppHandle, request: KanbanColumnR
     Ok(col)
 }
 
+/// Creates a new card inside a Kanban column
 #[tauri::command]
 pub fn create_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardRequest) -> Result<KanbanCard, String> {
-    // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
-    // M6 FIX: Enforce bounds on Kanban card
     if request.card.title.is_empty() || request.card.title.len() > 256 {
         return Err("Kanban card title must be between 1 and 256 characters.".to_string());
     }
@@ -124,12 +122,11 @@ pub fn create_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
     Ok(card)
 }
 
+/// Updates title, description, or column assignment for a Kanban card
 #[tauri::command]
 pub fn update_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardRequest) -> Result<(), String> {
-    // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
-    // M6 FIX: Enforce bounds on Kanban card
     if request.card.title.is_empty() || request.card.title.len() > 256 {
         return Err("Kanban card title must be between 1 and 256 characters.".to_string());
     }
@@ -159,9 +156,9 @@ pub fn update_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
     Ok(())
 }
 
+/// Moves a card to a new column and position
 #[tauri::command]
 pub fn move_kanban_card(app_handle: tauri::AppHandle, request: MoveCardRequest) -> Result<(), String> {
-    // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
@@ -177,9 +174,9 @@ pub fn move_kanban_card(app_handle: tauri::AppHandle, request: MoveCardRequest) 
     Ok(())
 }
 
+/// Deletes a Kanban column and all cards in it
 #[tauri::command]
 pub fn delete_kanban_column(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Result<(), String> {
-    // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
@@ -194,9 +191,9 @@ pub fn delete_kanban_column(app_handle: tauri::AppHandle, request: TaskIdRequest
     Ok(())
 }
 
+/// Deletes a single Kanban card
 #[tauri::command]
 pub fn delete_kanban_card(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Result<(), String> {
-    // Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;

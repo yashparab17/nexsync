@@ -1,26 +1,28 @@
+//! Recent workspace tracking and last-opened workspace session restoration.
+
 use std::fs;
-
 use crate::commands::config::validate_allowed_root;
-
 use super::helpers::{ensure_registry, is_valid_workspace, last_workspace_path};
 use super::models::WorkspaceInfo;
 
+const MAX_RECENT_WORKSPACES: usize = 20;
+
 // ────────────────────────────
-// Tauri commands — Recent workspaces registry (app-level, JSON)
+// Tauri commands — Recent workspaces registry
 // ────────────────────────────
 
+/// Retrieves the list of recent workspaces, filtering out any invalid paths
 #[tauri::command]
 pub fn get_recent_workspaces(app_handle: tauri::AppHandle) -> Result<Vec<WorkspaceInfo>, String> {
-    // Validate that all returned workspaces are still within allowed roots
     let registry = ensure_registry(&app_handle)?;
     if !registry.exists() {
         return Ok(vec![]);
     }
     let json = fs::read_to_string(&registry).map_err(|e| e.to_string())?;
     let mut workspaces: Vec<WorkspaceInfo> = serde_json::from_str(&json)
-        .map_err(|_| format!("Invalid workspaces registry."))?;
+        .map_err(|_| "Invalid workspaces registry.".to_string())?;
     
-    // M2 FIX: Filter to only include valid workspaces within allowed roots
+    // Prune entries that no longer exist or are not allowed
     workspaces.retain(|w| is_valid_workspace(&w.path) && validate_allowed_root(&app_handle, &w.path).is_ok());
     
     if !workspaces.is_empty() && !workspaces[0].id.is_empty() {
@@ -30,6 +32,7 @@ pub fn get_recent_workspaces(app_handle: tauri::AppHandle) -> Result<Vec<Workspa
     Ok(workspaces)
 }
 
+/// Retrieves the last opened workspace for startup session restoration
 #[tauri::command]
 pub fn get_last_workspace(app_handle: tauri::AppHandle) -> Result<Option<WorkspaceInfo>, String> {
     let path = last_workspace_path(&app_handle)?;
@@ -38,9 +41,8 @@ pub fn get_last_workspace(app_handle: tauri::AppHandle) -> Result<Option<Workspa
     }
     let json = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let workspace: WorkspaceInfo = serde_json::from_str(&json)
-        .map_err(|_| format!("Invalid last_workspace.json."))?;
+        .map_err(|_| "Invalid last_workspace.json.".to_string())?;
     
-    // M2 FIX: Validate that last workspace still exists, is valid, and is in allowed roots
     if !std::path::Path::new(&workspace.path).exists()
         || !is_valid_workspace(&workspace.path)
         || validate_allowed_root(&app_handle, &workspace.path).is_err()
@@ -50,14 +52,12 @@ pub fn get_last_workspace(app_handle: tauri::AppHandle) -> Result<Option<Workspa
     Ok(Some(workspace))
 }
 
-const MAX_RECENT_WORKSPACES: usize = 20;
-
+/// Persists the last active workspace record
 #[tauri::command]
 pub fn set_last_workspace(
     app_handle: tauri::AppHandle,
     workspace: WorkspaceInfo,
 ) -> Result<(), String> {
-    // C3 FIX: Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &workspace.path)?;
     
     if workspace.name.len() > 256 || workspace.description.len() > 1024 || workspace.path.len() > 1024 {
@@ -73,6 +73,7 @@ pub fn set_last_workspace(
     Ok(())
 }
 
+/// Clears the last active workspace record
 #[tauri::command]
 pub fn clear_last_workspace(app_handle: tauri::AppHandle) -> Result<(), String> {
     let path = last_workspace_path(&app_handle)?;
@@ -82,12 +83,12 @@ pub fn clear_last_workspace(app_handle: tauri::AppHandle) -> Result<(), String> 
     Ok(())
 }
 
+/// Adds or moves a workspace to the top of the recent workspaces registry
 #[tauri::command]
 pub fn add_recent_workspace(
     app_handle: tauri::AppHandle,
     workspace: WorkspaceInfo,
 ) -> Result<(), String> {
-    // C3 FIX: Validate that the workspace path is within allowed roots
     validate_allowed_root(&app_handle, &workspace.path)?;
     
     if workspace.name.len() > 256 || workspace.description.len() > 1024 || workspace.path.len() > 1024 {
@@ -109,6 +110,7 @@ pub fn add_recent_workspace(
     Ok(())
 }
 
+/// Removes a workspace by ID from the recent workspaces registry
 #[tauri::command]
 pub fn remove_recent_workspace(
     app_handle: tauri::AppHandle,

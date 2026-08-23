@@ -1,16 +1,17 @@
+//! Configuration management for allowed workspace storage directories.
+
 use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
 use serde::{Deserialize, Serialize};
 
-/// Configuration file path in the app-data directory.
+/// Configuration file path in the app-data directory
 const CONFIG_FILE_NAME: &str = "nexsync_config.json";
 
-/// Configuration for Nexsync security settings.
+/// Configuration for Nexsync security settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NexsyncConfig {
-    /// Allowed root directories for workspace creation/import.
-    /// Users can add their own paths to this list (e.g., Documents, Desktop, custom folders).
+    /// Allowed root directories for workspace creation/import
     pub allowed_workspace_roots: Vec<String>,
 }
 
@@ -37,7 +38,7 @@ impl Default for NexsyncConfig {
     }
 }
 
-/// Get the path to the configuration file in app-data directory.
+/// Returns the configuration file path in the app data directory
 pub fn config_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
     let app_data = app_handle
         .path()
@@ -46,7 +47,7 @@ pub fn config_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(app_data.join("nexsync").join(CONFIG_FILE_NAME))
 }
 
-/// Ensure the config directory exists and return the config path.
+/// Ensures the config directory exists
 fn ensure_config_dir(app_handle: &tauri::AppHandle) -> Result<(), String> {
     let config_dir = config_path(app_handle)?
         .parent()
@@ -58,7 +59,7 @@ fn ensure_config_dir(app_handle: &tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Load the current configuration from disk.
+/// Loads configuration from disk, falling back to defaults if not found
 pub fn load_config(app_handle: &tauri::AppHandle) -> Result<NexsyncConfig, String> {
     ensure_config_dir(app_handle)?;
     let config_file = config_path(app_handle)?;
@@ -74,7 +75,7 @@ pub fn load_config(app_handle: &tauri::AppHandle) -> Result<NexsyncConfig, Strin
         .map_err(|e| format!("Failed to parse config file: {}", e))
 }
 
-/// Validate that an allowed root candidate is safe and not a system directory or root volume
+/// Validates that an allowed root candidate is safe and not a system directory
 fn validate_root_candidate(root: &str) -> Result<PathBuf, String> {
     let path = expand_and_resolve(root)?;
     if !path.is_absolute() {
@@ -82,7 +83,7 @@ fn validate_root_candidate(root: &str) -> Result<PathBuf, String> {
     }
 
     let path_str = path.to_string_lossy();
-    // Reject system root directories
+    // Reject drive roots
     if path_str == "/" || path_str == "\\" || path_str.ends_with(":\\") || path_str.ends_with(":/") {
         return Err(format!("Root directory '{}' cannot be configured as a workspace root.", root));
     }
@@ -105,9 +106,8 @@ fn validate_root_candidate(root: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-/// Save the configuration to disk.
+/// Saves the configuration to disk after validating root candidates
 pub fn save_config(app_handle: &tauri::AppHandle, config: &NexsyncConfig) -> Result<(), String> {
-    // Validate each root in the incoming configuration
     for root in &config.allowed_workspace_roots {
         validate_root_candidate(root)?;
     }
@@ -124,11 +124,10 @@ pub fn save_config(app_handle: &tauri::AppHandle, config: &NexsyncConfig) -> Res
     Ok(())
 }
 
-/// Resolve an expanded path (~ to home dir, etc.) to an absolute canonical path.
+/// Resolves home directory tilde and normalizes path
 pub fn expand_and_resolve(path: &str) -> Result<PathBuf, String> {
     let path = path.trim();
     
-    // Handle tilde expansion
     let expanded = if path.starts_with("~/") || path == "~" {
         dirs::home_dir()
             .ok_or_else(|| "Could not resolve home directory".to_string())?
@@ -137,25 +136,19 @@ pub fn expand_and_resolve(path: &str) -> Result<PathBuf, String> {
         PathBuf::from(path)
     };
     
-    // Try to canonicalize; if it doesn't exist, at least normalize it
     match expanded.canonicalize() {
         Ok(p) => Ok(p),
-        Err(_) => {
-            // Directory may not exist yet - just normalize
-            Ok(expanded)
-        }
+        Err(_) => Ok(expanded),
     }
 }
 
-/// Validate that a workspace path is within the allowed roots.
-/// This enforces C3: Restricting workspace operations to safe directories.
+/// Validates that a workspace path resides within allowed directory roots
 pub fn validate_allowed_root(
     app_handle: &tauri::AppHandle,
     workspace_path: &str,
 ) -> Result<(), String> {
     let config = load_config(app_handle)?;
     
-    // If allowed_workspace_roots is empty, fall back to checking common safe locations
     if config.allowed_workspace_roots.is_empty() {
         return check_default_safe_paths(workspace_path);
     }
@@ -171,43 +164,35 @@ pub fn validate_allowed_root(
     }
     
     Err(format!(
-        "Workspace path '{}' is not within any allowed root directory. \
-         Please configure allowed roots or use standard folders (Documents, Desktop).",
+        "Workspace path '{}' is not within any allowed root directory.",
         candidate.display()
     ))
 }
 
-/// Check if the path is in one of the platform-default safe locations.
-/// 
-/// This is a fallback when allowed_workspace_roots is empty or not configured.
-/// The default behavior is to allow any path within the user's home directory.
+/// Fallback check against user home directory
 fn check_default_safe_paths(path: &str) -> Result<(), String> {
     let candidate = expand_and_resolve(path)?;
     let home = dirs::home_dir()
         .ok_or_else(|| "Could not resolve home directory for validation".to_string())?;
     
-    // Allow paths under the home directory
-    // This includes Documents, Desktop, Downloads, etc.
-    // but blocks system directories like /usr, C:\Windows, C:\Program Files
     if candidate.starts_with(&home) {
         return Ok(());
     }
     
     Err(format!(
-        "Workspace path '{}' is outside your home directory ({}) which is considered unsafe. \
-         Please use folders within your home directory (Documents, Desktop, etc.).",
+        "Workspace path '{}' is outside your home directory ({}).",
         candidate.display(),
         home.display()
     ))
 }
 
-/// Tauri command wrapper to load config
+/// Tauri command to retrieve current application config
 #[tauri::command]
 pub fn load_config_cmd(app_handle: tauri::AppHandle) -> Result<NexsyncConfig, String> {
     load_config(&app_handle)
 }
 
-/// Tauri command wrapper to save config
+/// Tauri command to persist application config
 #[tauri::command]
 pub fn save_config_cmd(
     app_handle: tauri::AppHandle,
@@ -216,7 +201,7 @@ pub fn save_config_cmd(
     save_config(&app_handle, &config)
 }
 
-/// Tauri command wrapper to validate allowed root
+/// Tauri command to check if a workspace path is allowed
 #[tauri::command]
 pub fn validate_allowed_root_cmd(
     app_handle: tauri::AppHandle,
@@ -240,13 +225,12 @@ mod tests {
 
     #[test]
     fn test_expand_tilde() {
-        // This test may fail if no home directory is found, so we handle gracefully
         match expand_and_resolve("~/test") {
             Ok(path) => {
                 assert!(path.is_absolute());
                 assert!(path.to_string_lossy().contains("test"));
             }
-            Err(_) => {} // Acceptable if no home directory
+            Err(_) => {}
         }
     }
 }

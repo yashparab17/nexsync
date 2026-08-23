@@ -1,3 +1,5 @@
+//! Workspace lifecycle commands (create, import, metadata read/write, statistics).
+
 use std::fs;
 use std::path::Path;
 
@@ -16,22 +18,20 @@ use super::models::{CreateWorkspaceRequest, History, Permissions, WorkspaceInfo,
 // Tauri commands — Workspace creation / import
 // ────────────────────────────
 
+/// Creates a new workspace on disk and initializes its SQLite database
 #[tauri::command]
 pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRequest) -> Result<WorkspaceInfo, String> {
-    // C6 FIX: Validate workspace name against traversal sequences and illegal characters
+    // Validate workspace name and root paths
     validate_workspace_item_name(&request.name)?;
-
-    // C3 FIX: Validate that the requested workspace parent path is within allowed roots
     validate_allowed_root(&app_handle, &request.path)?;
     
     let workspace_path = Path::new(&request.path).join(&request.name);
-    
-    // C6 FIX: Ensure the combined workspace path remains within allowed roots
     validate_allowed_root(&app_handle, workspace_path.to_string_lossy().as_ref())?;
 
     let workspace_id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
+    // Create directories
     fs::create_dir_all(&workspace_path).map_err(|e| e.to_string())?;
     fs::create_dir_all(workspace_path.join(".nexsync")).map_err(|e| e.to_string())?;
 
@@ -69,6 +69,7 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
         recent_files: vec![],
     };
 
+    // Initialize database records in a transaction
     let db = WorkspaceDb::open(&workspace.path)?;
     let tx = db.conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
@@ -133,6 +134,7 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
 
     tx.commit().map_err(|e| e.to_string())?;
 
+    // Create default content folders
     let folders = ["notes", "files", "tasks", "kanban", "editor", "assets"];
     for folder in folders {
         fs::create_dir_all(workspace_path.join(folder)).map_err(|e| e.to_string())?;
@@ -141,16 +143,16 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
     Ok(workspace)
 }
 
+/// Imports an existing workspace from disk
 #[tauri::command]
 pub fn import_workspace(app_handle: tauri::AppHandle, path: String) -> Result<WorkspaceInfo, String> {
-    // C3 FIX: Validate that the imported workspace path is within allowed roots
     validate_allowed_root(&app_handle, &path)?;
     
     let workspace_path = Path::new(&path);
     if !workspace_path.exists() {
         return Err("The selected folder does not exist.".to_string());
     }
-    // C3 / M3 FIX: Require existing .nexsync and nexsync.db; don't auto-create
+    
     let nexsync_dir = workspace_path.join(".nexsync");
     let nexsync_db = nexsync_dir.join("nexsync.db");
     if !nexsync_dir.exists() || !nexsync_db.is_file() {
@@ -159,6 +161,7 @@ pub fn import_workspace(app_handle: tauri::AppHandle, path: String) -> Result<Wo
             .to_string()
         );
     }
+    
     let db = WorkspaceDb::open_existing(&path)?;
     let workspace: WorkspaceInfo = db
         .conn
@@ -174,7 +177,7 @@ pub fn import_workspace(app_handle: tauri::AppHandle, path: String) -> Result<Wo
                 updated_at: r.get(5)?,
             }),
         )
-        .map_err(|_| format!("Failed to read workspace metadata."))?;
+        .map_err(|_| "Failed to read workspace metadata.".to_string())?;
     let mut workspace = workspace;
     workspace.path = path;
     Ok(workspace)
@@ -184,9 +187,9 @@ pub fn import_workspace(app_handle: tauri::AppHandle, path: String) -> Result<Wo
 // Tauri commands — Workspace metadata read / write
 // ────────────────────────────
 
+/// Loads complete workspace metadata from SQLite database
 #[tauri::command]
 pub fn read_workspace_metadata(app_handle: tauri::AppHandle, path: String) -> Result<WorkspaceMetadata, String> {
-    // Validate that the workspace path is within allowed roots for read operations too
     validate_allowed_root(&app_handle, &path)?;
     
     let _canonical_path = resolve_workspace_path(&path, ".")?;
@@ -210,7 +213,7 @@ pub fn read_workspace_metadata(app_handle: tauri::AppHandle, path: String) -> Re
                 updated_at: r.get(5)?,
             }),
         )
-        .map_err(|_| format!("workspace table is empty."))?;
+        .map_err(|_| "workspace table is empty.".to_string())?;
 
     let theme: String = tx
         .query_row("SELECT theme FROM settings WHERE workspace_id = ?1", [&workspace.id], |r| r.get(0))
@@ -258,12 +261,11 @@ pub fn read_workspace_metadata(app_handle: tauri::AppHandle, path: String) -> Re
     })
 }
 
+/// Persists workspace metadata updates to SQLite database
 #[tauri::command]
 pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMetadataRequest) -> Result<(), String> {
-    // Validate that the workspace path is within allowed roots before writing
     validate_allowed_root(&app_handle, &request.path)?;
     
-    // M4 FIX: Canonicalize path before storing to prevent divergence
     let canonical_path = resolve_workspace_path(&request.path, ".")?;
     let canonical_path_str = canonical_path.to_string_lossy().to_string();
 
@@ -271,7 +273,7 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
     let metadata = &request.metadata;
     let tx = db.conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
-    // H3 FIX: Validate overall metadata size before persisting
+    // Check overall metadata payload size
     const MAX_METADATA_SIZE: usize = 1024 * 1024; // 1 MB
     let metadata_json = serde_json::to_string(&metadata)
         .map_err(|e| format!("Failed to serialize metadata: {}", e))?;
@@ -344,7 +346,7 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
         .map_err(|e| e.to_string())?;
     }
 
-    // H3 FIX: Limit activity event count to prevent unbounded growth
+    // Restrict activity events length
     const MAX_ACTIVITY_EVENTS: usize = 500;
     let activity_events = &metadata.activity.events;
     if activity_events.len() > MAX_ACTIVITY_EVENTS {
@@ -366,7 +368,6 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
     )
     .map_err(|e| e.to_string())?;
 
-    // H3 FIX: Prune old activity events to keep only the most recent ones
     tx.execute(
         "DELETE FROM activity_events WHERE id NOT IN (SELECT id FROM activity_events ORDER BY timestamp DESC LIMIT ?)",
         [MAX_ACTIVITY_EVENTS as i64],
@@ -374,7 +375,6 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
     .map_err(|e| e.to_string())?;
 
     for e in activity_events {
-        // M1 FIX: Validate and sanitize activity event fields
         if e.action.len() > 64 || e.detail.len() > 1024 {
             return Err("Activity event action or detail exceeds maximum allowed length.".to_string());
         }
@@ -413,9 +413,9 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
 // Tauri commands — Workspace stats
 // ────────────────────────────
 
+/// Retrieves aggregate metrics for files, tasks, and members in the workspace
 #[tauri::command]
 pub fn get_workspace_stats(app_handle: tauri::AppHandle, path: String) -> Result<super::models::WorkspaceStats, String> {
-    // Validate that the workspace path is within allowed roots before stats
     validate_allowed_root(&app_handle, &path)?;
     
     let _canonical_path = resolve_workspace_path(&path, ".")?;

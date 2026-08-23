@@ -20,7 +20,7 @@ import type {
 	ActivityEvent,
 } from "@/types/workspace";
 
-// Tauri
+// Tauri IPC
 import {
 	readWorkspaceMetadata,
 	writeWorkspaceMetadata,
@@ -42,7 +42,6 @@ interface WorkspaceContextType {
 	stats: WorkspaceStats | null;
 	isLoading: boolean;
 	error: string | null;
-	/** The workspace that failed to load, if any (used by the error dialog). */
 	failedWorkspace: WorkspaceInfo | null;
 
 	// Actions
@@ -52,7 +51,7 @@ interface WorkspaceContextType {
 	clearWorkspace: () => Promise<void>;
 	refreshStats: () => Promise<void>;
 
-	// Metadata updaters (mutate local state; call saveWorkspace to persist)
+	// Metadata updaters (mutates local state; saveWorkspace persists)
 	updateSettings: (settings: Partial<Settings>) => void;
 	updateMembers: (members: Members) => void;
 	addActivityEvent: (
@@ -72,6 +71,7 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
 	undefined,
 );
 
+// Provides workspace data, metadata updates, and disk persistence to the component tree
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
 	const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
 	const logError = useErrorLog();
@@ -82,11 +82,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	// ── Load full workspace metadata from disk ──
-	// Takes the full WorkspaceInfo (not just a path) so that, on failure, the
-	// caller's workspace identity is preserved for the error dialog's friendly
-	// message. Errors are re-thrown so callers know the load failed and can
-	// avoid navigating into a broken workspace.
+	// Load full workspace metadata and stats from SQLite database
 	const loadWorkspace = useCallback(
 		async (ws: WorkspaceInfo) => {
 			setIsLoading(true);
@@ -99,7 +95,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 					getWorkspaceStats(ws.path),
 				]);
 
-				// Update last_opened timestamp on load.
+				// Update last opened timestamp
 				meta.history.last_opened = new Date().toISOString();
 
 				setMetadata(meta);
@@ -107,9 +103,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 				setWorkspace(meta.workspace);
 				setActiveSessionToken(meta.workspace.id);
 
-				// Update the app-level registries:
-				// 1. Add to recent workspaces list (for the Welcome page)
-				// 2. Set as the last opened workspace (for session restoration)
+				// Update recent workspaces and session restoration registry
 				await addRecentWorkspace(meta.workspace);
 				await setLastWorkspace(meta.workspace);
 			} catch (err) {
@@ -120,7 +114,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 				setWorkspace(null);
 				setActiveSessionToken(null);
 				logError(err, { source: "workspace_load", workspace: ws.path });
-				// Re-throw so callers can react (e.g. skip navigation).
 				throw err;
 			} finally {
 				setIsLoading(false);
@@ -129,7 +122,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		[logError],
 	);
 
-	// ── Save all metadata to disk ──
+	// Persist in-memory metadata changes to SQLite database
 	const saveWorkspace = useCallback(async () => {
 		if (!metadata) return;
 
@@ -148,12 +141,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		}
 	}, [metadata, logError]);
 
-	// ── Set workspace from an already-loaded WorkspaceInfo ──
+	// Set active workspace directly from existing info
 	const handleSetWorkspace = useCallback((ws: WorkspaceInfo) => {
 		setWorkspace(ws);
 	}, []);
 
-	// ── Refresh the dashboard stats from disk ──
+	// Refresh workspace metrics from disk
 	const refreshStats = useCallback(async () => {
 		if (!workspace) return;
 
@@ -169,13 +162,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		}
 	}, [workspace, logError]);
 
-	// ── Clear everything (saves first, then clears last-workspace tracking) ──
+	// Save and unload current workspace, clearing session tracking
 	const clearWorkspace = useCallback(async () => {
 		if (metadata) {
 			await saveWorkspace();
 		}
-		// Clear the last-workspace file so the app opens to Welcome
-		// on next startup instead of re-opening this workspace.
+		// Clear last workspace file so app reopens to Welcome page
 		await clearLastWorkspace();
 		setActiveSessionToken(null);
 		setWorkspace(null);
@@ -185,7 +177,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		setError(null);
 	}, [metadata, saveWorkspace]);
 
-	// ── Metadata updaters ──
+	// Update workspace settings in local state
 	const updateSettings = useCallback((settings: Partial<Settings>) => {
 		setMetadata((prev) => {
 			if (!prev) return prev;
@@ -196,6 +188,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
+	// Update workspace collaborators in local state
 	const updateMembers = useCallback((members: Members) => {
 		setMetadata((prev) => {
 			if (!prev) return prev;
@@ -203,6 +196,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
+	// Prepend a new activity event to the workspace history
 	const addActivityEvent = useCallback(
 		(
 			action: string,
@@ -233,6 +227,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		[],
 	);
 
+	// Update role permissions in local state
 	const updatePermissions = useCallback((permissions: Permissions) => {
 		setMetadata((prev) => {
 			if (!prev) return prev;
@@ -240,6 +235,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
+	// Update file navigation history in local state
 	const updateHistory = useCallback((history: Partial<History>) => {
 		setMetadata((prev) => {
 			if (!prev) return prev;
@@ -250,17 +246,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
+	// Reset error state
 	const clearError = useCallback(() => {
 		setError(null);
 		setFailedWorkspace(null);
 	}, []);
 
-	// ── Auto-save on window close ──
+	// Auto-save metadata on window unload
 	useEffect(() => {
 		const handleBeforeUnload = () => {
 			if (metadata) {
-				// Fire-and-forget: the browser/Tauri will wait for
-				// sendBeacon or the page will be unloaded anyway.
 				saveWorkspace();
 			}
 		};
@@ -297,6 +292,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 	);
 }
 
+// Hook to access the workspace context
 export function useWorkspace() {
 	const context = useContext(WorkspaceContext);
 
@@ -307,7 +303,7 @@ export function useWorkspace() {
 	return context;
 }
 
-/** Helper to get the current session ID from the active session state */
+// Get the current active session ID
 export function getCurrentWorkspaceSession(): string | null {
 	return getActiveSessionToken();
 }

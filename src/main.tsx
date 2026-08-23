@@ -10,6 +10,7 @@ import { ThemeProvider } from "./store/ThemeContext";
 import WorkspaceLoader from "./components/WorkspaceLoader";
 import ErrorBoundary from "./components/ErrorBoundary";
 
+// Application root bootstrap mounting React providers and router
 ReactDOM.createRoot(document.getElementById("root")!).render(
 	<React.StrictMode>
 		<ThemeProvider>

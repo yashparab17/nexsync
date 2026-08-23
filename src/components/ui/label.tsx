@@ -8,6 +8,7 @@ import {
 
 import { cn } from "@/lib/utils";
 
+// Form input label component
 function Label({ className, htmlFor, slot, ...props }: LabelProps) {
 	const label = (
 		<LabelPrimitive

@@ -1,3 +1,4 @@
+// Workspace task management and tracking view
 export default function WorkspaceTasks() {
 	return (
 		<div>

@@ -7,8 +7,7 @@ import { logError } from "@/lib/tauri";
 // Types
 import type { ErrorRecord } from "@/types/workspace";
 
-// A small selection of known error sources, kept as strings so the stored
-// log is greppable. Extend this union as the app grows.
+// Categorized error sources for greppable logging
 export type ErrorSource =
 	| "workspace_load"
 	| "workspace_save"
@@ -24,13 +23,10 @@ interface ErrorContext {
 	workspace?: string;
 }
 
-/**
- * Returns a fire-and-forget function that appends an error to the app-level
- * error log (`errors.jsonl`). Logging never blocks or crashes the UI — if the
- * write fails, the error is only reported to the console.
- */
+// Hook providing a fire-and-forget error logging function to append to errors.jsonl
 export function useErrorLog() {
 	return useCallback((error: unknown, context: ErrorContext) => {
+		// Construct standardized error record
 		const entry: ErrorRecord = {
 			timestamp: new Date().toISOString(),
 			message:
@@ -44,6 +40,7 @@ export function useErrorLog() {
 			:	{}),
 		};
 
+		// Fire-and-forget logging to backend without blocking UI
 		logError(entry).catch((err) => {
 			console.error("Failed to write to error log:", err);
 		});

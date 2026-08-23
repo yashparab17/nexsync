@@ -1,20 +1,22 @@
+//! Error logging command that appends records to `errors.jsonl`.
+
 use std::fs;
 use std::io::Write;
-
 use super::helpers::error_log_path;
 use super::models::ErrorRecord;
-
-// ────────────────────────────
-// Tauri commands — Error logging
-// ────────────────────────────
 
 const MAX_LOG_FILE_SIZE: u64 = 5 * 1024 * 1024; // 5 MB
 const MAX_MESSAGE_LEN: usize = 2048;
 const MAX_DETAIL_LEN: usize = 8192;
 
+// ────────────────────────────
+// Tauri commands — Error logging
+// ────────────────────────────
+
+/// Appends a new error record to the application error log
 #[tauri::command]
 pub fn log_error(app_handle: tauri::AppHandle, mut entry: ErrorRecord) -> Result<(), String> {
-    // H6 FIX: Enforce bounds on error payload fields
+    // Truncate fields to max lengths
     if entry.message.len() > MAX_MESSAGE_LEN {
         entry.message.truncate(MAX_MESSAGE_LEN);
     }
@@ -37,10 +39,9 @@ pub fn log_error(app_handle: tauri::AppHandle, mut entry: ErrorRecord) -> Result
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    // H6 FIX: Rotate/truncate log file if it exceeds maximum size
+    // Rotate log file if exceeding size limit
     if let Ok(metadata) = fs::metadata(&path) {
         if metadata.len() > MAX_LOG_FILE_SIZE {
-            // Keep the last 1MB of logs or reset
             if let Ok(content) = fs::read_to_string(&path) {
                 let lines: Vec<&str> = content.lines().collect();
                 let keep_count = lines.len() / 2;
@@ -50,6 +51,7 @@ pub fn log_error(app_handle: tauri::AppHandle, mut entry: ErrorRecord) -> Result
         }
     }
 
+    // Append JSON line
     let mut line = serde_json::to_string(&entry).map_err(|e| e.to_string())?;
     line.push('\n');
     let mut file = fs::OpenOptions::new()

@@ -1,3 +1,4 @@
+// Workspace member and role management view
 export default function WorkspaceMembers() {
 	return (
 		<div>

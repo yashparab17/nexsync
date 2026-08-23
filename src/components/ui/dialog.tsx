@@ -16,10 +16,12 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { XIcon } from "lucide-react";
 
+// Trigger element that opens the dialog modal
 function DialogTrigger({ ...props }: DialogTriggerPrimitiveProps) {
 	return <DialogTriggerPrimitive data-slot="dialog-trigger" {...props} />;
 }
 
+// Close button for dialog
 function DialogClose({
 	className,
 	variant = "outline",
@@ -38,6 +40,7 @@ function DialogClose({
 	);
 }
 
+// Backdrop overlay behind modal
 function DialogOverlay({
 	className,
 	children,
@@ -60,6 +63,7 @@ function DialogOverlay({
 	);
 }
 
+// Modal dialog container component
 function Dialog({
 	className,
 	children,
@@ -102,6 +106,7 @@ function Dialog({
 	);
 }
 
+// Dialog header container
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
@@ -112,6 +117,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 	);
 }
 
+// Dialog footer container with action buttons
 function DialogFooter({
 	className,
 	showCloseButton = false,
@@ -137,6 +143,7 @@ function DialogFooter({
 	);
 }
 
+// Dialog title heading
 function DialogTitle({
 	className,
 	...props
@@ -154,6 +161,7 @@ function DialogTitle({
 	);
 }
 
+// Dialog descriptive text
 function DialogDescription({
 	className,
 	...props

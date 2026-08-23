@@ -1,7 +1,5 @@
-// Typed wrapper around Tauri IPC commands.
-// All `invoke` calls should go through these functions so the UI never calls
-// commands by raw string — keeping the frontend/backend command surface in
-// sync and type-safe.
+// Typed wrapper around Tauri IPC commands
+// All backend invocations go through these functions to keep IPC calls type-safe
 
 import { invoke } from "@tauri-apps/api/core";
 
@@ -29,28 +27,33 @@ import type {
 
 let activeSessionToken: string | null = null;
 
+// Store the active session token in memory
 export function setActiveSessionToken(token: string | null) {
 	activeSessionToken = token;
 }
 
+// Get the current active session token
 export function getActiveSessionToken(): string | null {
 	return activeSessionToken;
 }
 
 // ────────────────────────────
-// Session Management Commands (auth)
+// Session Management Commands
 // ────────────────────────────
 
+// Create a new session for the workspace
 export function createWorkspaceSession(
 	workspacePath: string,
 ): Promise<string> {
 	return invoke("create_workspace_session", { workspacePath });
 }
 
+// Close an active workspace session
 export function closeWorkspaceSession(sessionId: string): Promise<void> {
 	return invoke("close_workspace_session", { sessionId });
 }
 
+// Fetch session info including role and created timestamp
 export function getCurrentSessionInfo(
 	sessionId: string,
 ): Promise<{ sessionId: string; workspacePath: string; userRole: string; createdAt: string } | null> {
@@ -61,38 +64,39 @@ export function getCurrentSessionInfo(
 // Error logging
 // ────────────────────────────
 
-/**
- * Appends an entry to the app-level error log (`errors.jsonl`).
- * Fire-and-forget: callers should never block the UI on this.
- */
+// Append an error record to app-level error log
 export function logError(entry: ErrorRecord): Promise<void> {
 	return invoke("log_error", { entry });
 }
 
 // ────────────────────────────
-// Workspace creation / import (Bootstrap operations)
+// Workspace creation & import
 // ────────────────────────────
 
+// Create a new workspace directory and database
 export function createWorkspace(
 	request: CreateWorkspaceRequest,
 ): Promise<WorkspaceInfo> {
 	return invoke("create_workspace", { request });
 }
 
+// Import an existing workspace from disk
 export function importWorkspace(path: string): Promise<WorkspaceInfo> {
 	return invoke("import_workspace", { path });
 }
 
 // ────────────────────────────
-// Metadata read / write
+// Metadata read & write
 // ────────────────────────────
 
+// Load full workspace metadata from database
 export function readWorkspaceMetadata(
 	path: string,
 ): Promise<WorkspaceMetadata> {
 	return invoke("read_workspace_metadata", { path });
 }
 
+// Persist updated workspace metadata to database
 export function writeWorkspaceMetadata(
 	request: UpdateMetadataRequest,
 ): Promise<void> {
@@ -103,18 +107,22 @@ export function writeWorkspaceMetadata(
 // Task commands
 // ────────────────────────────
 
+// Fetch all tasks for a workspace
 export function getTasks(path: string): Promise<Task[]> {
 	return invoke("get_tasks", { path });
 }
 
+// Create a new task in the workspace
 export function createTask(request: TaskRequest): Promise<Task> {
 	return invoke("create_task", { request });
 }
 
+// Update an existing task
 export function updateTask(request: TaskRequest): Promise<void> {
 	return invoke("update_task", { request });
 }
 
+// Delete a task by ID
 export function deleteTask(request: TaskIdRequest): Promise<void> {
 	return invoke("delete_task", { request });
 }
@@ -123,42 +131,50 @@ export function deleteTask(request: TaskIdRequest): Promise<void> {
 // Kanban commands
 // ────────────────────────────
 
+// Fetch kanban board columns and cards
 export function getKanban(path: string): Promise<KanbanColumn[]> {
 	return invoke("get_kanban", { path });
 }
 
+// Create a new kanban column
 export function createKanbanColumn(
 	request: KanbanColumnRequest,
 ): Promise<KanbanColumn> {
 	return invoke("create_kanban_column", { request });
 }
 
+// Create a new kanban card
 export function createKanbanCard(
 	request: KanbanCardRequest,
 ): Promise<KanbanCard> {
 	return invoke("create_kanban_card", { request });
 }
 
+// Update card title, description, or column
 export function updateKanbanCard(request: KanbanCardRequest): Promise<void> {
 	return invoke("update_kanban_card", { request });
 }
 
+// Move card to a new column and position
 export function moveKanbanCard(request: MoveCardRequest): Promise<void> {
 	return invoke("move_kanban_card", { request });
 }
 
+// Delete a kanban column and its cards
 export function deleteKanbanColumn(request: TaskIdRequest): Promise<void> {
 	return invoke("delete_kanban_column", { request });
 }
 
+// Delete a single kanban card
 export function deleteKanbanCard(request: TaskIdRequest): Promise<void> {
 	return invoke("delete_kanban_card", { request });
 }
 
 // ────────────────────────────
-// Filesystem / dashboard
+// Filesystem & Dashboard
 // ────────────────────────────
 
+// List files in a workspace content subdirectory
 export function listWorkspaceFiles(
 	path: string,
 	subdir: string,
@@ -166,7 +182,7 @@ export function listWorkspaceFiles(
 	return invoke("list_workspace_files", { path, subdir });
 }
 
-/** Creates a new empty file. `relPath` is the parent directory (e.g. `files/docs`). */
+// Create a new empty file in workspace
 export function createWorkspaceFile(
 	path: string,
 	relPath: string,
@@ -180,7 +196,7 @@ export function createWorkspaceFile(
 	});
 }
 
-/** Creates a new folder. `relPath` is the parent directory. */
+// Create a new folder in workspace
 export function createWorkspaceFolder(
 	path: string,
 	relPath: string,
@@ -194,7 +210,7 @@ export function createWorkspaceFolder(
 	});
 }
 
-/** Reads the text contents of a workspace file. */
+// Read text contents from workspace file
 export function readWorkspaceFile(
 	path: string,
 	relPath: string,
@@ -202,7 +218,7 @@ export function readWorkspaceFile(
 	return invoke("read_workspace_file", { path, relPath });
 }
 
-/** Writes text contents to a workspace file. */
+// Write text contents to workspace file
 export function writeWorkspaceFile(
 	path: string,
 	relPath: string,
@@ -211,7 +227,7 @@ export function writeWorkspaceFile(
 	return invoke("write_workspace_file", { path, relPath, content });
 }
 
-/** Permanently deletes a workspace file or folder (folders are recursive). */
+// Delete a workspace file or directory permanently
 export function deleteWorkspaceItem(
 	path: string,
 	relPath: string,
@@ -219,7 +235,7 @@ export function deleteWorkspaceItem(
 	return invoke("delete_workspace_item", { path, relPath });
 }
 
-/** Renames a workspace file or folder. */
+// Rename a workspace file or directory
 export function renameWorkspaceItem(
 	path: string,
 	relPath: string,
@@ -228,22 +244,26 @@ export function renameWorkspaceItem(
 	return invoke("rename_workspace_item", { path, relPath, newName });
 }
 
+// Get aggregate stats for workspace dashboard
 export function getWorkspaceStats(path: string): Promise<WorkspaceStats> {
 	return invoke("get_workspace_stats", { path });
 }
 
 // ────────────────────────────
-// Recent workspaces registry (Bootstrap operations)
+// Recent workspaces registry
 // ────────────────────────────
 
+// Get list of recent workspaces from app registry
 export function getRecentWorkspaces(): Promise<WorkspaceInfo[]> {
 	return invoke("get_recent_workspaces");
 }
 
+// Add workspace to recent workspaces list
 export function addRecentWorkspace(workspace: WorkspaceInfo): Promise<void> {
 	return invoke("add_recent_workspace", { workspace });
 }
 
+// Remove workspace from recent list
 export function removeRecentWorkspace(id: string): Promise<void> {
 	return invoke("remove_recent_workspace", { id });
 }
@@ -252,14 +272,17 @@ export function removeRecentWorkspace(id: string): Promise<void> {
 // Last workspace (session restoration)
 // ────────────────────────────
 
+// Get last opened workspace for automatic restoration
 export function getLastWorkspace(): Promise<WorkspaceInfo | null> {
 	return invoke("get_last_workspace");
 }
 
+// Persist last opened workspace
 export function setLastWorkspace(workspace: WorkspaceInfo): Promise<void> {
 	return invoke("set_last_workspace", { workspace });
 }
 
+// Clear last workspace tracking
 export function clearLastWorkspace(): Promise<void> {
 	return invoke("clear_last_workspace");
 }

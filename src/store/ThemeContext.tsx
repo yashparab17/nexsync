@@ -20,21 +20,22 @@ interface ThemeProviderProps {
 	children: ReactNode;
 }
 
+// Provider that manages light/dark mode and syncs class on root HTML element
 export function ThemeProvider({ children }: ThemeProviderProps) {
+	// Initialize theme from localStorage fallback to dark
 	const [theme, setTheme] = useState<Theme>(() => {
 		const savedTheme = localStorage.getItem("theme");
-
 		return savedTheme === "light" ? "light" : "dark";
 	});
 
+	// Synchronize dark class on document element and save to localStorage
 	useEffect(() => {
 		const root = document.documentElement;
-
 		root.classList.toggle("dark", theme === "dark");
-
 		localStorage.setItem("theme", theme);
 	}, [theme]);
 
+	// Toggle between light and dark themes
 	const toggleTheme = () => {
 		setTheme((current) => (current === "dark" ? "light" : "dark"));
 	};
@@ -52,6 +53,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 	);
 }
 
+// Hook to access the theme context
 export function useThemeContext() {
 	const context = useContext(ThemeContext);
 

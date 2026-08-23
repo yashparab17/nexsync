@@ -20,13 +20,11 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 // Assets
 import logo from "@/assets/logos/logo.svg";
 
-// ─── helpers ─────────────────────────────────────────────
+// ────────────────────────────
+// Helpers
+// ────────────────────────────
 
-/**
- * Converts an ISO-8601 timestamp into a compact, human-friendly relative
- * time (e.g. "5m ago"). Falls back to an absolute locale date for anything
- * older than a week.
- */
+// Converts ISO-8601 timestamp to a relative time string (e.g. "5m ago")
 function formatRelative(iso: string): string {
 	if (!iso) return "—";
 	const then = new Date(iso).getTime();
@@ -47,15 +45,16 @@ interface StatCardProps {
 	value: number;
 	to: string;
 	icon: ReactNode;
+	onNavigate?: (to: string) => void;
 }
 
-/**
- * A clickable stat card that deep-links into the corresponding workspace
- * section (Files, Assets, Tasks, Members) so counts become shortcuts.
- */
-function StatCard({ label, value, icon }: StatCardProps) {
+// Clickable metric card linking to its respective workspace section
+function StatCard({ label, value, icon, to, onNavigate }: StatCardProps) {
 	return (
-		<Card>
+		<Card
+			className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
+			onClick={() => onNavigate?.(to)}
+		>
 			<CardContent className="flex items-center justify-between py-5">
 				<div>
 					<p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -69,14 +68,18 @@ function StatCard({ label, value, icon }: StatCardProps) {
 	);
 }
 
-// ─── main component ──────────────────────────────────────
+// ────────────────────────────
+// Main component
+// ────────────────────────────
 
+// Workspace overview dashboard showing quick actions, stats, and activity
 export default function WorkspaceDashboard() {
 	const { workspace, metadata, stats } = useWorkspace();
 	const navigate = useNavigate();
 
 	const activity = metadata?.activity.events ?? [];
 
+	// Quick action shortcuts
 	const quickActions = [
 		{
 			label: "New File",
@@ -97,9 +100,11 @@ export default function WorkspaceDashboard() {
 
 	return (
 		<div className="space-y-6">
+			{/* Watermark logo */}
 			<div className="pointer-events-none absolute inset-0 flex items-center justify-center z-[-1]">
 				<img src={logo} className="h-150 w-150 opacity-10" alt="" />
 			</div>
+
 			{/* Header */}
 			<div>
 				<h1 className="text-2xl font-semibold">Dashboard</h1>
@@ -129,36 +134,40 @@ export default function WorkspaceDashboard() {
 				})}
 			</div>
 
-			{/* Stats */}
+			{/* Stats Grid */}
 			<div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
 				<StatCard
 					label="Files"
 					value={stats?.files ?? 0}
 					to="/workspace/files"
+					onNavigate={navigate}
 					icon={<FilePlus className="size-8 text-primary/60" />}
 				/>
 				<StatCard
 					label="Assets"
 					value={stats?.assets ?? 0}
 					to="/workspace/assets"
+					onNavigate={navigate}
 					icon={<Upload className="size-8 text-primary/60" />}
 				/>
 				<StatCard
 					label="Tasks"
 					value={stats?.tasks ?? 0}
 					to="/workspace/tasks"
+					onNavigate={navigate}
 					icon={<ListTodo className="size-8 text-primary/60" />}
 				/>
 				<StatCard
 					label="Members"
 					value={stats?.members ?? 0}
 					to="/workspace/members"
+					onNavigate={navigate}
 					icon={<UsersRound className="size-8 text-primary/60" />}
 				/>
 			</div>
 
+			{/* Recent Activity */}
 			<div>
-				{/* Recent Activity */}
 				<Card>
 					<CardHeader>
 						<CardTitle>Recent Activity</CardTitle>

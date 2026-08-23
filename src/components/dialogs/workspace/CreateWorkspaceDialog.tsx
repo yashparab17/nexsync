@@ -21,7 +21,7 @@ import {
 	DialogFooter,
 } from "@/components/ui/dialog";
 
-// Tauri
+// Tauri API
 import { open } from "@tauri-apps/plugin-dialog";
 import { documentDir } from "@tauri-apps/api/path";
 import { createWorkspace } from "@/lib/tauri";
@@ -33,6 +33,7 @@ interface CreateWorkspaceDialogProps {
 	children: ReactNode;
 }
 
+// Dialog modal for creating a new local workspace
 export default function CreateWorkspaceDialog({
 	children,
 }: CreateWorkspaceDialogProps) {
@@ -44,11 +45,10 @@ export default function CreateWorkspaceDialog({
 	const [workspacePath, setWorkspacePath] = useState("");
 	const [error, setError] = useState("");
 
-	// Guards against double-submits without triggering a re-render,
-	// so the button stays visually stable while the workspace is created.
+	// Guard against duplicate submissions
 	const isCreating = useRef(false);
 
-	// Default the storage location to the user's Documents directory.
+	// Default storage location to user Documents directory
 	useEffect(() => {
 		documentDir()
 			.then((dir) => setWorkspacePath(dir))
@@ -60,6 +60,7 @@ export default function CreateWorkspaceDialog({
 			});
 	}, []);
 
+	// Native directory picker dialog
 	const pickFolder = async () => {
 		const selected = await open({
 			directory: true,
@@ -72,6 +73,7 @@ export default function CreateWorkspaceDialog({
 		}
 	};
 
+	// Create workspace on disk and load into context
 	const handleCreateWorkspace = async () => {
 		if (!workspaceName.trim() || isCreating.current) {
 			return;
@@ -87,12 +89,7 @@ export default function CreateWorkspaceDialog({
 				path: workspacePath,
 			});
 
-			// loadWorkspace handles:
-			// - Loading full metadata into context
-			// - Adding to recent workspaces registry
-			// - Setting as last workspace for session restoration
 			await loadWorkspace(workspace);
-
 			navigate("/workspace");
 		} catch (err) {
 			console.error(err);

@@ -1,24 +1,20 @@
 //! SQLite schema definitions and migration runner.
-//!
-//! The schema is versioned via a `schema_migrations` table.  Each migration
-//! is idempotent (`CREATE TABLE IF NOT EXISTS`, `INSERT OR IGNORE`) so calling
-//! [`init_schema`] on an existing database is a no-op for already-applied
-//! migrations.
 
 use rusqlite::Connection;
 use rusqlite::Result as SqlResult;
 
-/// Current schema version.  Bump this whenever a migration is added and
-/// register a new `Migration` in [`MIGRATIONS`].
+/// Current schema version.
 #[allow(dead_code)]
 pub const SCHEMA_VERSION: usize = 1;
 
+/// Database migration entry
 struct Migration {
 	version: usize,
 	description: &'static str,
 	up: &'static str,
 }
 
+/// Migration catalog
 const MIGRATIONS: &[Migration] = &[Migration {
 	version: 1,
 	description: "initial schema",
@@ -131,7 +127,7 @@ CREATE TABLE IF NOT EXISTS kanban_card_tags (
     PRIMARY KEY (card_id, tag_id)
 );
 
--- Yjs binary state snapshots (Storage Rule 3: SQLite persists Yjs states)
+-- Yjs binary state snapshots
 CREATE TABLE IF NOT EXISTS yjs_documents (
     workspace_id  TEXT PRIMARY KEY REFERENCES workspace(id) ON DELETE CASCADE,
     doc_id        TEXT NOT NULL,
@@ -151,14 +147,14 @@ CREATE INDEX IF NOT EXISTS idx_members_workspace  ON members(workspace_id);
 "##,
 }];
 
-/// Initialises the schema on a fresh database.  Applies any migrations that
-/// have not yet been recorded in the `schema_migrations` table.
+/// Initialises the schema on a fresh database, running pending migrations
 pub fn init_schema(conn: &Connection) -> SqlResult<()> {
 	let tx = conn.unchecked_transaction()?;
 
-	tx.execute_batch(MIGRATIONS[0].up)?; // apply initial schema
+	// Apply initial schema DDL
+	tx.execute_batch(MIGRATIONS[0].up)?;
 
-	// Record applied migrations (idempotent).
+	// Record applied migrations idempotently
 	for mig in MIGRATIONS {
 		tx.execute(
 			"INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (?1, ?2)",
@@ -170,7 +166,7 @@ pub fn init_schema(conn: &Connection) -> SqlResult<()> {
 	Ok(())
 }
 
-/// Returns the current schema version recorded in the database.
+/// Returns the current schema version recorded in the database
 #[allow(dead_code)]
 pub fn current_version(conn: &Connection) -> SqlResult<usize> {
 	let result: SqlResult<i64> = conn.query_row(

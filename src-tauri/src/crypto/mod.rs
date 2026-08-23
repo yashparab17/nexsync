@@ -4,9 +4,11 @@ use libc::size_t;
 use libsodium_sys::{crypto_secretbox_KEYBYTES, crypto_secretbox_NONCEBYTES, crypto_secretbox_MACBYTES};
 
 /// Maximum allowed data size for encryption/decryption (100 MB).
+#[allow(dead_code)]
 pub const MAX_DATA_SIZE: usize = 100 * 1024 * 1024;
 
 /// Maximum allowed buffer length for random byte generation (64 MB).
+#[allow(dead_code)]
 pub const MAX_RANDOM_BYTES: usize = 64 * 1024 * 1024;
 
 /// Initialize libsodium. Should be called once at application startup.
@@ -20,6 +22,7 @@ pub fn init() -> Result<(), String> {
 }
 
 /// Generate a random cryptographic key for secretbox encryption.
+#[allow(dead_code)]
 pub fn generate_key() -> [u8; crypto_secretbox_KEYBYTES as usize] {
     let mut key = [0u8; crypto_secretbox_KEYBYTES as usize];
     unsafe {
@@ -29,6 +32,7 @@ pub fn generate_key() -> [u8; crypto_secretbox_KEYBYTES as usize] {
 }
 
 /// Generates cryptographically secure random bytes with upper bound check.
+#[allow(dead_code)]
 pub fn random_bytes(len: usize) -> Result<Vec<u8>, String> {
     if len > MAX_RANDOM_BYTES {
         return Err(format!("Requested random byte length ({len}) exceeds maximum allowed ({MAX_RANDOM_BYTES})"));
@@ -42,7 +46,9 @@ pub fn random_bytes(len: usize) -> Result<Vec<u8>, String> {
 
 /// Encrypts data using libsodium's secretbox (authenticated encryption).
 /// Returns nonce || ciphertext.
+#[allow(dead_code)]
 pub fn encrypt(data: &[u8], key: &[u8; crypto_secretbox_KEYBYTES as usize]) -> Result<Vec<u8>, String> {
+    // Validate data constraints
     if data.is_empty() {
         return Err("Data cannot be empty".to_string());
     }
@@ -50,11 +56,13 @@ pub fn encrypt(data: &[u8], key: &[u8; crypto_secretbox_KEYBYTES as usize]) -> R
         return Err(format!("Data length ({}) exceeds maximum limit ({} bytes)", data.len(), MAX_DATA_SIZE));
     }
 
+    // Generate random nonce
     let mut nonce = [0u8; crypto_secretbox_NONCEBYTES as usize];
     unsafe {
         libsodium_sys::randombytes_buf(nonce.as_mut_ptr() as *mut _, crypto_secretbox_NONCEBYTES as size_t);
     }
 
+    // Allocate buffer and encrypt payload
     let mac_len = crypto_secretbox_MACBYTES as usize;
     let total_len = mac_len.checked_add(data.len()).ok_or_else(|| "Ciphertext length overflow".to_string())?;
     let mut ciphertext = vec![0u8; total_len];
@@ -72,21 +80,25 @@ pub fn encrypt(data: &[u8], key: &[u8; crypto_secretbox_KEYBYTES as usize]) -> R
     }
 
     // Prepend nonce to ciphertext for decryption later
-    let mut result = nonce.to_vec();
+    let mut result = Vec::with_capacity(crypto_secretbox_NONCEBYTES as usize + total_len);
+    result.extend_from_slice(&nonce);
     result.extend(ciphertext);
     Ok(result)
 }
 
 /// Decrypts data encrypted with [`encrypt`].
+#[allow(dead_code)]
 pub fn decrypt(encrypted_data: &[u8], key: &[u8; crypto_secretbox_KEYBYTES as usize]) -> Result<Vec<u8>, String> {
+    // Validate minimum and maximum ciphertext bounds
     let min_len = (crypto_secretbox_NONCEBYTES + crypto_secretbox_MACBYTES) as usize;
     if encrypted_data.len() < min_len {
         return Err("Encrypted data too short".to_string());
     }
     if encrypted_data.len() > MAX_DATA_SIZE + min_len {
-        return Err(format!("Encrypted data length exceeds maximum allowed limit"));
+        return Err("Encrypted data length exceeds maximum allowed limit".to_string());
     }
 
+    // Extract nonce and ciphertext slices
     let nonce_start = 0;
     let nonce_end = crypto_secretbox_NONCEBYTES as usize;
     let nonce = &encrypted_data[nonce_start..nonce_end];
@@ -97,6 +109,7 @@ pub fn decrypt(encrypted_data: &[u8], key: &[u8; crypto_secretbox_KEYBYTES as us
 
     let mut plaintext = vec![0u8; decrypted_len];
 
+    // Authenticate and decrypt
     unsafe {
         match libsodium_sys::crypto_secretbox_open_easy(
             plaintext.as_mut_ptr() as *mut _,

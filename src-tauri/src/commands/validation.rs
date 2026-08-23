@@ -1,7 +1,6 @@
-/// Enums for validating user-provided values. These ensure only allowed
-/// values are written to the database, preventing data corruption and
-/// reducing the attack surface.
+//! Enums and helpers for validating user-provided inputs.
 
+/// Allowed task status states
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskStatus {
 	Todo,
@@ -9,6 +8,7 @@ pub enum TaskStatus {
 	Done,
 }
 
+/// Allowed task priority levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskPriority {
 	Low,
@@ -16,6 +16,7 @@ pub enum TaskPriority {
 	High,
 }
 
+/// Allowed collaborator roles
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MemberRole {
 	Owner,
@@ -23,7 +24,7 @@ pub enum MemberRole {
 	Viewer,
 }
 
-/// Validates a task status string. Returns `true` if it's one of the allowed values.
+/// Validates a task status string
 pub fn validate_task_status(status: &str) -> Result<TaskStatus, String> {
 	match status.to_lowercase().as_str() {
 		"todo" => Ok(TaskStatus::Todo),
@@ -33,7 +34,7 @@ pub fn validate_task_status(status: &str) -> Result<TaskStatus, String> {
 	}
 }
 
-/// Validates a task priority string. Returns `true` if it's one of the allowed values.
+/// Validates a task priority string
 pub fn validate_task_priority(priority: &str) -> Result<TaskPriority, String> {
 	match priority.to_lowercase().as_str() {
 		"low" => Ok(TaskPriority::Low),
@@ -43,7 +44,7 @@ pub fn validate_task_priority(priority: &str) -> Result<TaskPriority, String> {
 	}
 }
 
-/// Validates a member role string. Returns `true` if it's one of the allowed values.
+/// Validates a member role string
 pub fn validate_member_role(role: &str) -> Result<MemberRole, String> {
 	match role.to_lowercase().as_str() {
 		"owner" => Ok(MemberRole::Owner),

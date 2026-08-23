@@ -1,8 +1,9 @@
-use rusqlite::Transaction;
+//! Workspace metadata queries and loaders.
 
+use rusqlite::Transaction;
 use super::models::{Activity, ActivityEvent, History, Permissions};
 
-/// Load permissions from the database.
+/// Load permissions map from database
 pub(crate) fn load_permissions(
     tx: &Transaction,
     workspace_id: &str,
@@ -26,7 +27,7 @@ pub(crate) fn load_permissions(
     Ok(perms)
 }
 
-/// Load history from the database.
+/// Load workspace access history from database
 pub(crate) fn load_history(tx: &Transaction, workspace_id: &str) -> Result<History, String> {
     let row: Result<(String, String), rusqlite::Error> = tx.query_row(
         "SELECT last_opened, recent_files FROM history WHERE workspace_id = ?1",
@@ -40,7 +41,7 @@ pub(crate) fn load_history(tx: &Transaction, workspace_id: &str) -> Result<Histo
     Ok(History { last_opened, recent_files })
 }
 
-/// Load activity events from the database.
+/// Load recent activity events from database
 pub(crate) fn load_activity(tx: &Transaction, workspace_id: &str) -> Result<Activity, String> {
     let mut stmt = tx
         .prepare(
