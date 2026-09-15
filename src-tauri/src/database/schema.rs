@@ -5,7 +5,7 @@ use rusqlite::Result as SqlResult;
 
 /// Current schema version.
 #[allow(dead_code)]
-pub const SCHEMA_VERSION: usize = 1;
+pub const SCHEMA_VERSION: usize = 2;
 
 /// Database migration entry
 struct Migration {
@@ -15,10 +15,11 @@ struct Migration {
 }
 
 /// Migration catalog
-const MIGRATIONS: &[Migration] = &[Migration {
-	version: 1,
-	description: "initial schema",
-	up: r##"
+const MIGRATIONS: &[Migration] = &[
+	Migration {
+		version: 1,
+		description: "initial schema",
+		up: r##"
 CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY,
     description TEXT NOT NULL,
@@ -145,24 +146,62 @@ CREATE INDEX IF NOT EXISTS idx_activity_workspace ON activity_events(workspace_i
 CREATE INDEX IF NOT EXISTS idx_activity_ts        ON activity_events(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_members_workspace  ON members(workspace_id);
 "##,
-}];
+	},
+	Migration {
+		version: 2,
+		description: "yjs composite primary key",
+		up: r##"
+CREATE TABLE IF NOT EXISTS yjs_documents_v2 (
+    workspace_id  TEXT NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,
+    doc_id        TEXT NOT NULL,
+    binary_state  BLOB NOT NULL,
+    updated_at    TEXT NOT NULL,
+    PRIMARY KEY (workspace_id, doc_id)
+);
+
+INSERT OR IGNORE INTO yjs_documents_v2 (workspace_id, doc_id, binary_state, updated_at)
+SELECT workspace_id, doc_id, binary_state, updated_at FROM yjs_documents;
+
+DROP TABLE IF EXISTS yjs_documents;
+
+ALTER TABLE yjs_documents_v2 RENAME TO yjs_documents;
+
+CREATE INDEX IF NOT EXISTS idx_yjs_workspace_doc ON yjs_documents(workspace_id, doc_id);
+"##,
+	},
+];
 
 /// Initialises the schema on a fresh database, running pending migrations
 pub fn init_schema(conn: &Connection) -> SqlResult<()> {
-	let tx = conn.unchecked_transaction()?;
+	// Ensure migration tracking table exists
+	conn.execute_batch(
+		"CREATE TABLE IF NOT EXISTS schema_migrations (
+            version INTEGER PRIMARY KEY,
+            description TEXT NOT NULL,
+            applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );",
+	)?;
 
-	// Apply initial schema DDL
-	tx.execute_batch(MIGRATIONS[0].up)?;
-
-	// Record applied migrations idempotently
 	for mig in MIGRATIONS {
-		tx.execute(
-			"INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (?1, ?2)",
-			rusqlite::params![mig.version, mig.description],
-		)?;
+		let applied: bool = conn
+			.query_row(
+				"SELECT COUNT(*) > 0 FROM schema_migrations WHERE version = ?1",
+				rusqlite::params![mig.version],
+				|r| r.get(0),
+			)
+			.unwrap_or(false);
+
+		if !applied {
+			let tx = conn.unchecked_transaction()?;
+			tx.execute_batch(mig.up)?;
+			tx.execute(
+				"INSERT OR REPLACE INTO schema_migrations (version, description) VALUES (?1, ?2)",
+				rusqlite::params![mig.version, mig.description],
+			)?;
+			tx.commit()?;
+		}
 	}
 
-	tx.commit()?;
 	Ok(())
 }
 

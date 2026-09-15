@@ -66,6 +66,12 @@ pub fn run() {
             commands::workspace::move_kanban_card,
             commands::workspace::delete_kanban_column,
             commands::workspace::delete_kanban_card,
+
+            // Yjs CRDT binary document persistence
+            commands::workspace::get_yjs_doc,
+            commands::workspace::save_yjs_doc,
+            commands::workspace::delete_yjs_doc,
+            commands::workspace::list_yjs_docs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

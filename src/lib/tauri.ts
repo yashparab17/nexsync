@@ -20,6 +20,7 @@ import type {
 	KanbanCardRequest,
 	MoveCardRequest,
 	NexsyncConfig,
+	YjsDocSummary,
 } from "@/types/workspace";
 
 // ────────────────────────────
@@ -330,4 +331,78 @@ export function saveConfig(config: NexsyncConfig): Promise<void> {
 // Check if a directory path is valid and allowed
 export function validateAllowedRoot(workspacePath: string): Promise<boolean> {
 	return invoke("validate_allowed_root_cmd", { workspacePath });
+}
+
+// ────────────────────────────
+// Yjs CRDT Binary Persistence
+// ────────────────────────────
+
+// Convert Uint8Array to base64 string for IPC transmission
+export function uint8ArrayToBase64(bytes: Uint8Array): string {
+	let binary = "";
+	const len = bytes.byteLength;
+	const chunkSize = 0x8000;
+	for (let i = 0; i < len; i += chunkSize) {
+		const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
+		binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+	}
+	return btoa(binary);
+}
+
+// Convert base64 string from IPC transmission to Uint8Array
+export function base64ToUint8Array(base64: string): Uint8Array {
+	const binary = atob(base64);
+	const len = binary.length;
+	const bytes = new Uint8Array(len);
+	for (let i = 0; i < len; i++) {
+		bytes[i] = binary.charCodeAt(i);
+	}
+	return bytes;
+}
+
+// Retrieve stored Yjs CRDT document binary state from SQLite
+export async function getYjsDoc(
+	workspacePath: string,
+	docId: string,
+): Promise<Uint8Array | null> {
+	const base64Str = await invoke<string | null>("get_yjs_doc", {
+		workspacePath,
+		docId,
+	});
+	if (!base64Str) return null;
+	return base64ToUint8Array(base64Str);
+}
+
+// Persist Yjs CRDT document binary state into SQLite
+export async function saveYjsDoc(
+	workspacePath: string,
+	docId: string,
+	state: Uint8Array,
+): Promise<void> {
+	const base64Str = uint8ArrayToBase64(state);
+	await invoke("save_yjs_doc", {
+		workspacePath,
+		docId,
+		state: base64Str,
+	});
+}
+
+// Delete Yjs CRDT document binary state from SQLite
+export function deleteYjsDoc(
+	workspacePath: string,
+	docId: string,
+): Promise<void> {
+	return invoke("delete_yjs_doc", {
+		workspacePath,
+		docId,
+	});
+}
+
+// List all Yjs document snapshots stored in workspace database
+export function listYjsDocs(
+	workspacePath: string,
+): Promise<YjsDocSummary[]> {
+	return invoke("list_yjs_docs", {
+		workspacePath,
+	});
 }

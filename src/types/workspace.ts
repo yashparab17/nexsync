@@ -225,3 +225,15 @@ export interface MoveCardRequest {
 export interface NexsyncConfig {
 	allowed_workspace_roots: string[];
 }
+
+// ────────────────────────────
+// Yjs CRDT Persistence Types
+// ────────────────────────────
+
+// Summary of stored Yjs CRDT document binary state in SQLite
+export interface YjsDocSummary {
+	doc_id: string;
+	updated_at: string;
+	size_bytes: number;
+}
+

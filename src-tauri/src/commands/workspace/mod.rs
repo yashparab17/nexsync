@@ -9,6 +9,7 @@ pub mod filesystem;
 pub mod registry;
 pub mod tasks;
 pub mod kanban;
+pub mod yjs;
 pub mod error_log;
 
 // Re-exports for command invocation surface
@@ -17,4 +18,5 @@ pub use filesystem::*;
 pub use registry::*;
 pub use tasks::*;
 pub use kanban::*;
+pub use yjs::*;
 pub use error_log::*;
