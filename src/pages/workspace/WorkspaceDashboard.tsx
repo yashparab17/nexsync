@@ -2,7 +2,7 @@ import { type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { FilePlus, ListTodo, Upload, UsersRound } from "lucide-react";
+import { FilePlus, ListTodo, StickyNote, Upload, UsersRound } from "lucide-react";
 
 // Components
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,11 @@ export default function WorkspaceDashboard() {
 
 	// Quick action shortcuts
 	const quickActions = [
+		{
+			label: "New Note",
+			icon: StickyNote,
+			onClick: () => navigate("/workspace/notes"),
+		},
 		{
 			label: "New File",
 			icon: FilePlus,

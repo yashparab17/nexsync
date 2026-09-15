@@ -11,12 +11,11 @@ import {
 	Loader2,
 	Pencil,
 	RefreshCw,
-	Save,
 	Trash2,
-	X,
 } from "lucide-react";
 
 // Components
+import EditorContainer from "@/components/elements/editor/EditorContainer";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -28,7 +27,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -129,8 +127,6 @@ export default function WorkspaceFiles() {
 	const [openFilePath, setOpenFilePath] = useState<string | null>(null);
 	const [openFileContent, setOpenFileContent] = useState("");
 	const [isFileLoading, setIsFileLoading] = useState(false);
-	const [isSaving, setIsSaving] = useState(false);
-	const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
 	// Modal dialog state
 	const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
@@ -180,7 +176,6 @@ export default function WorkspaceFiles() {
 				const content = await readWorkspaceFile(workspacePath, relPath);
 				setOpenFilePath(relPath);
 				setOpenFileContent(content);
-				setHasUnsavedChanges(false);
 			} catch (err) {
 				logError(err, {
 					source: "files",
@@ -193,47 +188,10 @@ export default function WorkspaceFiles() {
 		[workspacePath, logError],
 	);
 
-	// Save modified file contents to backend
-	const handleSaveFile = useCallback(async () => {
-		if (!workspacePath || !openFilePath) return;
-
-		setIsSaving(true);
-		try {
-			await writeWorkspaceFile(
-				workspacePath,
-				openFilePath,
-				openFileContent,
-			);
-			setHasUnsavedChanges(false);
-			addActivityEvent(
-				"Saved file",
-				`Edited ${openFilePath}`,
-				`/${openFilePath}`,
-				"file",
-			);
-			void loadEntries();
-		} catch (err) {
-			logError(err, {
-				source: "files",
-				workspace: workspacePath,
-			});
-		} finally {
-			setIsSaving(false);
-		}
-	}, [
-		workspacePath,
-		openFilePath,
-		openFileContent,
-		addActivityEvent,
-		loadEntries,
-		logError,
-	]);
-
 	// Close open file editor
 	const handleCloseFile = useCallback(() => {
 		setOpenFilePath(null);
 		setOpenFileContent("");
-		setHasUnsavedChanges(false);
 	}, []);
 
 	// Open dialog to create file or folder
@@ -300,7 +258,6 @@ export default function WorkspaceFiles() {
 						);
 						setOpenFilePath(newPath);
 						setOpenFileContent(content);
-						setHasUnsavedChanges(false);
 					} finally {
 						setIsFileLoading(false);
 					}
@@ -363,7 +320,6 @@ export default function WorkspaceFiles() {
 			if (openFilePath === relPath) {
 				setOpenFilePath(null);
 				setOpenFileContent("");
-				setHasUnsavedChanges(false);
 			}
 
 			setDeleteItem(null);
@@ -567,73 +523,37 @@ export default function WorkspaceFiles() {
 					if (!isOpen) handleCloseFile();
 				}}
 				showCloseButton={false}
-				className="sm:max-w-2xl"
+				className="sm:max-w-5xl h-[85vh] p-4 flex flex-col"
 			>
 				{openFilePath && (
 					<>
-						<DialogHeader>
-							<div className="flex items-center justify-between gap-3">
-								<DialogTitle className="truncate">
-									{openFilePath.split("/").pop()}
-								</DialogTitle>
-								<DialogClose
-									variant="ghost"
-									size="icon-sm"
-									className="bg-secondary"
-									onPress={handleCloseFile}
-								>
-									<X className="size-4" />
-									<span className="sr-only">Close</span>
-								</DialogClose>
-							</div>
-							<DialogDescription className="truncate">
-								/{openFilePath}
-							</DialogDescription>
-						</DialogHeader>
-
-						{isFileLoading ?
-							<div className="flex items-center justify-center py-16">
+						{isFileLoading ? (
+							<div className="flex flex-1 items-center justify-center">
 								<Loader2 className="size-6 animate-spin text-muted-foreground" />
 							</div>
-						:	<Textarea
-								value={openFileContent}
-								onChange={(e) => {
-									setOpenFileContent(e.target.value);
-									setHasUnsavedChanges(true);
+						) : (
+							<EditorContainer
+								fileName={openFilePath.split("/").pop() || "file.txt"}
+								initialContent={openFileContent}
+								onSave={async (newContent) => {
+									if (!workspacePath || !openFilePath) return;
+									await writeWorkspaceFile(
+										workspacePath,
+										openFilePath,
+										newContent,
+									);
+									setOpenFileContent(newContent);
+									addActivityEvent(
+										"Saved file",
+										`Edited ${openFilePath}`,
+										`/${openFilePath}`,
+										"file",
+									);
+									void loadEntries();
 								}}
-								placeholder="File is empty — start typing…"
-								aria-label="File contents"
-								className="min-h-64 font-mono text-xs leading-relaxed"
+								onClose={handleCloseFile}
 							/>
-						}
-
-						<DialogFooter>
-							{hasUnsavedChanges && (
-								<p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-									<span className="size-1.5 rounded-full bg-amber-500" />
-									Unsaved changes
-								</p>
-							)}
-							<DialogClose
-								variant="outline"
-								onPress={handleCloseFile}
-							>
-								Close
-							</DialogClose>
-							<Button
-								onPress={() => void handleSaveFile()}
-								isDisabled={isSaving}
-							>
-								{isSaving ?
-									<Loader2 className="size-4 animate-spin" />
-								:	<Save
-										data-icon="inline-start"
-										className="size-4"
-									/>
-								}
-								Save
-							</Button>
-						</DialogFooter>
+						)}
 					</>
 				)}
 			</Dialog>

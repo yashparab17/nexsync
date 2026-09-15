@@ -132,6 +132,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 				path: metadata.workspace.path,
 				metadata,
 			});
+			// Sync with recent workspaces registry
+			await addRecentWorkspace(metadata.workspace);
 			setError(null);
 		} catch (err) {
 			setError(String(err));

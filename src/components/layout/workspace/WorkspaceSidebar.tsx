@@ -13,6 +13,7 @@ import {
 	LayoutDashboard,
 	ListTodo,
 	Settings,
+	StickyNote,
 	UsersRound,
 } from "lucide-react";
 
@@ -36,6 +37,11 @@ const navigation: NavigationItem[] = [
 		path: "/workspace",
 		icon: LayoutDashboard,
 		end: true,
+	},
+	{
+		name: "Notes",
+		path: "/workspace/notes",
+		icon: StickyNote,
 	},
 	{
 		name: "Files",
