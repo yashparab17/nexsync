@@ -75,32 +75,108 @@ pub fn load_config(app_handle: &tauri::AppHandle) -> Result<NexsyncConfig, Strin
         .map_err(|e| format!("Failed to parse config file: {}", e))
 }
 
+/// Checks if a path is inside a restricted OS system directory.
+pub fn is_system_directory(path: &std::path::Path) -> bool {
+    let path_str = path.to_string_lossy();
+
+    #[cfg(windows)]
+    {
+        let lower = path_str.to_lowercase().replace('/', "\\");
+
+        // Disallow standard Windows system locations
+        let forbidden_windows_prefixes = [
+            "c:\\windows",
+            "c:\\program files",
+            "c:\\program files (x86)",
+        ];
+        for prefix in forbidden_windows_prefixes {
+            if lower == prefix || lower.starts_with(&format!("{}\\", prefix)) {
+                return true;
+            }
+        }
+
+        // Disallow system directories on ANY drive (e.g. D:\$Recycle.Bin, E:\System Volume Information)
+        let forbidden_substrings = [
+            "\\windows\\",
+            "\\$recycle.bin",
+            "\\system volume information",
+            "\\recovery\\",
+        ];
+        for sub in forbidden_substrings {
+            if lower.contains(sub) || lower.ends_with(sub.trim_end_matches('\\')) {
+                return true;
+            }
+        }
+
+        // Environment-specific Windows directories
+        for var in ["WINDIR", "SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"] {
+            if let Ok(val) = std::env::var(var) {
+                let val_lower = val.to_lowercase().replace('/', "\\");
+                if lower == val_lower || lower.starts_with(&format!("{}\\", val_lower)) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    {
+        let s = path_str.as_ref();
+        let forbidden = ["/etc", "/usr", "/var", "/bin", "/sbin", "/dev", "/proc", "/sys", "/boot", "/root", "/System", "/Library"];
+        for prefix in forbidden {
+            if s == prefix || s.starts_with(&format!("{}/", prefix)) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Helper to check if `candidate` path starts with or is inside `prefix`.
+/// On Windows, handles case-insensitivity and ensures component-boundary matching.
+pub fn path_starts_with(candidate: &std::path::Path, prefix: &std::path::Path) -> bool {
+    #[cfg(windows)]
+    {
+        let c = candidate.to_string_lossy().to_lowercase().replace('/', "\\");
+        let mut p = prefix.to_string_lossy().to_lowercase().replace('/', "\\");
+        if c == p {
+            return true;
+        }
+        if !p.ends_with('\\') {
+            p.push('\\');
+        }
+        c.starts_with(&p)
+    }
+    #[cfg(not(windows))]
+    {
+        candidate.starts_with(prefix)
+    }
+}
+
 /// Validates that an allowed root candidate is safe and not a system directory
-fn validate_root_candidate(root: &str) -> Result<PathBuf, String> {
+pub fn validate_root_candidate(root: &str) -> Result<PathBuf, String> {
     let path = expand_and_resolve(root)?;
     if !path.is_absolute() {
         return Err(format!("Allowed root path '{}' must be absolute.", root));
     }
 
     let path_str = path.to_string_lossy();
-    // Reject drive roots
-    if path_str == "/" || path_str == "\\" || path_str.ends_with(":\\") || path_str.ends_with(":/") {
+    // Reject system root filesystem on Unix and C:\ on Windows
+    if path_str == "/" || path_str == "\\" {
         return Err(format!("Root directory '{}' cannot be configured as a workspace root.", root));
     }
 
     #[cfg(windows)]
     {
         let lower = path_str.to_lowercase();
-        if lower.starts_with("c:\\windows") || lower.starts_with("c:\\program files") || lower.starts_with("c:\\program files (x86)") {
-            return Err("System directories cannot be added as allowed workspace roots.".to_string());
+        if lower == "c:\\" || lower == "c:/" {
+            return Err("The system drive root 'C:\\' cannot be configured as a workspace root.".to_string());
         }
     }
 
-    #[cfg(unix)]
-    {
-        if path_str.starts_with("/etc") || path_str.starts_with("/usr") || path_str.starts_with("/var") || path_str.starts_with("/bin") || path_str.starts_with("/sbin") {
-            return Err("System directories cannot be added as allowed workspace roots.".to_string());
-        }
+    if is_system_directory(&path) {
+        return Err("System directories cannot be added as allowed workspace roots.".to_string());
     }
 
     Ok(path)
@@ -124,6 +200,24 @@ pub fn save_config(app_handle: &tauri::AppHandle, config: &NexsyncConfig) -> Res
     Ok(())
 }
 
+/// Strips the Windows extended-length UNC prefix `\\?\` from a path string.
+/// `std::fs::canonicalize` on Windows always returns these prefixed paths,
+/// which breaks `starts_with` comparisons against plain paths.
+#[cfg(windows)]
+pub fn strip_unc_prefix(path: PathBuf) -> PathBuf {
+    let s = path.to_string_lossy();
+    if let Some(stripped) = s.strip_prefix(r"\\?\") {
+        PathBuf::from(stripped)
+    } else {
+        path
+    }
+}
+
+#[cfg(not(windows))]
+pub fn strip_unc_prefix(path: PathBuf) -> PathBuf {
+    path
+}
+
 /// Resolves home directory tilde and normalizes path
 pub fn expand_and_resolve(path: &str) -> Result<PathBuf, String> {
     let path = path.trim();
@@ -137,52 +231,107 @@ pub fn expand_and_resolve(path: &str) -> Result<PathBuf, String> {
     };
     
     match expanded.canonicalize() {
-        Ok(p) => Ok(p),
-        Err(_) => Ok(expanded),
+        Ok(p) => Ok(strip_unc_prefix(p)),
+        Err(_) => Ok(strip_unc_prefix(expanded)),
     }
 }
 
-/// Validates that a workspace path resides within allowed directory roots
+/// Adds a root directory to allowed_workspace_roots in config if not already covered
+pub fn add_allowed_root(app_handle: &tauri::AppHandle, root_path: &str) -> Result<(), String> {
+    let mut config = load_config(app_handle)?;
+    let candidate = expand_and_resolve(root_path)?;
+
+    if is_system_directory(&candidate) {
+        return Err("Cannot add system directory as allowed root.".to_string());
+    }
+
+    for existing in &config.allowed_workspace_roots {
+        if let Ok(existing_path) = expand_and_resolve(existing) {
+            if path_starts_with(&candidate, &existing_path) {
+                return Ok(());
+            }
+        }
+    }
+
+    let candidate_str = candidate.to_string_lossy().to_string();
+    if validate_root_candidate(&candidate_str).is_ok() {
+        config.allowed_workspace_roots.push(candidate_str);
+        let _ = save_config(app_handle, &config);
+    }
+    Ok(())
+}
+
+/// Validates that a workspace path resides within allowed directory roots or is a safe workspace path
 pub fn validate_allowed_root(
     app_handle: &tauri::AppHandle,
     workspace_path: &str,
 ) -> Result<(), String> {
-    let config = load_config(app_handle)?;
-    
-    if config.allowed_workspace_roots.is_empty() {
-        return check_default_safe_paths(workspace_path);
-    }
-    
     let candidate = expand_and_resolve(workspace_path)?;
     
+    if !candidate.is_absolute() {
+        return Err(format!("Workspace path '{}' must be absolute.", workspace_path));
+    }
+
+    if is_system_directory(&candidate) {
+        return Err(format!(
+            "Workspace path '{}' is inside a protected system directory and cannot be used.",
+            candidate.display()
+        ));
+    }
+
+    let config = load_config(app_handle)?;
+
+    // 1. Check against explicitly configured allowed roots
     for root_template in &config.allowed_workspace_roots {
-        let root = expand_and_resolve(root_template)?;
-        
-        if candidate.starts_with(&root) {
-            return Ok(());
+        if let Ok(root) = expand_and_resolve(root_template) {
+            if path_starts_with(&candidate, &root) {
+                return Ok(());
+            }
         }
     }
-    
+
+    // 2. Check standard safe user folders (Documents, Desktop, Home)
+    if let Some(doc) = dirs::document_dir() {
+        if let Ok(p) = expand_and_resolve(&doc.to_string_lossy()) {
+            if path_starts_with(&candidate, &p) {
+                return Ok(());
+            }
+        }
+    }
+    if let Some(desk) = dirs::desktop_dir() {
+        if let Ok(p) = expand_and_resolve(&desk.to_string_lossy()) {
+            if path_starts_with(&candidate, &p) {
+                return Ok(());
+            }
+        }
+    }
+    if let Some(home) = dirs::home_dir() {
+        if let Ok(p) = expand_and_resolve(&home.to_string_lossy()) {
+            if path_starts_with(&candidate, &p) {
+                return Ok(());
+            }
+        }
+    }
+
+    // 3. For any other safe user location (e.g. secondary drives like E:\nexsynctest, D:\workspaces, etc.)
+    let cand_str = candidate.to_string_lossy();
+    if cand_str != "/" && cand_str != "\\" {
+        #[cfg(windows)]
+        {
+            let lower = cand_str.to_lowercase();
+            if lower == "c:\\" || lower == "c:/" {
+                return Err("The system drive root 'C:\\' cannot be used as a workspace.".to_string());
+            }
+        }
+
+        // Auto-register candidate as an allowed root so subsequent checks pass smoothly
+        let _ = add_allowed_root(app_handle, &cand_str);
+        return Ok(());
+    }
+
     Err(format!(
         "Workspace path '{}' is not within any allowed root directory.",
         candidate.display()
-    ))
-}
-
-/// Fallback check against user home directory
-fn check_default_safe_paths(path: &str) -> Result<(), String> {
-    let candidate = expand_and_resolve(path)?;
-    let home = dirs::home_dir()
-        .ok_or_else(|| "Could not resolve home directory for validation".to_string())?;
-    
-    if candidate.starts_with(&home) {
-        return Ok(());
-    }
-    
-    Err(format!(
-        "Workspace path '{}' is outside your home directory ({}).",
-        candidate.display(),
-        home.display()
     ))
 }
 
@@ -231,6 +380,50 @@ mod tests {
                 assert!(path.to_string_lossy().contains("test"));
             }
             Err(_) => {}
+        }
+    }
+
+    #[test]
+    fn test_path_starts_with() {
+        #[cfg(windows)]
+        {
+            assert!(path_starts_with(
+                std::path::Path::new("E:\\nexsynctest\\sub"),
+                std::path::Path::new("e:\\nexsynctest")
+            ));
+            assert!(path_starts_with(
+                std::path::Path::new("E:\\nexsynctest"),
+                std::path::Path::new("E:\\nexsynctest")
+            ));
+            assert!(!path_starts_with(
+                std::path::Path::new("E:\\nexsynctest2"),
+                std::path::Path::new("E:\\nexsynctest")
+            ));
+        }
+        #[cfg(not(windows))]
+        {
+            assert!(path_starts_with(
+                std::path::Path::new("/home/user/project/sub"),
+                std::path::Path::new("/home/user/project")
+            ));
+        }
+    }
+
+    #[test]
+    fn test_system_directories_blocked() {
+        #[cfg(windows)]
+        {
+            assert!(is_system_directory(std::path::Path::new("C:\\Windows")));
+            assert!(is_system_directory(std::path::Path::new("C:\\Windows\\System32")));
+            assert!(is_system_directory(std::path::Path::new("C:\\Program Files\\App")));
+            assert!(is_system_directory(std::path::Path::new("E:\\$Recycle.Bin")));
+            assert!(!is_system_directory(std::path::Path::new("E:\\nexsynctest")));
+        }
+        #[cfg(unix)]
+        {
+            assert!(is_system_directory(std::path::Path::new("/etc")));
+            assert!(is_system_directory(std::path::Path::new("/usr/bin")));
+            assert!(!is_system_directory(std::path::Path::new("/home/user/nexsynctest")));
         }
     }
 }

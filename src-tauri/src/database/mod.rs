@@ -5,7 +5,6 @@
 
 pub mod connection;
 pub mod schema;
-pub mod migrate;
 
 // Re-export WorkspaceDb connection wrapper
 pub use connection::WorkspaceDb;
