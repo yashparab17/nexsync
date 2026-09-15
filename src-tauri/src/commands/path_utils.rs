@@ -68,11 +68,7 @@ fn validate_rel_path(rel_path: &str) -> Result<(), String> {
     const ALLOWED_ROOTS: &[&str] = &["notes", "files", "assets", "tasks", "kanban", "editor"];
     
     let rel_path = rel_path.trim_matches('/');
-    if rel_path.is_empty() {
-        return Err("The path cannot be empty.".to_string());
-    }
-    
-    if rel_path == "." {
+    if rel_path.is_empty() || rel_path == "." {
         return Ok(());
     }
     

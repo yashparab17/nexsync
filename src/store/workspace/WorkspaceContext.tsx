@@ -219,7 +219,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
-	// Prepend a new activity event to the workspace history
+	// Prepend a new activity event to the workspace history and persist to database
 	const addActivityEvent = useCallback(
 		(
 			action: string,
@@ -239,12 +239,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 						target_type: targetType,
 					}),
 				};
-				return {
+				const updatedMetadata = {
 					...prev,
 					activity: {
 						events: [event, ...prev.activity.events],
 					},
 				};
+				// Auto-persist to SQLite
+				writeWorkspaceMetadata({
+					path: prev.workspace.path,
+					metadata: updatedMetadata,
+				}).catch((err) => {
+					console.error("Failed to auto-persist activity event:", err);
+				});
+				return updatedMetadata;
 			});
 		},
 		[],

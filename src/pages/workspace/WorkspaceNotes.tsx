@@ -33,7 +33,7 @@ import type { WorkspaceFile } from "@/types/workspace";
 
 // Filtered Notes workspace view managing .md documents with rich BlockNote and CodeMirror editing
 export default function WorkspaceNotes() {
-	const { workspace, refreshMetadata } = useWorkspace();
+	const { workspace, refreshMetadata, addActivityEvent } = useWorkspace();
 	const logError = useErrorLog();
 
 	// Notes file list
@@ -124,6 +124,12 @@ export default function WorkspaceNotes() {
 			const relPath = selectedNote.path.replace(/^\/+/, "");
 			await writeWorkspaceFile(workspace.path, relPath, newText);
 			setNoteContent(newText);
+			addActivityEvent(
+				"Saved note",
+				`Edited note ${selectedNote.name}`,
+				selectedNote.path,
+				"note",
+			);
 			await refreshMetadata();
 		} catch (err) {
 			console.error("Failed to save note:", err);
@@ -146,6 +152,12 @@ export default function WorkspaceNotes() {
 
 			// Save into "notes" subdirectory
 			await createWorkspaceFile(workspace.path, "notes", filename);
+			addActivityEvent(
+				"Created note",
+				`Created note ${filename}`,
+				`/notes/${filename}`,
+				"note",
+			);
 			setIsNewNoteOpen(false);
 			setNewNoteTitle("");
 			await loadNotes();
@@ -174,6 +186,12 @@ export default function WorkspaceNotes() {
 		try {
 			const relPath = deletingNote.path.replace(/^\/+/, "");
 			await deleteWorkspaceItem(workspace.path, relPath);
+			addActivityEvent(
+				"Deleted note",
+				`Deleted note ${deletingNote.name}`,
+				undefined,
+				"note",
+			);
 			if (selectedNote?.path === deletingNote.path) {
 				setSelectedNote(null);
 			}

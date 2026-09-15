@@ -79,8 +79,8 @@ pub(crate) fn validate_workspace_rel_path(rel_path: &str) -> Result<(), String> 
 /// Validates a workspace-relative path for safe filesystem access with specified roots
 pub(crate) fn validate_workspace_rel_path_with_roots(rel_path: &str, allowed_roots: &[&str]) -> Result<(), String> {
     let rel_path = rel_path.trim_matches('/');
-    if rel_path.is_empty() {
-        return Err("The path cannot be empty.".to_string());
+    if rel_path.is_empty() || rel_path == "." {
+        return Ok(());
     }
     let mut segments = rel_path.split('/');
     let first = segments.next().unwrap_or("");

@@ -228,6 +228,31 @@ export function writeWorkspaceFile(
 	return invoke("write_workspace_file", { path, relPath, content });
 }
 
+// Read binary file from workspace as base64 string
+export function readWorkspaceBinaryFile(
+	path: string,
+	relPath: string,
+): Promise<string> {
+	return invoke("read_workspace_binary_file", { path, relPath });
+}
+
+// Write binary base64 data to workspace file
+export function writeWorkspaceBinaryFile(
+	path: string,
+	relPath: string,
+	base64Data: string,
+): Promise<void> {
+	return invoke("write_workspace_binary_file", { path, relPath, base64Data });
+}
+
+// Import an external asset file from disk into workspace assets/
+export function importAssetFromPath(
+	workspacePath: string,
+	sourcePath: string,
+): Promise<WorkspaceFile> {
+	return invoke("import_asset_from_path", { workspacePath, sourcePath });
+}
+
 // Delete a workspace file or directory permanently
 export function deleteWorkspaceItem(
 	path: string,

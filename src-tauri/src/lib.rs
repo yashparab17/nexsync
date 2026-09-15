@@ -38,6 +38,9 @@ pub fn run() {
             commands::workspace::create_workspace_item,
             commands::workspace::read_workspace_file,
             commands::workspace::write_workspace_file,
+            commands::workspace::read_workspace_binary_file,
+            commands::workspace::write_workspace_binary_file,
+            commands::workspace::import_asset_from_path,
             commands::workspace::delete_workspace_item,
             commands::workspace::rename_workspace_item,
 

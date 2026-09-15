@@ -2,7 +2,15 @@ import { type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { FilePlus, ListTodo, StickyNote, Upload, UsersRound } from "lucide-react";
+import {
+	Activity,
+	FilePlus,
+	FolderOpen,
+	ListTodo,
+	StickyNote,
+	Upload,
+	UsersRound,
+} from "lucide-react";
 
 // Components
 import { Button } from "@/components/ui/button";
@@ -38,6 +46,35 @@ function formatRelative(iso: string): string {
 	const days = Math.floor(hours / 24);
 	if (days < 7) return `${days}d ago`;
 	return new Date(iso).toLocaleDateString();
+}
+
+// Converts raw action identifiers into human-friendly capitalized titles
+function formatAction(action: string): string {
+	const clean = action.replace(/_/g, " ").trim();
+	return clean.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Returns a contextual icon matching the entity type of the event
+function getActivityIcon(targetType?: string, action?: string) {
+	const act = (action || "").toLowerCase();
+	const type = (targetType || "").toLowerCase();
+
+	if (type === "note" || act.includes("note")) {
+		return <StickyNote className="size-4 text-sky-400 shrink-0" />;
+	}
+	if (type === "asset" || act.includes("asset")) {
+		return <Upload className="size-4 text-emerald-400 shrink-0" />;
+	}
+	if (type === "task" || act.includes("task")) {
+		return <ListTodo className="size-4 text-purple-400 shrink-0" />;
+	}
+	if (type === "folder") {
+		return <FolderOpen className="size-4 text-primary shrink-0" />;
+	}
+	if (type === "member" || act.includes("member")) {
+		return <UsersRound className="size-4 text-primary shrink-0" />;
+	}
+	return <FilePlus className="size-4 text-amber-400 shrink-0" />;
 }
 
 interface StatCardProps {
@@ -175,38 +212,46 @@ export default function WorkspaceDashboard() {
 			<div>
 				<Card>
 					<CardHeader>
-						<CardTitle>Recent Activity</CardTitle>
+						<CardTitle className="flex items-center gap-2">
+							<Activity className="size-5 text-primary" />
+							Recent Activity
+						</CardTitle>
 						<CardDescription>
-							Latest events in this workspace.
+							Latest events and changes in this workspace.
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
-						{activity.length === 0 ?
+						{activity.length === 0 ? (
 							<p className="text-sm text-muted-foreground">
-								No activity yet. Start by creating a file or
-								task.
+								No activity yet. Start by creating a note, file, or task.
 							</p>
-						:	<ul className="space-y-3">
-								{activity.slice(0, 6).map((event) => (
+						) : (
+							<ul className="divide-y divide-border/50">
+								{activity.slice(0, 7).map((event) => (
 									<li
 										key={event.id}
-										className="flex items-start justify-between gap-3 text-sm"
+										className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0 text-sm"
 									>
-										<div className="min-w-0">
-											<p className="truncate font-medium">
-												{event.action}
-											</p>
-											<p className="truncate text-muted-foreground">
-												{event.detail}
-											</p>
+										<div className="flex items-start gap-3 min-w-0">
+											<div className="p-2 rounded-lg bg-muted/60 mt-0.5">
+												{getActivityIcon(event.target_type, event.action)}
+											</div>
+											<div className="min-w-0">
+												<p className="font-semibold text-xs text-foreground">
+													{formatAction(event.action)}
+												</p>
+												<p className="text-xs text-muted-foreground truncate mt-0.5">
+													{event.detail}
+												</p>
+											</div>
 										</div>
-										<span className="shrink-0 text-xs text-muted-foreground">
+										<span className="shrink-0 text-[11px] font-mono text-muted-foreground">
 											{formatRelative(event.timestamp)}
 										</span>
 									</li>
 								))}
 							</ul>
-						}
+						)}
 					</CardContent>
 				</Card>
 			</div>

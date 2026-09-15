@@ -140,7 +140,7 @@ export default function WorkspaceFiles() {
 		if (!workspacePath) return;
 		setIsLoading(true);
 		try {
-			const relDir = currentDir ? `files/${currentDir}` : "files";
+			const relDir = currentDir;
 			const next = await listWorkspaceFiles(workspacePath, relDir);
 			setEntries(next);
 		} catch (err) {
@@ -226,37 +226,37 @@ export default function WorkspaceFiles() {
 		setNameError(null);
 
 		try {
-			const relDir = currentDir ? `files/${currentDir}` : "files";
+			const relDir = currentDir;
 
 			if (dialog.mode === "create") {
+				const itemRel = joinRelPath(currentDir, name);
 				if (dialog.kind === "file") {
 					await createWorkspaceFile(workspacePath, relDir, name);
 					addActivityEvent(
 						"Created file",
-						`Created ${joinRelPath(currentDir, name)}`,
-						`/files/${joinRelPath(currentDir, name)}`,
+						`Created ${name}`,
+						`/${itemRel}`,
 						"file",
 					);
 				} else {
 					await createWorkspaceFolder(workspacePath, relDir, name);
 					addActivityEvent(
 						"Created folder",
-						`Created ${joinRelPath(currentDir, name)}`,
-						`/files/${joinRelPath(currentDir, name)}`,
+						`Created folder ${name}`,
+						`/${itemRel}`,
 						"folder",
 					);
 				}
 
 				// Auto-open created file in editor
 				if (dialog.kind === "file") {
-					const newPath = `files/${joinRelPath(currentDir, name)}`;
 					setIsFileLoading(true);
 					try {
 						const content = await readWorkspaceFile(
 							workspacePath,
-							newPath,
+							itemRel,
 						);
-						setOpenFilePath(newPath);
+						setOpenFilePath(itemRel);
 						setOpenFileContent(content);
 					} finally {
 						setIsFileLoading(false);
@@ -265,15 +265,16 @@ export default function WorkspaceFiles() {
 			} else if (dialog.mode === "rename" && dialog.item) {
 				const relPath = toRelPath(dialog.item.path);
 				await renameWorkspaceItem(workspacePath, relPath, name);
+				const parent = getParentDir(relPath);
+				const newRelPath = parent ? `${parent}/${name}` : name;
 				addActivityEvent(
-					"Renamed",
+					"Renamed item",
 					`Renamed ${dialog.item.name} to ${name}`,
-					`/${getParentDir(relPath)}/${name}`,
+					`/${newRelPath}`,
 					dialog.item.is_dir ? "folder" : "file",
 				);
 
 				if (openFilePath === relPath) {
-					const newRelPath = `${getParentDir(relPath)}/${name}`;
 					setOpenFilePath(newRelPath);
 				}
 			}
@@ -311,7 +312,7 @@ export default function WorkspaceFiles() {
 			await deleteWorkspaceItem(workspacePath, relPath);
 
 			addActivityEvent(
-				"Deleted",
+				"Deleted item",
 				`Deleted ${deleteItem.name}${deleteItem.is_dir ? "/" : ""}`,
 				undefined,
 				deleteItem.is_dir ? "folder" : "file",
@@ -346,7 +347,7 @@ export default function WorkspaceFiles() {
 	// Construct breadcrumbs
 	const breadcrumbs = getBreadcrumbs(currentDir);
 	const crumbs = [
-		{ label: "Files", dir: "" },
+		{ label: workspace?.name || "Workspace", dir: "" },
 		...breadcrumbs.map((part, i) => ({
 			label: part,
 			dir: breadcrumbs.slice(0, i + 1).join("/"),
@@ -582,8 +583,8 @@ export default function WorkspaceFiles() {
 										:	"folder"
 									} in ${
 										currentDir ?
-											`/files/${currentDir}/`
-										:	"/files/"
+											`/${currentDir}/`
+										:	"/"
 									}.`
 								:	`Enter a new name for ${nameDialog.item?.name}.`
 								}

@@ -99,6 +99,21 @@ export interface WorkspaceStats {
 }
 
 // ────────────────────────────
+// Asset types & categories
+// ────────────────────────────
+
+export type AssetCategory = "all" | "image" | "video" | "audio" | "document" | "other";
+
+export type AssetSyncStatus = "synced" | "remote_placeholder" | "downloading";
+
+export interface AssetItem extends WorkspaceFile {
+	category: AssetCategory;
+	mimeType?: string;
+	syncStatus: AssetSyncStatus;
+	dimensions?: { width: number; height: number };
+}
+
+// ────────────────────────────
 // Error logging types
 // ────────────────────────────
 
