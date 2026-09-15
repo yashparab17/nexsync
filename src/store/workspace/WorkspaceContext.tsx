@@ -50,6 +50,7 @@ interface WorkspaceContextType {
 	saveWorkspace: () => Promise<void>;
 	clearWorkspace: () => Promise<void>;
 	refreshStats: () => Promise<void>;
+	refreshMetadata: () => Promise<void>;
 
 	// Metadata updaters (mutates local state; saveWorkspace persists)
 	updateSettings: (settings: Partial<Settings>) => void;
@@ -145,6 +146,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 	const handleSetWorkspace = useCallback((ws: WorkspaceInfo) => {
 		setWorkspace(ws);
 	}, []);
+
+	// Refresh workspace metrics and metadata from disk
+	const refreshMetadata = useCallback(async () => {
+		if (!workspace) return;
+
+		try {
+			const [meta, nextStats] = await Promise.all([
+				readWorkspaceMetadata(workspace.path),
+				getWorkspaceStats(workspace.path),
+			]);
+			setMetadata(meta);
+			setStats(nextStats);
+		} catch (err) {
+			setError(String(err));
+			logError(err, {
+				source: "workspace_stats",
+				workspace: workspace.path,
+			});
+		}
+	}, [workspace, logError]);
 
 	// Refresh workspace metrics from disk
 	const refreshStats = useCallback(async () => {
@@ -279,6 +300,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 				saveWorkspace,
 				clearWorkspace,
 				refreshStats,
+				refreshMetadata,
 				updateSettings,
 				updateMembers,
 				addActivityEvent,

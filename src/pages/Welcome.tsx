@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { FolderOpen, FolderPlus, UsersRound } from "lucide-react";
+import { FolderOpen, FolderPlus, Settings, UsersRound } from "lucide-react";
 
 // Hooks
 import { useTheme } from "@/hooks/useTheme";
@@ -104,8 +104,13 @@ export default function Welcome() {
 				<div className="absolute right-0 flex items-center gap-2">
 					<ThemeToggle />
 
-					<Button variant="ghost" size="icon">
-						<UsersRound className="size-5" />
+					<Button
+						variant="ghost"
+						size="icon"
+						onPress={() => navigate("/settings")}
+						aria-label="Application Settings"
+					>
+						<Settings className="size-5" />
 					</Button>
 				</div>
 			</header>

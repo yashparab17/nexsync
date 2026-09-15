@@ -16,7 +16,12 @@ export type ErrorSource =
 	| "recent_load"
 	| "dialog"
 	| "render"
-	| "files";
+	| "files"
+	| "tasks"
+	| "kanban"
+	| "members"
+	| "settings"
+	| (string & {});
 
 interface ErrorContext {
 	source: ErrorSource;

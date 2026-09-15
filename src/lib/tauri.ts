@@ -19,6 +19,7 @@ import type {
 	KanbanColumnRequest,
 	KanbanCardRequest,
 	MoveCardRequest,
+	NexsyncConfig,
 } from "@/types/workspace";
 
 // ────────────────────────────
@@ -285,4 +286,23 @@ export function setLastWorkspace(workspace: WorkspaceInfo): Promise<void> {
 // Clear last workspace tracking
 export function clearLastWorkspace(): Promise<void> {
 	return invoke("clear_last_workspace");
+}
+
+// ────────────────────────────
+// Security & App Configuration
+// ────────────────────────────
+
+// Load application security configuration
+export function loadConfig(): Promise<NexsyncConfig> {
+	return invoke("load_config_cmd");
+}
+
+// Save application security configuration
+export function saveConfig(config: NexsyncConfig): Promise<void> {
+	return invoke("save_config_cmd", { config });
+}
+
+// Check if a directory path is valid and allowed
+export function validateAllowedRoot(workspacePath: string): Promise<boolean> {
+	return invoke("validate_allowed_root_cmd", { workspacePath });
 }

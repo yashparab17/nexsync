@@ -202,3 +202,11 @@ export interface MoveCardRequest {
 	column_id: string;
 	position: number;
 }
+
+// ────────────────────────────
+// App Security & Configuration
+// ────────────────────────────
+
+export interface NexsyncConfig {
+	allowed_workspace_roots: string[];
+}
