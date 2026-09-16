@@ -40,6 +40,7 @@ import {
 	writeWorkspaceBinaryFile,
 } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { useP2P } from "@/store/p2p/P2PContext";
 import type {
 	AssetCategory,
 	AssetItem,
@@ -75,6 +76,7 @@ function formatBytes(bytes: number): string {
 
 export default function WorkspaceAssets() {
 	const { workspace, refreshStats, addActivityEvent } = useWorkspace();
+	const { placeholders, downloadFileOnDemand } = useP2P();
 	const logError = useErrorLog();
 
 	// State
@@ -101,7 +103,7 @@ export default function WorkspaceAssets() {
 	const [isDraggingOver, setIsDraggingOver] = useState(false);
 	const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-	// Fetch assets from workspace/assets directory
+	// Fetch assets from workspace/assets directory and merge remote placeholders (>10MB)
 	const loadAssets = useCallback(async () => {
 		if (!workspace?.path) return;
 		setLoading(true);
@@ -119,10 +121,26 @@ export default function WorkspaceAssets() {
 					syncStatus: "synced",
 				}));
 
+			// Merge in any remote placeholders (>10MB) not yet downloaded
+			for (const p of placeholders) {
+				const cleanPath = p.relPath.startsWith("/") ? p.relPath.slice(1) : p.relPath;
+				if (!assetItems.some((a) => a.path.includes(p.name))) {
+					assetItems.push({
+						name: p.name,
+						path: `/${cleanPath}`,
+						is_dir: false,
+						size: p.size,
+						modified_at: new Date().toISOString(),
+						category: getAssetCategory(p.name),
+						syncStatus: "remote_placeholder",
+					});
+				}
+			}
+
 			setAssets(assetItems);
 
 			// Preload thumbnails for image assets
-			const imageFiles = assetItems.filter((a) => a.category === "image");
+			const imageFiles = assetItems.filter((a) => a.category === "image" && a.syncStatus === "synced");
 			for (const img of imageFiles) {
 				const cleanPath =
 					img.path.startsWith("/") ? img.path.slice(1) : img.path;
@@ -143,7 +161,7 @@ export default function WorkspaceAssets() {
 		} finally {
 			setLoading(false);
 		}
-	}, [workspace?.path, logError]);
+	}, [workspace?.path, placeholders, logError]);
 
 	useEffect(() => {
 		loadAssets();
@@ -258,19 +276,18 @@ export default function WorkspaceAssets() {
 		}
 	};
 
-	// Simulate lazy sync download on demand
+	// Real lazy sync download on demand over WebRTC
 	const handleLazyDownload = async (asset: AssetItem) => {
-		// Simulates peer chunk download
-		await new Promise((r) => setTimeout(r, 1200));
-		setAssets((prev) =>
-			prev.map((a) =>
-				a.name === asset.name ? { ...a, syncStatus: "synced" } : a,
-			),
-		);
-		if (previewAsset?.name === asset.name) {
-			setPreviewAsset((prev) =>
-				prev ? { ...prev, syncStatus: "synced" } : null,
-			);
+		try {
+			await downloadFileOnDemand(asset.path);
+			await loadAssets();
+			if (previewAsset?.name === asset.name) {
+				setPreviewAsset((prev) =>
+					prev ? { ...prev, syncStatus: "synced" } : null,
+				);
+			}
+		} catch (err) {
+			console.error("Failed to download lazy file on demand:", err);
 		}
 	};
 

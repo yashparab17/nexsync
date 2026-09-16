@@ -26,8 +26,13 @@ import { removeRecentWorkspace, writeWorkspaceMetadata } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
 export default function WorkspaceSettings() {
-	const { workspace, metadata, refreshMetadata, clearWorkspace } =
-		useWorkspace();
+	const {
+		workspace,
+		metadata,
+		refreshMetadata,
+		clearWorkspace,
+		addActivityEvent,
+	} = useWorkspace();
 	const logError = useErrorLog();
 	const navigate = useNavigate();
 
@@ -71,6 +76,12 @@ export default function WorkspaceSettings() {
 				path: workspace.path,
 				metadata: updatedMetadata,
 			});
+			await addActivityEvent(
+				"Updated settings",
+				"Saved workspace configuration",
+				undefined,
+				"settings",
+			);
 			setSavedSuccess(true);
 			setTimeout(() => setSavedSuccess(false), 2500);
 			await refreshMetadata();

@@ -12,7 +12,7 @@ edition = "2021"
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "nexsync_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["lib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -31,6 +31,11 @@ dirs = "5"
 lazy_static = "1.4"
 strum = { version = "0.26", features = ["derive"] }
 
-# Cryptography - libsodium via libsodium-sys
-libsodium-sys = "0.2.7"
+# Cryptography - Pure RustCrypto & X25519 Diffie-Hellman
+aes-gcm = "0.10"
+chacha20poly1305 = "0.10"
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+rand = "0.8"
+zeroize = { version = "1.8", features = ["derive"] }
 base64 = "0.22"
+

@@ -1,6 +1,7 @@
 mod commands;
 mod database;
-mod crypto;
+#[allow(dead_code)]
+pub mod crypto;
 
 /// Initializes plugins, registers Tauri command handlers, and runs the application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

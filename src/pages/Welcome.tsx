@@ -14,7 +14,9 @@ import { useErrorLog } from "@/hooks/useErrorLog";
 // Components
 import CreateWorkspaceDialog from "@/components/dialogs/workspace/CreateWorkspaceDialog";
 import ImportWorkspaceDialog from "@/components/dialogs/workspace/ImportWorkspaceDialog";
+import JoinWorkspaceDialog from "@/components/dialogs/workspace/JoinWorkspaceDialog";
 import ThemeToggle from "@/components/elements/ThemeToggle";
+
 
 import { Button } from "@/components/ui/button";
 import {
@@ -145,10 +147,12 @@ export default function Welcome() {
 							</Button>
 						</CreateWorkspaceDialog>
 
-						<Button className={actionButtonClass}>
-							<UsersRound className="size-5" />
-							Join Workspace
-						</Button>
+						<JoinWorkspaceDialog>
+							<Button className={actionButtonClass}>
+								<UsersRound className="size-5" />
+								Join Workspace
+							</Button>
+						</JoinWorkspaceDialog>
 
 						<ImportWorkspaceDialog>
 							<Button className={actionButtonClass}>
@@ -157,6 +161,7 @@ export default function Welcome() {
 							</Button>
 						</ImportWorkspaceDialog>
 					</div>
+
 
 					{/* Recent Workspaces */}
 					<section className="flex w-full flex-col items-center gap-4">

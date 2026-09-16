@@ -85,7 +85,7 @@ const STATUS_CONFIG: Record<
 };
 
 export default function WorkspaceTasks() {
-	const { workspace, refreshMetadata } = useWorkspace();
+	const { workspace, refreshMetadata, addActivityEvent } = useWorkspace();
 	const logError = useErrorLog();
 
 	const [tasks, setTasks] = useState<Task[]>([]);
@@ -168,6 +168,12 @@ export default function WorkspaceTasks() {
 			};
 
 			await createTask({ path: workspace.path, task: newTask });
+			await addActivityEvent(
+				"Created task",
+				`Created task: ${newTask.title}`,
+				undefined,
+				"task",
+			);
 			setIsCreateOpen(false);
 			await loadTasks();
 			await refreshMetadata();
@@ -197,6 +203,12 @@ export default function WorkspaceTasks() {
 			};
 
 			await updateTask({ path: workspace.path, task: updated });
+			await addActivityEvent(
+				"Updated task",
+				`Updated task: ${updated.title}`,
+				undefined,
+				"task",
+			);
 			setEditingTask(null);
 			await loadTasks();
 			await refreshMetadata();
@@ -223,6 +235,12 @@ export default function WorkspaceTasks() {
 		};
 		try {
 			await updateTask({ path: workspace.path, task: updated });
+			await addActivityEvent(
+				"Updated task status",
+				`Changed "${task.title}" to ${updated.status}`,
+				undefined,
+				"task",
+			);
 			await loadTasks();
 			await refreshMetadata();
 		} catch (err) {
@@ -235,7 +253,14 @@ export default function WorkspaceTasks() {
 	const handleDeleteTask = async () => {
 		if (!workspace?.path || !deletingTaskId) return;
 		try {
+			const deleted = tasks.find((t) => t.id === deletingTaskId);
 			await deleteTask({ path: workspace.path, id: deletingTaskId });
+			await addActivityEvent(
+				"Deleted task",
+				`Deleted task: ${deleted?.title || "Task"}`,
+				undefined,
+				"task",
+			);
 			setDeletingTaskId(null);
 			await loadTasks();
 			await refreshMetadata();

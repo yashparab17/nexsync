@@ -35,7 +35,7 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { KanbanCard, KanbanColumn } from "@/types/workspace";
 
 export default function WorkspaceKanban() {
-	const { workspace, refreshMetadata } = useWorkspace();
+	const { workspace, refreshMetadata, addActivityEvent } = useWorkspace();
 	const logError = useErrorLog();
 
 	const [columns, setColumns] = useState<KanbanColumn[]>([]);
@@ -91,6 +91,12 @@ export default function WorkspaceKanban() {
 				};
 				await createKanbanColumn({ path: workspace.path, column: col });
 			}
+			await addActivityEvent(
+				"Created default columns",
+				"Initialized default Kanban board columns",
+				undefined,
+				"kanban",
+			);
 			await loadKanban();
 			await refreshMetadata();
 		} catch (err) {
@@ -115,6 +121,12 @@ export default function WorkspaceKanban() {
 				cards: [],
 			};
 			await createKanbanColumn({ path: workspace.path, column: newCol });
+			await addActivityEvent(
+				"Created list",
+				`Created list "${newCol.title}"`,
+				undefined,
+				"kanban",
+			);
 			setIsCreateColOpen(false);
 			setNewColTitle("");
 			await loadKanban();
@@ -131,7 +143,14 @@ export default function WorkspaceKanban() {
 	const handleDeleteColumn = async () => {
 		if (!workspace?.path || !deletingColId) return;
 		try {
+			const deletedCol = columns.find((c) => c.id === deletingColId);
 			await deleteKanbanColumn({ path: workspace.path, id: deletingColId });
+			await addActivityEvent(
+				"Deleted list",
+				`Deleted list "${deletedCol?.title || "List"}"`,
+				undefined,
+				"kanban",
+			);
 			setDeletingColId(null);
 			await loadKanban();
 			await refreshMetadata();
@@ -163,6 +182,12 @@ export default function WorkspaceKanban() {
 			};
 
 			await createKanbanCard({ path: workspace.path, card: newCard });
+			await addActivityEvent(
+				"Created card",
+				`Created card "${newCard.title}"`,
+				undefined,
+				"kanban",
+			);
 			setActiveColIdForNewCard(null);
 			setCardTitle("");
 			setCardDesc("");
@@ -197,6 +222,12 @@ export default function WorkspaceKanban() {
 				updated_at: new Date().toISOString(),
 			};
 			await updateKanbanCard({ path: workspace.path, card: updated });
+			await addActivityEvent(
+				"Updated card",
+				`Updated card "${updated.title}"`,
+				undefined,
+				"kanban",
+			);
 			setEditingCard(null);
 			await loadKanban();
 			await refreshMetadata();
@@ -225,6 +256,12 @@ export default function WorkspaceKanban() {
 				column_id: targetColId,
 				position: newPos,
 			});
+			await addActivityEvent(
+				"Moved card",
+				`Moved card "${card.title}" to ${targetCol?.title || "list"}`,
+				undefined,
+				"kanban",
+			);
 			await loadKanban();
 			await refreshMetadata();
 		} catch (err) {
@@ -237,7 +274,21 @@ export default function WorkspaceKanban() {
 	const handleDeleteCard = async () => {
 		if (!workspace?.path || !deletingCardId) return;
 		try {
+			let deletedTitle = "Card";
+			for (const col of columns) {
+				const c = col.cards?.find((x) => x.id === deletingCardId);
+				if (c) {
+					deletedTitle = c.title;
+					break;
+				}
+			}
 			await deleteKanbanCard({ path: workspace.path, id: deletingCardId });
+			await addActivityEvent(
+				"Deleted card",
+				`Deleted card "${deletedTitle}"`,
+				undefined,
+				"kanban",
+			);
 			setDeletingCardId(null);
 			await loadKanban();
 			await refreshMetadata();

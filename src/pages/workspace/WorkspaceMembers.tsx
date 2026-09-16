@@ -1,7 +1,5 @@
 import { useState } from "react";
 import {
-	Check,
-	Copy,
 	Crown,
 	KeyRound,
 	Pencil,
@@ -29,10 +27,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { writeWorkspaceMetadata } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { useP2P } from "@/store/p2p/P2PContext";
+import P2PConnectDialog from "@/components/dialogs/workspace/P2PConnectDialog";
 import type { Member } from "@/types/workspace";
 
 const ROLE_CONFIG: Record<
@@ -60,7 +61,8 @@ const ROLE_CONFIG: Record<
 };
 
 export default function WorkspaceMembers() {
-	const { workspace, metadata, refreshMetadata } = useWorkspace();
+	const { workspace, metadata, refreshMetadata, addActivityEvent } =
+		useWorkspace();
 	const logError = useErrorLog();
 
 	const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -72,19 +74,11 @@ export default function WorkspaceMembers() {
 	const [editRole, setEditRole] = useState("Editor");
 
 	const [deletingMember, setDeletingMember] = useState<Member | null>(null);
-	const [copiedInvite, setCopiedInvite] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 
+	const { peers } = useP2P();
 	const members = metadata?.members.members ?? [];
 
-	// Generate a simulated cryptographic invite code
-	const inviteCode = `nx-${workspace?.id?.slice(0, 8) || "invite"}-${Date.now().toString(36)}`;
-
-	const handleCopyInvite = () => {
-		navigator.clipboard.writeText(inviteCode);
-		setCopiedInvite(true);
-		setTimeout(() => setCopiedInvite(false), 2000);
-	};
 
 	// Add Member directly
 	const handleAddMemberSubmit = async (e: React.FormEvent) => {
@@ -109,6 +103,12 @@ export default function WorkspaceMembers() {
 				path: workspace.path,
 				metadata: updatedMetadata,
 			});
+			await addActivityEvent(
+				"Added member",
+				`Added member ${newMember.name} (${newMember.role})`,
+				undefined,
+				"member",
+			);
 			setIsAddMemberOpen(false);
 			setNewMemberName("");
 			await refreshMetadata();
@@ -139,6 +139,12 @@ export default function WorkspaceMembers() {
 				path: workspace.path,
 				metadata: updatedMetadata,
 			});
+			await addActivityEvent(
+				"Changed role",
+				`Changed role of ${editingMember.name} to ${editRole}`,
+				undefined,
+				"member",
+			);
 			setEditingMember(null);
 			await refreshMetadata();
 		} catch (err) {
@@ -165,6 +171,12 @@ export default function WorkspaceMembers() {
 				path: workspace.path,
 				metadata: updatedMetadata,
 			});
+			await addActivityEvent(
+				"Removed member",
+				`Removed ${deletingMember.name} from workspace`,
+				undefined,
+				"member",
+			);
 			setDeletingMember(null);
 			await refreshMetadata();
 		} catch (err) {
@@ -191,8 +203,11 @@ export default function WorkspaceMembers() {
 						onPress={() => setIsInviteOpen(true)}
 						className="gap-1.5"
 					>
-						<KeyRound className="size-4" />
-						Invite Code
+						<KeyRound className="size-4 text-sky-400" />
+						P2P Sync & Invite
+						{peers.length > 0 && (
+							<span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping ml-1" />
+						)}
 					</Button>
 					<Button
 						onPress={() => {
@@ -347,57 +362,11 @@ export default function WorkspaceMembers() {
 				</div>
 			</div>
 
-			{/* Invite Code Dialog */}
-			{isInviteOpen && (
-				<Dialog
-					isOpen={isInviteOpen}
-					onOpenChange={setIsInviteOpen}
-					className="max-w-md"
-				>
-					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Collaborator Invite Code</DialogTitle>
-							<DialogDescription>
-								Share this code with peer collaborators to let them join this
-								workspace via P2P.
-							</DialogDescription>
-						</DialogHeader>
-
-						<div className="space-y-2">
-							<Label>Invite Token</Label>
-							<div className="flex items-center gap-2">
-								<Input
-									readOnly
-									value={inviteCode}
-									className="font-mono text-xs bg-muted/50"
-								/>
-								<Button
-									variant="outline"
-									size="icon"
-									onPress={handleCopyInvite}
-								>
-									{copiedInvite ? (
-										<Check className="size-4 text-emerald-400" />
-									) : (
-										<Copy className="size-4" />
-									)}
-								</Button>
-							</div>
-							{copiedInvite && (
-								<p className="text-xs text-emerald-400">
-									Copied to clipboard!
-								</p>
-							)}
-						</div>
-
-						<DialogFooter>
-							<Button variant="outline" onPress={() => setIsInviteOpen(false)}>
-								Close
-							</Button>
-						</DialogFooter>
-					</div>
-				</Dialog>
-			)}
+			{/* Real P2P WebRTC Connection & E2EE Handshake Dialog */}
+			<P2PConnectDialog
+				open={isInviteOpen}
+				onOpenChange={setIsInviteOpen}
+			/>
 
 			{/* Add Member Dialog */}
 			{isAddMemberOpen && (

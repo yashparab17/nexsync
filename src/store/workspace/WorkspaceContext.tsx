@@ -5,6 +5,7 @@ import {
 	useState,
 	useCallback,
 	useEffect,
+	useRef,
 	type ReactNode,
 } from "react";
 
@@ -49,8 +50,8 @@ interface WorkspaceContextType {
 	loadWorkspace: (workspace: WorkspaceInfo) => Promise<void>;
 	saveWorkspace: () => Promise<void>;
 	clearWorkspace: () => Promise<void>;
-	refreshStats: () => Promise<void>;
-	refreshMetadata: () => Promise<void>;
+	refreshStats: (customPath?: string) => Promise<void>;
+	refreshMetadata: (customPath?: string) => Promise<void>;
 
 	// Metadata updaters (mutates local state; saveWorkspace persists)
 	updateSettings: (settings: Partial<Settings>) => void;
@@ -60,7 +61,7 @@ interface WorkspaceContextType {
 		detail: string,
 		target?: string,
 		targetType?: string,
-	) => void;
+	) => Promise<void>;
 	updatePermissions: (permissions: Permissions) => void;
 	updateHistory: (history: Partial<History>) => void;
 
@@ -71,6 +72,16 @@ interface WorkspaceContextType {
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
 	undefined,
 );
+
+type ActivityListener = (event: ActivityEvent) => void;
+const activityListeners = new Set<ActivityListener>();
+
+export function subscribeToActivityEvents(listener: ActivityListener): () => void {
+	activityListeners.add(listener);
+	return () => {
+		activityListeners.delete(listener);
+	};
+}
 
 // Provides workspace data, metadata updates, and disk persistence to the component tree
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
@@ -149,41 +160,53 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		setWorkspace(ws);
 	}, []);
 
-	// Refresh workspace metrics and metadata from disk
-	const refreshMetadata = useCallback(async () => {
-		if (!workspace) return;
+	const workspaceRef = useRef<WorkspaceInfo | null>(null);
+	workspaceRef.current = workspace;
 
-		try {
-			const [meta, nextStats] = await Promise.all([
-				readWorkspaceMetadata(workspace.path),
-				getWorkspaceStats(workspace.path),
-			]);
-			setMetadata(meta);
-			setStats(nextStats);
-		} catch (err) {
-			setError(String(err));
-			logError(err, {
-				source: "workspace_stats",
-				workspace: workspace.path,
-			});
-		}
-	}, [workspace, logError]);
+	// Refresh workspace metrics and metadata from disk
+	const refreshMetadata = useCallback(
+		async (customPath?: string) => {
+			const targetPath = customPath || workspaceRef.current?.path;
+			if (!targetPath) return;
+
+			try {
+				const [meta, nextStats] = await Promise.all([
+					readWorkspaceMetadata(targetPath),
+					getWorkspaceStats(targetPath),
+				]);
+				setMetadata(meta);
+				setStats(nextStats);
+				setWorkspace(meta.workspace);
+			} catch (err) {
+				setError(String(err));
+				logError(err, {
+					source: "workspace_stats",
+					workspace: targetPath,
+				});
+			}
+		},
+		[logError],
+	);
 
 	// Refresh workspace metrics from disk
-	const refreshStats = useCallback(async () => {
-		if (!workspace) return;
+	const refreshStats = useCallback(
+		async (customPath?: string) => {
+			const targetPath = customPath || workspaceRef.current?.path;
+			if (!targetPath) return;
 
-		try {
-			const nextStats = await getWorkspaceStats(workspace.path);
-			setStats(nextStats);
-		} catch (err) {
-			setError(String(err));
-			logError(err, {
-				source: "workspace_stats",
-				workspace: workspace.path,
-			});
-		}
-	}, [workspace, logError]);
+			try {
+				const nextStats = await getWorkspaceStats(targetPath);
+				setStats(nextStats);
+			} catch (err) {
+				setError(String(err));
+				logError(err, {
+					source: "workspace_stats",
+					workspace: targetPath,
+				});
+			}
+		},
+		[logError],
+	);
 
 	// Save and unload current workspace, clearing session tracking
 	const clearWorkspace = useCallback(async () => {
@@ -219,41 +242,65 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
-	// Prepend a new activity event to the workspace history and persist to database
+	// Prepend a new activity event to the workspace history, notify listeners, and persist to database
 	const addActivityEvent = useCallback(
-		(
+		async (
 			action: string,
 			detail: string,
 			target?: string,
 			targetType?: string,
 		) => {
+			const currentWs = workspaceRef.current;
+			if (!currentWs) return;
+
+			const event: ActivityEvent = {
+				id: crypto.randomUUID(),
+				timestamp: new Date().toISOString(),
+				action,
+				detail,
+				...(target !== undefined && { target }),
+				...(targetType !== undefined && {
+					target_type: targetType,
+				}),
+			};
+
+			// Optimistically update React state
 			setMetadata((prev) => {
 				if (!prev) return prev;
-				const event: ActivityEvent = {
-					id: crypto.randomUUID(),
-					timestamp: new Date().toISOString(),
-					action,
-					detail,
-					...(target !== undefined && { target }),
-					...(targetType !== undefined && {
-						target_type: targetType,
-					}),
-				};
-				const updatedMetadata = {
+				if (prev.activity.events.some((e) => e.id === event.id)) return prev;
+				return {
 					...prev,
 					activity: {
 						events: [event, ...prev.activity.events],
 					},
 				};
-				// Auto-persist to SQLite
-				writeWorkspaceMetadata({
-					path: prev.workspace.path,
-					metadata: updatedMetadata,
-				}).catch((err) => {
-					console.error("Failed to auto-persist activity event:", err);
-				});
-				return updatedMetadata;
 			});
+
+			// Notify all registered listeners (e.g. P2P broadcast)
+			activityListeners.forEach((listener) => {
+				try {
+					listener(event);
+				} catch (e) {
+					console.error("Activity listener error:", e);
+				}
+			});
+
+			// Persist to SQLite database
+			try {
+				const currentMeta = await readWorkspaceMetadata(currentWs.path);
+				const updatedMetadata = {
+					...currentMeta,
+					activity: {
+						events: [event, ...currentMeta.activity.events.filter((e) => e.id !== event.id)],
+					},
+				};
+				await writeWorkspaceMetadata({
+					path: currentWs.path,
+					metadata: updatedMetadata,
+				});
+			} catch (err) {
+				console.error("Failed to auto-persist activity event:", err);
+			}
 		},
 		[],
 	);

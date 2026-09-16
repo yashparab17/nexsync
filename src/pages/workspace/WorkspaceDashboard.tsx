@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
@@ -68,6 +68,9 @@ function getActivityIcon(targetType?: string, action?: string) {
 	if (type === "task" || act.includes("task")) {
 		return <ListTodo className="size-4 text-purple-400 shrink-0" />;
 	}
+	if (type === "kanban" || act.includes("card") || act.includes("list") || act.includes("column")) {
+		return <ListTodo className="size-4 text-indigo-400 shrink-0" />;
+	}
 	if (type === "folder") {
 		return <FolderOpen className="size-4 text-primary shrink-0" />;
 	}
@@ -111,8 +114,14 @@ function StatCard({ label, value, icon, to, onNavigate }: StatCardProps) {
 
 // Workspace overview dashboard showing quick actions, stats, and activity
 export default function WorkspaceDashboard() {
-	const { workspace, metadata, stats } = useWorkspace();
+	const { workspace, metadata, stats, refreshMetadata, refreshStats } =
+		useWorkspace();
 	const navigate = useNavigate();
+
+	useEffect(() => {
+		void refreshMetadata();
+		void refreshStats();
+	}, [refreshMetadata, refreshStats]);
 
 	const activity = metadata?.activity.events ?? [];
 
