@@ -17,10 +17,16 @@ export interface SignalingMessage {
 	payload: string; // E2EE-encrypted Base64 payload
 }
 
+// Ordered list of public signaling servers — tried in order on failure.
+// Note: wss://y-webrtc-signaling-eu.herokuapp.com was removed (Heroku free tier shut down Nov 2022).
 const DEFAULT_SIGNALING_SERVERS = [
 	"wss://signaling.yjs.dev",
-	"wss://y-webrtc-signaling-eu.herokuapp.com",
+	"wss://demos.yjs.dev",
+	"wss://signaling.fly.dev",
 ];
+
+const MAX_RECONNECT_ATTEMPTS = 3;
+const RECONNECT_BASE_DELAY_MS = 1500;
 
 export class P2PSignaling {
 	private ws: WebSocket | null = null;
@@ -28,14 +34,14 @@ export class P2PSignaling {
 	private room: string = "";
 	private key: CryptoKey | null = null;
 	private peerId: string;
-	private serverUrl: string;
+	private serverIndex: number = 0;
 	private onMessageCallbacks: Set<(data: { type: string; payload: any; senderId: string }) => void> = new Set();
 	private isDestroyed: boolean = false;
 	private pingTimer: ReturnType<typeof setInterval> | null = null;
+	private reconnectAttempt: number = 0;
 
-	constructor(peerId: string, serverUrl: string = DEFAULT_SIGNALING_SERVERS[0]) {
+	constructor(peerId: string) {
 		this.peerId = peerId;
-		this.serverUrl = serverUrl;
 	}
 
 	// Connect to signaling room using the short code
@@ -55,37 +61,75 @@ export class P2PSignaling {
 			console.warn("[Signaling] BroadcastChannel init error:", err);
 		}
 
-		// 2. Connect to remote WebSocket signaling server for internet peers
+		// 2. Connect to remote WebSocket signaling server for internet peers (with fallback)
+		await this.connectWebSocket(shortCode);
+	}
+
+	// Attempt WebSocket connection with automatic server fallback and exponential backoff
+	private connectWebSocket(shortCode: string): Promise<void> {
+		if (this.isDestroyed) return Promise.resolve();
+
+		const serverUrl = DEFAULT_SIGNALING_SERVERS[this.serverIndex % DEFAULT_SIGNALING_SERVERS.length];
+		console.log(`[Signaling] Connecting to ${serverUrl} (attempt ${this.reconnectAttempt + 1})`);
+
 		return new Promise((resolve) => {
+			let resolved = false;
+			const doResolve = () => {
+				if (!resolved) { resolved = true; resolve(); }
+			};
+
+			const connectTimeout = setTimeout(() => {
+				// If WS didn't open within 5s, treat as failure
+				if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+					this.ws.close();
+				}
+			}, 5000);
+
 			try {
-				this.ws = new WebSocket(this.serverUrl);
+				this.ws = new WebSocket(serverUrl);
 
 				this.ws.onopen = () => {
-					console.log(`[Signaling] Connected to rendezvous server for code: ${shortCode.toUpperCase()}`);
-					// Subscribe to topic
+					clearTimeout(connectTimeout);
+					this.reconnectAttempt = 0;
+					console.log(`[Signaling] Connected to rendezvous server: ${serverUrl} (code: ${shortCode.toUpperCase()})`);
 					this.sendRaw({
 						type: "subscribe",
 						topics: [this.room],
 					});
 					this.startHeartbeat();
-					resolve();
+					doResolve();
 				};
 
 				this.ws.onmessage = async (event) => {
 					await this.processRawSignalingFrame(event.data);
 				};
 
-				this.ws.onerror = (err) => {
-					console.warn("[Signaling] WebSocket connection warning (fallback to local):", err);
-					resolve(); // Don't crash, allow local BroadcastChannel or fallback
+				this.ws.onerror = () => {
+					clearTimeout(connectTimeout);
+					console.warn(`[Signaling] Server ${serverUrl} failed.`);
 				};
 
 				this.ws.onclose = () => {
+					clearTimeout(connectTimeout);
 					this.stopHeartbeat();
+					// Attempt reconnect with next server if not yet destroyed
+					if (!this.isDestroyed && this.reconnectAttempt < MAX_RECONNECT_ATTEMPTS) {
+						this.reconnectAttempt++;
+						this.serverIndex++;
+						const delay = RECONNECT_BASE_DELAY_MS * Math.pow(1.5, this.reconnectAttempt - 1);
+						console.log(`[Signaling] Retrying with next server in ${Math.round(delay)}ms...`);
+						setTimeout(() => {
+							this.connectWebSocket(shortCode).then(doResolve);
+						}, delay);
+					} else {
+						console.warn("[Signaling] All servers exhausted. Falling back to BroadcastChannel only.");
+						doResolve();
+					}
 				};
 			} catch (err) {
-				console.warn("[Signaling] WebSocket failed:", err);
-				resolve();
+				clearTimeout(connectTimeout);
+				console.warn("[Signaling] WebSocket creation failed:", err);
+				doResolve();
 			}
 		});
 	}

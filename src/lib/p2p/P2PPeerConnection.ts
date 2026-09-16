@@ -20,9 +20,27 @@ import type {
 } from "./types";
 
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+	// STUN servers — used for NAT traversal (works on simple NATs)
 	{ urls: "stun:stun.l.google.com:19302" },
 	{ urls: "stun:stun1.l.google.com:19302" },
 	{ urls: "stun:global.stun.twilio.com:3478" },
+	// TURN relay servers — required for symmetric NAT, firewalls, mobile networks (~40% of peers)
+	// Using OpenRelay (Metered.ca) — free, public, always-on
+	{
+		urls: "turn:openrelay.metered.ca:80",
+		username: "openrelayproject",
+		credential: "openrelayproject",
+	},
+	{
+		urls: "turn:openrelay.metered.ca:443",
+		username: "openrelayproject",
+		credential: "openrelayproject",
+	},
+	{
+		urls: "turn:openrelay.metered.ca:443?transport=tcp",
+		username: "openrelayproject",
+		credential: "openrelayproject",
+	},
 ];
 
 export interface P2PPeerOptions {
@@ -89,6 +107,24 @@ export class P2PPeerConnection {
 			) {
 				this.stopPingMonitor();
 			}
+		};
+
+		// Monitor ICE connection state separately — surfaces "failed" earlier than connectionState
+		this.pc.oniceconnectionstatechange = () => {
+			const iceState = this.pc.iceConnectionState;
+			console.log(`[P2P] ICE connection state: ${iceState}`);
+			if (iceState === "failed") {
+				console.error("[P2P] ICE negotiation failed. Check STUN/TURN reachability.");
+				this.setStatus("failed");
+				this.stopPingMonitor();
+			} else if (iceState === "disconnected") {
+				// Transient disconnection — WebRTC may recover automatically
+				console.warn("[P2P] ICE disconnected (may recover automatically).");
+			}
+		};
+
+		this.pc.onicegatheringstatechange = () => {
+			console.log(`[P2P] ICE gathering state: ${this.pc.iceGatheringState}`);
 		};
 
 		this.pc.ondatachannel = (event) => {
@@ -259,19 +295,27 @@ export class P2PPeerConnection {
 		this.setE2eeKey(key);
 
 		this.signaling = new P2PSignaling(this.peerId);
-		await this.signaling.connect(shortCode);
 
-		return new Promise((resolve, reject) => {
+		// IMPORTANT: Register onMessage BEFORE connecting & sending request_offer.
+		// This prevents a race condition where the host's broadcast offer arrives
+		// before the listener is set up, causing it to be silently dropped.
+		const handshakePromise = new Promise<{
+			workspaceId: string;
+			workspaceName: string;
+		}>((resolve, reject) => {
 			const timeout = setTimeout(() => {
 				reject(
 					new Error(
 						"Connection timed out. Please verify the 6-character code and ensure the host is online.",
 					),
 				);
-			}, 20000);
+			}, 30000); // Extended to 30s to account for TURN relay negotiation time
 
-			this.signaling?.onMessage(async (msg) => {
-				if (msg.type === "offer" && msg.payload?.sdp) {
+			let offerHandled = false;
+
+			this.signaling!.onMessage(async (msg) => {
+				if (msg.type === "offer" && msg.payload?.sdp && !offerHandled) {
+					offerHandled = true;
 					clearTimeout(timeout);
 					try {
 						const offerPayload = msg.payload;
@@ -307,13 +351,18 @@ export class P2PPeerConnection {
 					}
 				}
 			});
-
-			// Instantly request offer from host upon entering room
-			this.signaling?.send("request_offer", {
-				joinerPeerId: this.peerId,
-				joinerPeerName: this.peerName,
-			});
 		});
+
+		// Now connect and request offer AFTER listener is registered
+		await this.signaling.connect(shortCode);
+
+		// Request offer from host. If host is already broadcasting, onMessage will catch it.
+		this.signaling.send("request_offer", {
+			joinerPeerId: this.peerId,
+			joinerPeerName: this.peerName,
+		});
+
+		return handshakePromise;
 	}
 
 	// ────────────────────────────
@@ -435,6 +484,10 @@ export class P2PPeerConnection {
 			return Promise.resolve();
 		}
 
+		// Increased from 2500ms: Linux + TURN relay servers need up to 8s to gather all candidates.
+		// Sending an offer/answer with incomplete candidates causes ICE to stall in 'checking' state.
+		const ICE_GATHERING_TIMEOUT_MS = 8000;
+
 		return new Promise((resolve) => {
 			const checkState = () => {
 				if (this.pc.iceGatheringState === "complete") {
@@ -451,8 +504,9 @@ export class P2PPeerConnection {
 					"icegatheringstatechange",
 					checkState,
 				);
+				console.warn(`[P2P] ICE gathering timed out after ${ICE_GATHERING_TIMEOUT_MS}ms — proceeding with available candidates.`);
 				resolve();
-			}, 2500);
+			}, ICE_GATHERING_TIMEOUT_MS);
 		});
 	}
 
