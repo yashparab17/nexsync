@@ -19,6 +19,7 @@ export type P2PMessageKind =
 	| "ACTIVITY_EVENT"
 	| "MUTATION_BROADCAST"
 	| "AWARENESS_UPDATE"
+	| "WORKSPACE_INFO"
 	| "PING"
 	| "PONG";
 
@@ -81,7 +82,7 @@ export interface InvitePayload {
 	hostPeerName: string;
 	role: string;
 	e2eeKey: string; // Base64-encoded 256-bit AES-GCM key
-	sdpOffer?: RTCSessionDescriptionInit;
+	sdpOffer?: RTCSessionDescriptionInit | null; // Legacy field — not used with PeerJS
 	created: number;
 }
 
