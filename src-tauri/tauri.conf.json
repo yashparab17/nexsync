@@ -15,7 +15,7 @@
 				"title": "nexsync",
 				"width": 800,
 				"height": 600,
-				"devtools": false,
+				"devtools": true,
 				"incognito": false
 			}
 		],
