@@ -1,0 +1,47 @@
+name: Build Linux App
+on: [push, workflow_dispatch]
+
+jobs:
+    build-linux:
+        runs-on: ubuntu-22.04
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install system dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: "pnpm"
+
+            - name: Setup Rust
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Install dependencies
+              run: pnpm install
+
+            - name: Build Tauri App
+              uses: tauri-apps/tauri-action@v0
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Upload Linux Bundles
+              uses: actions/upload-artifact@v4
+              with:
+                  name: nexsync-linux-packages
+                  path: |
+                      src-tauri/target/release/bundle/appimage/*.AppImage
+                      src-tauri/target/release/bundle/deb/*.deb
+                      src-tauri/target/release/nexsync
+                  if-no-files-found: warn
