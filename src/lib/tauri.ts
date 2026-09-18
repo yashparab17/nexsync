@@ -1,7 +1,31 @@
 // Typed wrapper around Tauri IPC commands
 // All backend invocations go through these functions to keep IPC calls type-safe
+// X25519 operations fall back to @noble/curves when running outside Tauri (e.g. plain browser)
 
 import { invoke } from "@tauri-apps/api/core";
+import { x25519 } from "@noble/curves/ed25519.js";
+
+// Returns true when running inside a Tauri desktop window
+function isTauri(): boolean {
+	return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+// Minimal base64url helpers used only for X25519 key encoding below
+function _toB64Url(bytes: Uint8Array): string {
+	let binary = "";
+	for (let i = 0; i < bytes.length; i++)
+		binary += String.fromCharCode(bytes[i]);
+	return btoa(binary)
+		.replace(/\+/g, "-")
+		.replace(/\//g, "_")
+		.replace(/=/g, "");
+}
+function _fromB64Url(b64: string): Uint8Array {
+	const padded = b64.replace(/-/g, "+").replace(/_/g, "/");
+	const s = padded + "=".repeat((4 - (padded.length % 4)) % 4);
+	const binary = atob(s);
+	return new Uint8Array(binary.length).map((_, i) => binary.charCodeAt(i));
+}
 
 import type {
 	WorkspaceInfo,
@@ -44,9 +68,7 @@ export function getActiveSessionToken(): string | null {
 // ────────────────────────────
 
 // Create a new session for the workspace
-export function createWorkspaceSession(
-	workspacePath: string,
-): Promise<string> {
+export function createWorkspaceSession(workspacePath: string): Promise<string> {
 	return invoke("create_workspace_session", { workspacePath });
 }
 
@@ -58,7 +80,12 @@ export function closeWorkspaceSession(sessionId: string): Promise<void> {
 // Fetch session info including role and created timestamp
 export function getCurrentSessionInfo(
 	sessionId: string,
-): Promise<{ sessionId: string; workspacePath: string; userRole: string; createdAt: string } | null> {
+): Promise<{
+	sessionId: string;
+	workspacePath: string;
+	userRole: string;
+	createdAt: string;
+} | null> {
 	return invoke("get_current_session_info", { sessionId });
 }
 
@@ -399,9 +426,7 @@ export function deleteYjsDoc(
 }
 
 // List all Yjs document snapshots stored in workspace database
-export function listYjsDocs(
-	workspacePath: string,
-): Promise<YjsDocSummary[]> {
+export function listYjsDocs(workspacePath: string): Promise<YjsDocSummary[]> {
 	return invoke("list_yjs_docs", {
 		workspacePath,
 	});
@@ -416,13 +441,23 @@ export interface X25519KeyPair {
 	secretKey: string;
 }
 
-// Generate a fresh ephemeral X25519 keypair in Rust (WebView X25519 support is
-// inconsistent, so the curve math always runs in the native side)
+// Generate a fresh ephemeral X25519 keypair.
+// Uses the Rust backend when running in Tauri; falls back to @noble/curves
+// (pure JS, same wire format) when running in a plain browser.
 export async function generateX25519KeyPair(): Promise<X25519KeyPair> {
-	const result = await invoke<{ public_key: string; secret_key: string }>(
-		"x25519_generate_keypair",
-	);
-	return { publicKey: result.public_key, secretKey: result.secret_key };
+	if (isTauri()) {
+		const result = await invoke<{ public_key: string; secret_key: string }>(
+			"x25519_generate_keypair",
+		);
+		return { publicKey: result.public_key, secretKey: result.secret_key };
+	}
+	// Browser fallback: @noble/curves produces the same raw 32-byte format as x25519-dalek
+	const secretBytes = x25519.utils.randomSecretKey();
+	const publicBytes = x25519.getPublicKey(secretBytes);
+	return {
+		publicKey: _toB64Url(publicBytes),
+		secretKey: _toB64Url(secretBytes),
+	};
 }
 
 // Compute the raw X25519 ECDH shared secret for a P2P handshake.
@@ -431,8 +466,16 @@ export function deriveX25519SharedSecret(
 	secretKey: string,
 	peerPublicKey: string,
 ): Promise<string> {
-	return invoke("x25519_derive_shared_secret", {
-		secretKey,
-		peerPublicKey,
-	});
+	if (isTauri()) {
+		return invoke("x25519_derive_shared_secret", {
+			secretKey,
+			peerPublicKey,
+		});
+	}
+	// Browser fallback: same DH math, same raw 32-byte output as x25519-dalek
+	const shared = x25519.getSharedSecret(
+		_fromB64Url(secretKey),
+		_fromB64Url(peerPublicKey),
+	);
+	return Promise.resolve(_toB64Url(shared));
 }
