@@ -16,11 +16,11 @@
 				"width": 800,
 				"height": 600,
 				"devtools": false,
-				"incognito": true
+				"incognito": false
 			}
 		],
 		"security": {
-			"csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; media-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 ws://localhost:1421 wss:"
+			"csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; media-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 ws://localhost:1421 wss: https://0.peerjs.com wss://0.peerjs.com"
 		}
 	},
 	"bundle": {
