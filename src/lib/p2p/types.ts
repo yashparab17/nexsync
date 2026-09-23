@@ -1,6 +1,6 @@
 // P2P message and peer types shared with the Rust Iroh backend
 
-import type { WorkspaceMetadata, Task, KanbanColumn } from "@/types/workspace";
+import type { WorkspaceMetadata, Task, KanbanCard, KanbanColumn } from "@/types/workspace";
 
 export type P2PMessageKind =
 	| "SYNC_STEP_1"
@@ -8,7 +8,9 @@ export type P2PMessageKind =
 	| "SYNC_UPDATE"
 	| "WORKSPACE_SYNC_REQUEST"
 	| "WORKSPACE_SYNC_RESPONSE"
-	| "ACTIVITY_EVENT";
+	| "ACTIVITY_EVENT"
+	| "DATA_CHANGE" // Task/kanban edit; hosts drop these from Viewers and relay the rest
+	| "MEMBERS_UPDATE"; // Host's member list; only accepted from the host
 
 // JSON envelope carried over a peer's encrypted control stream
 export interface P2PMessage {
@@ -24,6 +26,15 @@ export interface WorkspaceSyncFileItem {
 	size: number;
 	isPlaceholder: boolean; // Too large for initial sync; downloaded on demand
 }
+
+// One task or kanban edit, sent as the payload of a DATA_CHANGE message
+export type DataChange =
+	| { entity: "task"; op: "upsert"; task: Task }
+	| { entity: "task"; op: "delete"; id: string }
+	| { entity: "column"; op: "upsert"; column: KanbanColumn }
+	| { entity: "column"; op: "delete"; id: string }
+	| { entity: "card"; op: "upsert"; card: KanbanCard }
+	| { entity: "card"; op: "delete"; id: string };
 
 // Workspace state sent by a host to a guest that asks for it
 export interface WorkspaceSyncSnapshot {

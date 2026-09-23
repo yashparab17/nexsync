@@ -72,12 +72,16 @@ export default function WorkspaceMembers() {
 
 	const [editingMember, setEditingMember] = useState<Member | null>(null);
 	const [editRole, setEditRole] = useState("Editor");
+	const [editName, setEditName] = useState("");
 
 	const [deletingMember, setDeletingMember] = useState<Member | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 
-	const { peers } = useP2P();
+	const { peers, selfName } = useP2P();
 	const members = metadata?.members.members ?? [];
+	// In a copy joined from someone else, the host manages the member list
+	const isJoinedCopy = selfName !== null;
+	const onlineNames = new Set(peers.map((p) => p.name.toLowerCase()));
 
 
 	// Add Member directly
@@ -123,12 +127,18 @@ export default function WorkspaceMembers() {
 	// Save Role Edit
 	const handleEditRoleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!workspace?.path || !metadata || !editingMember) return;
+		const name = editName.trim();
+		if (!workspace?.path || !metadata || !editingMember || !name) return;
+		if (members.some((m) => m.id !== editingMember.id && m.name.toLowerCase() === name.toLowerCase())) {
+			logError(new Error(`A member named "${name}" already exists.`), { source: "members" });
+			return;
+		}
 
 		try {
 			setSubmitting(true);
+			const isOwner = editingMember.role.toLowerCase() === "owner";
 			const updatedMembers = members.map((m) =>
-				m.id === editingMember.id ? { ...m, role: editRole } : m,
+				m.id === editingMember.id ? { ...m, name, role: isOwner ? m.role : editRole } : m,
 			);
 			const updatedMetadata = {
 				...metadata,
@@ -140,8 +150,8 @@ export default function WorkspaceMembers() {
 				metadata: updatedMetadata,
 			});
 			await addActivityEvent(
-				"Changed role",
-				`Changed role of ${editingMember.name} to ${editRole}`,
+				"Updated member",
+				`Updated ${name} (${editingMember.role.toLowerCase() === "owner" ? "Owner" : editRole})`,
 				undefined,
 				"member",
 			);
@@ -210,6 +220,7 @@ export default function WorkspaceMembers() {
 						)}
 					</Button>
 					<Button
+						isDisabled={isJoinedCopy}
 						onPress={() => {
 							setNewMemberName("");
 							setNewMemberRole("Editor");
@@ -236,6 +247,11 @@ export default function WorkspaceMembers() {
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-3">
+							{isJoinedCopy && (
+								<p className="text-xs text-muted-foreground">
+									You joined this workspace, so its host manages the member list.
+								</p>
+							)}
 							{members.length === 0 ? (
 								<p className="text-sm text-muted-foreground">
 									No members registered.
@@ -246,6 +262,8 @@ export default function WorkspaceMembers() {
 										ROLE_CONFIG[member.role] || ROLE_CONFIG.Viewer;
 									const RoleIcon = roleConf.icon;
 									const isOwner = member.role.toLowerCase() === "owner";
+									const isYou = isJoinedCopy ? member.name === selfName : isOwner;
+									const isOnline = !isYou && onlineNames.has(member.name.toLowerCase());
 
 									return (
 										<div
@@ -261,9 +279,15 @@ export default function WorkspaceMembers() {
 														<span className="font-semibold text-sm">
 															{member.name}
 														</span>
-														{isOwner && (
+														{isYou && (
 															<span className="text-[10px] text-muted-foreground">
 																(You)
+															</span>
+														)}
+														{isOnline && (
+															<span className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
+																<span className="size-1.5 rounded-full bg-emerald-400" />
+																Online
 															</span>
 														)}
 													</div>
@@ -282,27 +306,30 @@ export default function WorkspaceMembers() {
 												</div>
 											</div>
 
-											{!isOwner && (
+											{!isJoinedCopy && (
 												<div className="flex items-center gap-1">
 													<Button
 														variant="ghost"
 														size="icon-xs"
 														onPress={() => {
 															setEditingMember(member);
+															setEditName(member.name);
 															setEditRole(member.role);
 														}}
-														aria-label="Change Role"
+														aria-label="Edit Member"
 													>
 														<Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
 													</Button>
-													<Button
-														variant="ghost"
-														size="icon-xs"
-														onPress={() => setDeletingMember(member)}
-														aria-label="Remove Member"
-													>
-														<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
-													</Button>
+													{!isOwner && (
+														<Button
+															variant="ghost"
+															size="icon-xs"
+															onPress={() => setDeletingMember(member)}
+															aria-label="Remove Member"
+														>
+															<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+														</Button>
+													)}
 												</div>
 											)}
 										</div>
@@ -441,9 +468,9 @@ export default function WorkspaceMembers() {
 				>
 					<form onSubmit={handleEditRoleSubmit} className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Change Role</DialogTitle>
+							<DialogTitle>Edit Member</DialogTitle>
 							<DialogDescription>
-								Update permissions for{" "}
+								Update the name and permissions for{" "}
 								<span className="font-semibold text-foreground">
 									{editingMember.name}
 								</span>
@@ -452,8 +479,25 @@ export default function WorkspaceMembers() {
 						</DialogHeader>
 
 						<div>
-							<Label htmlFor="edit-role-select">Role</Label>
-							<select
+							<Label htmlFor="edit-member-name">Name</Label>
+							<Input
+								id="edit-member-name"
+								required
+								value={editName}
+								onChange={(e) => setEditName(e.target.value)}
+								className="mt-1"
+							/>
+							{editingMember.role.toLowerCase() === "owner" && (
+								<p className="mt-1 text-[11px] text-muted-foreground">
+									Collaborators see this name when you invite them.
+								</p>
+							)}
+						</div>
+
+						{editingMember.role.toLowerCase() !== "owner" && (
+							<div>
+								<Label htmlFor="edit-role-select">Role</Label>
+								<select
 								id="edit-role-select"
 								value={editRole}
 								onChange={(e) => setEditRole(e.target.value)}
@@ -463,7 +507,8 @@ export default function WorkspaceMembers() {
 								<option value="Viewer">Viewer</option>
 								<option value="Owner">Owner</option>
 							</select>
-						</div>
+							</div>
+						)}
 
 						<DialogFooter>
 							<Button
@@ -474,7 +519,7 @@ export default function WorkspaceMembers() {
 							>
 								Cancel
 							</Button>
-							<Button type="submit" isDisabled={submitting}>
+							<Button type="submit" isDisabled={submitting || !editName.trim()}>
 								{submitting ? "Saving…" : "Save Changes"}
 							</Button>
 						</DialogFooter>

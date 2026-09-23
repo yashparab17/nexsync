@@ -32,10 +32,12 @@ import {
 	updateKanbanCard,
 } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { useP2P } from "@/store/p2p/P2PContext";
 import type { KanbanCard, KanbanColumn } from "@/types/workspace";
 
 export default function WorkspaceKanban() {
 	const { workspace, refreshMetadata, addActivityEvent } = useWorkspace();
+	const { dataVersion, publishDataChange } = useP2P();
 	const logError = useErrorLog();
 
 	const [columns, setColumns] = useState<KanbanColumn[]>([]);
@@ -76,6 +78,12 @@ export default function WorkspaceKanban() {
 		loadKanban();
 	}, [loadKanban]);
 
+	// Reload silently when a collaborator changes the board
+	useEffect(() => {
+		if (!dataVersion || !workspace?.path) return;
+		getKanban(workspace.path).then(setColumns).catch(console.error);
+	}, [dataVersion, workspace?.path]);
+
 	// Create Default Starter Columns if board is completely empty
 	const handleCreateDefaultColumns = async () => {
 		if (!workspace?.path) return;
@@ -90,6 +98,7 @@ export default function WorkspaceKanban() {
 					cards: [],
 				};
 				await createKanbanColumn({ path: workspace.path, column: col });
+				publishDataChange({ entity: "column", op: "upsert", column: col });
 			}
 			await addActivityEvent(
 				"Created default columns",
@@ -121,6 +130,7 @@ export default function WorkspaceKanban() {
 				cards: [],
 			};
 			await createKanbanColumn({ path: workspace.path, column: newCol });
+			publishDataChange({ entity: "column", op: "upsert", column: newCol });
 			await addActivityEvent(
 				"Created list",
 				`Created list "${newCol.title}"`,
@@ -145,6 +155,7 @@ export default function WorkspaceKanban() {
 		try {
 			const deletedCol = columns.find((c) => c.id === deletingColId);
 			await deleteKanbanColumn({ path: workspace.path, id: deletingColId });
+			publishDataChange({ entity: "column", op: "delete", id: deletingColId });
 			await addActivityEvent(
 				"Deleted list",
 				`Deleted list "${deletedCol?.title || "List"}"`,
@@ -182,6 +193,7 @@ export default function WorkspaceKanban() {
 			};
 
 			await createKanbanCard({ path: workspace.path, card: newCard });
+			publishDataChange({ entity: "card", op: "upsert", card: newCard });
 			await addActivityEvent(
 				"Created card",
 				`Created card "${newCard.title}"`,
@@ -222,6 +234,7 @@ export default function WorkspaceKanban() {
 				updated_at: new Date().toISOString(),
 			};
 			await updateKanbanCard({ path: workspace.path, card: updated });
+			publishDataChange({ entity: "card", op: "upsert", card: updated });
 			await addActivityEvent(
 				"Updated card",
 				`Updated card "${updated.title}"`,
@@ -256,6 +269,11 @@ export default function WorkspaceKanban() {
 				column_id: targetColId,
 				position: newPos,
 			});
+			publishDataChange({
+				entity: "card",
+				op: "upsert",
+				card: { ...card, column_id: targetColId, position: newPos, updated_at: new Date().toISOString() },
+			});
 			await addActivityEvent(
 				"Moved card",
 				`Moved card "${card.title}" to ${targetCol?.title || "list"}`,
@@ -283,6 +301,7 @@ export default function WorkspaceKanban() {
 				}
 			}
 			await deleteKanbanCard({ path: workspace.path, id: deletingCardId });
+			publishDataChange({ entity: "card", op: "delete", id: deletingCardId });
 			await addActivityEvent(
 				"Deleted card",
 				`Deleted card "${deletedTitle}"`,

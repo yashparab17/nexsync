@@ -30,6 +30,7 @@ import { useErrorLog } from "@/hooks/useErrorLog";
 import { createTask, deleteTask, getTasks, updateTask } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { useP2P } from "@/store/p2p/P2PContext";
 import type { Task, TaskPriority, TaskStatus } from "@/types/workspace";
 
 // ────────────────────────────
@@ -86,6 +87,7 @@ const STATUS_CONFIG: Record<
 
 export default function WorkspaceTasks() {
 	const { workspace, refreshMetadata, addActivityEvent } = useWorkspace();
+	const { dataVersion, publishDataChange } = useP2P();
 	const logError = useErrorLog();
 
 	const [tasks, setTasks] = useState<Task[]>([]);
@@ -128,6 +130,12 @@ export default function WorkspaceTasks() {
 		loadTasks();
 	}, [loadTasks]);
 
+	// Reload silently when a collaborator adds, edits or removes a task
+	useEffect(() => {
+		if (!dataVersion || !workspace?.path) return;
+		getTasks(workspace.path).then(setTasks).catch(console.error);
+	}, [dataVersion, workspace?.path]);
+
 	// Open Create Modal
 	const handleOpenCreate = () => {
 		setFormTitle("");
@@ -168,6 +176,7 @@ export default function WorkspaceTasks() {
 			};
 
 			await createTask({ path: workspace.path, task: newTask });
+			publishDataChange({ entity: "task", op: "upsert", task: newTask });
 			await addActivityEvent(
 				"Created task",
 				`Created task: ${newTask.title}`,
@@ -203,6 +212,7 @@ export default function WorkspaceTasks() {
 			};
 
 			await updateTask({ path: workspace.path, task: updated });
+			publishDataChange({ entity: "task", op: "upsert", task: updated });
 			await addActivityEvent(
 				"Updated task",
 				`Updated task: ${updated.title}`,
@@ -235,6 +245,7 @@ export default function WorkspaceTasks() {
 		};
 		try {
 			await updateTask({ path: workspace.path, task: updated });
+			publishDataChange({ entity: "task", op: "upsert", task: updated });
 			await addActivityEvent(
 				"Updated task status",
 				`Changed "${task.title}" to ${updated.status}`,
@@ -255,6 +266,7 @@ export default function WorkspaceTasks() {
 		try {
 			const deleted = tasks.find((t) => t.id === deletingTaskId);
 			await deleteTask({ path: workspace.path, id: deletingTaskId });
+			publishDataChange({ entity: "task", op: "delete", id: deletingTaskId });
 			await addActivityEvent(
 				"Deleted task",
 				`Deleted task: ${deleted?.title || "Task"}`,

@@ -46,6 +46,13 @@ const CLOSE_NORMAL: u32 = 0;
 const CLOSE_REJECTED: u32 = 1;
 const CLOSE_REPLACED: u32 = 2;
 
+/// Task/kanban edits; hosts drop them from Viewer guests
+const KIND_DATA_CHANGE: &str = "DATA_CHANGE";
+/// The host's member list; accepted only from the host
+const KIND_MEMBERS_UPDATE: &str = "MEMBERS_UPDATE";
+/// App messages a host forwards from one guest to the others
+const RELAYED_KINDS: &[&str] = &[KIND_DATA_CHANGE, "ACTIVITY_EVENT"];
+
 /// Roles a host may grant through an invite
 const INVITE_ROLES: &[&str] = &["Editor", "Viewer"];
 
@@ -524,6 +531,29 @@ impl Node {
             }
             return;
         }
+
+        let Some((from_host, may_write)) = self
+            .lock()
+            .peers
+            .get(from)
+            .map(|p| (p.is_host, p.is_host || p.role != "Viewer"))
+        else {
+            return;
+        };
+        match kind {
+            KIND_DATA_CHANGE if !may_write => {
+                eprintln!("[P2P] Ignoring a data change from Viewer {}", from.fmt_short());
+                return;
+            }
+            // Only the host decides who is in the workspace
+            KIND_MEMBERS_UPDATE if !from_host => return,
+            _ => {}
+        }
+        // A host passes guests' changes on so every guest sees them
+        if !from_host && RELAYED_KINDS.contains(&kind) {
+            self.relay(from, bytes.to_vec());
+        }
+
         self.emit(
             EVENT_MESSAGE,
             IncomingMessage {
@@ -531,6 +561,25 @@ impl Node {
                 message,
             },
         );
+    }
+
+    /// Forwards a message to every peer except the one it came from
+    fn relay(&self, from: &EndpointId, bytes: Vec<u8>) {
+        let outboxes: Vec<mpsc::Sender<Vec<u8>>> = self
+            .lock()
+            .peers
+            .iter()
+            .filter(|(id, _)| *id != from)
+            .map(|(_, p)| p.outbox.clone())
+            .collect();
+        if outboxes.is_empty() {
+            return;
+        }
+        tokio::spawn(async move {
+            for outbox in outboxes {
+                let _ = outbox.send(bytes.clone()).await;
+            }
+        });
     }
 
     /// Removes a peer only if the map still holds this exact connection
@@ -886,6 +935,67 @@ mod tests {
             .flatten()
             .any(|stamp| stamp.path().join("notes").join("live").join("new.md").exists());
         assert!(trashed, "deleted file should be recoverable from .nexsync/trash");
+    }
+
+    // Next DATA_CHANGE / MEMBERS_UPDATE message this node's frontend receives, if any within `wait`
+    async fn next_shared_message(test: &mut TestNode, wait: Duration) -> Option<serde_json::Value> {
+        tokio::time::timeout(wait, async {
+            loop {
+                let (event, payload) = test.events.recv().await?;
+                let kind = payload["message"]["kind"].as_str().unwrap_or_default().to_string();
+                if event == EVENT_MESSAGE && (kind == KIND_DATA_CHANGE || kind == KIND_MEMBERS_UPDATE) {
+                    return Some(payload);
+                }
+            }
+        })
+        .await
+        .ok()
+        .flatten()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_data_changes_are_relayed_and_role_checked() {
+        let mut host = start_test_node("data_host").await;
+        let mut editor = start_test_node("data_editor").await;
+        let mut viewer = start_test_node("data_viewer").await;
+
+        let invite = host
+            .node
+            .create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into())
+            .await
+            .unwrap();
+        editor.node.join(&invite.ticket, "Ed").await.unwrap();
+        let invite = host
+            .node
+            .create_invite("Viewer".into(), "ws".into(), "Demo".into(), "Host".into())
+            .await
+            .unwrap();
+        viewer.node.join(&invite.ticket, "Vi").await.unwrap();
+        wait_until("both guests are connected", || host.node.peers().len() == 2).await;
+
+        // An Editor's task change reaches the host and is relayed to the other guest, not echoed back
+        let change = serde_json::json!({ "kind": KIND_DATA_CHANGE, "payload": "editor-task" });
+        editor.node.send(None, &change).await.unwrap();
+        for node in [&mut host, &mut viewer] {
+            let msg = next_shared_message(node, Duration::from_secs(20)).await.expect("change not delivered");
+            assert_eq!(msg["message"]["payload"], "editor-task");
+        }
+        assert!(next_shared_message(&mut editor, Duration::from_secs(2)).await.is_none());
+
+        // A Viewer's task change is dropped by the host and never relayed
+        let change = serde_json::json!({ "kind": KIND_DATA_CHANGE, "payload": "viewer-task" });
+        viewer.node.send(None, &change).await.unwrap();
+        assert!(next_shared_message(&mut host, Duration::from_secs(3)).await.is_none());
+        assert!(next_shared_message(&mut editor, Duration::from_secs(1)).await.is_none());
+
+        // Guests can't rewrite the member list; the host can
+        let members = serde_json::json!({ "kind": KIND_MEMBERS_UPDATE, "payload": "[]" });
+        editor.node.send(None, &members).await.unwrap();
+        assert!(next_shared_message(&mut host, Duration::from_secs(3)).await.is_none());
+        host.node.send(None, &members).await.unwrap();
+        assert!(next_shared_message(&mut editor, Duration::from_secs(20)).await.is_some());
+        assert!(next_shared_message(&mut viewer, Duration::from_secs(20)).await.is_some());
     }
 
     #[test]

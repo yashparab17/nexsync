@@ -5,6 +5,7 @@ import React, {
 	useCallback,
 	useContext,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -12,7 +13,11 @@ import * as Y from "yjs";
 import {
 	p2p,
 	P2PSyncProvider,
+	applyDataChange,
+	upsertKanbanCard,
+	upsertTask,
 	type ConnectedPeerInfo,
+	type DataChange,
 	type InviteInfo,
 	type JoinResult,
 	type P2PMessage,
@@ -26,11 +31,10 @@ import {
 	readWorkspaceMetadata,
 	writeWorkspaceMetadata,
 	getTasks,
-	createTask,
 	getKanban,
 	createKanbanColumn,
-	createKanbanCard,
 } from "@/lib/tauri";
+import type { Member } from "@/types/workspace";
 
 // Files above this size are listed as placeholders during sync and downloaded on demand
 export const LAZY_LOAD_THRESHOLD_BYTES = 10 * 1024 * 1024;
@@ -67,12 +71,40 @@ export interface SyncedFile {
 	version: number;
 }
 
+// Name this device joined a workspace under, keyed by the local copy's id (paths vary in spelling)
+const selfNameKey = (workspaceId: string) => `nexsync.selfName:${workspaceId}`;
+
+function readSelfName(workspaceId: string | undefined): string | null {
+	if (!workspaceId) return null;
+	try {
+		return localStorage.getItem(selfNameKey(workspaceId));
+	} catch {
+		return null;
+	}
+}
+
+function isMemberList(value: unknown): value is Member[] {
+	return (
+		Array.isArray(value) &&
+		value.every(
+			(m) =>
+				m &&
+				typeof m.id === "string" &&
+				typeof m.name === "string" &&
+				typeof m.role === "string",
+		)
+	);
+}
+
 interface P2PContextType {
 	peers: ConnectedPeerInfo[];
 	connectionStatus: "offline" | "connecting" | "connected";
 	placeholders: PlaceholderItem[];
 	syncProgress: SyncProgress | null;
 	lastSyncedFile: SyncedFile | null;
+	dataVersion: number; // Changes whenever a collaborator's task/kanban edit is applied
+	selfName: string | null; // Our member name in a workspace we joined; null in our own workspaces
+	publishDataChange: (change: DataChange) => void;
 	createInvite: (role?: string) => Promise<InviteInfo>;
 	revokeInvite: () => Promise<void>;
 	joinWithTicket: (ticket: string, displayName?: string) => Promise<JoinResult>;
@@ -95,7 +127,13 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
 	const [lastSyncedFile, setLastSyncedFile] = useState<SyncedFile | null>(null);
 	const [isJoining, setIsJoining] = useState(false);
+	const [dataVersion, setDataVersion] = useState(0);
+	const [selfNameVersion, setSelfNameVersion] = useState(0);
 	const syncVersionRef = useRef(0);
+	// Display name used for the most recent join, saved once we know the local workspace path
+	const pendingSelfNameRef = useRef<string | null>(null);
+	// Incoming changes are applied one at a time, in the order the peer sent them
+	const applyQueueRef = useRef<Promise<void>>(Promise.resolve());
 
 	const markSynced = useCallback((relPath: string) => {
 		syncVersionRef.current += 1;
@@ -145,6 +183,25 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		prevWorkspaceIdRef.current = currentId;
 	}, [workspace?.id]);
 
+	// A host lists every guest that joins as a member with the role from their invite
+	const addGuestMember = useCallback(async (peer: ConnectedPeerInfo) => {
+		const path = workspaceRef.current?.path;
+		if (!path) return;
+		try {
+			const meta = await readWorkspaceMetadata(path);
+			const current = meta.members.members;
+			const existing = current.find((m) => m.name.toLowerCase() === peer.name.toLowerCase());
+			if (existing && (existing.role === peer.role || existing.role === "Owner")) return;
+			const members = existing
+				? current.map((m) => (m.id === existing.id ? { ...m, role: peer.role } : m))
+				: [...current, { id: crypto.randomUUID(), name: peer.name, role: peer.role }];
+			await writeWorkspaceMetadata({ path, metadata: { ...meta, members: { members } } });
+			await refreshMetadataRef.current(path);
+		} catch (err) {
+			console.error("[P2P] Failed to add the new collaborator as a member:", err);
+		}
+	}, []);
+
 	// Track connected peers and attach them to live Yjs providers
 	useEffect(() => {
 		const updatePeers = (list: ConnectedPeerInfo[]) => {
@@ -156,6 +213,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		const offPeers = p2p.onPeers(updatePeers);
 		const offJoined = p2p.onPeerJoined((peer) => {
 			syncProvidersRef.current.forEach((provider) => provider.addPeer(peer.id));
+			if (!peer.isHost) void addGuestMember(peer);
 		});
 		const offLeft = p2p.onPeerLeft(({ peerId }) => {
 			syncProvidersRef.current.forEach((provider) => provider.removePeer(peerId));
@@ -166,7 +224,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			offJoined();
 			offLeft();
 		};
-	}, []);
+	}, [addGuestMember]);
 
 	// Broadcast local activity events to connected peers
 	useEffect(() => {
@@ -222,6 +280,15 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			try {
 				// Keep this device's workspace identity; take everything else from the peer
 				const local = await readWorkspaceMetadata(path);
+				if (pendingSelfNameRef.current) {
+					try {
+						localStorage.setItem(selfNameKey(local.workspace.id), pendingSelfNameRef.current);
+					} catch {
+						// Only affects the "(You)" label
+					}
+					pendingSelfNameRef.current = null;
+					setSelfNameVersion((v) => v + 1);
+				}
 				await writeWorkspaceMetadata({
 					path,
 					metadata: {
@@ -234,16 +301,17 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 					},
 				});
 
-				// Existing rows fail to insert, so re-syncing only adds what's missing
+				// Re-syncing updates existing rows and adds missing ones
 				for (const task of snapshot.tasks ?? []) {
-					await createTask({ path, task }).catch(() => {});
+					await upsertTask(path, task).catch(() => {});
 				}
 				for (const column of snapshot.kanban ?? []) {
 					await createKanbanColumn({ path, column }).catch(() => {});
 					for (const card of column.cards ?? []) {
-						await createKanbanCard({ path, card }).catch(() => {});
+						await upsertKanbanCard(path, card).catch(() => {});
 					}
 				}
+				setDataVersion((v) => v + 1);
 
 				const eager = snapshot.files.filter((f) => !f.isPlaceholder);
 				const lazy: PlaceholderItem[] = snapshot.files
@@ -285,6 +353,25 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		[markSynced],
 	);
 
+	// Hosts share their member list so guests see everyone in the workspace
+	const sendMembers = useCallback(
+		(peerId?: string) => {
+			const members = metadataRef.current?.members.members;
+			if (!members) return;
+			send({ kind: "MEMBERS_UPDATE", timestamp: Date.now(), payload: JSON.stringify(members) }, peerId);
+		},
+		[send],
+	);
+
+	// Tell collaborators about a local task/kanban edit
+	const publishDataChange = useCallback(
+		(change: DataChange) => {
+			if (peersRef.current.length === 0) return;
+			send({ kind: "DATA_CHANGE", timestamp: Date.now(), payload: JSON.stringify(change) });
+		},
+		[send],
+	);
+
 	// Handle an incoming app message from a peer
 	const handleMessage = useCallback(
 		async (peerId: string, message: P2PMessage) => {
@@ -308,6 +395,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 							},
 							peerId,
 						);
+						// The requester may have been added as a member after the snapshot was read
+						sendMembers(peerId);
 					}
 					break;
 				}
@@ -325,6 +414,36 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 						await applyWorkspaceSnapshot(snapshot, peerId, targetPath);
 					} catch (err) {
 						console.error("[P2P] Received a malformed workspace snapshot:", err);
+					}
+					break;
+				}
+
+				case "DATA_CHANGE": {
+					const path = workspaceRef.current?.path;
+					if (!path || !message.payload) break;
+					try {
+						const change: DataChange = JSON.parse(message.payload);
+						await applyDataChange(path, change);
+						setDataVersion((v) => v + 1);
+					} catch (err) {
+						console.error("[P2P] Failed to apply a collaborator's change:", err);
+					}
+					break;
+				}
+
+				case "MEMBERS_UPDATE": {
+					// The backend only delivers this from the host we joined
+					const path = workspaceRef.current?.path;
+					if (!path || !message.payload) break;
+					try {
+						const members: unknown = JSON.parse(message.payload);
+						if (!isMemberList(members)) break;
+						const meta = await readWorkspaceMetadata(path);
+						if (JSON.stringify(meta.members.members) === JSON.stringify(members)) break;
+						await writeWorkspaceMetadata({ path, metadata: { ...meta, members: { members } } });
+						await refreshMetadataRef.current(path);
+					} catch (err) {
+						console.error("[P2P] Failed to apply the member list:", err);
 					}
 					break;
 				}
@@ -351,7 +470,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				}
 			}
 		},
-		[generateWorkspaceSnapshot, applyWorkspaceSnapshot, send],
+		[generateWorkspaceSnapshot, applyWorkspaceSnapshot, send, sendMembers],
 	);
 
 	const handleMessageRef = useRef(handleMessage);
@@ -359,7 +478,14 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 
 	useEffect(() => {
 		return p2p.onMessage(({ peerId, message }) => {
-			void handleMessageRef.current(peerId, message);
+			if (message.kind === "WORKSPACE_SYNC_REQUEST" || message.kind.startsWith("SYNC_")) {
+				void handleMessageRef.current(peerId, message);
+				return;
+			}
+			// Queue anything that writes to the workspace so a snapshot and later edits land in order
+			applyQueueRef.current = applyQueueRef.current.then(() =>
+				handleMessageRef.current(peerId, message),
+			);
 		});
 	}, []);
 
@@ -420,7 +546,9 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const joinWithTicket = useCallback(async (ticket: string, displayName = "Collaborator") => {
 		setIsJoining(true);
 		try {
-			return await p2p.joinWithTicket(ticket.trim(), displayName);
+			const result = await p2p.joinWithTicket(ticket.trim(), displayName);
+			pendingSelfNameRef.current = displayName.trim() || "Collaborator";
+			return result;
 		} finally {
 			setIsJoining(false);
 		}
@@ -475,6 +603,19 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const disconnectPeer = useCallback((peerId: string) => p2p.disconnectPeer(peerId), []);
 	const disconnectAll = useCallback(() => p2p.disconnectAll(), []);
 
+	// While hosting, push the member list to guests whenever it changes or someone joins
+	const membersJson = JSON.stringify(metadata?.members.members ?? null);
+	const guestCount = peers.filter((p) => !p.isHost).length;
+	useEffect(() => {
+		if (guestCount > 0 && membersJson !== "null") sendMembers();
+	}, [membersJson, guestCount, sendMembers]);
+
+	const selfName = useMemo(
+		() => readSelfName(workspace?.id),
+		// selfNameVersion changes when a join saves a new name for this workspace
+		[workspace?.id, selfNameVersion],
+	);
+
 	const connectionStatus: P2PContextType["connectionStatus"] =
 		peers.length > 0 ? "connected" : isJoining ? "connecting" : "offline";
 
@@ -486,6 +627,9 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				placeholders,
 				syncProgress,
 				lastSyncedFile,
+				dataVersion,
+				selfName,
+				publishDataChange,
 				createInvite,
 				revokeInvite,
 				joinWithTicket,

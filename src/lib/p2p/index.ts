@@ -10,4 +10,6 @@ export type {
 	ConnectedPeerInfo,
 	WorkspaceSyncSnapshot,
 	WorkspaceSyncFileItem,
+	DataChange,
 } from "./types";
+export { applyDataChange, upsertTask, upsertKanbanCard } from "./sharedData";

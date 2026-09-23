@@ -270,7 +270,18 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
     let canonical_path_str = canonical_path.to_string_lossy().to_string();
 
     let db = WorkspaceDb::open_existing(&request.path)?;
-    let metadata = &request.metadata;
+    persist_metadata(&db, &canonical_path_str, &request.metadata)
+}
+
+/// Writes metadata in one transaction without disturbing tasks, kanban or other child rows
+fn persist_metadata(db: &WorkspaceDb, canonical_path_str: &str, metadata: &WorkspaceMetadata) -> Result<(), String> {
+    // A second workspace row would break every query that expects exactly one
+    if let Ok(existing_id) = get_workspace_id(db) {
+        if existing_id != metadata.workspace.id {
+            return Err("Workspace ID mismatch - metadata belongs to a different workspace.".to_string());
+        }
+    }
+
     let tx = db.conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
     // Check overall metadata payload size
@@ -285,9 +296,12 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
         ));
     }
 
+    // Upsert, not REPLACE: REPLACE deletes the row first, which cascades to every task, card and member
     tx.execute(
-        "INSERT OR REPLACE INTO workspace (id, name, description, path, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT INTO workspace (id, name, description, path, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name, description = excluded.description,
+             path = excluded.path, created_at = excluded.created_at, updated_at = excluded.updated_at",
         rusqlite::params![
             &metadata.workspace.id,
             &metadata.workspace.name,
@@ -311,12 +325,27 @@ pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMet
     )
     .map_err(|e| e.to_string())?;
 
-    tx.execute("DELETE FROM members WHERE workspace_id = ?1", [&metadata.workspace.id])
-        .map_err(|e| e.to_string())?;
+    // Keep surviving member rows in place so task assignees aren't cleared on every save
+    let member_ids = serde_json::to_string(
+        &metadata.members.members.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+    )
+    .map_err(|e| e.to_string())?;
+    tx.execute(
+        "DELETE FROM members WHERE workspace_id = ?1 AND id NOT IN (SELECT value FROM json_each(?2))",
+        rusqlite::params![&metadata.workspace.id, &member_ids],
+    )
+    .map_err(|e| e.to_string())?;
+    // Clear names first so renames that swap names don't trip UNIQUE(workspace_id, name)
+    tx.execute(
+        "UPDATE members SET name = '~' || id WHERE workspace_id = ?1",
+        [&metadata.workspace.id],
+    )
+    .map_err(|e| e.to_string())?;
     for m in &metadata.members.members {
         validate_member_role(&m.role).map_err(|e| e.to_string())?;
         tx.execute(
-            "INSERT INTO members (id, workspace_id, name, role) VALUES (?1, ?2, ?3, ?4)",
+            "INSERT INTO members (id, workspace_id, name, role) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(id) DO UPDATE SET name = excluded.name, role = excluded.role",
             rusqlite::params![&m.id, &metadata.workspace.id, &m.name, &m.role],
         )
         .map_err(|e| e.to_string())?;
@@ -463,4 +492,83 @@ pub fn get_workspace_stats(app_handle: tauri::AppHandle, path: String) -> Result
         kanban_cards: kanban_count as usize,
         members: member_count as usize,
     })
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn metadata(members: serde_json::Value) -> WorkspaceMetadata {
+        serde_json::from_value(serde_json::json!({
+            "workspace": { "id": "ws-1", "name": "Demo", "description": "", "path": "",
+                           "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-02T00:00:00Z" },
+            "settings": { "theme": "dark", "autosave": true, "sync": true },
+            "members": { "members": members },
+            "activity": { "events": [{ "id": "ev-1", "timestamp": "2026-01-02T00:00:00Z",
+                                       "action": "Created task", "detail": "Created task: A" }] },
+            "permissions": { "owner": ["edit"], "editor": ["edit"], "viewer": ["view"] },
+            "history": { "last_opened": "2026-01-02T00:00:00Z", "recent_files": [] }
+        }))
+        .unwrap()
+    }
+
+    fn count(db: &WorkspaceDb, table: &str) -> i64 {
+        db.conn
+            .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))
+            .unwrap()
+    }
+
+    #[test]
+    fn test_saving_metadata_keeps_tasks_kanban_and_assignees() {
+        let dir = std::env::temp_dir().join(format!("nexsync-meta-{}", Uuid::new_v4()));
+        let db = WorkspaceDb::open(dir.to_str().unwrap()).unwrap();
+        let path = dir.to_string_lossy().to_string();
+        let owner = serde_json::json!({ "id": "owner", "name": "User", "role": "Owner" });
+        let friend = serde_json::json!({ "id": "m-2", "name": "Friend", "role": "Editor" });
+        persist_metadata(&db, &path, &metadata(serde_json::json!([owner, friend]))).unwrap();
+
+        db.conn
+            .execute_batch(
+                "INSERT INTO tasks (id, workspace_id, title, description, status, priority, assignee_id, created_at, updated_at)
+                     VALUES ('t-1', 'ws-1', 'A', '', 'todo', 'medium', 'm-2', 'x', 'x');
+                 INSERT INTO kanban_columns (id, workspace_id, title, position, created_at, updated_at)
+                     VALUES ('c-1', 'ws-1', 'To Do', 0, 'x', 'x');
+                 INSERT INTO kanban_cards (id, workspace_id, column_id, title, description, position, created_at, updated_at)
+                     VALUES ('k-1', 'ws-1', 'c-1', 'Card', '', 0, 'x', 'x');",
+            )
+            .unwrap();
+
+        // Saving again (as every activity event does) must not cascade-delete anything
+        let owner = serde_json::json!({ "id": "owner", "name": "Host", "role": "Owner" });
+        persist_metadata(&db, &path, &metadata(serde_json::json!([owner, friend]))).unwrap();
+        assert_eq!(count(&db, "workspace"), 1);
+        assert_eq!(count(&db, "tasks"), 1);
+        assert_eq!(count(&db, "kanban_columns"), 1);
+        assert_eq!(count(&db, "kanban_cards"), 1);
+        let assignee: Option<String> = db
+            .conn
+            .query_row("SELECT assignee_id FROM tasks WHERE id = 't-1'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(assignee.as_deref(), Some("m-2"));
+        let owner_name: String = db
+            .conn
+            .query_row("SELECT name FROM members WHERE id = 'owner'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(owner_name, "Host");
+
+        // Swapping two names must not trip UNIQUE(workspace_id, name); removed members go away
+        let a = serde_json::json!({ "id": "owner", "name": "Friend", "role": "Owner" });
+        let b = serde_json::json!({ "id": "m-2", "name": "Host", "role": "Editor" });
+        persist_metadata(&db, &path, &metadata(serde_json::json!([a, b]))).unwrap();
+        persist_metadata(&db, &path, &metadata(serde_json::json!([a]))).unwrap();
+        assert_eq!(count(&db, "members"), 1);
+        assert_eq!(count(&db, "tasks"), 1);
+
+        // Metadata for another workspace is refused instead of adding a second row
+        let mut other = metadata(serde_json::json!([a]));
+        other.workspace.id = "ws-2".into();
+        assert!(persist_metadata(&db, &path, &other).is_err());
+
+        drop(db);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
