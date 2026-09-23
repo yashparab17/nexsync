@@ -276,7 +276,7 @@ export default function WorkspaceAssets() {
 		}
 	};
 
-	// Real lazy sync download on demand over WebRTC
+	// Download a remote placeholder on demand from a connected peer
 	const handleLazyDownload = async (asset: AssetItem) => {
 		try {
 			await downloadFileOnDemand(asset.path);

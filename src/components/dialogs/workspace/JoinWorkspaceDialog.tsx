@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
 	Dialog,
 	DialogTrigger,
@@ -38,9 +39,9 @@ export default function JoinWorkspaceDialog({
 }: JoinWorkspaceDialogProps) {
 	const navigate = useNavigate();
 	const { loadWorkspace } = useWorkspace();
-	const { joinWithShortCode, requestWorkspaceSnapshot } = useP2P();
+	const { joinWithTicket, requestWorkspaceSnapshot } = useP2P();
 
-	const [shortCode, setShortCode] = useState("");
+	const [ticket, setTicket] = useState("");
 	const [workspaceParentPath, setWorkspaceParentPath] = useState("");
 	const [userName, setUserName] = useState("Collaborator");
 	const [isProcessing, setIsProcessing] = useState(false);
@@ -74,20 +75,23 @@ export default function JoinWorkspaceDialog({
 		}
 	};
 
-	// Handle Join & Connection Handshake
+	// Connect to the host, create a local copy of its workspace, then sync it
 	const handleJoinWorkspace = async () => {
-		const cleanCode = shortCode.trim().toUpperCase();
-		if (!cleanCode || !workspaceParentPath.trim() || isProcessing) {
+		const cleanTicket = ticket.trim();
+		if (!cleanTicket || !workspaceParentPath.trim() || isProcessing) {
 			return;
 		}
 
 		try {
 			setIsProcessing(true);
 			setError(null);
-			setStatusMessage("Connecting to host via encrypted rendezvous…");
+			setStatusMessage("Connecting to host…");
 
-			// 1. Establish WebRTC handshake automatically using short code
-			const { workspaceName } = await joinWithShortCode(cleanCode);
+			// 1. Dial the host and prove we hold its invite
+			const { workspaceName, peerId } = await joinWithTicket(
+				cleanTicket,
+				userName.trim() || "Collaborator",
+			);
 
 			setStatusMessage(`Connected to ${workspaceName}! Initializing local workspace…`);
 
@@ -108,11 +112,10 @@ export default function JoinWorkspaceDialog({
 				wsInfo = await importWorkspace(targetPath);
 			}
 
-			// Load workspace into context so workspaceRef.current is active
 			await loadWorkspace(wsInfo as any);
 
-			// Explicitly trigger snapshot sync now that workspace is loaded
-			await requestWorkspaceSnapshot();
+			// Pull the host's workspace into the new local copy; files keep downloading after we navigate
+			await requestWorkspaceSnapshot(peerId, wsInfo.path);
 
 			setIsSuccess(true);
 			setStatusMessage("Workspace ready! Opening…");
@@ -143,7 +146,7 @@ export default function JoinWorkspaceDialog({
 						<div>
 							<DialogTitle className="text-lg">Join P2P Workspace</DialogTitle>
 							<DialogDescription className="text-xs">
-								Connect to a collaborator's workspace with a single 1-step room code.
+								Paste the invite your collaborator shared to get a synced copy of their workspace.
 							</DialogDescription>
 						</div>
 					</div>
@@ -153,11 +156,11 @@ export default function JoinWorkspaceDialog({
 				<div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-400">
 					<div className="flex items-center gap-2">
 						<ShieldCheck className="h-4 w-4" />
-						<span>End-to-End Encrypted (AES-256-GCM + X25519)</span>
+						<span>End-to-end encrypted (QUIC + TLS 1.3 via Iroh)</span>
 					</div>
 					<div className="flex items-center gap-1 font-mono text-[11px]">
 						<Lock className="h-3 w-3" />
-						<span>Direct P2P</span>
+						<span>Peer-to-peer</span>
 					</div>
 				</div>
 
@@ -168,14 +171,15 @@ export default function JoinWorkspaceDialog({
 				)}
 
 				<div className="space-y-4 pt-1">
-					{/* Pairing Code Input */}
+					{/* Invite ticket input */}
 					<div className="space-y-1.5">
-						<Label className="text-xs">Host Pairing Code *</Label>
-						<Input
-							placeholder="e.g. NX-4821"
-							value={shortCode}
-							onChange={(e) => setShortCode(e.target.value.toUpperCase())}
-							className="font-mono text-center text-lg tracking-wider font-semibold h-11"
+						<Label className="text-xs">Host's Invite *</Label>
+						<Textarea
+							placeholder="nexsync…"
+							value={ticket}
+							onChange={(e) => setTicket(e.target.value)}
+							rows={3}
+							className="font-mono text-[11px] break-all rounded-md border border-input px-3 py-2"
 							autoFocus
 						/>
 					</div>
@@ -227,7 +231,7 @@ export default function JoinWorkspaceDialog({
 					<DialogFooter>
 						<Button
 							onPress={handleJoinWorkspace}
-							isDisabled={!shortCode.trim() || !workspaceParentPath.trim() || isProcessing || isSuccess}
+							isDisabled={!ticket.trim() || !workspaceParentPath.trim() || isProcessing || isSuccess}
 							className="w-full h-10 text-xs gap-2"
 						>
 							{isProcessing ? (

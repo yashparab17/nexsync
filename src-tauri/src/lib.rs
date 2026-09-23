@@ -1,14 +1,13 @@
 mod commands;
 mod database;
-pub mod crypto;
 
 /// Initializes plugins, registers Tauri command handlers, and runs the application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(commands::p2p::P2pState::default())
         .setup(|_app| {
-            // Initialize cryptography subsystem and auth registry
-            crypto::init().map_err(|e| format!("Crypto initialization failed: {e}"))?;
+            // Initialize the session auth registry
             commands::auth::init();
             Ok(())
         })
@@ -73,9 +72,17 @@ pub fn run() {
             commands::workspace::delete_yjs_doc,
             commands::workspace::list_yjs_docs,
 
-            // P2P E2EE handshake (X25519 ECDH)
-            commands::crypto::x25519_generate_keypair,
-            commands::crypto::x25519_derive_shared_secret,
+            // P2P collaboration (Iroh)
+            commands::p2p::p2p_set_workspace,
+            commands::p2p::p2p_create_invite,
+            commands::p2p::p2p_revoke_invite,
+            commands::p2p::p2p_join,
+            commands::p2p::p2p_send,
+            commands::p2p::p2p_list_peers,
+            commands::p2p::p2p_disconnect,
+            commands::p2p::p2p_disconnect_all,
+            commands::p2p::p2p_fetch_file,
+            commands::p2p::p2p_list_shareable_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

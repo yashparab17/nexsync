@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+	AlertTriangle,
 	Check,
 	Copy,
 	Globe,
@@ -8,10 +9,10 @@ import {
 	Radio,
 	RefreshCw,
 	ShieldCheck,
+	Sparkles,
 	Unplug,
 	Users,
 	Wifi,
-	Sparkles,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,10 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useP2P } from "@/store/p2p/P2PContext";
+import { Textarea } from "@/components/ui/textarea";
+import { useP2P, describeSyncProgress } from "@/store/p2p/P2PContext";
+import type { InviteInfo } from "@/lib/p2p";
 import { cn } from "@/lib/utils";
 
 interface P2PConnectDialogProps {
@@ -31,6 +33,10 @@ interface P2PConnectDialogProps {
 	onOpenChange: (open: boolean) => void;
 }
 
+const errorText = (err: unknown, fallback: string) =>
+	err instanceof Error ? err.message : typeof err === "string" ? err : fallback;
+
+// Dialog for hosting, joining and managing P2P collaboration sessions
 export default function P2PConnectDialog({
 	open,
 	onOpenChange,
@@ -38,8 +44,10 @@ export default function P2PConnectDialog({
 	const {
 		peers,
 		connectionStatus,
-		createShortCodeInvite,
-		joinWithShortCode,
+		syncProgress,
+		createInvite,
+		revokeInvite,
+		joinWithTicket,
 		requestWorkspaceSnapshot,
 		disconnectPeer,
 	} = useP2P();
@@ -48,60 +56,74 @@ export default function P2PConnectDialog({
 
 	// Host flow state
 	const [hostRole, setHostRole] = useState("Editor");
-	const [generatedShortCode, setGeneratedShortCode] = useState<string | null>(null);
+	const [invite, setInvite] = useState<InviteInfo | null>(null);
 	const [isGenerating, setIsGenerating] = useState(false);
-	const [copiedCode, setCopiedCode] = useState(false);
+	const [copied, setCopied] = useState(false);
 
 	// Join flow state
-	const [joinCodeInput, setJoinCodeInput] = useState("");
+	const [ticketInput, setTicketInput] = useState("");
 	const [isJoining, setIsJoining] = useState(false);
 	const [joinSuccess, setJoinSuccess] = useState(false);
 
-	// Error state
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-	// Generate Host 1-Step Short Code
-	const handleGenerateCode = async () => {
+	const hasGuests = peers.some((p) => !p.isHost);
+	const hasHost = peers.some((p) => p.isHost);
+
+	// Mint a fresh invite ticket (invalidates any previous one)
+	const handleGenerateInvite = async () => {
 		try {
 			setIsGenerating(true);
 			setErrorMessage(null);
-			const { shortCode } = await createShortCodeInvite(hostRole);
-			setGeneratedShortCode(shortCode);
-		} catch (err: unknown) {
-			setErrorMessage(err instanceof Error ? err.message : "Failed to generate invite code.");
+			setInvite(await createInvite(hostRole));
+		} catch (err) {
+			setErrorMessage(errorText(err, "Failed to create an invite."));
 		} finally {
 			setIsGenerating(false);
 		}
 	};
 
-	// Join directly with 1-Step Short Code
-	const handleJoinWithCode = async () => {
-		const cleanCode = joinCodeInput.trim().toUpperCase();
-		if (!cleanCode) return;
+	const handleStopInviting = async () => {
+		await revokeInvite().catch(() => {});
+		setInvite(null);
+	};
+
+	// Join a host and pull its workspace into the one that's open
+	const handleJoin = async () => {
+		const ticket = ticketInput.trim();
+		if (!ticket) return;
 
 		try {
 			setIsJoining(true);
 			setErrorMessage(null);
-			await joinWithShortCode(cleanCode);
+			const joined = await joinWithTicket(ticket);
+			await requestWorkspaceSnapshot(joined.peerId);
 			setJoinSuccess(true);
+			setTicketInput("");
 			setTimeout(() => {
 				setActiveTab("peers");
 				setJoinSuccess(false);
 			}, 1500);
-		} catch (err: unknown) {
-			setErrorMessage(err instanceof Error ? err.message : "Failed to connect. Make sure code is correct and host is online.");
+		} catch (err) {
+			setErrorMessage(errorText(err, "Couldn't connect. Check the invite and that the host is online."));
 		} finally {
 			setIsJoining(false);
 		}
 	};
 
-	const handleCopy = (text: string) => {
-		navigator.clipboard.writeText(text);
-		setCopiedCode(true);
-		setTimeout(() => setCopiedCode(false), 2000);
+	const handleCopy = async (text: string) => {
+		await navigator.clipboard.writeText(text);
+		setCopied(true);
+		setTimeout(() => setCopied(false), 2000);
 	};
 
-	const hasConnectedPeer = peers.some((p) => p.status === "connected");
+	const tabClass = (tab: typeof activeTab) =>
+		cn(
+			"flex flex-1 items-center justify-center gap-2 border-b-2 py-2.5 text-xs font-medium transition-colors",
+			activeTab === tab
+				? "border-primary text-foreground"
+				: "border-transparent text-muted-foreground hover:text-foreground",
+		);
 
 	return (
 		<Dialog isOpen={open} onOpenChange={onOpenChange} className="max-w-xl">
@@ -116,7 +138,7 @@ export default function P2PConnectDialog({
 								P2P Real-Time Collaboration
 							</DialogTitle>
 							<DialogDescription className="text-xs">
-								Connect directly with collaborators using a single 1-step room code.
+								Share an invite with a collaborator to connect directly, from any network.
 							</DialogDescription>
 						</div>
 					</div>
@@ -126,7 +148,7 @@ export default function P2PConnectDialog({
 				<div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-400">
 					<div className="flex items-center gap-2">
 						<ShieldCheck className="h-4 w-4" />
-						<span>End-to-End Encrypted (AES-256-GCM + X25519)</span>
+						<span>End-to-end encrypted (QUIC + TLS 1.3 via Iroh)</span>
 					</div>
 					<div className="flex items-center gap-1.5 font-mono text-[11px]">
 						<span
@@ -149,44 +171,24 @@ export default function P2PConnectDialog({
 					</div>
 				)}
 
+				{syncProgress && (
+					<div className="flex items-center gap-2 rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs text-sky-400">
+						<RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" />
+						<span className="truncate">{describeSyncProgress(syncProgress)}</span>
+					</div>
+				)}
+
 				{/* Tab Selection */}
 				<div className="flex border-b border-border/50">
-					<button
-						type="button"
-						onClick={() => setActiveTab("invite")}
-						className={cn(
-							"flex flex-1 items-center justify-center gap-2 border-b-2 py-2.5 text-xs font-medium transition-colors",
-							activeTab === "invite"
-								? "border-primary text-foreground"
-								: "border-transparent text-muted-foreground hover:text-foreground",
-						)}
-					>
+					<button type="button" onClick={() => setActiveTab("invite")} className={tabClass("invite")}>
 						<Users className="h-3.5 w-3.5" />
 						Host Workspace
 					</button>
-					<button
-						type="button"
-						onClick={() => setActiveTab("join")}
-						className={cn(
-							"flex flex-1 items-center justify-center gap-2 border-b-2 py-2.5 text-xs font-medium transition-colors",
-							activeTab === "join"
-								? "border-primary text-foreground"
-								: "border-transparent text-muted-foreground hover:text-foreground",
-						)}
-					>
+					<button type="button" onClick={() => setActiveTab("join")} className={tabClass("join")}>
 						<Globe className="h-3.5 w-3.5" />
-						Join with Code
+						Join with Invite
 					</button>
-					<button
-						type="button"
-						onClick={() => setActiveTab("peers")}
-						className={cn(
-							"flex flex-1 items-center justify-center gap-2 border-b-2 py-2.5 text-xs font-medium transition-colors",
-							activeTab === "peers"
-								? "border-primary text-foreground"
-								: "border-transparent text-muted-foreground hover:text-foreground",
-						)}
-					>
+					<button type="button" onClick={() => setActiveTab("peers")} className={tabClass("peers")}>
 						<Wifi className="h-3.5 w-3.5" />
 						Peers ({peers.length})
 					</button>
@@ -212,107 +214,131 @@ export default function P2PConnectDialog({
 							</div>
 						</div>
 
-						{!generatedShortCode ? (
+						{!invite ? (
 							<Button
-								onPress={handleGenerateCode}
+								onPress={handleGenerateInvite}
 								isDisabled={isGenerating}
 								className="w-full h-9 text-xs gap-2"
 							>
 								{isGenerating ? (
 									<>
 										<RefreshCw className="h-3.5 w-3.5 animate-spin" />
-										Generating Pairing Code…
+										Connecting to the relay network…
 									</>
 								) : (
 									<>
 										<KeyRound className="h-3.5 w-3.5" />
-										Generate 1-Step Pairing Code
+										Create Invite
 									</>
 								)}
 							</Button>
 						) : (
 							<div className="space-y-3 rounded-lg border bg-muted/30 p-4">
-								<div className="flex flex-col items-center justify-center space-y-2 py-2">
+								<div className="flex items-center justify-between">
 									<Label className="text-xs text-muted-foreground font-medium">
-										Share this code with your collaborator:
+										Send this invite to your collaborator:
 									</Label>
-									<div className="flex items-center gap-3">
-										<span className="font-mono text-3xl font-extrabold tracking-wider bg-background px-4 py-1.5 rounded-lg border border-primary/30 shadow-inner text-primary">
-											{generatedShortCode}
-										</span>
-										<Button
-											size="sm"
-											variant="secondary"
-											onPress={() => handleCopy(generatedShortCode)}
-											className="h-10 px-3 text-xs gap-1.5"
-										>
-											{copiedCode ? (
-												<>
-													<Check className="h-4 w-4 text-emerald-400" />
-													Copied
-												</>
-											) : (
-												<>
-													<Copy className="h-4 w-4" />
-													Copy
-												</>
-											)}
-										</Button>
-									</div>
+									<Button
+										size="sm"
+										variant="secondary"
+										onPress={() => handleCopy(invite.ticket)}
+										className="h-8 px-3 text-xs gap-1.5"
+									>
+										{copied ? (
+											<>
+												<Check className="h-4 w-4 text-emerald-400" />
+												Copied
+											</>
+										) : (
+											<>
+												<Copy className="h-4 w-4" />
+												Copy
+											</>
+										)}
+									</Button>
 								</div>
+								<div className="max-h-28 overflow-y-auto rounded-md border border-primary/30 bg-background px-3 py-2 font-mono text-[11px] leading-relaxed break-all select-all text-primary">
+									{invite.ticket}
+								</div>
+
+								{!invite.relayConnected && (
+									<div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-400">
+										<AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+										<span>
+											Couldn't reach the relay network, so only collaborators on your local
+											network can join. Check your internet connection and create a new invite.
+										</span>
+									</div>
+								)}
 
 								{/* Live rendezvous status */}
 								<div className="rounded-md border border-border/50 bg-background/60 p-3 text-xs flex items-center justify-between">
-									<div className="flex items-center gap-2">
-										{hasConnectedPeer ? (
-											<div className="flex items-center gap-2 text-emerald-400 font-medium">
-												<Check className="h-4 w-4" />
-												<span>Collaborator connected! Live sync active.</span>
-											</div>
-										) : (
-											<div className="flex items-center gap-2 text-muted-foreground">
-												<RefreshCw className="h-3.5 w-3.5 animate-spin text-sky-400" />
-												<span>Waiting for collaborator to enter code…</span>
-											</div>
-										)}
+									{hasGuests ? (
+										<div className="flex items-center gap-2 text-emerald-400 font-medium">
+											<Check className="h-4 w-4" />
+											<span>Collaborator connected! Live sync active.</span>
+										</div>
+									) : (
+										<div className="flex items-center gap-2 text-muted-foreground">
+											<RefreshCw className="h-3.5 w-3.5 animate-spin text-sky-400" />
+											<span>Waiting for a collaborator to join…</span>
+										</div>
+									)}
+									<div className="flex items-center gap-1">
+										<Button
+											variant="ghost"
+											size="sm"
+											onPress={handleGenerateInvite}
+											className="h-7 text-[11px] text-muted-foreground hover:text-foreground"
+										>
+											New Invite
+										</Button>
+										<Button
+											variant="ghost"
+											size="sm"
+											onPress={handleStopInviting}
+											className="h-7 text-[11px] text-muted-foreground hover:text-destructive"
+										>
+											Stop
+										</Button>
 									</div>
-									<Button
-										variant="ghost"
-										size="sm"
-										onPress={handleGenerateCode}
-										className="h-7 text-[11px] text-muted-foreground hover:text-foreground"
-									>
-										New Code
-									</Button>
 								</div>
+								<p className="text-[11px] text-muted-foreground">
+									Creating a new invite or pressing Stop invalidates this one. Collaborators who
+									already joined stay connected.
+								</p>
 							</div>
 						)}
 					</div>
 				)}
 
-				{/* TAB 2: JOIN WITH CODE */}
+				{/* TAB 2: JOIN WITH INVITE */}
 				{activeTab === "join" && (
 					<div className="space-y-4 pt-1">
 						<div className="space-y-2">
-							<Label className="text-xs">Enter Host's Pairing Code</Label>
-							<Input
-								placeholder="e.g. NX-4821"
-								value={joinCodeInput}
-								onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-								className="font-mono text-center text-lg tracking-wider font-semibold h-11"
+							<Label className="text-xs">Paste the host's invite</Label>
+							<Textarea
+								placeholder="nexsync…"
+								value={ticketInput}
+								onChange={(e) => setTicketInput(e.target.value)}
+								rows={4}
+								className="font-mono text-[11px] break-all rounded-md border border-input px-3 py-2"
 								autoFocus
 							/>
+							<p className="text-[11px] text-muted-foreground">
+								The host's workspace will be synced into the workspace you have open.
+							</p>
 						</div>
 
 						{joinSuccess ? (
 							<div className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-400 font-medium">
 								<Sparkles className="h-4 w-4" />
-								<span>Connected successfully! Syncing workspace…</span>
+								<span>Connected! Syncing workspace…</span>
 							</div>
 						) : (
 							<Button
-								onPress={handleJoinWithCode}
-								isDisabled={!joinCodeInput.trim() || isJoining}
+								onPress={handleJoin}
+								isDisabled={!ticketInput.trim() || isJoining}
 								className="w-full h-10 text-xs gap-2"
 							>
 								{isJoining ? (
@@ -339,24 +365,27 @@ export default function P2PConnectDialog({
 								<Radio className="h-8 w-8 stroke-[1.25] text-muted-foreground/40 mb-2" />
 								<p className="text-xs font-medium">No peers connected</p>
 								<p className="text-[11px] text-muted-foreground/70">
-									Generate a pairing code or enter a code from a collaborator to connect.
+									Create an invite or paste one from a collaborator to connect.
 								</p>
 							</div>
 						) : (
 							<div className="space-y-3">
 								<div className="flex items-center justify-between">
 									<span className="text-xs text-muted-foreground">
-										Active Mesh Connections ({peers.length})
+										Connected Peers ({peers.length})
 									</span>
-									<Button
-										size="sm"
-										variant="outline"
-										onPress={() => requestWorkspaceSnapshot()}
-										className="h-7 text-xs gap-1.5"
-									>
-										<RefreshCw className="h-3 w-3" />
-										Sync All Workspace Data
-									</Button>
+									{hasHost && (
+										<Button
+											size="sm"
+											variant="outline"
+											onPress={() => requestWorkspaceSnapshot()}
+											isDisabled={syncProgress !== null}
+											className="h-7 text-xs gap-1.5"
+										>
+											<RefreshCw className="h-3 w-3" />
+											Pull from Host
+										</Button>
+									)}
 								</div>
 
 								<div className="space-y-2 max-h-[240px] overflow-y-auto">
@@ -366,19 +395,31 @@ export default function P2PConnectDialog({
 											className="flex items-center justify-between rounded-lg border bg-card p-2.5 text-xs"
 										>
 											<div className="flex items-center gap-2.5">
-												<span
-													className={cn(
-														"h-2 w-2 rounded-full",
-														peer.status === "connected"
-															? "bg-emerald-400"
-															: "bg-amber-400 animate-pulse",
-													)}
-												/>
+												<span className="h-2 w-2 rounded-full bg-emerald-400" />
 												<div>
 													<div className="flex items-center gap-1.5 font-medium">
 														<span>{peer.name}</span>
 														<span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground uppercase tracking-wider">
-															{peer.role}
+															{peer.isHost ? "Host" : peer.role}
+														</span>
+														<span
+															className={cn(
+																"rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider",
+																peer.connectionType === "direct"
+																	? "bg-emerald-500/10 text-emerald-400"
+																	: "bg-amber-500/10 text-amber-400",
+															)}
+															title={
+																peer.connectionType === "relay"
+																	? "Traffic goes through an encrypted Iroh relay; NexSync keeps trying to switch to a direct link."
+																	: undefined
+															}
+														>
+															{peer.connectionType === "direct"
+																? "Direct"
+																: peer.connectionType === "relay"
+																	? "Relayed"
+																	: "Connecting"}
 														</span>
 													</div>
 													<div className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
@@ -418,4 +459,3 @@ export default function P2PConnectDialog({
 		</Dialog>
 	);
 }
-
