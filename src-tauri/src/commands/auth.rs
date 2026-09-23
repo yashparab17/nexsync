@@ -21,7 +21,6 @@ pub struct WorkspaceSession {
 }
 
 /// User roles for role-based access control
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, strum::Display, Default)]
 #[strum(serialize_all = "snake_case")]
 pub enum UserRole {
@@ -29,34 +28,6 @@ pub enum UserRole {
     Editor,
     #[default]
     Viewer,
-}
-
-#[allow(dead_code)]
-impl UserRole {
-    /// Check if this role can perform file creation
-    pub fn can_create(&self) -> bool {
-        matches!(self, UserRole::Owner | UserRole::Editor)
-    }
-
-    /// Check if this role can perform file deletion
-    pub fn can_delete(&self) -> bool {
-        matches!(self, UserRole::Owner)
-    }
-
-    /// Check if this role can invite new members
-    pub fn can_invite(&self) -> bool {
-        matches!(self, UserRole::Owner)
-    }
-
-    /// Check if this role can read/view content
-    pub fn can_view(&self) -> bool {
-        true
-    }
-
-    /// Check if this role can modify settings/metadata
-    pub fn can_edit_metadata(&self) -> bool {
-        matches!(self, UserRole::Owner | UserRole::Editor)
-    }
 }
 
 /// Create a new workspace session with a unique token
@@ -92,28 +63,6 @@ pub fn remove_session(session_id: &str) -> bool {
         .is_some()
 }
 
-/// Validate that a session exists and belongs to the specified workspace path
-#[allow(dead_code)]
-pub fn validate_session_for_path(session_id: &str, workspace_path: &str) -> Result<WorkspaceSession, String> {
-    let session = get_session(session_id)
-        .ok_or_else(|| "Invalid or expired session token".to_string())?;
-    
-    if session.workspace_path != workspace_path {
-        return Err(format!(
-            "Session token '{}' does not match workspace '{}'",
-            session_id, workspace_path
-        ));
-    }
-    
-    Ok(session)
-}
-
-/// Get or create a session for the given workspace path
-#[allow(dead_code)]
-pub fn get_or_create_session(workspace_path: &str) -> String {
-    create_session(workspace_path, UserRole::Owner)
-}
-
 /// Initialize the session registry
 pub fn init() {
     if SESSION_REGISTRY.lock().is_err() {
@@ -122,9 +71,8 @@ pub fn init() {
 }
 
 // Global thread-safe session map
-lazy_static::lazy_static! {
-    pub static ref SESSION_REGISTRY: SessionRegistry = Arc::new(Mutex::new(HashMap::new()));
-}
+pub static SESSION_REGISTRY: std::sync::LazyLock<SessionRegistry> =
+    std::sync::LazyLock::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tauri Commands for Session Management
@@ -169,10 +117,6 @@ pub struct SessionInfo {
     pub created_at: String,
 }
 
-/// Error code for missing session
-#[allow(dead_code)]
-pub const ERROR_MISSING_SESSION: &str = "Missing authentication token. Please call create_workspace_session first.";
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,37 +146,4 @@ mod tests {
         assert!(session.is_none());
     }
 
-    #[test]
-    fn test_validate_session_for_path() {
-        init();
-        let workspace_path = "/tmp/test-workspace".to_string();
-        let session_id = create_session(&workspace_path, UserRole::Owner);
-        
-        // Should succeed
-        let result = validate_session_for_path(&session_id, &workspace_path);
-        assert!(result.is_ok());
-        
-        // Should fail with wrong path
-        let bad_result = validate_session_for_path(&session_id, "/tmp/wrong-path");
-        assert!(bad_result.is_err());
-    }
-
-    #[test]
-    fn test_role_permissions() {
-        assert!(UserRole::Owner.can_create());
-        assert!(UserRole::Editor.can_create());
-        assert!(!UserRole::Viewer.can_create());
-        
-        assert!(UserRole::Owner.can_delete());
-        assert!(!UserRole::Editor.can_delete());
-        assert!(!UserRole::Viewer.can_delete());
-        
-        assert!(UserRole::Owner.can_invite());
-        assert!(!UserRole::Editor.can_invite());
-        assert!(!UserRole::Viewer.can_invite());
-        
-        assert!(UserRole::Owner.can_view());
-        assert!(UserRole::Editor.can_view());
-        assert!(UserRole::Viewer.can_view());
-    }
 }

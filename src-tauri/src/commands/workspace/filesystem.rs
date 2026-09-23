@@ -2,7 +2,7 @@ use std::fs;
 use chrono::{DateTime, Utc};
 use base64::prelude::*;
 use crate::commands::config::validate_allowed_root;
-use super::helpers::{validate_workspace_item_name, validate_workspace_rel_path_with_roots};
+use super::helpers::validate_workspace_item_name;
 use super::models::WorkspaceFile;
 
 /// Maximum file size for text file write and read operations (10 MB)
@@ -24,10 +24,6 @@ pub fn list_workspace_files(
 ) -> Result<Vec<WorkspaceFile>, String> {
     validate_allowed_root(&app_handle, &path)?;
     let clean_sub = subdir.trim().trim_matches('/');
-    if !clean_sub.is_empty() && clean_sub != "." {
-        validate_workspace_rel_path_with_roots(clean_sub, &["notes", "files", "assets", "tasks", "kanban", "editor"])?;
-    }
-    
     let target_sub = if clean_sub.is_empty() { "." } else { clean_sub };
     let dir = crate::commands::path_utils::resolve_workspace_path(&path, target_sub)?;
     if !dir.exists() {
@@ -95,7 +91,6 @@ pub fn create_workspace_item(
     is_dir: bool,
 ) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
-    validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "tasks", "kanban", "editor", "assets"])?;
     validate_workspace_item_name(&name)?;
     
     let base = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
@@ -123,8 +118,7 @@ pub fn create_workspace_item(
 #[tauri::command]
 pub fn read_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<String, String> {
     validate_allowed_root(&app_handle, &path)?;
-    validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "assets", "tasks", "kanban", "editor"])?;
-    
+
     let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
     
     if !target.exists() {
@@ -146,8 +140,7 @@ pub fn read_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path:
 #[tauri::command]
 pub fn write_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path: String, content: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
-    validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "assets", "tasks", "kanban", "editor"])?;
-    
+
     let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
     
     if content.len() as u64 > MAX_FILE_SIZE {
@@ -170,7 +163,6 @@ pub fn rename_workspace_item(
     new_name: String,
 ) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
-    validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "tasks", "kanban", "editor", "assets"])?;
     validate_workspace_item_name(&new_name)?;
     
     let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
@@ -198,8 +190,7 @@ pub fn rename_workspace_item(
 #[tauri::command]
 pub fn delete_workspace_item(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
-    validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "tasks", "kanban", "editor", "assets"])?;
-    
+
     let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
     if !target.exists() {
         return Err(format!("Item not found: /{rel_path}"));
@@ -220,7 +211,6 @@ pub fn read_workspace_binary_file(
     rel_path: String,
 ) -> Result<String, String> {
     validate_allowed_root(&app_handle, &path)?;
-    validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "assets", "tasks", "kanban", "editor"])?;
 
     let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
     if !target.exists() || target.is_dir() {
@@ -248,7 +238,6 @@ pub fn write_workspace_binary_file(
     base64_data: String,
 ) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
-    validate_workspace_rel_path_with_roots(&rel_path, &["notes", "files", "assets", "tasks", "kanban", "editor"])?;
 
     let bytes = BASE64_STANDARD
         .decode(&base64_data)

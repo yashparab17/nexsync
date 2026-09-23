@@ -23,7 +23,6 @@ interface EditorContainerProps {
 	onSave: (content: string) => Promise<void>;
 	onClose: () => void;
 	readOnly?: boolean;
-	autosave?: boolean;
 }
 
 // Unified dual-mode Editor Container dynamically switching between Rich-text BlockNote and CodeMirror
@@ -33,7 +32,6 @@ export default function EditorContainer({
 	onSave,
 	onClose,
 	readOnly = false,
-	autosave: _autosave = true,
 }: EditorContainerProps) {
 	const isMarkdown = useMemo(() => {
 		const ext = fileName.split(".").pop()?.toLowerCase();

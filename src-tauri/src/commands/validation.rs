@@ -1,55 +1,25 @@
-//! Enums and helpers for validating user-provided inputs.
-
-/// Allowed task status states
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TaskStatus {
-	Todo,
-	InProgress,
-	Done,
-}
-
-/// Allowed task priority levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TaskPriority {
-	Low,
-	Medium,
-	High,
-}
-
-/// Allowed collaborator roles
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MemberRole {
-	Owner,
-	Editor,
-	Viewer,
-}
+//! Helpers for validating user-provided inputs.
 
 /// Validates a task status string
-pub fn validate_task_status(status: &str) -> Result<TaskStatus, String> {
+pub fn validate_task_status(status: &str) -> Result<(), String> {
 	match status.to_lowercase().as_str() {
-		"todo" => Ok(TaskStatus::Todo),
-		"in_progress" => Ok(TaskStatus::InProgress),
-		"done" => Ok(TaskStatus::Done),
+		"todo" | "in_progress" | "done" => Ok(()),
 		_ => Err(format!("Invalid task status: '{}'. Must be one of: todo, in_progress, done", status)),
 	}
 }
 
 /// Validates a task priority string
-pub fn validate_task_priority(priority: &str) -> Result<TaskPriority, String> {
+pub fn validate_task_priority(priority: &str) -> Result<(), String> {
 	match priority.to_lowercase().as_str() {
-		"low" => Ok(TaskPriority::Low),
-		"medium" => Ok(TaskPriority::Medium),
-		"high" => Ok(TaskPriority::High),
+		"low" | "medium" | "high" => Ok(()),
 		_ => Err(format!("Invalid task priority: '{}'. Must be one of: low, medium, high", priority)),
 	}
 }
 
 /// Validates a member role string
-pub fn validate_member_role(role: &str) -> Result<MemberRole, String> {
+pub fn validate_member_role(role: &str) -> Result<(), String> {
 	match role.to_lowercase().as_str() {
-		"owner" => Ok(MemberRole::Owner),
-		"editor" => Ok(MemberRole::Editor),
-		"viewer" => Ok(MemberRole::Viewer),
+		"owner" | "editor" | "viewer" => Ok(()),
 		_ => Err(format!("Invalid member role: '{}'. Must be one of: owner, editor, viewer", role)),
 	}
 }
@@ -60,9 +30,9 @@ mod tests {
 
 	#[test]
 	fn test_valid_statuses() {
-		assert!(matches!(validate_task_status("todo"), Ok(TaskStatus::Todo)));
-		assert!(matches!(validate_task_status("in_progress"), Ok(TaskStatus::InProgress)));
-		assert!(matches!(validate_task_status("done"), Ok(TaskStatus::Done)));
+		assert!(validate_task_status("todo").is_ok());
+		assert!(validate_task_status("in_progress").is_ok());
+		assert!(validate_task_status("done").is_ok());
 	}
 
 	#[test]
@@ -72,9 +42,9 @@ mod tests {
 
 	#[test]
 	fn test_valid_priorities() {
-		assert!(matches!(validate_task_priority("low"), Ok(TaskPriority::Low)));
-		assert!(matches!(validate_task_priority("medium"), Ok(TaskPriority::Medium)));
-		assert!(matches!(validate_task_priority("high"), Ok(TaskPriority::High)));
+		assert!(validate_task_priority("low").is_ok());
+		assert!(validate_task_priority("medium").is_ok());
+		assert!(validate_task_priority("high").is_ok());
 	}
 
 	#[test]
@@ -84,9 +54,9 @@ mod tests {
 
 	#[test]
 	fn test_valid_roles() {
-		assert!(matches!(validate_member_role("owner"), Ok(MemberRole::Owner)));
-		assert!(matches!(validate_member_role("editor"), Ok(MemberRole::Editor)));
-		assert!(matches!(validate_member_role("viewer"), Ok(MemberRole::Viewer)));
+		assert!(validate_member_role("owner").is_ok());
+		assert!(validate_member_role("editor").is_ok());
+		assert!(validate_member_role("viewer").is_ok());
 	}
 
 	#[test]

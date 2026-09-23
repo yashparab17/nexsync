@@ -2,24 +2,10 @@
 
 import * as Y from "yjs";
 import type { P2PMessage } from "./types";
+import { uint8ArrayToBase64 as bytesToBase64, base64ToUint8Array as base64ToBytes } from "@/lib/tauri";
 
 // Sends a message to a single peer
 export type SyncSend = (message: P2PMessage, peerId: string) => void;
-
-function bytesToBase64(bytes: Uint8Array): string {
-	let binary = "";
-	for (let i = 0; i < bytes.length; i += 0x8000) {
-		binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-	}
-	return btoa(binary);
-}
-
-function base64ToBytes(base64: string): Uint8Array {
-	const binary = atob(base64);
-	const bytes = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-	return bytes;
-}
 
 // Keeps one Y.Doc in sync with every connected peer
 export class P2PSyncProvider {

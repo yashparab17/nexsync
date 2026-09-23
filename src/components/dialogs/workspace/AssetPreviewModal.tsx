@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/dialog";
 
 import { readWorkspaceBinaryFile } from "@/lib/tauri";
+import { getMimeType, formatBytes } from "@/lib/utils";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import type { AssetItem } from "@/types/workspace";
 
 interface AssetPreviewModalProps {
@@ -33,60 +35,6 @@ interface AssetPreviewModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	onDownloadLazy?: (asset: AssetItem) => Promise<void>;
-}
-
-// Map file extensions to standard MIME types
-function getMimeType(fileName: string): string {
-	const ext = fileName.split(".").pop()?.toLowerCase() || "";
-	switch (ext) {
-		case "png":
-			return "image/png";
-		case "jpg":
-		case "jpeg":
-			return "image/jpeg";
-		case "gif":
-			return "image/gif";
-		case "webp":
-			return "image/webp";
-		case "svg":
-			return "image/svg+xml";
-		case "bmp":
-			return "image/bmp";
-		case "ico":
-			return "image/x-icon";
-		case "mp4":
-			return "video/mp4";
-		case "webm":
-			return "video/webm";
-		case "mov":
-			return "video/quicktime";
-		case "mp3":
-			return "audio/mpeg";
-		case "wav":
-			return "audio/wav";
-		case "ogg":
-			return "audio/ogg";
-		case "m4a":
-		case "aac":
-			return "audio/aac";
-		case "pdf":
-			return "application/pdf";
-		case "txt":
-			return "text/plain";
-		case "json":
-			return "application/json";
-		default:
-			return "application/octet-stream";
-	}
-}
-
-// Format bytes into human-readable size
-function formatBytes(bytes: number): string {
-	if (bytes === 0) return "0 Bytes";
-	const k = 1024;
-	const sizes = ["Bytes", "KB", "MB", "GB"];
-	const i = Math.floor(Math.log(bytes) / Math.log(k));
-	return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
 export default function AssetPreviewModal({
@@ -99,8 +47,7 @@ export default function AssetPreviewModal({
 	const [dataUrl, setDataUrl] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [copiedMarkdown, setCopiedMarkdown] = useState(false);
-	const [copiedPath, setCopiedPath] = useState(false);
+	const { copiedKey, copy } = useCopyToClipboard();
 	const [dimensions, setDimensions] = useState<{
 		width: number;
 		height: number;
@@ -166,17 +113,9 @@ export default function AssetPreviewModal({
 			`![${asset.name}](${cleanRelPath})`
 		:	`[${asset.name}](${cleanRelPath})`;
 
-	const handleCopyMarkdown = () => {
-		navigator.clipboard.writeText(markdownSnippet);
-		setCopiedMarkdown(true);
-		setTimeout(() => setCopiedMarkdown(false), 2000);
-	};
+	const handleCopyMarkdown = () => copy(markdownSnippet, "markdown");
 
-	const handleCopyPath = () => {
-		navigator.clipboard.writeText(cleanRelPath);
-		setCopiedPath(true);
-		setTimeout(() => setCopiedPath(false), 2000);
-	};
+	const handleCopyPath = () => copy(cleanRelPath, "path");
 
 	const handleDownloadFile = () => {
 		if (!dataUrl) return;
@@ -460,10 +399,10 @@ export default function AssetPreviewModal({
 									onPress={handleCopyMarkdown}
 									className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary"
 								>
-									{copiedMarkdown ?
+									{copiedKey === "markdown" ?
 										<Check className="size-3 text-emerald-400" />
 									:	<Copy className="size-3" />}
-									{copiedMarkdown ? "Copied" : "Copy"}
+									{copiedKey === "markdown" ? "Copied" : "Copy"}
 								</Button>
 							</div>
 							<div className="p-2.5 rounded-md bg-muted/60 border border-border/60 font-mono text-xs break-all select-all text-muted-foreground">
@@ -487,10 +426,10 @@ export default function AssetPreviewModal({
 									onPress={handleCopyPath}
 									className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary"
 								>
-									{copiedPath ?
+									{copiedKey === "path" ?
 										<Check className="size-3 text-emerald-400" />
 									:	<Copy className="size-3" />}
-									{copiedPath ? "Copied" : "Copy"}
+									{copiedKey === "path" ? "Copied" : "Copy"}
 								</Button>
 							</div>
 							<div className="p-2 rounded-md bg-muted/40 font-mono text-xs text-foreground/80 break-all select-all">

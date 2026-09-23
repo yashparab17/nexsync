@@ -3,10 +3,6 @@
 use rusqlite::Connection;
 use rusqlite::Result as SqlResult;
 
-/// Current schema version.
-#[allow(dead_code)]
-pub const SCHEMA_VERSION: usize = 2;
-
 /// Database migration entry
 struct Migration {
 	version: usize,
@@ -203,20 +199,4 @@ pub fn init_schema(conn: &Connection) -> SqlResult<()> {
 	}
 
 	Ok(())
-}
-
-/// Returns the current schema version recorded in the database
-#[allow(dead_code)]
-pub fn current_version(conn: &Connection) -> SqlResult<usize> {
-	let result: SqlResult<i64> = conn.query_row(
-		"SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1",
-		[],
-		|r| r.get(0),
-	);
-
-	match result {
-		Ok(v) => Ok(v as usize),
-		Err(rusqlite::Error::QueryReturnedNoRows) => Ok(0),
-		Err(e) => Err(e),
-	}
 }

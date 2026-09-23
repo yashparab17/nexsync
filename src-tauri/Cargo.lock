@@ -3199,8 +3199,6 @@ dependencies = [
  "data-encoding",
  "dirs 5.0.1",
  "iroh",
- "lazy_static",
- "libc",
  "notify",
  "postcard",
  "rand 0.8.8",

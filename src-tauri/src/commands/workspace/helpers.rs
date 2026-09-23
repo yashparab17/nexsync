@@ -28,20 +28,6 @@ pub(crate) fn get_workspace_id(db: &WorkspaceDb) -> Result<String, String> {
     }
 }
 
-/// Verify that the workspace_id matches the one in the given workspace DB
-#[allow(dead_code)]
-pub(crate) fn verify_workspace_id(db: &WorkspaceDb, workspace_id: &str) -> Result<(), String> {
-    let db_id: String = db
-        .conn
-        .query_row("SELECT id FROM workspace LIMIT 1", [], |r| r.get(0))
-        .map_err(|e| e.to_string())?;
-    if db_id == workspace_id {
-        Ok(())
-    } else {
-        Err("Workspace ID mismatch - operation targets wrong workspace".to_string())
-    }
-}
-
 /// Returns the path to the workspace registry file in the app-data directory
 pub(crate) fn registry_path(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     let app_data = app_handle
@@ -67,40 +53,6 @@ pub(crate) fn ensure_registry(app_handle: &tauri::AppHandle) -> Result<std::path
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     Ok(path)
-}
-
-/// Validates a workspace-relative path for safe filesystem access
-#[allow(dead_code)]
-pub(crate) fn validate_workspace_rel_path(rel_path: &str) -> Result<(), String> {
-    const ALLOWED_ROOTS: &[&str] = &["notes", "files", "assets", "tasks", "kanban", "editor"];
-    validate_workspace_rel_path_with_roots(rel_path, ALLOWED_ROOTS)
-}
-
-/// Validates a workspace-relative path for safe filesystem access with specified roots
-pub(crate) fn validate_workspace_rel_path_with_roots(rel_path: &str, allowed_roots: &[&str]) -> Result<(), String> {
-    let rel_path = rel_path.trim_matches('/');
-    if rel_path.is_empty() || rel_path == "." {
-        return Ok(());
-    }
-    let mut segments = rel_path.split('/');
-    let first = segments.next().unwrap_or("");
-    if !allowed_roots.contains(&first) {
-        return Err(format!("Invalid workspace path: {rel_path}"));
-    }
-    if first.contains('\\') || first.contains(':') {
-        return Err(format!("Invalid path segment: {first}"));
-    }
-    for segment in segments {
-        if segment.is_empty()
-            || segment == "."
-            || segment == ".."
-            || segment.contains('\\')
-            || segment.contains(':')
-        {
-            return Err(format!("Invalid path segment: {segment}"));
-        }
-    }
-    Ok(())
 }
 
 /// Validates a single file or folder name for create and rename operations

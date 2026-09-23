@@ -32,6 +32,8 @@ import { Label } from "@/components/ui/label";
 import AssetPreviewModal from "@/components/dialogs/workspace/AssetPreviewModal";
 import AssetUploadDialog from "@/components/dialogs/workspace/AssetUploadDialog";
 import { useErrorLog } from "@/hooks/useErrorLog";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
+import { formatBytes } from "@/lib/utils";
 import {
 	deleteWorkspaceItem,
 	listWorkspaceFiles,
@@ -65,15 +67,6 @@ function getAssetCategory(fileName: string): AssetCategory {
 	return "other";
 }
 
-// Format bytes into human-readable size
-function formatBytes(bytes: number): string {
-	if (bytes === 0) return "0 Bytes";
-	const k = 1024;
-	const sizes = ["Bytes", "KB", "MB", "GB"];
-	const i = Math.floor(Math.log(bytes) / Math.log(k));
-	return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
-
 export default function WorkspaceAssets() {
 	const { workspace, refreshStats, addActivityEvent } = useWorkspace();
 	const { placeholders, downloadFileOnDemand, lastSyncedFile } = useP2P();
@@ -101,7 +94,7 @@ export default function WorkspaceAssets() {
 
 	// Drag and drop overlay
 	const [isDraggingOver, setIsDraggingOver] = useState(false);
-	const [copiedKey, setCopiedKey] = useState<string | null>(null);
+	const { copiedKey, copy } = useCopyToClipboard(1800);
 
 	// Fetch assets from workspace/assets directory and merge remote placeholders (>10MB)
 	const loadAssets = useCallback(async () => {
@@ -206,9 +199,7 @@ export default function WorkspaceAssets() {
 				`![${asset.name}](${cleanPath})`
 			:	`[${asset.name}](${cleanPath})`;
 
-		navigator.clipboard.writeText(snippet);
-		setCopiedKey(asset.name);
-		setTimeout(() => setCopiedKey(null), 1800);
+		copy(snippet, asset.name);
 	};
 
 	// Rename item

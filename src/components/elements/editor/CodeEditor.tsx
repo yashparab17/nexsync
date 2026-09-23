@@ -8,7 +8,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { rust } from "@codemirror/lang-rust";
 import { oneDark } from "@codemirror/theme-one-dark";
 
-import { useTheme } from "@/hooks/useTheme";
+import { useThemeContext } from "@/store/ThemeContext";
 
 interface CodeEditorProps {
 	value: string;
@@ -59,7 +59,7 @@ export default function CodeEditor({
 	readOnly = false,
 	minHeight = "400px",
 }: CodeEditorProps) {
-	const { isDark } = useTheme();
+	const { isDark } = useThemeContext();
 
 	// Configure syntax highlighting extensions based on filename
 	const extensions = useMemo(() => {

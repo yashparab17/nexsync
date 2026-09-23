@@ -9,11 +9,8 @@ pub fn db_path(workspace_path: &Path) -> std::path::PathBuf {
 }
 
 /// A connection scoped to a single workspace database
-#[allow(dead_code)]
 pub struct WorkspaceDb {
 	pub conn: Connection,
-	/// Absolute path to the workspace root directory.
-	pub workspace_path: std::path::PathBuf,
 }
 
 impl WorkspaceDb {
@@ -45,10 +42,7 @@ impl WorkspaceDb {
 		)
 		.map_err(|e| e.to_string())?;
 
-		let db = Self {
-			conn,
-			workspace_path: workspace.to_path_buf(),
-		};
+		let db = Self { conn };
 
 		// Initialise tables if they don't exist yet
 		crate::database::schema::init_schema(&db.conn).map_err(|e| e.to_string())?;
@@ -78,10 +72,7 @@ impl WorkspaceDb {
 		)
 		.map_err(|e| e.to_string())?;
 
-		let db = Self {
-			conn,
-			workspace_path: workspace.to_path_buf(),
-		};
+		let db = Self { conn };
 
 		// Ensure schema is up to date
 		crate::database::schema::init_schema(&db.conn).map_err(|e| e.to_string())?;

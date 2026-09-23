@@ -5,46 +5,15 @@ import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 
-import { useTheme } from "@/hooks/useTheme";
+import { useThemeContext } from "@/store/ThemeContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { readWorkspaceBinaryFile, writeWorkspaceBinaryFile } from "@/lib/tauri";
+import { getMimeType } from "@/lib/utils";
 
 interface BlockNoteEditorProps {
 	initialMarkdown: string;
 	onChange: (markdown: string) => void;
 	readOnly?: boolean;
-}
-
-// Map file extension to image/media MIME type
-function getMimeType(fileName: string): string {
-	const ext = fileName.split(".").pop()?.toLowerCase() || "png";
-	switch (ext) {
-		case "svg":
-			return "image/svg+xml";
-		case "jpg":
-		case "jpeg":
-			return "image/jpeg";
-		case "gif":
-			return "image/gif";
-		case "webp":
-			return "image/webp";
-		case "bmp":
-			return "image/bmp";
-		case "ico":
-			return "image/x-icon";
-		case "mp4":
-			return "video/mp4";
-		case "webm":
-			return "video/webm";
-		case "mp3":
-			return "audio/mpeg";
-		case "wav":
-			return "audio/wav";
-		case "pdf":
-			return "application/pdf";
-		default:
-			return "image/png";
-	}
 }
 
 // Rich-text Markdown block editor powered by BlockNote
@@ -53,7 +22,7 @@ export default function BlockNoteEditor({
 	onChange,
 	readOnly = false,
 }: BlockNoteEditorProps) {
-	const { isDark } = useTheme();
+	const { isDark } = useThemeContext();
 	const { workspace } = useWorkspace();
 	const workspacePath = workspace?.path;
 
@@ -89,7 +58,7 @@ export default function BlockNoteEditor({
 					workspacePath,
 					cleanRelPath,
 				);
-				const mime = getMimeType(cleanRelPath);
+				const mime = getMimeType(cleanRelPath, "image/png");
 				const dataUrl = `data:${mime};base64,${base64}`;
 				urlCacheRef.current.set(url, dataUrl);
 				return dataUrl;
@@ -124,7 +93,7 @@ export default function BlockNoteEditor({
 					base64Data,
 				);
 				const relUrl = `assets/${sanitizedName}`;
-				const mime = file.type || getMimeType(sanitizedName);
+				const mime = file.type || getMimeType(sanitizedName, "image/png");
 				urlCacheRef.current.set(relUrl, `data:${mime};base64,${base64Data}`);
 				return relUrl;
 			} catch (err) {

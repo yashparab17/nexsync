@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { FolderOpen, FolderPlus, Settings, UsersRound } from "lucide-react";
 
 // Hooks
-import { useTheme } from "@/hooks/useTheme";
+import { useThemeContext } from "@/store/ThemeContext";
 import { useErrorLog } from "@/hooks/useErrorLog";
 
 // Components
@@ -43,7 +43,7 @@ import logo_white from "@/assets/logos/logo-white.svg";
 // Welcome landing page with recent workspaces and quick actions
 export default function Welcome() {
 	// Hooks
-	const { isDark } = useTheme();
+	const { isDark } = useThemeContext();
 	const navigate = useNavigate();
 
 	// Workspace state & logging

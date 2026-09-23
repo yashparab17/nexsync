@@ -26,15 +26,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useP2P, describeSyncProgress } from "@/store/p2p/P2PContext";
 import type { InviteInfo } from "@/lib/p2p";
-import { cn } from "@/lib/utils";
+import { cn, errorText } from "@/lib/utils";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 
 interface P2PConnectDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }
-
-const errorText = (err: unknown, fallback: string) =>
-	err instanceof Error ? err.message : typeof err === "string" ? err : fallback;
 
 // Dialog for hosting, joining and managing P2P collaboration sessions
 export default function P2PConnectDialog({
@@ -58,7 +56,7 @@ export default function P2PConnectDialog({
 	const [hostRole, setHostRole] = useState("Editor");
 	const [invite, setInvite] = useState<InviteInfo | null>(null);
 	const [isGenerating, setIsGenerating] = useState(false);
-	const [copied, setCopied] = useState(false);
+	const { copiedKey, copy } = useCopyToClipboard();
 
 	// Join flow state
 	const [ticketInput, setTicketInput] = useState("");
@@ -109,12 +107,6 @@ export default function P2PConnectDialog({
 		} finally {
 			setIsJoining(false);
 		}
-	};
-
-	const handleCopy = async (text: string) => {
-		await navigator.clipboard.writeText(text);
-		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
 	};
 
 	const tabClass = (tab: typeof activeTab) =>
@@ -241,10 +233,10 @@ export default function P2PConnectDialog({
 									<Button
 										size="sm"
 										variant="secondary"
-										onPress={() => handleCopy(invite.ticket)}
+										onPress={() => copy(invite.ticket)}
 										className="h-8 px-3 text-xs gap-1.5"
 									>
-										{copied ? (
+										{copiedKey === "copied" ? (
 											<>
 												<Check className="h-4 w-4 text-emerald-400" />
 												Copied

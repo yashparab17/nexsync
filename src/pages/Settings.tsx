@@ -25,13 +25,13 @@ import {
 import { Input } from "@/components/ui/input";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
-import { useTheme } from "@/hooks/useTheme";
+import { useThemeContext } from "@/store/ThemeContext";
 import { loadConfig, saveConfig } from "@/lib/tauri";
 import type { NexsyncConfig } from "@/types/workspace";
 
 export default function Settings() {
 	const navigate = useNavigate();
-	const { isDark } = useTheme();
+	const { isDark } = useThemeContext();
 	const logError = useErrorLog();
 
 	const [config, setConfig] = useState<NexsyncConfig>({

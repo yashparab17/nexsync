@@ -27,6 +27,7 @@ import {
 import { open } from "@tauri-apps/plugin-dialog";
 import { documentDir } from "@tauri-apps/api/path";
 import { createWorkspace, importWorkspace } from "@/lib/tauri";
+import { errorText } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
 
@@ -127,13 +128,7 @@ export default function JoinWorkspaceDialog({
 			}, 600);
 		} catch (err: unknown) {
 			console.error("Join workspace failed:", err);
-			setError(
-				err instanceof Error
-					? err.message
-					: typeof err === "string"
-						? err
-						: "Failed to join workspace. Ensure host is online.",
-			);
+			setError(errorText(err, "Failed to join workspace. Ensure host is online."));
 			setStatusMessage(null);
 		} finally {
 			setIsProcessing(false);
