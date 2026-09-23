@@ -37,6 +37,8 @@ tokio = { version = "1", features = ["rt", "sync", "time", "macros", "fs", "io-u
 data-encoding = "2"
 subtle = "2"
 postcard = { version = "1", default-features = false, features = ["use-std"] }
+notify = "8"
+blake3 = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

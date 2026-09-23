@@ -8,6 +8,7 @@
 
 mod files;
 mod node;
+mod sync;
 mod ticket;
 mod wire;
 
@@ -18,9 +19,9 @@ pub use node::P2pState;
 use node::{InviteInfo, JoinResult, PeerInfo};
 use files::ShareableFile;
 
-/// Sets (or clears) the workspace folder that connected peers may read files from
+/// Sets (or clears) the workspace folder shared with peers and kept in live sync
 #[tauri::command]
-pub fn p2p_set_workspace(
+pub async fn p2p_set_workspace(
     app: AppHandle,
     state: State<'_, P2pState>,
     workspace_path: Option<String>,
@@ -28,7 +29,7 @@ pub fn p2p_set_workspace(
     if let Some(path) = &workspace_path {
         validate_allowed_root(&app, path)?;
     }
-    state.set_workspace_path(workspace_path);
+    state.set_workspace_path(workspace_path).await;
     Ok(())
 }
 

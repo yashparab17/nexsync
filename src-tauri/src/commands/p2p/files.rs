@@ -50,7 +50,7 @@ struct FileProgress<'a> {
 }
 
 /// Validates a peer-supplied path: must name a non-hidden file inside a synced folder
-fn check_rel_path(rel_path: &str) -> Result<String, String> {
+pub(super) fn check_rel_path(rel_path: &str) -> Result<String, String> {
     let trimmed = rel_path.trim().trim_start_matches('/');
     let invalid = || format!("Invalid file path: {rel_path}");
 

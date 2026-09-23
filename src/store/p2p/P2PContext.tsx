@@ -61,11 +61,18 @@ export function describeSyncProgress(progress: SyncProgress): string {
 	return `Downloading file ${filesDone + 1} of ${filesTotal}: ${currentFile}${percent}`;
 }
 
+// Last file a collaborator changed; `version` changes on every update so pages can reload
+export interface SyncedFile {
+	relPath: string; // Empty after a full workspace sync
+	version: number;
+}
+
 interface P2PContextType {
 	peers: ConnectedPeerInfo[];
 	connectionStatus: "offline" | "connecting" | "connected";
 	placeholders: PlaceholderItem[];
 	syncProgress: SyncProgress | null;
+	lastSyncedFile: SyncedFile | null;
 	createInvite: (role?: string) => Promise<InviteInfo>;
 	revokeInvite: () => Promise<void>;
 	joinWithTicket: (ticket: string, displayName?: string) => Promise<JoinResult>;
@@ -86,7 +93,14 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const [peers, setPeers] = useState<ConnectedPeerInfo[]>([]);
 	const [placeholders, setPlaceholders] = useState<PlaceholderItem[]>([]);
 	const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+	const [lastSyncedFile, setLastSyncedFile] = useState<SyncedFile | null>(null);
 	const [isJoining, setIsJoining] = useState(false);
+	const syncVersionRef = useRef(0);
+
+	const markSynced = useCallback((relPath: string) => {
+		syncVersionRef.current += 1;
+		setLastSyncedFile({ relPath, version: syncVersionRef.current });
+	}, []);
 
 	const workspaceRef = useRef(workspace);
 	workspaceRef.current = workspace;
@@ -258,6 +272,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 					...lazy,
 				]);
 				await refreshMetadataRef.current(path);
+				markSynced("");
 				if (failed > 0) {
 					console.warn(`[P2P] Workspace synced with ${failed} file(s) missing.`);
 				}
@@ -267,7 +282,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				setSyncProgress(null);
 			}
 		},
-		[],
+		[markSynced],
 	);
 
 	// Handle an incoming app message from a peer
@@ -347,6 +362,29 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			void handleMessageRef.current(peerId, message);
 		});
 	}, []);
+
+	// Live file sync: surface collaborators' changes and large files that need a manual download
+	useEffect(() => {
+		let statsTimer: ReturnType<typeof setTimeout> | undefined;
+		const offChanged = p2p.onFilesChanged(({ relPath }) => {
+			setPlaceholders((prev) => prev.filter((p) => p.relPath !== relPath));
+			markSynced(relPath);
+			// Refresh dashboard counts once a burst of changes settles
+			clearTimeout(statsTimer);
+			statsTimer = setTimeout(() => void refreshMetadataRef.current(), 1000);
+		});
+		const offRemote = p2p.onRemoteFile(({ peerId, relPath, size }) => {
+			setPlaceholders((prev) => [
+				...prev.filter((p) => p.relPath !== relPath),
+				{ relPath, name: relPath.split("/").pop() || relPath, size, peerId },
+			]);
+		});
+		return () => {
+			clearTimeout(statsTimer);
+			offChanged();
+			offRemote();
+		};
+	}, [markSynced]);
 
 	// Attach byte progress to the file currently being synced
 	useEffect(() => {
@@ -447,6 +485,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				connectionStatus,
 				placeholders,
 				syncProgress,
+				lastSyncedFile,
 				createInvite,
 				revokeInvite,
 				joinWithTicket,

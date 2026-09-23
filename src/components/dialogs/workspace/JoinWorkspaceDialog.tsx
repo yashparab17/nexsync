@@ -97,15 +97,16 @@ export default function JoinWorkspaceDialog({
 
 			// 2. Determine target workspace path
 			const sanitizedName = (workspaceName || "synced-workspace").replace(/[^\w\s-]/gi, "");
-			const targetPath = `${workspaceParentPath.replace(/\\/g, "/")}/${sanitizedName}`;
+			const parentPath = workspaceParentPath.replace(/\\/g, "/");
+			const targetPath = `${parentPath}/${sanitizedName}`;
 
-			// 3. Create or import local workspace clone on disk
+			// 3. Create or import local workspace clone on disk (create_workspace appends the name itself)
 			let wsInfo;
 			try {
 				wsInfo = await createWorkspace({
-					name: workspaceName,
+					name: sanitizedName,
 					description: `Collaborative P2P workspace synced with host`,
-					path: targetPath,
+					path: parentPath,
 				});
 			} catch {
 				// If directory already exists, import it
@@ -126,7 +127,13 @@ export default function JoinWorkspaceDialog({
 			}, 600);
 		} catch (err: unknown) {
 			console.error("Join workspace failed:", err);
-			setError(err instanceof Error ? err.message : "Failed to join workspace. Ensure host is online.");
+			setError(
+				err instanceof Error
+					? err.message
+					: typeof err === "string"
+						? err
+						: "Failed to join workspace. Ensure host is online.",
+			);
 			setStatusMessage(null);
 		} finally {
 			setIsProcessing(false);

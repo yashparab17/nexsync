@@ -95,9 +95,11 @@ export default function WorkspaceSettings() {
 
 	const handleRemoveWorkspace = async () => {
 		if (!workspace?.id) return;
+		const workspaceId = workspace.id;
 		try {
-			await removeRecentWorkspace(workspace.id);
+			// Close first: clearWorkspace saves the workspace, which re-adds it to the recent list
 			await clearWorkspace();
+			await removeRecentWorkspace(workspaceId);
 			navigate("/");
 		} catch (err) {
 			console.error("Failed to remove workspace:", err);

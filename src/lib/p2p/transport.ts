@@ -119,3 +119,17 @@ export const onMessage = (handler: (event: IncomingMessage) => void) =>
 
 export const onFileProgress = (handler: (event: FileProgress) => void) =>
 	subscribe<FileProgress>("p2p://file-progress", handler);
+
+// A collaborator's change was written to (or trashed from) the shared workspace
+export const onFilesChanged = (handler: (event: { relPath: string }) => void) =>
+	subscribe<{ relPath: string }>("p2p://files-changed", handler);
+
+export interface RemoteFileEvent {
+	peerId: string;
+	relPath: string;
+	size: number;
+}
+
+// A collaborator changed a file too large to download automatically
+export const onRemoteFile = (handler: (event: RemoteFileEvent) => void) =>
+	subscribe<RemoteFileEvent>("p2p://remote-file", handler);

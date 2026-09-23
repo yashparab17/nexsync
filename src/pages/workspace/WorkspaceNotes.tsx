@@ -29,6 +29,7 @@ import {
 } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { useP2P } from "@/store/p2p/P2PContext";
 import type { WorkspaceFile } from "@/types/workspace";
 
 // Filtered Notes workspace view managing .md documents with rich BlockNote and CodeMirror editing
@@ -116,6 +117,23 @@ export default function WorkspaceNotes() {
 
 		fetchContent();
 	}, [workspace?.path, selectedNote, logError]);
+
+	// Reload the list, and the open note, when a collaborator's changes arrive
+	const { lastSyncedFile } = useP2P();
+	const [remoteRevision, setRemoteRevision] = useState(0);
+	useEffect(() => {
+		if (!lastSyncedFile || !workspace?.path) return;
+		void loadNotes();
+		const openPath = selectedNote?.path.replace(/^\/+/, "");
+		if (openPath && (lastSyncedFile.relPath === openPath || lastSyncedFile.relPath === "")) {
+			readWorkspaceFile(workspace.path, openPath)
+				.then((text) => {
+					setNoteContent(text);
+					setRemoteRevision((r) => r + 1);
+				})
+				.catch(() => {});
+		}
+	}, [lastSyncedFile]);
 
 	// Save note content to OS disk
 	const handleSaveNote = async (newText: string) => {
@@ -329,7 +347,7 @@ export default function WorkspaceNotes() {
 					</div>
 				) : (
 					<EditorContainer
-						key={selectedNote.path}
+						key={`${selectedNote.path}#${remoteRevision}`}
 						fileName={selectedNote.name}
 						initialContent={noteContent}
 						onSave={handleSaveNote}

@@ -76,7 +76,7 @@ function formatBytes(bytes: number): string {
 
 export default function WorkspaceAssets() {
 	const { workspace, refreshStats, addActivityEvent } = useWorkspace();
-	const { placeholders, downloadFileOnDemand } = useP2P();
+	const { placeholders, downloadFileOnDemand, lastSyncedFile } = useP2P();
 	const logError = useErrorLog();
 
 	// State
@@ -166,6 +166,11 @@ export default function WorkspaceAssets() {
 	useEffect(() => {
 		loadAssets();
 	}, [loadAssets]);
+
+	// Reload when a collaborator's changes arrive
+	useEffect(() => {
+		if (lastSyncedFile) void loadAssets();
+	}, [lastSyncedFile]);
 
 	// Filtered assets
 	const filteredAssets = useMemo(() => {

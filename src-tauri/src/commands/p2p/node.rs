@@ -25,6 +25,7 @@ use tokio::{
 
 use super::{
     files,
+    sync::{self, LiveSync, SyncMessage},
     ticket::{self, Ticket, SECRET_LEN},
     wire::{self, HandshakeReply, Hello},
 };
@@ -82,9 +83,12 @@ impl P2pState {
         self.node.lock().await.clone()
     }
 
-    /// Sets the workspace served to peers; takes effect without starting the network
-    pub fn set_workspace_path(&self, path: Option<String>) {
-        *self.workspace.lock().unwrap_or_else(|p| p.into_inner()) = path;
+    /// Sets the workspace shared with peers; takes effect without starting the network
+    pub async fn set_workspace_path(&self, path: Option<String>) {
+        *self.workspace.lock().unwrap_or_else(|p| p.into_inner()) = path.clone();
+        if let Some(node) = self.existing().await {
+            node.sync.watch(path.as_deref());
+        }
     }
 }
 
@@ -164,11 +168,12 @@ pub struct Node {
     endpoint: Endpoint,
     events: EventSink,
     workspace: SharedWorkspace,
+    sync: LiveSync,
     state: Mutex<NodeState>,
 }
 
 impl Node {
-    /// Binds the Iroh endpoint and spawns the accept and stats loops
+    /// Binds the Iroh endpoint and spawns the accept, stats and live-sync loops
     async fn start(events: EventSink, workspace: SharedWorkspace) -> Result<Arc<Self>, String> {
         let endpoint = Endpoint::builder(presets::N0)
             .alpns(vec![wire::ALPN.to_vec()])
@@ -176,16 +181,37 @@ impl Node {
             .await
             .map_err(|e| format!("Failed to start the P2P network: {e}"))?;
 
+        let (live_sync, local_changes) = LiveSync::new();
         let node = Arc::new(Self {
             endpoint,
             events,
             workspace,
+            sync: live_sync,
             state: Mutex::new(NodeState::default()),
         });
 
         tokio::spawn(node.clone().accept_loop());
         tokio::spawn(node.clone().stats_loop());
+        tokio::spawn(sync::run_local_changes(node.clone(), local_changes));
+        node.sync.watch(node.workspace_path().as_deref());
         Ok(node)
+    }
+
+    pub fn sync(&self) -> &LiveSync {
+        &self.sync
+    }
+
+    pub fn has_peers(&self) -> bool {
+        !self.lock().peers.is_empty()
+    }
+
+    /// Hosts accept file changes from Editor guests only; guests always accept the host's
+    pub fn peer_may_write(&self, peer_id: &str) -> bool {
+        let Ok(id) = parse_peer_id(peer_id) else { return false };
+        self.lock()
+            .peers
+            .get(&id)
+            .is_some_and(|p| p.is_host || p.role != "Viewer")
     }
 
     /// Emits a frontend event; payloads are plain structs, so serialization cannot fail
@@ -475,7 +501,7 @@ impl Node {
         self.remove_peer(&id, conn.stable_id());
     }
 
-    fn dispatch_message(&self, from: &EndpointId, bytes: &[u8]) {
+    fn dispatch_message(self: &Arc<Self>, from: &EndpointId, bytes: &[u8]) {
         let message: serde_json::Value = match serde_json::from_slice(bytes) {
             Ok(value) => value,
             Err(_) => {
@@ -483,8 +509,19 @@ impl Node {
                 return;
             }
         };
-        if !message.get("kind").is_some_and(|k| k.is_string()) {
+        let Some(kind) = message.get("kind").and_then(|k| k.as_str()) else {
             eprintln!("[P2P] Dropping message without a kind from {}", from.fmt_short());
+            return;
+        };
+
+        // File sync is handled entirely in the backend
+        if SyncMessage::is_sync_kind(kind) {
+            match serde_json::from_value::<SyncMessage>(message) {
+                Ok(sync_message) => {
+                    tokio::spawn(sync::handle_remote(self.clone(), from.to_string(), sync_message));
+                }
+                Err(_) => eprintln!("[P2P] Dropping malformed file sync message from {}", from.fmt_short()),
+            }
             return;
         }
         self.emit(
@@ -781,6 +818,74 @@ mod tests {
         let left = next_event(&mut host.events, EVENT_PEER_LEFT).await;
         assert_eq!(left["peerId"], guest_id.as_str());
         assert!(host.node.peers().is_empty());
+    }
+
+    // Polls until `check` passes, panicking with `what` after 15 seconds
+    async fn wait_until(what: &str, check: impl Fn() -> bool) {
+        for _ in 0..150 {
+            if check() {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        panic!("timed out waiting until {what}");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_live_file_sync() {
+        let host = start_test_node("sync_host").await;
+        let editor = start_test_node("sync_editor").await;
+        let viewer = start_test_node("sync_viewer").await;
+
+        let editor_invite = host
+            .node
+            .create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into())
+            .await
+            .unwrap();
+        editor.node.join(&editor_invite.ticket, "Ed").await.unwrap();
+        let viewer_invite = host
+            .node
+            .create_invite("Viewer".into(), "ws".into(), "Demo".into(), "Host".into())
+            .await
+            .unwrap();
+        viewer.node.join(&viewer_invite.ticket, "Vi").await.unwrap();
+        wait_until("both guests are connected", || host.node.peers().len() == 2).await;
+
+        // Host creates a nested note after both guests joined
+        std::fs::create_dir_all(host.dir.join("notes").join("live")).unwrap();
+        std::fs::write(host.dir.join("notes").join("live").join("new.md"), "from host").unwrap();
+        let editor_copy = editor.dir.join("notes").join("live").join("new.md");
+        let viewer_copy = viewer.dir.join("notes").join("live").join("new.md");
+        wait_until("guests receive the host's note", || {
+            std::fs::read_to_string(&editor_copy).ok().as_deref() == Some("from host")
+                && std::fs::read_to_string(&viewer_copy).ok().as_deref() == Some("from host")
+        })
+        .await;
+
+        // An Editor guest's edit reaches the host and, through it, the other guest
+        std::fs::write(&editor_copy, "edited by editor").unwrap();
+        let host_copy = host.dir.join("notes").join("live").join("new.md");
+        wait_until("the editor's edit reaches everyone", || {
+            std::fs::read_to_string(&host_copy).ok().as_deref() == Some("edited by editor")
+                && std::fs::read_to_string(&viewer_copy).ok().as_deref() == Some("edited by editor")
+        })
+        .await;
+
+        // A Viewer guest's local edit is ignored by the host
+        std::fs::write(viewer.dir.join("notes").join("viewer.md"), "should not sync").unwrap();
+        tokio::time::sleep(Duration::from_secs(3)).await;
+        assert!(!host.dir.join("notes").join("viewer.md").exists());
+
+        // Deleting on the editor moves the host's copy into the trash instead of destroying it
+        std::fs::remove_file(&editor_copy).unwrap();
+        wait_until("the deletion reaches the host", || !host_copy.exists()).await;
+        let trash = host.dir.join(".nexsync").join("trash");
+        let trashed = std::fs::read_dir(&trash)
+            .unwrap()
+            .flatten()
+            .any(|stamp| stamp.path().join("notes").join("live").join("new.md").exists());
+        assert!(trashed, "deleted file should be recoverable from .nexsync/trash");
     }
 
     #[test]

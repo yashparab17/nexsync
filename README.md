@@ -13,7 +13,7 @@ Built with [Tauri 2](https://tauri.app) (Rust) + React 19 + TypeScript, with pee
 - **P2P collaboration:**
     - Invite a collaborator with a single copy-pasteable ticket.
     - Connects across NATs and firewalls, with end-to-end encryption.
-    - The guest gets a full copy of the workspace, and activity syncs live.
+    - The guest gets a full copy of the workspace; after that, notes and files sync live in both directions.
 
 ## How peer-to-peer works
 
@@ -23,6 +23,7 @@ All networking runs in the Rust backend (`src-tauri/src/commands/p2p/`). The Rea
 - **Connectivity:** Iroh first tries to punch a direct UDP path between the two devices. If that's impossible (strict NAT, carrier-grade NAT, mobile hotspot, campus network), traffic goes through an **encrypted relay**. The relay only forwards encrypted bytes. The UI shows whether each peer is **Direct** or **Relayed**.
 - **Encryption:** every connection is QUIC with TLS 1.3, authenticated by the peers' keys.
 - **Invites:** a ticket (`nexsync…`) contains the host's key, home relay, a few IP hints and a random 128-bit secret. The guest proves it has the ticket by sending the secret _inside_ the encrypted connection. Creating a new invite or pressing **Stop** invalidates the previous ticket.
+- **Live file sync:** each app watches its open workspace. When a file changes, peers are told its path, size and content hash, and download it only if their copy differs. Deleted files are moved to `.nexsync/trash/` on the other side rather than destroyed. The host re-announces what it receives, so every guest stays in sync.
 
 ```mermaid
 sequenceDiagram
@@ -39,7 +40,7 @@ sequenceDiagram
         G->>H: file stream request
         H->>G: raw bytes, disk to disk
     end
-    Note over G,H: activity events + Yjs updates over the control stream
+    Note over G,H: live FILE_CHANGED / FILE_DELETED, activity events and Yjs updates over the control stream
 ```
 
 Files larger than 10 MB are not copied during the initial sync. They show up as **Remote** placeholders in Assets and download when you open them.
@@ -99,16 +100,20 @@ If you already have the synced workspace open, use **P2P Sync → Join with Invi
 ## Security model
 
 - Only someone holding a current invite can join, and each invite secret is 128 bits of randomness checked in constant time.
-- Peers can read only files inside `notes/`, `files/`, `assets/` and `editor/` of the workspace that is currently open. Hidden files and the `.Nexsync/` database are never served, and every path is checked against traversal.
+- Peers can read only files inside `notes/`, `files/`, `assets/` and `editor/` of the workspace that is currently open. Hidden files and the `.nexsync/` database are never served, and every path is checked against traversal.
 - Closing or switching workspaces disconnects all peers and revokes the invite.
 - A guest applies a workspace snapshot only if it asked for one, so a peer can't push changes into your workspace unprompted.
+- A host ignores live file changes from guests invited as **Viewer**.
+- Files deleted by a collaborator are moved into your workspace's `.nexsync/trash/` folder, so a mistake on their side can be undone on yours.
 - Relays and discovery use n0's public infrastructure. They can see that two endpoint keys are talking, but not what they say.
 
 ## Current limitations
 
 - **Star topology:** guests talk to the host, not to each other, so one guest's changes don't reach another guest yet.
-- **Roles are informational:** the `Viewer` role is shown but not yet enforced on incoming changes.
-- **Pull overwrites:** re-syncing from the host overwrites local copies of files ≤ 10 MB rather than merging edits.
+- **Roles are only partly enforced:** Viewers can't push file changes, but tasks, kanban and metadata changes aren't role-checked yet.
+- **Last writer wins:** if two people edit the same file at the same moment, the later save replaces the other; an open note reloads when a collaborator's edit arrives. Re-pulling from the host also overwrites local copies of files ≤ 10 MB.
+- **Offline changes aren't reconciled:** edits made while disconnected sync only when the file changes again, or via **Pull from Host**.
+- **Trash isn't emptied automatically:** clear `.nexsync/trash/` yourself if it grows.
 - **No live co-editing in the editors yet:** the Yjs sync provider (`createSyncProvider`) exists but isn't wired into BlockNote/CodeMirror.
 - **Public relays:** n0's public relays are meant for development and light use. A production deployment should run its own [iroh-relay](https://github.com/n0-computer/iroh).
 

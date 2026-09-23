@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { useP2P } from "@/store/p2p/P2PContext";
 
 // Hooks
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -158,6 +159,12 @@ export default function WorkspaceFiles() {
 	useEffect(() => {
 		void loadEntries();
 	}, [loadEntries]);
+
+	// Reload the listing when a collaborator's changes arrive
+	const { lastSyncedFile } = useP2P();
+	useEffect(() => {
+		if (lastSyncedFile) void loadEntries();
+	}, [lastSyncedFile]);
 
 	// Navigate into a sub-directory
 	const navigateToDir = useCallback((dir: string) => {
