@@ -18,7 +18,3 @@ Most collaborative tools ask you to hand your files to someone else's server. Ne
 ## Built with
 
 Tauri 2 (Rust) + React 19 + TypeScript on the frontend, Iroh for P2P networking, Yjs for CRDT sync, SQLite for structured data.
-
-## Status
-
-Actively developed. See [README.md](README.md) for setup and usage, and `IMPLEMENTATION_PLAN.md` (local, gitignored) for the detailed build log and roadmap.
