@@ -2,15 +2,13 @@
 // Handles automatic debounced synchronization between in-memory Y.Doc instances and local SQLite database
 
 import * as Y from "yjs";
-import { getYjsDoc, saveYjsDoc, deleteYjsDoc } from "@/lib/tauri";
+import { getYjsDoc, saveYjsDoc } from "@/lib/tauri";
 
 export interface SqlitePersistenceOptions {
 	// Debounce interval in milliseconds before persisting updates to SQLite (default: 500ms)
 	debounceMs?: number;
 }
 
-export type PersistenceStatus = "loading" | "synced" | "saving" | "error" | "destroyed";
-type StatusListener = (status: PersistenceStatus) => void;
 type SyncedListener = () => void;
 
 // Custom Yjs persistence provider backing documents to SQLite via Tauri IPC
@@ -23,8 +21,6 @@ export class SqlitePersistenceProvider {
 
 	private readonly debounceMs: number;
 	private saveTimeout: ReturnType<typeof setTimeout> | null = null;
-	private status: PersistenceStatus = "loading";
-	private statusListeners: Set<StatusListener> = new Set();
 	private syncedListeners: Set<SyncedListener> = new Set();
 	private pendingSavePromise: Promise<void> | null = null;
 	public readonly whenSynced: Promise<void>;
@@ -51,7 +47,6 @@ export class SqlitePersistenceProvider {
 	private async loadInitialDoc(): Promise<void> {
 		if (this.destroyed) return;
 
-		this.setStatus("loading");
 		try {
 			const binaryState = await getYjsDoc(this.workspacePath, this.docId);
 
@@ -62,7 +57,6 @@ export class SqlitePersistenceProvider {
 
 			if (!this.destroyed) {
 				this.synced = true;
-				this.setStatus("synced");
 				this.syncedListeners.forEach((listener) => {
 					try {
 						listener();
@@ -73,9 +67,6 @@ export class SqlitePersistenceProvider {
 			}
 		} catch (error) {
 			console.error(`[SqlitePersistenceProvider] Failed to load doc "${this.docId}":`, error);
-			if (!this.destroyed) {
-				this.setStatus("error");
-			}
 		}
 	}
 
@@ -118,20 +109,12 @@ export class SqlitePersistenceProvider {
 			return this.pendingSavePromise;
 		}
 
-		this.setStatus("saving");
-
 		this.pendingSavePromise = (async () => {
 			try {
 				const state = Y.encodeStateAsUpdate(this.doc);
 				await saveYjsDoc(this.workspacePath, this.docId, state);
-				if (!this.destroyed) {
-					this.setStatus("synced");
-				}
 			} catch (error) {
 				console.error(`[SqlitePersistenceProvider] Failed to persist doc "${this.docId}":`, error);
-				if (!this.destroyed) {
-					this.setStatus("error");
-				}
 				throw error;
 			} finally {
 				this.pendingSavePromise = null;
@@ -139,24 +122,6 @@ export class SqlitePersistenceProvider {
 		})();
 
 		return this.pendingSavePromise;
-	}
-
-	// Flushes any scheduled debounced save immediately
-	public async flush(): Promise<void> {
-		if (this.saveTimeout !== null) {
-			await this.saveNow();
-		} else if (this.pendingSavePromise) {
-			await this.pendingSavePromise;
-		}
-	}
-
-	// Deletes the binary document snapshot from SQLite
-	public async clear(): Promise<void> {
-		if (this.saveTimeout !== null) {
-			clearTimeout(this.saveTimeout);
-			this.saveTimeout = null;
-		}
-		await deleteYjsDoc(this.workspacePath, this.docId);
 	}
 
 	// Unbinds listeners, flushes pending state, and destroys provider instance
@@ -178,23 +143,7 @@ export class SqlitePersistenceProvider {
 			}
 		}
 
-		this.statusListeners.clear();
 		this.syncedListeners.clear();
-		this.setStatus("destroyed");
-	}
-
-	// Returns the current sync status
-	public getStatus(): PersistenceStatus {
-		return this.status;
-	}
-
-	// Subscribes to status changes (loading, synced, saving, error, destroyed)
-	public onStatusChange(listener: StatusListener): () => void {
-		this.statusListeners.add(listener);
-		listener(this.status);
-		return () => {
-			this.statusListeners.delete(listener);
-		};
 	}
 
 	// Subscribes to initial sync completion
@@ -207,17 +156,5 @@ export class SqlitePersistenceProvider {
 		return () => {
 			this.syncedListeners.delete(listener);
 		};
-	}
-
-	// Updates internal status and alerts subscribers
-	private setStatus(status: PersistenceStatus) {
-		this.status = status;
-		this.statusListeners.forEach((listener) => {
-			try {
-				listener(status);
-			} catch (err) {
-				console.error("[SqlitePersistenceProvider] Error in status listener:", err);
-			}
-		});
 	}
 }

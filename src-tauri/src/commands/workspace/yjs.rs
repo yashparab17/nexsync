@@ -2,7 +2,6 @@
 
 use base64::prelude::*;
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
 
 use crate::commands::config::validate_allowed_root;
 use crate::database::WorkspaceDb;
@@ -10,14 +9,6 @@ use super::helpers::get_workspace_id;
 
 /// Maximum allowed binary state snapshot size (25 MB)
 const MAX_YJS_DOC_SIZE: usize = 25 * 1024 * 1024;
-
-/// Summary metadata for a persisted Yjs document snapshot
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct YjsDocSummary {
-	pub doc_id: String,
-	pub updated_at: String,
-	pub size_bytes: usize,
-}
 
 // ────────────────────────────
 // Tauri commands — Yjs Persistence
@@ -93,6 +84,41 @@ pub fn save_yjs_doc(
 	Ok(())
 }
 
+/// Moves a document's binary CRDT state to a new doc id, so a file rename doesn't strand its
+/// live collaboration state under the old path. A no-op if nothing was stored under `old_doc_id`;
+/// replaces any state already stored under `new_doc_id` (renaming onto an existing file's id).
+#[tauri::command]
+pub fn rename_yjs_doc(
+	app_handle: tauri::AppHandle,
+	workspace_path: String,
+	old_doc_id: String,
+	new_doc_id: String,
+) -> Result<(), String> {
+	validate_allowed_root(&app_handle, &workspace_path)?;
+
+	if new_doc_id.is_empty() || new_doc_id.len() > 512 {
+		return Err("Invalid document ID.".to_string());
+	}
+
+	let mut db = WorkspaceDb::open_existing(&workspace_path)?;
+	let ws_id = get_workspace_id(&db)?;
+
+	let tx = db.conn.transaction().map_err(|e| e.to_string())?;
+	tx.execute(
+		"DELETE FROM yjs_documents WHERE workspace_id = ?1 AND doc_id = ?2",
+		rusqlite::params![&ws_id, &new_doc_id],
+	)
+	.map_err(|e| format!("Failed to rename Yjs document: {}", e))?;
+	tx.execute(
+		"UPDATE yjs_documents SET doc_id = ?1 WHERE workspace_id = ?2 AND doc_id = ?3",
+		rusqlite::params![&new_doc_id, &ws_id, &old_doc_id],
+	)
+	.map_err(|e| format!("Failed to rename Yjs document: {}", e))?;
+	tx.commit().map_err(|e| e.to_string())?;
+
+	Ok(())
+}
+
 /// Deletes a document's binary CRDT state from SQLite
 #[tauri::command]
 pub fn delete_yjs_doc(
@@ -113,40 +139,4 @@ pub fn delete_yjs_doc(
 		.map_err(|e| format!("Failed to delete Yjs document: {}", e))?;
 
 	Ok(())
-}
-
-/// Lists all Yjs document snapshots stored in the workspace database
-#[tauri::command]
-pub fn list_yjs_docs(
-	app_handle: tauri::AppHandle,
-	workspace_path: String,
-) -> Result<Vec<YjsDocSummary>, String> {
-	validate_allowed_root(&app_handle, &workspace_path)?;
-
-	let db = WorkspaceDb::open_existing(&workspace_path)?;
-	let ws_id = get_workspace_id(&db)?;
-
-	let mut stmt = db
-		.conn
-		.prepare(
-			"SELECT doc_id, updated_at, length(binary_state)
-             FROM yjs_documents
-             WHERE workspace_id = ?1
-             ORDER BY updated_at DESC",
-		)
-		.map_err(|e| e.to_string())?;
-
-	let docs = stmt
-		.query_map([&ws_id], |r| {
-			Ok(YjsDocSummary {
-				doc_id: r.get(0)?,
-				updated_at: r.get(1)?,
-				size_bytes: r.get::<_, i64>(2)? as usize,
-			})
-		})
-		.map_err(|e| e.to_string())?
-		.filter_map(|r| r.ok())
-		.collect();
-
-	Ok(docs)
 }

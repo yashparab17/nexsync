@@ -6,6 +6,7 @@ export type P2PMessageKind =
 	| "SYNC_STEP_1"
 	| "SYNC_STEP_2"
 	| "SYNC_UPDATE"
+	| "AWARENESS_UPDATE" // Cursor/presence state for a Yjs doc's collaborators
 	| "WORKSPACE_SYNC_REQUEST"
 	| "WORKSPACE_SYNC_RESPONSE"
 	| "ACTIVITY_EVENT"

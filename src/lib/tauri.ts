@@ -21,7 +21,6 @@ import type {
 	KanbanCardRequest,
 	MoveCardRequest,
 	NexsyncConfig,
-	YjsDocSummary,
 } from "@/types/workspace";
 
 // ────────────────────────────
@@ -391,6 +390,19 @@ export async function saveYjsDoc(
 	});
 }
 
+// Move a Yjs document's binary CRDT state to a new doc id, e.g. after a file rename
+export function renameYjsDoc(
+	workspacePath: string,
+	oldDocId: string,
+	newDocId: string,
+): Promise<void> {
+	return invoke("rename_yjs_doc", {
+		workspacePath,
+		oldDocId,
+		newDocId,
+	});
+}
+
 // Delete Yjs CRDT document binary state from SQLite
 export function deleteYjsDoc(
 	workspacePath: string,
@@ -399,12 +411,5 @@ export function deleteYjsDoc(
 	return invoke("delete_yjs_doc", {
 		workspacePath,
 		docId,
-	});
-}
-
-// List all Yjs document snapshots stored in workspace database
-export function listYjsDocs(workspacePath: string): Promise<YjsDocSummary[]> {
-	return invoke("list_yjs_docs", {
-		workspacePath,
 	});
 }

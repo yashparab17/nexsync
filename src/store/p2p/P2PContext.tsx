@@ -10,6 +10,7 @@ import React, {
 	useState,
 } from "react";
 import * as Y from "yjs";
+import type { Awareness } from "y-protocols/awareness";
 import {
 	p2p,
 	P2PSyncProvider,
@@ -108,7 +109,7 @@ interface P2PContextType {
 	createInvite: (role?: string) => Promise<InviteInfo>;
 	revokeInvite: () => Promise<void>;
 	joinWithTicket: (ticket: string, displayName?: string) => Promise<JoinResult>;
-	createSyncProvider: (doc: Y.Doc, docId?: string) => P2PSyncProvider;
+	createSyncProvider: (doc: Y.Doc, docId?: string, awareness?: Awareness | null) => P2PSyncProvider;
 	requestWorkspaceSnapshot: (peerId?: string, targetWorkspacePath?: string) => Promise<void>;
 	downloadFileOnDemand: (relPath: string) => Promise<void>;
 	disconnectPeer: (peerId: string) => Promise<void>;
@@ -379,6 +380,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				case "SYNC_STEP_1":
 				case "SYNC_STEP_2":
 				case "SYNC_UPDATE":
+				case "AWARENESS_UPDATE":
 					syncProvidersRef.current.forEach((provider) =>
 						provider.handleMessage(peerId, message),
 					);
@@ -478,7 +480,11 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 
 	useEffect(() => {
 		return p2p.onMessage(({ peerId, message }) => {
-			if (message.kind === "WORKSPACE_SYNC_REQUEST" || message.kind.startsWith("SYNC_")) {
+			if (
+				message.kind === "WORKSPACE_SYNC_REQUEST" ||
+				message.kind.startsWith("SYNC_") ||
+				message.kind === "AWARENESS_UPDATE"
+			) {
 				void handleMessageRef.current(peerId, message);
 				return;
 			}
@@ -591,8 +597,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 
 	// Create a Yjs provider that stays in sync with every connected peer
 	const createSyncProvider = useCallback(
-		(doc: Y.Doc, docId: string = "root") => {
-			const provider = new P2PSyncProvider(doc, (message, peerId) => send(message, peerId), docId);
+		(doc: Y.Doc, docId: string = "root", awareness: Awareness | null = null) => {
+			const provider = new P2PSyncProvider(doc, (message, peerId) => send(message, peerId), docId, awareness);
 			peersRef.current.forEach((peer) => provider.addPeer(peer.id));
 			syncProvidersRef.current.add(provider);
 			return provider;
@@ -651,4 +657,16 @@ export function useP2P() {
 		throw new Error("useP2P must be used within a P2PProvider");
 	}
 	return context;
+}
+
+// True if this device joined someone else's workspace with the Viewer role
+export function useIsViewer(): boolean {
+	const { metadata } = useWorkspace();
+	const { selfName } = useP2P();
+	if (selfName === null) return false;
+	return (
+		metadata?.members.members.some(
+			(m) => m.name === selfName && m.role === "Viewer",
+		) ?? false
+	);
 }

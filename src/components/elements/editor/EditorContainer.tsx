@@ -8,6 +8,7 @@ import {
 	Minimize2,
 	Save,
 	Sparkles,
+	Users,
 	X,
 } from "lucide-react";
 
@@ -16,6 +17,9 @@ import { Button } from "@/components/ui/button";
 import BlockNoteEditor from "./BlockNoteEditor";
 import CodeEditor from "./CodeEditor";
 import { cn } from "@/lib/utils";
+import { useCollabDoc } from "@/hooks/useCollabDoc";
+import { useP2P } from "@/store/p2p/P2PContext";
+import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
 interface EditorContainerProps {
 	fileName: string;
@@ -23,6 +27,10 @@ interface EditorContainerProps {
 	onSave: (content: string) => Promise<void>;
 	onClose: () => void;
 	readOnly?: boolean;
+	// Workspace-relative path of the open file; enables live P2P co-editing when
+	// given together with `workspacePath` (both are required to collaborate)
+	workspacePath?: string;
+	docId?: string;
 }
 
 // Unified dual-mode Editor Container dynamically switching between Rich-text BlockNote and CodeMirror
@@ -32,11 +40,23 @@ export default function EditorContainer({
 	onSave,
 	onClose,
 	readOnly = false,
+	workspacePath,
+	docId,
 }: EditorContainerProps) {
 	const isMarkdown = useMemo(() => {
 		const ext = fileName.split(".").pop()?.toLowerCase();
 		return ext === "md" || ext === "markdown";
 	}, [fileName]);
+
+	// Live Yjs document for this file, synced with connected peers and persisted to SQLite
+	const collab = useCollabDoc(workspacePath, docId);
+	const { peers, selfName } = useP2P();
+	const { metadata } = useWorkspace();
+	const userName =
+		selfName ??
+		metadata?.members.members.find((m) => m.role === "Owner")?.name ??
+		"You";
+	const isCollaborating = collab !== null && peers.length > 0;
 
 	// Editor state
 	const [content, setContent] = useState(initialContent);
@@ -178,6 +198,14 @@ export default function EditorContainer({
 						</div>
 					)}
 
+					{/* Live Collaboration Indicator */}
+					{isCollaborating && (
+						<span className="flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+							<Users className="size-3" />
+							Live
+						</span>
+					)}
+
 					{/* Stats Badge */}
 					<div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground font-mono bg-muted/20 px-2.5 py-1 rounded-md border">
 						<span>{stats.lines} lines</span>
@@ -227,6 +255,8 @@ export default function EditorContainer({
 						initialMarkdown={content}
 						onChange={handleContentChange}
 						readOnly={readOnly}
+						collab={collab}
+						userName={userName}
 					/>
 				) : (
 					<CodeEditor
@@ -234,6 +264,8 @@ export default function EditorContainer({
 						fileName={fileName}
 						onChange={handleContentChange}
 						readOnly={readOnly}
+						collab={collab}
+						userName={userName}
 					/>
 				)}
 			</div>

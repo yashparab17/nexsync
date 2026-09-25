@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { removeRecentWorkspace, writeWorkspaceMetadata } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { useP2P } from "@/store/p2p/P2PContext";
 
 export default function WorkspaceSettings() {
 	const {
@@ -35,6 +36,10 @@ export default function WorkspaceSettings() {
 	} = useWorkspace();
 	const logError = useErrorLog();
 	const navigate = useNavigate();
+	const { selfName } = useP2P();
+	// Only the workspace owner may change settings; a joined copy's local edits would just
+	// get overwritten by the next full snapshot pull anyway, same rule as the Members page.
+	const isJoinedCopy = selfName !== null;
 
 	const [name, setName] = useState(workspace?.name || "");
 	const [description, setDescription] = useState(
@@ -52,7 +57,7 @@ export default function WorkspaceSettings() {
 
 	const handleSaveSettings = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!workspace?.path || !metadata) return;
+		if (isJoinedCopy || !workspace?.path || !metadata) return;
 
 		try {
 			setSaving(true);
@@ -238,7 +243,11 @@ export default function WorkspaceSettings() {
 
 				{/* Save Button */}
 				<div className="flex items-center gap-3">
-					<Button type="submit" isDisabled={saving} className="gap-2">
+					<Button
+						type="submit"
+						isDisabled={saving || isJoinedCopy}
+						className="gap-2"
+					>
 						<Save className="size-4" />
 						{saving ? "Saving…" : "Save Settings"}
 					</Button>
@@ -246,6 +255,11 @@ export default function WorkspaceSettings() {
 						<span className="flex items-center gap-1.5 text-xs text-emerald-400">
 							<Check className="size-4" />
 							Settings saved successfully
+						</span>
+					)}
+					{isJoinedCopy && (
+						<span className="text-xs text-muted-foreground">
+							You joined this workspace, so its host manages these settings.
 						</span>
 					)}
 				</div>

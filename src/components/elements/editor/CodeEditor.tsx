@@ -7,8 +7,13 @@ import { json } from "@codemirror/lang-json";
 import { markdown } from "@codemirror/lang-markdown";
 import { rust } from "@codemirror/lang-rust";
 import { oneDark } from "@codemirror/theme-one-dark";
+import { keymap } from "@codemirror/view";
+import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
 
 import { useThemeContext } from "@/store/ThemeContext";
+import { colorForName } from "@/lib/collabColor";
+import { useSeedOnce } from "@/hooks/useSeedOnce";
+import type { CollabDoc } from "@/hooks/useCollabDoc";
 
 interface CodeEditorProps {
 	value: string;
@@ -16,6 +21,10 @@ interface CodeEditorProps {
 	onChange: (value: string) => void;
 	readOnly?: boolean;
 	minHeight?: string;
+	// Live P2P-synced document; when present the editor mirrors this doc's
+	// "content" Y.Text instead of the controlled `value` prop
+	collab?: CollabDoc | null;
+	userName?: string;
 }
 
 // Determines the CodeMirror language extension from the file extension
@@ -51,25 +60,56 @@ function getLanguageExtension(fileName: string) {
 	}
 }
 
-// CodeMirror code editor supporting multiple programming languages and dark theme
+// CodeMirror code editor supporting multiple programming languages, dark theme, and optional live Yjs collaboration
 export default function CodeEditor({
 	value,
 	fileName = "file.txt",
 	onChange,
 	readOnly = false,
 	minHeight = "400px",
+	collab = null,
+	userName = "You",
 }: CodeEditorProps) {
 	const { isDark } = useThemeContext();
 
 	// Configure syntax highlighting extensions based on filename
-	const extensions = useMemo(() => {
+	const languageExtensions = useMemo(() => {
 		return getLanguageExtension(fileName);
 	}, [fileName]);
+
+	// Seed the shared text from on-disk content the first time it's ever opened
+	useSeedOnce(
+		!!collab?.synced,
+		() => {
+			if (!collab) return;
+			const ytext = collab.doc.getText("content");
+			if (ytext.length === 0 && value) {
+				ytext.insert(0, value);
+			}
+		},
+		[collab, value],
+	);
+
+	const extensions = useMemo(() => {
+		if (!collab) return languageExtensions;
+		collab.awareness.setLocalStateField("user", {
+			name: userName,
+			color: colorForName(userName),
+		});
+		return [
+			...languageExtensions,
+			yCollab(collab.doc.getText("content"), collab.awareness),
+			// Route Ctrl+Z/Ctrl+Y through yCollab's Y.UndoManager instead of CodeMirror's own
+			// history (disabled below via basicSetup), so undo only reverts local edits rather
+			// than fighting the shared CRDT state.
+			keymap.of(yUndoManagerKeymap),
+		];
+	}, [languageExtensions, collab, userName]);
 
 	return (
 		<div className="h-full w-full overflow-hidden rounded-lg border bg-background font-mono text-xs">
 			<CodeMirror
-				value={value}
+				{...(collab ? {} : { value })}
 				height="100%"
 				minHeight={minHeight}
 				theme={isDark ? oneDark : "light"}
@@ -80,7 +120,8 @@ export default function CodeEditor({
 					lineNumbers: true,
 					highlightActiveLineGutter: true,
 					highlightSpecialChars: true,
-					history: true,
+					// yCollab supplies its own CRDT-aware undo/redo when collaborating (see extensions above)
+					history: !collab,
 					foldGutter: true,
 					drawSelection: true,
 					dropCursor: true,
@@ -97,7 +138,7 @@ export default function CodeEditor({
 					closeBracketsKeymap: true,
 					defaultKeymap: true,
 					searchKeymap: true,
-					historyKeymap: true,
+					historyKeymap: !collab,
 					foldKeymap: true,
 					completionKeymap: true,
 					lintKeymap: true,

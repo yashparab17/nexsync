@@ -30,7 +30,7 @@ import { useErrorLog } from "@/hooks/useErrorLog";
 import { createTask, deleteTask, getTasks, updateTask } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
-import { useP2P } from "@/store/p2p/P2PContext";
+import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type { Task, TaskPriority, TaskStatus } from "@/types/workspace";
 
 // ────────────────────────────
@@ -88,6 +88,7 @@ const STATUS_CONFIG: Record<
 export default function WorkspaceTasks() {
 	const { workspace, refreshMetadata, addActivityEvent } = useWorkspace();
 	const { dataVersion, publishDataChange } = useP2P();
+	const isViewer = useIsViewer();
 	const logError = useErrorLog();
 
 	const [tasks, setTasks] = useState<Task[]>([]);
@@ -159,7 +160,7 @@ export default function WorkspaceTasks() {
 	// Submit Create Task
 	const handleCreateSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!workspace?.path || !formTitle.trim()) return;
+		if (isViewer || !workspace?.path || !formTitle.trim()) return;
 
 		try {
 			setFormSubmitting(true);
@@ -197,7 +198,7 @@ export default function WorkspaceTasks() {
 	// Submit Edit Task
 	const handleEditSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!workspace?.path || !editingTask || !formTitle.trim()) return;
+		if (isViewer || !workspace?.path || !editingTask || !formTitle.trim()) return;
 
 		try {
 			setFormSubmitting(true);
@@ -232,7 +233,7 @@ export default function WorkspaceTasks() {
 
 	// Toggle Quick Status (Cycle: todo -> in_progress -> done -> todo)
 	const handleToggleStatus = async (task: Task) => {
-		if (!workspace?.path) return;
+		if (isViewer || !workspace?.path) return;
 		const nextStatus: Record<TaskStatus, TaskStatus> = {
 			todo: "in_progress",
 			in_progress: "done",
@@ -262,7 +263,7 @@ export default function WorkspaceTasks() {
 
 	// Delete Task
 	const handleDeleteTask = async () => {
-		if (!workspace?.path || !deletingTaskId) return;
+		if (isViewer || !workspace?.path || !deletingTaskId) return;
 		try {
 			const deleted = tasks.find((t) => t.id === deletingTaskId);
 			await deleteTask({ path: workspace.path, id: deletingTaskId });
@@ -315,13 +316,15 @@ export default function WorkspaceTasks() {
 						Organize, track, and manage your workspace priorities.
 					</p>
 				</div>
-				<Button
-					onPress={handleOpenCreate}
-					className="w-fit gap-2 shadow-sm transition-transform active:scale-95"
-				>
-					<Plus className="size-4" />
-					New Task
-				</Button>
+				{!isViewer && (
+					<Button
+						onPress={handleOpenCreate}
+						className="w-fit gap-2 shadow-sm transition-transform active:scale-95"
+					>
+						<Plus className="size-4" />
+						New Task
+					</Button>
+				)}
 			</div>
 
 			{/* Metric Stat Cards */}
@@ -467,14 +470,16 @@ export default function WorkspaceTasks() {
 							Clear Filters
 						</Button>
 					) : (
-						<Button
-							size="sm"
-							className="mt-4 gap-1.5"
-							onPress={handleOpenCreate}
-						>
-							<Plus className="size-4" />
-							Create Task
-						</Button>
+						!isViewer && (
+							<Button
+								size="sm"
+								className="mt-4 gap-1.5"
+								onPress={handleOpenCreate}
+							>
+								<Plus className="size-4" />
+								Create Task
+							</Button>
+						)
 					)}
 				</div>
 			) : (
@@ -497,9 +502,15 @@ export default function WorkspaceTasks() {
 									<button
 										type="button"
 										onClick={() => handleToggleStatus(task)}
-										title="Click to cycle status (To Do -> In Progress -> Done)"
+										disabled={isViewer}
+										title={
+											isViewer
+												? undefined
+												: "Click to cycle status (To Do -> In Progress -> Done)"
+										}
 										className={cn(
-											"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors cursor-pointer",
+											"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors",
+											isViewer ? "cursor-default" : "cursor-pointer",
 											task.status === "done"
 												? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
 												: task.status === "in_progress"
@@ -559,24 +570,26 @@ export default function WorkspaceTasks() {
 								</div>
 
 								{/* Right: Actions */}
-								<div className="flex items-center gap-1 sm:self-center self-end">
-									<Button
-										variant="ghost"
-										size="icon-xs"
-										onPress={() => handleOpenEdit(task)}
-										aria-label="Edit Task"
-									>
-										<Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon-xs"
-										onPress={() => setDeletingTaskId(task.id)}
-										aria-label="Delete Task"
-									>
-										<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
-									</Button>
-								</div>
+								{!isViewer && (
+									<div className="flex items-center gap-1 sm:self-center self-end">
+										<Button
+											variant="ghost"
+											size="icon-xs"
+											onPress={() => handleOpenEdit(task)}
+											aria-label="Edit Task"
+										>
+											<Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
+										</Button>
+										<Button
+											variant="ghost"
+											size="icon-xs"
+											onPress={() => setDeletingTaskId(task.id)}
+											aria-label="Delete Task"
+										>
+											<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+										</Button>
+									</div>
+								)}
 							</div>
 						);
 					})}

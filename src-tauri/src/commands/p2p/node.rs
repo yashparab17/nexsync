@@ -50,8 +50,18 @@ const CLOSE_REPLACED: u32 = 2;
 const KIND_DATA_CHANGE: &str = "DATA_CHANGE";
 /// The host's member list; accepted only from the host
 const KIND_MEMBERS_UPDATE: &str = "MEMBERS_UPDATE";
-/// App messages a host forwards from one guest to the others
-const RELAYED_KINDS: &[&str] = &[KIND_DATA_CHANGE, "ACTIVITY_EVENT"];
+/// App messages a host forwards from one guest to the others. Yjs sync messages are included
+/// so live co-editing reaches every guest even when the host has the document closed: guests
+/// only ever connect to the host (a star topology), so without this a guest's edits would stop
+/// at the host and never reach a third peer.
+const RELAYED_KINDS: &[&str] = &[
+    KIND_DATA_CHANGE,
+    "ACTIVITY_EVENT",
+    "SYNC_STEP_1",
+    "SYNC_STEP_2",
+    "SYNC_UPDATE",
+    "AWARENESS_UPDATE",
+];
 
 /// Roles a host may grant through an invite
 const INVITE_ROLES: &[&str] = &["Editor", "Viewer"];
@@ -543,6 +553,13 @@ impl Node {
         match kind {
             KIND_DATA_CHANGE if !may_write => {
                 eprintln!("[P2P] Ignoring a data change from Viewer {}", from.fmt_short());
+                return;
+            }
+            // A Viewer's readOnly editor is a UI nicety, not a security boundary: a modified
+            // client could still send raw Yjs updates, so the host must drop them itself. Sync
+            // step 1/2 (state-vector handshake, no content) and presence stay allowed.
+            "SYNC_UPDATE" if !may_write => {
+                eprintln!("[P2P] Ignoring a Yjs update from Viewer {}", from.fmt_short());
                 return;
             }
             // Only the host decides who is in the workspace

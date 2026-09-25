@@ -32,12 +32,13 @@ import {
 	updateKanbanCard,
 } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
-import { useP2P } from "@/store/p2p/P2PContext";
+import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type { KanbanCard, KanbanColumn } from "@/types/workspace";
 
 export default function WorkspaceKanban() {
 	const { workspace, refreshMetadata, addActivityEvent } = useWorkspace();
 	const { dataVersion, publishDataChange } = useP2P();
+	const isViewer = useIsViewer();
 	const logError = useErrorLog();
 
 	const [columns, setColumns] = useState<KanbanColumn[]>([]);
@@ -86,7 +87,7 @@ export default function WorkspaceKanban() {
 
 	// Create Default Starter Columns if board is completely empty
 	const handleCreateDefaultColumns = async () => {
-		if (!workspace?.path) return;
+		if (isViewer || !workspace?.path) return;
 		try {
 			setSubmitting(true);
 			const defaultCols = ["Backlog", "In Progress", "In Review", "Done"];
@@ -119,7 +120,7 @@ export default function WorkspaceKanban() {
 	// Create Column Submit
 	const handleCreateColumnSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!workspace?.path || !newColTitle.trim()) return;
+		if (isViewer || !workspace?.path || !newColTitle.trim()) return;
 
 		try {
 			setSubmitting(true);
@@ -151,7 +152,7 @@ export default function WorkspaceKanban() {
 
 	// Delete Column
 	const handleDeleteColumn = async () => {
-		if (!workspace?.path || !deletingColId) return;
+		if (isViewer || !workspace?.path || !deletingColId) return;
 		try {
 			const deletedCol = columns.find((c) => c.id === deletingColId);
 			await deleteKanbanColumn({ path: workspace.path, id: deletingColId });
@@ -174,7 +175,7 @@ export default function WorkspaceKanban() {
 	// Create Card Submit
 	const handleCreateCardSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!workspace?.path || !activeColIdForNewCard || !cardTitle.trim()) return;
+		if (isViewer || !workspace?.path || !activeColIdForNewCard || !cardTitle.trim()) return;
 
 		try {
 			setSubmitting(true);
@@ -223,7 +224,7 @@ export default function WorkspaceKanban() {
 	// Edit Card Submit
 	const handleEditCardSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!workspace?.path || !editingCard || !cardTitle.trim()) return;
+		if (isViewer || !workspace?.path || !editingCard || !cardTitle.trim()) return;
 
 		try {
 			setSubmitting(true);
@@ -258,7 +259,7 @@ export default function WorkspaceKanban() {
 		targetColId: string,
 		_direction: "left" | "right",
 	) => {
-		if (!workspace?.path) return;
+		if (isViewer || !workspace?.path) return;
 		try {
 			const targetCol = columns.find((c) => c.id === targetColId);
 			const newPos = targetCol ? targetCol.cards.length : 0;
@@ -290,7 +291,7 @@ export default function WorkspaceKanban() {
 
 	// Delete Card
 	const handleDeleteCard = async () => {
-		if (!workspace?.path || !deletingCardId) return;
+		if (isViewer || !workspace?.path || !deletingCardId) return;
 		try {
 			let deletedTitle = "Card";
 			for (const col of columns) {
@@ -327,17 +328,19 @@ export default function WorkspaceKanban() {
 						Visual workspace columns and cards backed by local SQLite.
 					</p>
 				</div>
-				<div className="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						onPress={() => setIsCreateColOpen(true)}
-						className="gap-1.5"
-					>
-						<Plus className="size-4" />
-						New Column
-					</Button>
-				</div>
+				{!isViewer && (
+					<div className="flex items-center gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							onPress={() => setIsCreateColOpen(true)}
+							className="gap-1.5"
+						>
+							<Plus className="size-4" />
+							New Column
+						</Button>
+					</div>
+				)}
 			</div>
 
 			{/* Kanban Board Container */}
@@ -357,25 +360,27 @@ export default function WorkspaceKanban() {
 						Your Kanban board is currently empty. You can generate default starter
 						columns or create your own.
 					</p>
-					<div className="mt-4 flex gap-3">
-						<Button
-							size="sm"
-							variant="outline"
-							onPress={handleCreateDefaultColumns}
-							isDisabled={submitting}
-						>
-							<Sparkles className="size-4 mr-1 text-amber-400" />
-							Create Default Columns
-						</Button>
-						<Button
-							size="sm"
-							onPress={() => setIsCreateColOpen(true)}
-							className="gap-1"
-						>
-							<Plus className="size-4" />
-							New Column
-						</Button>
-					</div>
+					{!isViewer && (
+						<div className="mt-4 flex gap-3">
+							<Button
+								size="sm"
+								variant="outline"
+								onPress={handleCreateDefaultColumns}
+								isDisabled={submitting}
+							>
+								<Sparkles className="size-4 mr-1 text-amber-400" />
+								Create Default Columns
+							</Button>
+							<Button
+								size="sm"
+								onPress={() => setIsCreateColOpen(true)}
+								className="gap-1"
+							>
+								<Plus className="size-4" />
+								New Column
+							</Button>
+						</div>
+					)}
 				</div>
 			) : (
 				<div className="flex flex-1 gap-4 overflow-x-auto pb-4 pt-1">
@@ -400,28 +405,30 @@ export default function WorkspaceKanban() {
 										</span>
 									</div>
 
-									<div className="flex items-center gap-1">
-										<Button
-											variant="ghost"
-											size="icon-xs"
-											onPress={() => {
-												setCardTitle("");
-												setCardDesc("");
-												setActiveColIdForNewCard(col.id);
-											}}
-											aria-label="Add card"
-										>
-											<Plus className="size-3.5" />
-										</Button>
-										<Button
-											variant="ghost"
-											size="icon-xs"
-											onPress={() => setDeletingColId(col.id)}
-											aria-label="Delete column"
-										>
-											<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
-										</Button>
-									</div>
+									{!isViewer && (
+										<div className="flex items-center gap-1">
+											<Button
+												variant="ghost"
+												size="icon-xs"
+												onPress={() => {
+													setCardTitle("");
+													setCardDesc("");
+													setActiveColIdForNewCard(col.id);
+												}}
+												aria-label="Add card"
+											>
+												<Plus className="size-3.5" />
+											</Button>
+											<Button
+												variant="ghost"
+												size="icon-xs"
+												onPress={() => setDeletingColId(col.id)}
+												aria-label="Delete column"
+											>
+												<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+											</Button>
+										</div>
+									)}
 								</div>
 
 								{/* Cards Column Body */}
@@ -440,24 +447,26 @@ export default function WorkspaceKanban() {
 													<h4 className="text-sm font-medium leading-snug text-foreground">
 														{card.title}
 													</h4>
-													<div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-														<Button
-															variant="ghost"
-															size="icon-xs"
-															onPress={() => handleOpenEditCard(card)}
-															aria-label="Edit card"
-														>
-															<Pencil className="size-3" />
-														</Button>
-														<Button
-															variant="ghost"
-															size="icon-xs"
-															onPress={() => setDeletingCardId(card.id)}
-															aria-label="Delete card"
-														>
-															<Trash2 className="size-3 text-destructive" />
-														</Button>
-													</div>
+													{!isViewer && (
+														<div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+															<Button
+																variant="ghost"
+																size="icon-xs"
+																onPress={() => handleOpenEditCard(card)}
+																aria-label="Edit card"
+															>
+																<Pencil className="size-3" />
+															</Button>
+															<Button
+																variant="ghost"
+																size="icon-xs"
+																onPress={() => setDeletingCardId(card.id)}
+																aria-label="Delete card"
+															>
+																<Trash2 className="size-3 text-destructive" />
+															</Button>
+														</div>
+													)}
 												</div>
 
 												{card.description && (
@@ -467,6 +476,7 @@ export default function WorkspaceKanban() {
 												)}
 
 												{/* Quick Move Across Columns */}
+												{!isViewer && (
 												<div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2 text-[10px] text-muted-foreground">
 													{prevCol ? (
 														<button
@@ -498,25 +508,28 @@ export default function WorkspaceKanban() {
 														</button>
 													) : null}
 												</div>
-											</div>
-										))
+											)}
+										</div>
+									))
 									)}
 								</div>
 
 								{/* Add Card Quick Button */}
-								<Button
-									variant="ghost"
-									size="sm"
-									className="mt-2 w-full justify-start text-xs text-muted-foreground hover:text-foreground"
-									onPress={() => {
-										setCardTitle("");
-										setCardDesc("");
-										setActiveColIdForNewCard(col.id);
-									}}
-								>
-									<Plus className="size-3.5 mr-1.5" />
-									Add a card
-								</Button>
+								{!isViewer && (
+									<Button
+										variant="ghost"
+										size="sm"
+										className="mt-2 w-full justify-start text-xs text-muted-foreground hover:text-foreground"
+										onPress={() => {
+											setCardTitle("");
+											setCardDesc("");
+											setActiveColIdForNewCard(col.id);
+										}}
+									>
+										<Plus className="size-3.5 mr-1.5" />
+										Add a card
+									</Button>
+								)}
 							</div>
 						);
 					})}

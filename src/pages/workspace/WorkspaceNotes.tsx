@@ -29,7 +29,7 @@ import {
 } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
-import { useP2P } from "@/store/p2p/P2PContext";
+import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type { WorkspaceFile } from "@/types/workspace";
 
 // Filtered Notes workspace view managing .md documents with rich BlockNote and CodeMirror editing
@@ -118,22 +118,15 @@ export default function WorkspaceNotes() {
 		fetchContent();
 	}, [workspace?.path, selectedNote, logError]);
 
-	// Reload the list, and the open note, when a collaborator's changes arrive
+	// Reload the note list when a collaborator's changes arrive. The open note itself no longer
+	// needs a refetch-and-remount: live edits now flow straight into the editor's Yjs document.
 	const { lastSyncedFile } = useP2P();
-	const [remoteRevision, setRemoteRevision] = useState(0);
 	useEffect(() => {
 		if (!lastSyncedFile || !workspace?.path) return;
 		void loadNotes();
-		const openPath = selectedNote?.path.replace(/^\/+/, "");
-		if (openPath && (lastSyncedFile.relPath === openPath || lastSyncedFile.relPath === "")) {
-			readWorkspaceFile(workspace.path, openPath)
-				.then((text) => {
-					setNoteContent(text);
-					setRemoteRevision((r) => r + 1);
-				})
-				.catch(() => {});
-		}
 	}, [lastSyncedFile]);
+
+	const isViewer = useIsViewer();
 
 	// Save note content to OS disk
 	const handleSaveNote = async (newText: string) => {
@@ -159,7 +152,7 @@ export default function WorkspaceNotes() {
 	// Create new markdown note on OS disk
 	const handleCreateNoteSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!workspace?.path || !newNoteTitle.trim()) return;
+		if (isViewer || !workspace?.path || !newNoteTitle.trim()) return;
 
 		try {
 			setSubmitting(true);
@@ -200,7 +193,7 @@ export default function WorkspaceNotes() {
 
 	// Delete Note
 	const handleDeleteNote = async () => {
-		if (!workspace?.path || !deletingNote) return;
+		if (isViewer || !workspace?.path || !deletingNote) return;
 		try {
 			const relPath = deletingNote.path.replace(/^\/+/, "");
 			await deleteWorkspaceItem(workspace.path, relPath);
@@ -242,17 +235,19 @@ export default function WorkspaceNotes() {
 							{notes.length}
 						</span>
 					</div>
-					<Button
-						size="sm"
-						onPress={() => {
-							setNewNoteTitle("");
-							setIsNewNoteOpen(true);
-						}}
-						className="gap-1 px-2.5 h-8"
-					>
-						<Plus className="size-3.5" />
-						New
-					</Button>
+					{!isViewer && (
+						<Button
+							size="sm"
+							onPress={() => {
+								setNewNoteTitle("");
+								setIsNewNoteOpen(true);
+							}}
+							className="gap-1 px-2.5 h-8"
+						>
+							<Plus className="size-3.5" />
+							New
+						</Button>
+					)}
 				</div>
 
 				{/* Search Input */}
@@ -304,15 +299,17 @@ export default function WorkspaceNotes() {
 										</p>
 									</div>
 
-									<Button
-										variant="ghost"
-										size="icon-xs"
-										className="opacity-0 group-hover:opacity-100 transition-opacity"
-										onPress={() => setDeletingNote(note)}
-										aria-label={`Delete ${note.name}`}
-									>
-										<Trash2 className="size-3 text-destructive" />
-									</Button>
+									{!isViewer && (
+										<Button
+											variant="ghost"
+											size="icon-xs"
+											className="opacity-0 group-hover:opacity-100 transition-opacity"
+											onPress={() => setDeletingNote(note)}
+											aria-label={`Delete ${note.name}`}
+										>
+											<Trash2 className="size-3 text-destructive" />
+										</Button>
+									)}
 								</div>
 							);
 						})
@@ -332,14 +329,16 @@ export default function WorkspaceNotes() {
 							Choose a note from the left sidebar to edit with BlockNote rich-text or
 							CodeMirror markdown code.
 						</p>
-						<Button
-							size="sm"
-							className="mt-4 gap-1.5"
-							onPress={() => setIsNewNoteOpen(true)}
-						>
-							<Plus className="size-4" />
-							Create New Note
-						</Button>
+						{!isViewer && (
+							<Button
+								size="sm"
+								className="mt-4 gap-1.5"
+								onPress={() => setIsNewNoteOpen(true)}
+							>
+								<Plus className="size-4" />
+								Create New Note
+							</Button>
+						)}
 					</div>
 				) : contentLoading ? (
 					<div className="flex flex-1 items-center justify-center">
@@ -347,11 +346,14 @@ export default function WorkspaceNotes() {
 					</div>
 				) : (
 					<EditorContainer
-						key={`${selectedNote.path}#${remoteRevision}`}
+						key={selectedNote.path}
 						fileName={selectedNote.name}
 						initialContent={noteContent}
 						onSave={handleSaveNote}
 						onClose={() => setSelectedNote(null)}
+						readOnly={isViewer}
+						workspacePath={workspace?.path}
+						docId={selectedNote.path.replace(/^\/+/, "")}
 					/>
 				)}
 			</div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
+import { withCollaboration } from "@blocknote/core/yjs";
 
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
@@ -9,18 +10,27 @@ import { useThemeContext } from "@/store/ThemeContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { readWorkspaceBinaryFile, writeWorkspaceBinaryFile } from "@/lib/tauri";
 import { getMimeType } from "@/lib/utils";
+import { colorForName } from "@/lib/collabColor";
+import { useSeedOnce } from "@/hooks/useSeedOnce";
+import type { CollabDoc } from "@/hooks/useCollabDoc";
 
 interface BlockNoteEditorProps {
 	initialMarkdown: string;
 	onChange: (markdown: string) => void;
 	readOnly?: boolean;
+	// Live P2P-synced document; when present the editor mirrors this doc's
+	// "blocknote" XML fragment instead of a one-shot markdown parse
+	collab?: CollabDoc | null;
+	userName?: string;
 }
 
-// Rich-text Markdown block editor powered by BlockNote
+// Rich-text Markdown block editor powered by BlockNote, with optional live Yjs collaboration
 export default function BlockNoteEditor({
 	initialMarkdown,
 	onChange,
 	readOnly = false,
+	collab = null,
+	userName = "You",
 }: BlockNoteEditorProps) {
 	const { isDark } = useThemeContext();
 	const { workspace } = useWorkspace();
@@ -28,7 +38,7 @@ export default function BlockNoteEditor({
 
 	const isUpdatingRef = useRef(false);
 	const lastMarkdownRef = useRef(initialMarkdown);
-	const [isReady, setIsReady] = useState(false);
+	const [localReady, setLocalReady] = useState(false);
 
 	// In-memory cache for resolved binary data URLs so they load instantly
 	const urlCacheRef = useRef<Map<string, string>>(new Map());
@@ -104,17 +114,25 @@ export default function BlockNoteEditor({
 		[workspacePath],
 	);
 
-	// Initialize BlockNote editor instance with custom file resolver and upload handler
+	// Initialize BlockNote editor instance, wired to the live Yjs doc when collaborating
 	const editor = useCreateBlockNote(
-		{
-			resolveFileUrl,
-			uploadFile,
-		},
-		[resolveFileUrl, uploadFile],
+		collab
+			? withCollaboration({
+					resolveFileUrl,
+					uploadFile,
+					collaboration: {
+						fragment: collab.doc.getXmlFragment("blocknote"),
+						user: { name: userName, color: colorForName(userName) },
+						provider: { awareness: collab.awareness },
+					},
+				})
+			: { resolveFileUrl, uploadFile },
+		[resolveFileUrl, uploadFile, collab?.doc],
 	);
 
-	// Load initial Markdown blocks into editor once ready
+	// Non-collaborative mode: load the initial Markdown blocks once
 	useEffect(() => {
+		if (collab) return;
 		async function loadInitialMarkdown() {
 			if (!editor) return;
 			try {
@@ -131,17 +149,42 @@ export default function BlockNoteEditor({
 					]);
 				}
 				lastMarkdownRef.current = initialMarkdown;
-				setIsReady(true);
+				setLocalReady(true);
 			} catch (err) {
 				console.error("Failed to parse markdown to blocks:", err);
-				setIsReady(true);
+				setLocalReady(true);
 			} finally {
 				isUpdatingRef.current = false;
 			}
 		}
 
 		loadInitialMarkdown();
-	}, [editor, initialMarkdown]);
+	}, [editor, initialMarkdown, collab]);
+
+	// Collaborative mode: seed the shared fragment from on-disk content the first time it's ever opened
+	useSeedOnce(
+		!!collab?.synced,
+		() => {
+			if (!collab || !editor) return;
+			const fragment = collab.doc.getXmlFragment("blocknote");
+			if (fragment.length > 0 || !initialMarkdown.trim()) return;
+
+			(async () => {
+				try {
+					isUpdatingRef.current = true;
+					const blocks = await editor.tryParseMarkdownToBlocks(initialMarkdown);
+					editor.replaceBlocks(editor.document, blocks);
+				} catch (err) {
+					console.error("Failed to seed collaborative document:", err);
+				} finally {
+					isUpdatingRef.current = false;
+				}
+			})();
+		},
+		[collab, editor, initialMarkdown],
+	);
+
+	const isReady = collab ? collab.synced : localReady;
 
 	// Handle block changes and serialize back to markdown
 	const handleChange = async () => {

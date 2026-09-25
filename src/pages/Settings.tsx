@@ -4,9 +4,11 @@ import { open } from "@tauri-apps/plugin-dialog";
 import {
 	ArrowLeft,
 	Check,
+	DownloadCloud,
 	FolderPlus,
 	HardDrive,
 	Info,
+	Loader2,
 	Plus,
 	Save,
 	ShieldCheck,
@@ -25,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
+import { useAppUpdater } from "@/hooks/useAppUpdater";
 import { useThemeContext } from "@/store/ThemeContext";
 import { loadConfig, saveConfig } from "@/lib/tauri";
 import type { NexsyncConfig } from "@/types/workspace";
@@ -33,6 +36,7 @@ export default function Settings() {
 	const navigate = useNavigate();
 	const { isDark } = useThemeContext();
 	const logError = useErrorLog();
+	const updater = useAppUpdater();
 
 	const [config, setConfig] = useState<NexsyncConfig>({
 		allowed_workspace_roots: [],
@@ -257,7 +261,7 @@ export default function Settings() {
 							About Nexsync
 						</CardTitle>
 					</CardHeader>
-					<CardContent className="space-y-2 text-xs text-muted-foreground">
+					<CardContent className="space-y-3 text-xs text-muted-foreground">
 						<p>
 							<strong className="text-foreground">Nexsync v0.1.0</strong> —
 							Local-first peer-to-peer collaborative workspaces.
@@ -266,6 +270,51 @@ export default function Settings() {
 							Engineered with Rust, Tauri, React 19, SQLite, libsodium, and Yjs
 							CRDT.
 						</p>
+
+						<div className="flex items-center gap-3 pt-1">
+							{updater.status === "available" ||
+							updater.status === "installing" ? (
+								<Button
+									size="sm"
+									onPress={updater.installUpdate}
+									isDisabled={updater.status === "installing"}
+									className="gap-1.5"
+								>
+									{updater.status === "installing" ? (
+										<Loader2 className="size-3.5 animate-spin" />
+									) : (
+										<DownloadCloud className="size-3.5" />
+									)}
+									{updater.status === "installing"
+										? "Installing…"
+										: `Install v${updater.version} & Restart`}
+								</Button>
+							) : (
+								<Button
+									variant="outline"
+									size="sm"
+									onPress={updater.checkForUpdate}
+									isDisabled={updater.status === "checking"}
+									className="gap-1.5"
+								>
+									{updater.status === "checking" ? (
+										<Loader2 className="size-3.5 animate-spin" />
+									) : (
+										<DownloadCloud className="size-3.5" />
+									)}
+									Check for Updates
+								</Button>
+							)}
+							{updater.status === "up-to-date" && (
+								<span className="flex items-center gap-1.5 text-emerald-400">
+									<Check className="size-3.5" />
+									You're on the latest version
+								</span>
+							)}
+							{updater.status === "error" && (
+								<span className="text-destructive">{updater.error}</span>
+							)}
+						</div>
 					</CardContent>
 				</Card>
 			</div>

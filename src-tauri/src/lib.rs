@@ -6,13 +6,18 @@ mod database;
 pub fn run() {
     tauri::Builder::default()
         .manage(commands::p2p::P2pState::default())
-        .setup(|_app| {
+        .setup(|app| {
             // Initialize the session auth registry
             commands::auth::init();
+            // The updater checks GitHub Releases for a signed newer build; desktop-only, like
+            // upstream's own scaffold, since there's nothing to update on mobile app stores.
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             // Session management
             commands::auth::create_workspace_session,
@@ -69,8 +74,8 @@ pub fn run() {
             // Yjs CRDT binary document persistence
             commands::workspace::get_yjs_doc,
             commands::workspace::save_yjs_doc,
+            commands::workspace::rename_yjs_doc,
             commands::workspace::delete_yjs_doc,
-            commands::workspace::list_yjs_docs,
 
             // P2P collaboration (Iroh)
             commands::p2p::p2p_set_workspace,

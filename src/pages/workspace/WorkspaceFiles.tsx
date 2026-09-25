@@ -30,7 +30,7 @@ import { Label } from "@/components/ui/label";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
-import { useP2P } from "@/store/p2p/P2PContext";
+import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 
 // Hooks
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -43,6 +43,7 @@ import {
 	listWorkspaceFiles,
 	readWorkspaceFile,
 	renameWorkspaceItem,
+	renameYjsDoc,
 	writeWorkspaceFile,
 } from "@/lib/tauri";
 
@@ -115,6 +116,7 @@ interface NameDialogState {
 // File manager page for browsing, creating, editing, and deleting files
 export default function WorkspaceFiles() {
 	const { workspace, refreshStats, addActivityEvent } = useWorkspace();
+	const isViewer = useIsViewer();
 	const logError = useErrorLog();
 
 	const workspacePath = workspace?.path ?? "";
@@ -221,7 +223,7 @@ export default function WorkspaceFiles() {
 	// Submit creation or renaming request to backend
 	const handleNameSubmit = useCallback(async () => {
 		const dialog = nameDialog;
-		if (!dialog || !workspacePath) return;
+		if (isViewer || !dialog || !workspacePath) return;
 
 		const name = dialog.value.trim();
 		if (!name) {
@@ -281,6 +283,12 @@ export default function WorkspaceFiles() {
 					dialog.item.is_dir ? "folder" : "file",
 				);
 
+				// Carry any live/persisted collaboration state over to the new path instead of
+				// stranding it under the old doc id
+				if (!dialog.item.is_dir) {
+					renameYjsDoc(workspacePath, relPath, newRelPath).catch(() => {});
+				}
+
 				if (openFilePath === relPath) {
 					setOpenFilePath(newRelPath);
 				}
@@ -303,6 +311,7 @@ export default function WorkspaceFiles() {
 		workspacePath,
 		currentDir,
 		openFilePath,
+		isViewer,
 		addActivityEvent,
 		loadEntries,
 		refreshStats,
@@ -311,7 +320,7 @@ export default function WorkspaceFiles() {
 
 	// Delete item permanently from disk
 	const handleDelete = useCallback(async () => {
-		if (!deleteItem || !workspacePath) return;
+		if (isViewer || !deleteItem || !workspacePath) return;
 
 		setIsDeleting(true);
 		try {
@@ -345,6 +354,7 @@ export default function WorkspaceFiles() {
 		deleteItem,
 		workspacePath,
 		openFilePath,
+		isViewer,
 		addActivityEvent,
 		loadEntries,
 		refreshStats,
@@ -385,23 +395,27 @@ export default function WorkspaceFiles() {
 							className={`size-4 ${isLoading ? "animate-spin" : ""}`}
 						/>
 					</Button>
-					<Button
-						variant="outline"
-						onPress={() => openCreateDialog("file")}
-					>
-						<FilePlus data-icon="inline-start" className="size-4" />
-						New File
-					</Button>
-					<Button
-						variant="outline"
-						onPress={() => openCreateDialog("folder")}
-					>
-						<FolderInput
-							data-icon="inline-start"
-							className="size-4"
-						/>
-						New Folder
-					</Button>
+					{!isViewer && (
+						<>
+							<Button
+								variant="outline"
+								onPress={() => openCreateDialog("file")}
+							>
+								<FilePlus data-icon="inline-start" className="size-4" />
+								New File
+							</Button>
+							<Button
+								variant="outline"
+								onPress={() => openCreateDialog("folder")}
+							>
+								<FolderInput
+									data-icon="inline-start"
+									className="size-4"
+								/>
+								New Folder
+							</Button>
+						</>
+					)}
 				</div>
 			</div>
 
@@ -494,28 +508,30 @@ export default function WorkspaceFiles() {
 										</span>
 
 										{/* Row actions */}
-										<div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-											<Button
-												variant="ghost"
-												size="icon-sm"
-												onPress={() =>
-													openRenameDialog(entry)
-												}
-												aria-label={`Rename ${entry.name}`}
-											>
-												<Pencil className="size-3.5" />
-											</Button>
-											<Button
-												variant="ghost"
-												size="icon-sm"
-												onPress={() =>
-													setDeleteItem(entry)
-												}
-												aria-label={`Delete ${entry.name}`}
-											>
-												<Trash2 className="size-3.5 text-destructive" />
-											</Button>
-										</div>
+										{!isViewer && (
+											<div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+												<Button
+													variant="ghost"
+													size="icon-sm"
+													onPress={() =>
+														openRenameDialog(entry)
+													}
+													aria-label={`Rename ${entry.name}`}
+												>
+													<Pencil className="size-3.5" />
+												</Button>
+												<Button
+													variant="ghost"
+													size="icon-sm"
+													onPress={() =>
+														setDeleteItem(entry)
+													}
+													aria-label={`Delete ${entry.name}`}
+												>
+													<Trash2 className="size-3.5 text-destructive" />
+												</Button>
+											</div>
+										)}
 									</div>
 								</div>
 							</li>
@@ -543,6 +559,9 @@ export default function WorkspaceFiles() {
 							<EditorContainer
 								fileName={openFilePath.split("/").pop() || "file.txt"}
 								initialContent={openFileContent}
+								readOnly={isViewer}
+								workspacePath={workspacePath}
+								docId={openFilePath}
 								onSave={async (newContent) => {
 									if (!workspacePath || !openFilePath) return;
 									await writeWorkspaceFile(

@@ -42,7 +42,7 @@ import {
 	writeWorkspaceBinaryFile,
 } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
-import { useP2P } from "@/store/p2p/P2PContext";
+import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type {
 	AssetCategory,
 	AssetItem,
@@ -70,6 +70,7 @@ function getAssetCategory(fileName: string): AssetCategory {
 export default function WorkspaceAssets() {
 	const { workspace, refreshStats, addActivityEvent } = useWorkspace();
 	const { placeholders, downloadFileOnDemand, lastSyncedFile } = useP2P();
+	const isViewer = useIsViewer();
 	const logError = useErrorLog();
 
 	// State
@@ -204,7 +205,7 @@ export default function WorkspaceAssets() {
 
 	// Rename item
 	const handleRenameConfirm = async () => {
-		if (!assetToRename || !workspace?.path || !newName.trim()) return;
+		if (isViewer || !assetToRename || !workspace?.path || !newName.trim()) return;
 
 		setIsRenaming(true);
 		try {
@@ -245,7 +246,7 @@ export default function WorkspaceAssets() {
 
 	// Delete item
 	const handleDeleteConfirm = async () => {
-		if (!assetToDelete || !workspace?.path) return;
+		if (isViewer || !assetToDelete || !workspace?.path) return;
 
 		setIsDeleting(true);
 		try {
@@ -305,7 +306,12 @@ export default function WorkspaceAssets() {
 	const handlePageDrop = async (e: React.DragEvent) => {
 		e.preventDefault();
 		setIsDraggingOver(false);
-		if (!workspace?.path || !e.dataTransfer.files || e.dataTransfer.files.length === 0)
+		if (
+			isViewer ||
+			!workspace?.path ||
+			!e.dataTransfer.files ||
+			e.dataTransfer.files.length === 0
+		)
 			return;
 
 		for (const file of Array.from(e.dataTransfer.files)) {
@@ -379,13 +385,15 @@ export default function WorkspaceAssets() {
 						<Sparkles className="size-3.5 text-amber-500" />
 						Simulate Peer Asset
 					</Button>
-					<Button
-						onPress={() => setIsUploadOpen(true)}
-						className="gap-2 text-xs"
-					>
-						<Upload className="size-4" />
-						Upload Asset
-					</Button>
+					{!isViewer && (
+						<Button
+							onPress={() => setIsUploadOpen(true)}
+							className="gap-2 text-xs"
+						>
+							<Upload className="size-4" />
+							Upload Asset
+						</Button>
+					)}
 				</div>
 			</div>
 
@@ -488,7 +496,7 @@ export default function WorkspaceAssets() {
 							"Try refining your search query or switching categories."
 						:	"Upload images, media, or documents to link them directly into your notes and code files."}
 					</p>
-					{!searchQuery && (
+					{!searchQuery && !isViewer && (
 						<Button
 							size="sm"
 							onPress={() => setIsUploadOpen(true)}
@@ -567,27 +575,31 @@ export default function WorkspaceAssets() {
 												<Check className="size-3.5 text-emerald-400" />
 											:	<Copy className="size-3.5" />}
 										</button>
-										<button
-											onClick={(e) => {
-												e.stopPropagation();
-												setAssetToRename(asset);
-												setNewName(asset.name);
-											}}
-											title="Rename"
-											className="p-1.5 rounded-md bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
-										>
-											<Pencil className="size-3.5" />
-										</button>
-										<button
-											onClick={(e) => {
-												e.stopPropagation();
-												setAssetToDelete(asset);
-											}}
-											title="Delete"
-											className="p-1.5 rounded-md bg-background/80 hover:bg-destructive text-foreground hover:text-destructive-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
-										>
-											<Trash2 className="size-3.5" />
-										</button>
+										{!isViewer && (
+											<>
+												<button
+													onClick={(e) => {
+														e.stopPropagation();
+														setAssetToRename(asset);
+														setNewName(asset.name);
+													}}
+													title="Rename"
+													className="p-1.5 rounded-md bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
+												>
+													<Pencil className="size-3.5" />
+												</button>
+												<button
+													onClick={(e) => {
+														e.stopPropagation();
+														setAssetToDelete(asset);
+													}}
+													title="Delete"
+													className="p-1.5 rounded-md bg-background/80 hover:bg-destructive text-foreground hover:text-destructive-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
+												>
+													<Trash2 className="size-3.5" />
+												</button>
+											</>
+										)}
 									</div>
 								</div>
 
@@ -699,25 +711,29 @@ export default function WorkspaceAssets() {
 													:	<Copy className="size-3" />}
 													{copiedKey === asset.name ? "Copied" : "Copy"}
 												</button>
-												<button
-													onClick={(e) => {
-														e.stopPropagation();
-														setAssetToRename(asset);
-														setNewName(asset.name);
-													}}
-													className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-all"
-												>
-													<Pencil className="size-3.5" />
-												</button>
-												<button
-													onClick={(e) => {
-														e.stopPropagation();
-														setAssetToDelete(asset);
-													}}
-													className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer transition-all"
-												>
-													<Trash2 className="size-3.5" />
-												</button>
+												{!isViewer && (
+													<>
+														<button
+															onClick={(e) => {
+																e.stopPropagation();
+																setAssetToRename(asset);
+																setNewName(asset.name);
+															}}
+															className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-all"
+														>
+															<Pencil className="size-3.5" />
+														</button>
+														<button
+															onClick={(e) => {
+																e.stopPropagation();
+																setAssetToDelete(asset);
+															}}
+															className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer transition-all"
+														>
+															<Trash2 className="size-3.5" />
+														</button>
+													</>
+												)}
 											</div>
 										</td>
 									</tr>

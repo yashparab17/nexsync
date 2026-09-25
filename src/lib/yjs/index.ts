@@ -7,5 +7,4 @@ export * from "yjs";
 export {
 	SqlitePersistenceProvider,
 	type SqlitePersistenceOptions,
-	type PersistenceStatus,
 } from "./SqlitePersistenceProvider";
