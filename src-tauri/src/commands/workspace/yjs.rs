@@ -43,6 +43,25 @@ pub fn get_yjs_doc(
 	}
 }
 
+/// Lists the ids of every document with stored CRDT state, so catch-up can cover closed notes
+#[tauri::command]
+pub fn list_yjs_docs(app_handle: tauri::AppHandle, workspace_path: String) -> Result<Vec<String>, String> {
+	validate_allowed_root(&app_handle, &workspace_path)?;
+
+	let db = WorkspaceDb::open_existing(&workspace_path)?;
+	let ws_id = get_workspace_id(&db)?;
+	let mut stmt = db
+		.conn
+		.prepare("SELECT doc_id FROM yjs_documents WHERE workspace_id = ?1")
+		.map_err(|e| e.to_string())?;
+	let ids = stmt
+		.query_map([&ws_id], |r| r.get(0))
+		.map_err(|e| e.to_string())?
+		.filter_map(|r| r.ok())
+		.collect();
+	Ok(ids)
+}
+
 /// Persists a document's binary CRDT state snapshot into SQLite
 #[tauri::command]
 pub fn save_yjs_doc(

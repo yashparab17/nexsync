@@ -10,6 +10,7 @@ import WorkspaceHeader from "@/components/layout/workspace/WorkspaceHeader";
 import JoinRequestDialog from "@/components/dialogs/workspace/JoinRequestDialog";
 import WorkspaceDeletedDialog from "@/components/dialogs/workspace/WorkspaceDeletedDialog";
 import HostHandoffDialog from "@/components/dialogs/workspace/HostHandoffDialog";
+import TransferTray from "@/components/layout/workspace/TransferTray";
 
 // Shell layout for all workspace sub-routes
 export default function Workspace() {
@@ -57,6 +58,9 @@ export default function Workspace() {
 
 			{/* Shown to a guest the host wants to hand hosting to */}
 			<HostHandoffDialog />
+
+			{/* Progress and cancel for file downloads */}
+			<TransferTray />
 		</div>
 	);
 }

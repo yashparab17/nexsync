@@ -16,6 +16,8 @@ export type P2PMessageKind =
 	| "ROLE_REQUEST" // An Admin guest asking the host to change a role; only delivered to the host
 	| "HOST_HANDOFF" // The host offering a guest to take over hosting; only accepted from the host
 	| "HOST_READY" // The chosen guest's answer to a handoff: a fresh invite ticket, or none if declined
+	| "YDOC_INVENTORY" // State summary of every stored note, sent on connect so the peer can send what is missing
+	| "YDOC_UPDATE" // What one note is missing on the peer, answering an inventory
 	| "HOST_MOVED"; // The host telling guests the ticket of the new host; only accepted from the host
 
 // JSON envelope carried over a peer's encrypted control stream

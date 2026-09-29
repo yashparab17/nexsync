@@ -29,7 +29,7 @@ All networking runs in the Rust backend (`src-tauri/src/commands/p2p/`). The Rea
 - **Invites:** a ticket (`nexsync…`) contains the host's key, home relay, a few IP hints and a random 128-bit secret. The guest proves it has the ticket by sending the secret _inside_ the encrypted connection. Creating a new invite or pressing **Stop** invalidates the previous ticket.
 - **Live task and kanban sync:** every task or card you create, edit, move or delete is sent to collaborators as a small change message and applied to their SQLite database. The host also shares its member list, so everyone sees who is in the workspace.
 - **Live file sync:** each app watches its open workspace. When a file changes, peers are told its path, size and content hash, and download it only if their copy differs. Deleted files are moved to `.nexsync/trash/` on the other side rather than destroyed. The host re-announces what it receives, so every guest stays in sync.
-- **Live co-editing:** when two people open the same note or file, keystrokes flow over the same control stream as a Yjs CRDT update, merged automatically instead of one save overwriting the other. Cursor/presence state rides along the same channel. Guests only ever connect to the host, so the host relays these updates (and a Viewer's are dropped, never applied) the same way it already relays task, kanban and file changes.
+- **Live co-editing:** when two people open the same note or file, keystrokes flow over the same control stream as a Yjs CRDT update, merged automatically instead of one save overwriting the other. Cursor/presence state rides along the same channel. While the host is online it relays these updates to every guest (and a Viewer's are dropped, never applied); guests also send them straight to each other. Notes that were closed while devices were apart are merged when they reconnect.
 
 ```mermaid
 sequenceDiagram
@@ -125,7 +125,7 @@ If you already have the synced workspace open, use **P2P Sync → Join with Invi
 
 ## Current limitations
 
-- **Star topology:** guests talk only to the host, which relays file, task, kanban, activity and live-editing changes on to the other guests. If the host goes offline, guests can't reach each other.
+- **Host-vouched mesh:** guests join through the host, which relays changes and introduces each pair of guests to each other. Guests then link directly and keep syncing if the host goes offline, but a direct link that drops while the host is away is not re-dialed, and new guests cannot join until a host is back.
 - **Live co-editing has no presence UI yet:** cursor/selection data is relayed and applied, but nothing outside the open editor reads it — no "who's viewing this file" indicator on the Members page yet.
 - **CodeMirror's undo is CRDT-aware, but a rename mid-edit only migrates the collaboration state for files, not folders**, and the very first time two people open a never-before-collaborated file at almost the same instant, both may seed it independently (harmless once anyone edits it once).
 - **Last writer wins, outside a live session:** a plain file save (not currently open together) or a re-pull from the host still replaces the other side's copy of files ≤ 10 MB rather than merging.

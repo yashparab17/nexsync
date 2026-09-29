@@ -31,6 +31,7 @@ import {
 	subscribeToActivityEvents,
 } from "@/store/workspace/WorkspaceContext";
 import {
+	base64ToUint8Array,
 	readWorkspaceMetadata,
 	writeWorkspaceMetadata,
 	getTasks,
@@ -40,6 +41,7 @@ import {
 } from "@/lib/tauri";
 import type { Member } from "@/types/workspace";
 import { bindGuestMember, canChangeRole, roleTable } from "@/lib/roles";
+import { applyCatchUp, buildInventory, updatesFor, type Inventory } from "@/lib/p2p/yjsCatchUp";
 
 // Files above this size are listed as placeholders during sync and downloaded on demand
 export const LAZY_LOAD_THRESHOLD_BYTES = 10 * 1024 * 1024;
@@ -100,6 +102,14 @@ function setSelfName(workspaceId: string, name: string | null) {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const HANDOFF_TIMEOUT_MS = 60_000;
 
+// A file being downloaded from a peer
+export interface FileTransfer {
+	peerId: string;
+	relPath: string;
+	receivedBytes: number;
+	totalBytes: number;
+}
+
 // What the host sends a guest it wants to hand hosting to: the member list with the roles already swapped
 export interface HandoffOffer {
 	from: string; // Peer id of the current host
@@ -130,6 +140,8 @@ interface P2PContextType {
 	selfName: string | null; // Our member name in a workspace we joined; null in our own workspaces
 	selfId: string | null; // Our device key, set once we have joined a workspace
 	requestRoleChange: (deviceId: string, role: string) => void; // Admin guests only; the host decides
+	transfers: FileTransfer[]; // Downloads in progress, from live sync, catch-up or a workspace snapshot
+	cancelTransfers: (relPath?: string) => Promise<void>; // One file, or every download when omitted
 	handoffOffer: HandoffOffer | null; // The host asked this device to take over hosting
 	acceptHandoff: () => Promise<void>;
 	declineHandoff: () => void;
@@ -167,6 +179,14 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const [reconnecting, setReconnecting] = useState(false);
 	const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
 	const [workspaceDeleted, setWorkspaceDeleted] = useState(false);
+	// Read inside handlers: guests can now see other guests, so only the host may act on them
+	const selfNameRef = useRef<string | null>(null);
+	// Note catch-up steps run one at a time, so two updates to the same closed note cannot overwrite each other
+	const catchUpQueueRef = useRef<Promise<void>>(Promise.resolve());
+	const sendInventoryRef = useRef<(peerId: string) => void>(() => {});
+	const [transfers, setTransfers] = useState<FileTransfer[]>([]);
+	// Set when the user cancels everything, so a snapshot download loop stops instead of starting the next file
+	const cancelledRef = useRef(false);
 	const [handoffOffer, setHandoffOffer] = useState<HandoffOffer | null>(null);
 	// The guest the host is waiting on to answer a handoff, and how to deliver the answer
 	const handoffWaitRef = useRef<{ peerId: string; resolve: (ticket: string | null) => void } | null>(null);
@@ -265,7 +285,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		const offJoined = p2p.onPeerJoined((peer) => {
 			setReconnecting(false);
 			syncProvidersRef.current.forEach((provider) => provider.addPeer(peer.id));
-			if (!peer.isHost) void addGuestMember(peer);
+			sendInventoryRef.current(peer.id);
+			if (!peer.isHost && selfNameRef.current === null) void addGuestMember(peer);
 		});
 		const offLeft = p2p.onPeerLeft(({ peerId }) => {
 			syncProvidersRef.current.forEach((provider) => provider.removePeer(peerId));
@@ -370,6 +391,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				}
 				setDataVersion((v) => v + 1);
 
+				cancelledRef.current = false;
 				const eager = snapshot.files.filter((f) => !f.isPlaceholder);
 				const lazy: PlaceholderItem[] = snapshot.files
 					.filter((f) => f.isPlaceholder)
@@ -382,6 +404,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 
 				let failed = 0;
 				for (let i = 0; i < eager.length; i++) {
+					if (cancelledRef.current) break;
 					const relPath = stripLeadingSlash(eager[i].relPath);
 					setSyncProgress({ filesDone: i, filesTotal: eager.length, currentFile: relPath });
 					try {
@@ -419,6 +442,28 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		},
 		[send],
 	);
+
+	// Notes open in an editor, whose live state is newer than what is stored
+	const liveDocs = useCallback(
+		() => [...syncProvidersRef.current].map((provider) => ({ docId: provider.docId, doc: provider.doc })),
+		[],
+	);
+
+	const runCatchUp = useCallback((step: () => Promise<void>) => {
+		catchUpQueueRef.current = catchUpQueueRef.current.then(step).catch((err) =>
+			console.error("[P2P] Note catch-up failed:", err),
+		);
+	}, []);
+
+	// Tell a peer what every note here looks like, so it can send what this device is missing
+	sendInventoryRef.current = (peerId: string) => {
+		const path = workspaceRef.current?.path;
+		if (!path) return;
+		runCatchUp(async () => {
+			const inventory = await buildInventory(path, liveDocs());
+			send({ kind: "YDOC_INVENTORY", timestamp: Date.now(), payload: JSON.stringify(inventory) }, peerId);
+		});
+	};
 
 	// Tell collaborators about a local task/kanban edit
 	const publishDataChange = useCallback(
@@ -494,6 +539,36 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 					setWorkspaceDeleted(true);
 					break;
 
+				case "YDOC_INVENTORY": {
+					const path = workspaceRef.current?.path;
+					if (!path || !message.payload) break;
+					try {
+						const inventory: Inventory = JSON.parse(message.payload);
+						runCatchUp(async () => {
+							for (const { docId, update } of await updatesFor(path, inventory, liveDocs())) {
+								send({ kind: "YDOC_UPDATE", timestamp: Date.now(), docId, payload: update }, peerId);
+							}
+						});
+					} catch {
+						console.warn("[P2P] Ignoring a malformed note inventory.");
+					}
+					break;
+				}
+
+				case "YDOC_UPDATE": {
+					const path = workspaceRef.current?.path;
+					const { docId, payload } = message;
+					if (!path || !docId || !payload) break;
+					runCatchUp(async () => {
+						const changed = await applyCatchUp(path, docId, base64ToUint8Array(payload), liveDocs());
+						// Everyone else may now be missing what this device just learned.
+						if (changed) {
+							for (const peer of peersRef.current) if (peer.id !== peerId) sendInventoryRef.current(peer.id);
+						}
+					});
+					break;
+				}
+
 				case "HOST_HANDOFF": {
 					// The backend only delivers this from the host we joined
 					try {
@@ -537,7 +612,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				case "ROLE_REQUEST": {
 					// The backend only delivers this from an Admin guest, but what they may change is checked here
 					const path = workspaceRef.current?.path;
-					if (!path || !message.payload) break;
+					if (!path || !message.payload || selfNameRef.current !== null) break;
 					try {
 						const request: { deviceId?: unknown; role?: unknown } = JSON.parse(message.payload);
 						if (typeof request.deviceId !== "string" || typeof request.role !== "string") break;
@@ -594,7 +669,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				}
 			}
 		},
-		[generateWorkspaceSnapshot, applyWorkspaceSnapshot, send, sendMembers],
+		[generateWorkspaceSnapshot, applyWorkspaceSnapshot, send, sendMembers, liveDocs, runCatchUp],
 	);
 
 	const handleMessageRef = useRef(handleMessage);
@@ -639,6 +714,28 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			offRemote();
 		};
 	}, [markSynced]);
+
+	// Track every download in flight so the UI can show progress and offer to cancel
+	useEffect(() => {
+		const offProgress = p2p.onFileProgress((event) =>
+			setTransfers((prev) => [
+				...prev.filter((t) => !(t.peerId === event.peerId && t.relPath === event.relPath)),
+				{ peerId: event.peerId, relPath: event.relPath, receivedBytes: event.receivedBytes, totalBytes: event.totalBytes },
+			]),
+		);
+		const offEnded = p2p.onFileEnded((event) =>
+			setTransfers((prev) => prev.filter((t) => !(t.peerId === event.peerId && t.relPath === event.relPath))),
+		);
+		return () => {
+			offProgress();
+			offEnded();
+		};
+	}, []);
+
+	const cancelTransfers = useCallback(async (relPath?: string) => {
+		if (!relPath) cancelledRef.current = true;
+		await p2p.cancelTransfers(relPath).catch(() => 0);
+	}, []);
 
 	// Attach byte progress to the file currently being synced
 	useEffect(() => {
@@ -788,7 +885,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const membersJson = JSON.stringify(metadata?.members.members ?? null);
 	const guestCount = peers.filter((p) => !p.isHost).length;
 	useEffect(() => {
-		if (guestCount > 0 && membersJson !== "null") sendMembers();
+		if (guestCount > 0 && membersJson !== "null" && selfNameRef.current === null) sendMembers();
 	}, [membersJson, guestCount, sendMembers]);
 
 	const selfName = useMemo(
@@ -796,6 +893,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		// selfNameVersion changes when a join saves a new name for this workspace
 		[workspace?.id, selfNameVersion],
 	);
+	selfNameRef.current = selfName;
 
 	// The host enforces roles by device key, so it hands the current member list to the backend
 	useEffect(() => {
@@ -930,6 +1028,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				selfName,
 				selfId,
 				requestRoleChange,
+				transfers,
+				cancelTransfers,
 				handoffOffer,
 				acceptHandoff,
 				declineHandoff,

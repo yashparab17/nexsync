@@ -7,6 +7,7 @@
 //! commands below and listens to `p2p://*` events.
 
 mod files;
+mod mesh;
 mod node;
 pub(crate) mod short_code;
 mod sync;
@@ -139,6 +140,12 @@ pub async fn p2p_send(
 #[tauri::command]
 pub async fn p2p_list_peers(state: State<'_, P2pState>) -> Result<Vec<PeerInfo>, String> {
     Ok(state.existing().await.map(|node| node.peers()).unwrap_or_default())
+}
+
+/// Cancels the downloads of one file, or every download when `rel_path` is omitted
+#[tauri::command]
+pub async fn p2p_cancel_transfers(state: State<'_, P2pState>, rel_path: Option<String>) -> Result<usize, String> {
+    Ok(state.existing().await.map_or(0, |node| node.sync().cancel_transfers(rel_path.as_deref())))
 }
 
 /// Disconnects a single peer

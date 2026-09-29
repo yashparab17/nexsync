@@ -13,7 +13,7 @@ use std::{
 
 use iroh::{
     endpoint::{presets, Connection, RecvStream, SendStream},
-    Endpoint, EndpointId, SecretKey,
+    Endpoint, EndpointAddr, EndpointId, SecretKey,
 };
 use serde::Serialize;
 use subtle::ConstantTimeEq;
@@ -25,6 +25,7 @@ use tokio::{
 
 use super::{
     files,
+    mesh::{self, MeshAllow},
     short_code::ShortCodes,
     sync::{self, LiveSync, SyncMessage},
     ticket::{self, Ticket, SECRET_LEN},
@@ -46,6 +47,8 @@ const RECONNECT_MAX_DELAY: Duration = Duration::from_secs(30);
 const REJECT_LINGER: Duration = Duration::from_secs(3);
 const STATS_INTERVAL: Duration = Duration::from_secs(2);
 const OUTBOX_CAPACITY: usize = 256;
+const MESH_DIAL_ATTEMPTS: u32 = 3;
+const MESH_DIAL_DELAY: Duration = Duration::from_secs(2);
 
 const CLOSE_NORMAL: u32 = 0;
 const CLOSE_REJECTED: u32 = 1;
@@ -61,6 +64,8 @@ const KIND_WORKSPACE_DELETED: &str = "WORKSPACE_DELETED";
 const KIND_HOST_HANDOFF: &str = "HOST_HANDOFF";
 /// The host telling guests where the new host is; accepted only from the host
 const KIND_HOST_MOVED: &str = "HOST_MOVED";
+/// Catch-up content for a note that was closed while apart; dropped from Viewer guests like live edits
+const KIND_YDOC_UPDATE: &str = "YDOC_UPDATE";
 /// An Admin guest asking the host to change someone's role; dropped from everyone else
 const KIND_ROLE_REQUEST: &str = "ROLE_REQUEST";
 /// App messages a host forwards from one guest to the others. Yjs sync messages are included
@@ -213,12 +218,28 @@ struct Invite {
     host_name: String,
 }
 
+/// Who a new peer is and how it is linked to us
+struct PeerIdentity {
+    name: String,
+    role: String,
+    is_host: bool,
+    mesh: bool,
+}
+
+impl PeerIdentity {
+    fn guest(name: String, role: String, mesh: bool) -> Self {
+        Self { name, role, is_host: false, mesh }
+    }
+}
+
 struct Peer {
     conn: Connection,
     outbox: mpsc::Sender<Vec<u8>>,
     name: String,
     role: String,
     is_host: bool,
+    /// True for a link made directly between two guests rather than through the host
+    mesh: bool,
     connected_at: u64,
 }
 
@@ -231,6 +252,10 @@ struct NodeState {
     reconnecting: bool,
     /// Roles the host has assigned by device key; these win over the role on the invite used to join
     roles: HashMap<String, String>,
+    /// Other guests the host vouched for, keyed by device; a guest accepts a direct link only from these
+    mesh_allow: HashMap<EndpointId, MeshAllow>,
+    /// Host side: the token shared by each pair of guests
+    mesh_tokens: mesh::MeshTokens,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -301,7 +326,7 @@ impl Node {
     }
 
     /// Replaces the roles the host has assigned by device key and applies them to connected guests
-    pub fn set_roles(&self, roles: Vec<(String, String)>) {
+    pub fn set_roles(self: &Arc<Self>, roles: Vec<(String, String)>) {
         let roles: HashMap<String, String> = roles
             .into_iter()
             .filter(|(_, role)| GUEST_ROLES.contains(&role.as_str()))
@@ -316,6 +341,9 @@ impl Node {
             }
         }
         st.roles = roles;
+        drop(st);
+        // Guests hold each other's roles too, so they hear about the change.
+        self.broadcast_mesh();
     }
 
     pub fn has_peers(&self) -> bool {
@@ -437,8 +465,20 @@ impl Node {
         .await
         .map_err(|_| "handshake timed out".to_string())??;
 
+        // A guest the host vouched for shows the token from the host instead of an invite secret.
+        let mesh_peer = (hello.v == wire::PROTOCOL_VERSION)
+            .then(|| self.check_mesh(&hello.secret, &conn.remote_id()))
+            .flatten();
         let verdict = if hello.v != wire::PROTOCOL_VERSION {
             Err("You're running a different version of NexSync than the host. Update both apps and try again.".to_string())
+        } else if let Some(allow) = &mesh_peer {
+            Ok(HandshakeReply::Welcome {
+                v: wire::PROTOCOL_VERSION,
+                host_name: String::new(),
+                role: allow.role.clone(),
+                workspace_id: String::new(),
+                workspace_name: String::new(),
+            })
         } else {
             self.check_invite(&hello.secret, &conn.remote_id())
         };
@@ -450,7 +490,10 @@ impl Node {
                 };
                 let role = role.clone();
                 wire::write_json(&mut send, &welcome).await?;
-                self.register_peer(conn, send, recv, sanitize_name(&hello.name), role, false);
+                match mesh_peer {
+                    Some(allow) => self.register_peer(conn, send, recv, PeerIdentity::guest(allow.name, role, true)),
+                    None => self.register_peer(conn, send, recv, PeerIdentity::guest(sanitize_name(&hello.name), role, false)),
+                }
                 Ok(())
             }
             Err(error) => {
@@ -462,6 +505,14 @@ impl Node {
                 Err(error)
             }
         }
+    }
+
+    /// The guest entry if `id` was vouched for by the host and presented the right token
+    fn check_mesh(&self, presented: &str, id: &EndpointId) -> Option<MeshAllow> {
+        let st = self.lock();
+        let allow = st.mesh_allow.get(id)?;
+        let presented = ticket::decode_secret(presented)?;
+        bool::from(presented.ct_eq(&allow.token)).then(|| allow.clone())
     }
 
     fn check_invite(&self, presented: &str, guest: &EndpointId) -> Result<HandshakeReply, String> {
@@ -542,7 +593,7 @@ impl Node {
                 }
                 let host_name = sanitize_name(&host_name);
                 self.lock().last_join = Some((ticket_str.to_string(), display_name.to_string()));
-                self.register_peer(conn, send, recv, host_name.clone(), role.clone(), true);
+                self.register_peer(conn, send, recv, PeerIdentity { name: host_name.clone(), role: role.clone(), is_host: true, mesh: false });
                 Ok(JoinResult {
                     peer_id: host_id.to_string(),
                     workspace_id,
@@ -567,10 +618,9 @@ impl Node {
         conn: Connection,
         send: SendStream,
         recv: RecvStream,
-        name: String,
-        role: String,
-        is_host: bool,
+        who: PeerIdentity,
     ) {
+        let PeerIdentity { name, role, is_host, mesh } = who;
         let id = conn.remote_id();
         let (outbox, rx) = mpsc::channel(OUTBOX_CAPACITY);
         let peer = Peer {
@@ -579,11 +629,21 @@ impl Node {
             name,
             role,
             is_host,
+            mesh,
             connected_at: now_ms(),
         };
         let info = peer_info(&id, &peer);
 
-        let replaced = self.lock().peers.insert(id, peer);
+        let replaced = {
+            let mut st = self.lock();
+            // A direct guest link never displaces a connection we already have, such as the one to the host.
+            if mesh && st.peers.contains_key(&id) {
+                drop(st);
+                conn.close(CLOSE_REPLACED.into(), b"already connected");
+                return;
+            }
+            st.peers.insert(id, peer)
+        };
         if let Some(old) = replaced {
             old.conn.close(CLOSE_REPLACED.into(), b"replaced by a newer connection");
         }
@@ -591,6 +651,9 @@ impl Node {
         // Announce the peer before reading from it, so the UI never sees a message from an unknown peer
         self.emit(EVENT_PEER_JOINED, &info);
         self.emit_peers();
+        if !mesh {
+            self.broadcast_mesh();
+        }
 
         tokio::spawn(write_loop(send, rx));
         tokio::spawn(self.clone().run_peer(conn, recv));
@@ -686,6 +749,16 @@ impl Node {
             return;
         };
 
+        // Who else is in the workspace is decided by the host and handled here
+        if kind == mesh::KIND_MESH_STATE {
+            if self.peer_is_host(&from.to_string()) == Some(true) {
+                if let Ok(state) = serde_json::from_value::<mesh::MeshState>(message) {
+                    self.handle_mesh_state(state);
+                }
+            }
+            return;
+        }
+
         // File sync is handled entirely in the backend
         if SyncMessage::is_sync_kind(kind) {
             match serde_json::from_value::<SyncMessage>(message) {
@@ -697,12 +770,12 @@ impl Node {
             return;
         }
 
-        let Some((from_host, may_write, is_admin)) = self
-            .lock()
-            .peers
-            .get(from)
-            .map(|p| (p.is_host, p.is_host || p.role != "Viewer", p.role == "Admin"))
-        else {
+        let Some((from_host, may_write, is_admin, hosting)) = ({
+            let st = self.lock();
+            st.peers
+                .get(from)
+                .map(|p| (p.is_host, p.is_host || p.role != "Viewer", p.role == "Admin", is_hosting(&st)))
+        }) else {
             return;
         };
         match kind {
@@ -713,21 +786,21 @@ impl Node {
             // A Viewer's readOnly editor is a UI nicety, not a security boundary: a modified
             // client could still send raw Yjs updates, so the host must drop them itself. Sync
             // step 1/2 (state-vector handshake, no content) and presence stay allowed.
-            "SYNC_UPDATE" if !may_write => {
+            "SYNC_UPDATE" | KIND_YDOC_UPDATE if !may_write => {
                 eprintln!("[P2P] Ignoring a Yjs update from Viewer {}", from.fmt_short());
                 return;
             }
             // Only the host decides who is in the workspace
             KIND_MEMBERS_UPDATE | KIND_WORKSPACE_DELETED | KIND_HOST_HANDOFF | KIND_HOST_MOVED if !from_host => return,
             // Only Admin guests may ask for role changes, and only a host acts on them
-            KIND_ROLE_REQUEST if from_host || !is_admin => {
+            KIND_ROLE_REQUEST if from_host || !is_admin || !hosting => {
                 eprintln!("[P2P] Ignoring a role request from {}", from.fmt_short());
                 return;
             }
             _ => {}
         }
-        // A host passes guests' changes on so every guest sees them
-        if !from_host && RELAYED_KINDS.contains(&kind) {
+        // Only the host passes changes on; guests linked directly to each other would otherwise loop them
+        if !from_host && hosting && RELAYED_KINDS.contains(&kind) {
             self.relay(from, bytes.to_vec());
         }
 
@@ -738,6 +811,132 @@ impl Node {
                 message,
             },
         );
+    }
+
+    /// Host only: tells every guest about the other guests so they can link up directly
+    fn broadcast_mesh(&self) {
+        let sends: Vec<(mpsc::Sender<Vec<u8>>, Vec<u8>)> = {
+            let mut st = self.lock();
+            if !is_hosting(&st) {
+                return;
+            }
+            let rows: Vec<(mesh::GuestRow, mpsc::Sender<Vec<u8>>)> = st
+                .peers
+                .iter()
+                .filter(|(_, p)| !p.mesh)
+                .map(|(id, p)| {
+                    let row = mesh::GuestRow {
+                        id: id.to_string(),
+                        name: p.name.clone(),
+                        role: p.role.clone(),
+                        connected_at: p.connected_at,
+                    };
+                    (row, p.outbox.clone())
+                })
+                .collect();
+            let all: Vec<mesh::GuestRow> = rows.iter().map(|(row, _)| row.clone()).collect();
+            rows.into_iter()
+                .filter_map(|(row, outbox)| {
+                    let state = mesh::state_for(&row, &all, &mut st.mesh_tokens);
+                    serde_json::to_vec(&state).ok().map(|bytes| (outbox, bytes))
+                })
+                .collect()
+        };
+        tokio::spawn(async move {
+            for (outbox, bytes) in sends {
+                let _ = outbox.send(bytes).await;
+            }
+        });
+    }
+
+    /// Guest side: remembers who the host vouched for, dials those we should, and drops any that left
+    fn handle_mesh_state(self: &Arc<Self>, state: mesh::MeshState) {
+        let me = self.endpoint.id();
+        let mut to_dial = Vec::new();
+        let mut dropped = Vec::new();
+        {
+            let mut st = self.lock();
+            let mut allowed = HashMap::new();
+            for entry in state.peers {
+                let Ok(id) = entry.id.parse::<EndpointId>() else { continue };
+                let Some(token) = ticket::decode_secret(&entry.token) else { continue };
+                if id == me {
+                    continue;
+                }
+                let role = if GUEST_ROLES.contains(&entry.role.as_str()) { entry.role } else { "Viewer".to_string() };
+                let allow = MeshAllow { token, name: sanitize_name(&entry.name), role };
+                match st.peers.get_mut(&id) {
+                    Some(peer) if !peer.is_host => peer.role = allow.role.clone(),
+                    Some(_) => {}
+                    None if entry.dial => to_dial.push((id, allow.clone())),
+                    None => {}
+                }
+                allowed.insert(id, allow);
+            }
+            for (id, peer) in st.peers.iter() {
+                if peer.mesh && !allowed.contains_key(id) {
+                    dropped.push(peer.conn.clone());
+                }
+            }
+            st.mesh_allow = allowed;
+        }
+        for conn in dropped {
+            conn.close(CLOSE_NORMAL.into(), b"left the workspace");
+        }
+        for (id, allow) in to_dial {
+            tokio::spawn(self.clone().dial_mesh(id, allow));
+        }
+    }
+
+    /// Opens a direct link to another guest, retrying a few times while the other side hears about us
+    async fn dial_mesh(self: Arc<Self>, id: EndpointId, allow: MeshAllow) {
+        for attempt in 0..MESH_DIAL_ATTEMPTS {
+            if attempt > 0 {
+                tokio::time::sleep(MESH_DIAL_DELAY).await;
+            }
+            {
+                let st = self.lock();
+                if st.peers.contains_key(&id) || !st.mesh_allow.contains_key(&id) {
+                    return;
+                }
+            }
+            match self.try_dial_mesh(id, &allow).await {
+                Ok(()) => return,
+                Err(e) => eprintln!("[P2P] Could not link to guest {}: {e}", id.fmt_short()),
+            }
+        }
+    }
+
+    async fn try_dial_mesh(self: &Arc<Self>, id: EndpointId, allow: &MeshAllow) -> Result<(), String> {
+        let conn = tokio::time::timeout(CONNECT_TIMEOUT, self.endpoint.connect(EndpointAddr::new(id), wire::ALPN))
+            .await
+            .map_err(|_| "timed out".to_string())?
+            .map_err(|e| e.to_string())?;
+        let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+        send.write_all(&[wire::STREAM_CONTROL]).await.map_err(|e| e.to_string())?;
+        wire::write_json(
+            &mut send,
+            &Hello {
+                v: wire::PROTOCOL_VERSION,
+                secret: ticket::encode_secret(&allow.token),
+                name: "Guest".to_string(),
+            },
+        )
+        .await?;
+        let reply: HandshakeReply =
+            tokio::time::timeout(HANDSHAKE_TIMEOUT, wire::read_json(&mut recv, wire::MAX_SMALL_FRAME))
+                .await
+                .map_err(|_| "no answer".to_string())??;
+        match reply {
+            HandshakeReply::Welcome { .. } => {
+                self.register_peer(conn, send, recv, PeerIdentity::guest(allow.name.clone(), allow.role.clone(), true));
+                Ok(())
+            }
+            HandshakeReply::Reject { error } => {
+                conn.close(CLOSE_REJECTED.into(), b"rejected");
+                Err(error)
+            }
+        }
     }
 
     /// Forwards a message to every peer except the one it came from
@@ -761,7 +960,7 @@ impl Node {
 
     /// Removes a peer only if the map still holds this exact connection
     /// Removes a peer whose connection ended; returns true when it was the host we joined
-    fn remove_peer(&self, id: &EndpointId, stable_id: usize) -> bool {
+    fn remove_peer(self: &Arc<Self>, id: &EndpointId, stable_id: usize) -> bool {
         let removed = {
             let mut st = self.lock();
             match st.peers.get(id) {
@@ -772,11 +971,13 @@ impl Node {
         let Some(peer) = removed else { return false };
         self.emit(EVENT_PEER_LEFT, PeerLeft { peer_id: id.to_string() });
         self.emit_peers();
+        self.lock().mesh_tokens.forget(&id.to_string());
+        self.broadcast_mesh();
         peer.is_host
     }
 
     /// Closes the connection to one peer
-    pub fn disconnect(&self, peer_id: &str) -> Result<(), String> {
+    pub fn disconnect(self: &Arc<Self>, peer_id: &str) -> Result<(), String> {
         let id = parse_peer_id(peer_id)?;
         let removed = {
             let mut st = self.lock();
@@ -790,6 +991,8 @@ impl Node {
             peer.conn.close(CLOSE_NORMAL.into(), b"disconnected");
             self.emit(EVENT_PEER_LEFT, PeerLeft { peer_id: id.to_string() });
             self.emit_peers();
+            self.lock().mesh_tokens.forget(&id.to_string());
+            self.broadcast_mesh();
         }
         Ok(())
     }
@@ -801,6 +1004,8 @@ impl Node {
             st.invite = None;
             self.short_codes.cancel();
             st.last_join = None;
+            st.mesh_allow.clear();
+            st.mesh_tokens.clear();
             st.peers.drain().collect()
         };
         for (id, peer) in peers {
@@ -888,6 +1093,11 @@ async fn write_loop(mut send: SendStream, mut rx: mpsc::Receiver<Vec<u8>>) {
         }
     }
     let _ = send.finish();
+}
+
+/// True on the device that runs the hub: it did not join anyone and no peer is its host
+fn is_hosting(st: &NodeState) -> bool {
+    st.last_join.is_none() && st.peers.values().all(|p| !p.is_host)
 }
 
 fn peer_info(id: &EndpointId, peer: &Peer) -> PeerInfo {
@@ -1250,7 +1460,45 @@ mod tests {
         assert_eq!(rejoined.role, "Admin");
         wait_until("everyone is on the new host", || new_host.node.peers().len() == 2).await;
         assert!(new_host.node.peers().iter().all(|p| !p.is_host));
-        assert!(other.node.peers().iter().all(|p| p.is_host && p.id == new_host.node.self_id()));
+        assert!(other.node.peers().iter().any(|p| p.is_host && p.id == new_host.node.self_id()));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_guests_keep_syncing_with_each_other_when_the_host_is_gone() {
+        let host = start_test_node("mesh-host").await;
+        let mut editor = start_test_node("mesh-editor").await;
+        let mut viewer = start_test_node("mesh-viewer").await;
+        for (guest, role, name) in [(&editor, "Editor", "Ed"), (&viewer, "Viewer", "Vi")] {
+            let invite = host
+                .node
+                .create_invite(role.into(), "ws".into(), "Demo".into(), "Host".into())
+                .await
+                .unwrap();
+            guest.node.join(&invite.ticket, name).await.unwrap();
+        }
+
+        // The host vouches for them, so they link up directly.
+        wait_until("the guests link up", || editor.node.peers().len() == 2 && viewer.node.peers().len() == 2).await;
+        host.node.disconnect_all();
+        wait_until("the host is gone", || editor.node.peers().len() == 1 && viewer.node.peers().len() == 1).await;
+
+        // An Editor's change still reaches the other guest, with the host offline.
+        let change = serde_json::json!({ "kind": KIND_DATA_CHANGE, "payload": "from-editor" });
+        editor.node.send(None, &change).await.unwrap();
+        let heard = next_shared_message(&mut viewer, Duration::from_secs(10)).await.expect("the viewer should hear the editor");
+        assert_eq!(heard["message"]["payload"], "from-editor");
+
+        // The Viewer's role travelled with the host's introduction, so its changes are still refused.
+        let change = serde_json::json!({ "kind": KIND_DATA_CHANGE, "payload": "from-viewer" });
+        viewer.node.send(None, &change).await.unwrap();
+        assert!(next_shared_message(&mut editor, Duration::from_secs(2)).await.is_none());
+
+        // A guest cannot make itself the source of host-only notices.
+        let notice = serde_json::json!({ "kind": "WORKSPACE_DELETED", "timestamp": 1 });
+        editor.node.send(None, &notice).await.unwrap();
+        let spoofed = tokio::time::timeout(Duration::from_secs(2), next_event(&mut viewer.events, EVENT_MESSAGE)).await;
+        assert!(spoofed.is_err(), "a guest must not act on another guest's host-only notice");
     }
 
     async fn short_code_for(host: &TestNode, ttl: Duration) -> String {

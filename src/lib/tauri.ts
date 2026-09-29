@@ -417,6 +417,11 @@ export async function getYjsDoc(
 	return base64ToUint8Array(base64Str);
 }
 
+// Ids of every document that has stored CRDT state
+export function listYjsDocs(workspacePath: string): Promise<string[]> {
+	return invoke("list_yjs_docs", { workspacePath });
+}
+
 // Persist Yjs CRDT document binary state into SQLite
 export async function saveYjsDoc(
 	workspacePath: string,

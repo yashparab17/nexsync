@@ -127,6 +127,11 @@ export function disconnectAll(): Promise<void> {
 }
 
 // Invoke backend command to stream a file from a peer into the local workspace
+// Cancel the download of one file, or every download; what arrived is kept so it can resume
+export function cancelTransfers(relPath?: string): Promise<number> {
+	return invoke("p2p_cancel_transfers", { relPath: relPath ?? null });
+}
+
 export function fetchFile(peerId: string, workspacePath: string, relPath: string): Promise<number> {
 	return invoke("p2p_fetch_file", { peerId, workspacePath, relPath });
 }
@@ -183,6 +188,9 @@ export const onReconnectFailed = (handler: () => void) =>
 
 export const onMessage = (handler: (event: IncomingMessage) => void) =>
 	subscribe<IncomingMessage>("p2p://message", handler);
+
+export const onFileEnded = (handler: (event: { peerId: string; relPath: string }) => void) =>
+	subscribe<{ peerId: string; relPath: string }>("p2p://file-ended", handler);
 
 export const onFileProgress = (handler: (event: FileProgress) => void) =>
 	subscribe<FileProgress>("p2p://file-progress", handler);

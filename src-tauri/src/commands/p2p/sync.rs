@@ -9,13 +9,16 @@
 use std::{
     collections::{HashMap, HashSet},
     path::{Component, Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 
 use super::{files, node::Node};
 use crate::commands::path_utils::resolve_workspace_path;
@@ -89,6 +92,10 @@ pub struct LiveSync {
     local_changes: mpsc::UnboundedSender<PathBuf>,
     // Paths being downloaded; `true` means another change arrived meanwhile
     inflight: Mutex<HashMap<String, bool>>,
+    /// Downloads in progress by (peer, path), each with the switch that cancels it
+    transfers: Mutex<HashMap<(String, String), watch::Sender<bool>>>,
+    /// Bumped when the user cancels everything, so catch-up loops stop starting new downloads
+    generation: AtomicU64,
 }
 
 impl LiveSync {
@@ -98,8 +105,40 @@ impl LiveSync {
             watcher: Mutex::new(None),
             local_changes,
             inflight: Mutex::new(HashMap::new()),
+            transfers: Mutex::new(HashMap::new()),
+            generation: AtomicU64::new(0),
         };
         (sync, rx)
+    }
+
+    /// Registers a download and returns the receiver that turns `true` when it is cancelled
+    pub fn start_transfer(&self, peer_id: &str, rel_path: &str) -> watch::Receiver<bool> {
+        let (tx, rx) = watch::channel(false);
+        self.transfers.lock().unwrap_or_else(|p| p.into_inner()).insert((peer_id.into(), rel_path.into()), tx);
+        rx
+    }
+
+    pub fn end_transfer(&self, peer_id: &str, rel_path: &str) {
+        self.transfers.lock().unwrap_or_else(|p| p.into_inner()).remove(&(peer_id.to_string(), rel_path.to_string()));
+    }
+
+    /// Cancels the downloads of `rel_path`, or every download when `None`; returns how many were running
+    pub fn cancel_transfers(&self, rel_path: Option<&str>) -> usize {
+        if rel_path.is_none() {
+            self.generation.fetch_add(1, Ordering::SeqCst);
+        }
+        let transfers = self.transfers.lock().unwrap_or_else(|p| p.into_inner());
+        let mut cancelled = 0;
+        for ((_, rel), tx) in transfers.iter() {
+            if rel_path.is_none_or(|r| r == rel) && tx.send(true).is_ok() {
+                cancelled += 1;
+            }
+        }
+        cancelled
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.generation.load(Ordering::SeqCst)
     }
 
     /// Starts watching `path` (replacing any previous watch), or stops watching when `None`
@@ -333,7 +372,12 @@ async fn pull(node: &Arc<Node>, peer_id: &str, workspace: &str, rel: String, siz
 /// Brings this device up to date with a peer's file list without ever losing an edit.
 async fn handle_manifest(node: &Arc<Node>, peer_id: &str, workspace: &str, entries: Vec<ManifestEntry>) {
     let last_sync = read_last_sync(workspace);
+    let generation = node.sync().generation();
     for entry in entries {
+        // The user cancelled the transfers, so don't start the rest of this catch-up.
+        if node.sync().generation() != generation {
+            break;
+        }
         let Ok(rel) = files::check_rel_path(&entry.rel_path) else { continue };
         let Ok(local) = resolve_workspace_path(workspace, &rel) else { continue };
         let meta = tokio::fs::metadata(&local).await.ok().filter(|m| m.is_file());
@@ -447,6 +491,24 @@ async fn move_to_trash(workspace: &str, local: &Path, rel: &str) -> std::io::Res
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_cancelling_transfers_reaches_only_the_matching_downloads() {
+        let (sync, _rx) = LiveSync::new();
+        let a = sync.start_transfer("peer", "files/a.bin");
+        let b = sync.start_transfer("peer", "files/b.bin");
+        assert_eq!(sync.cancel_transfers(Some("files/a.bin")), 1);
+        assert!(*a.borrow() && !*b.borrow());
+        assert_eq!(sync.generation(), 0, "cancelling one file must not stop the catch-up");
+
+        assert_eq!(sync.cancel_transfers(None), 2);
+        assert!(*b.borrow());
+        assert_eq!(sync.generation(), 1);
+
+        sync.end_transfer("peer", "files/a.bin");
+        sync.end_transfer("peer", "files/b.bin");
+        assert_eq!(sync.cancel_transfers(None), 0);
+    }
 
     #[test]
     fn test_sync_message_json_shape() {

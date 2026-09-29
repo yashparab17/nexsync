@@ -13,7 +13,10 @@ use std::{
 
 use iroh::endpoint::{RecvStream, SendStream};
 use serde::Serialize;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::{
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
+    sync::watch,
+};
 
 use super::{
     node::Node,
@@ -22,6 +25,8 @@ use super::{
 use crate::commands::path_utils::resolve_workspace_path;
 
 pub const EVENT_FILE_PROGRESS: &str = "p2p://file-progress";
+/// A download ended, whether it finished, failed or was cancelled
+pub const EVENT_FILE_ENDED: &str = "p2p://file-ended";
 
 /// Workspace folders whose contents are shared with collaborators
 const SYNC_ROOTS: &[&str] = &["notes", "files", "assets", "editor"];
@@ -47,6 +52,35 @@ struct FileProgress<'a> {
     rel_path: &'a str,
     received_bytes: u64,
     total_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FileEnded<'a> {
+    peer_id: &'a str,
+    rel_path: &'a str,
+}
+
+/// Keeps a download registered so it can be cancelled, and announces when it ends
+struct TransferGuard {
+    node: Arc<Node>,
+    peer_id: String,
+    rel_path: String,
+}
+
+impl TransferGuard {
+    fn start(node: &Arc<Node>, peer_id: &str, rel_path: &str) -> (Self, watch::Receiver<bool>) {
+        let cancel = node.sync().start_transfer(peer_id, rel_path);
+        let guard = Self { node: node.clone(), peer_id: peer_id.into(), rel_path: rel_path.into() };
+        (guard, cancel)
+    }
+}
+
+impl Drop for TransferGuard {
+    fn drop(&mut self) {
+        self.node.sync().end_transfer(&self.peer_id, &self.rel_path);
+        self.node.emit(EVENT_FILE_ENDED, FileEnded { peer_id: &self.peer_id, rel_path: &self.rel_path });
+    }
 }
 
 /// Validates a peer-supplied path: must name a non-hidden file inside a synced folder
@@ -136,6 +170,7 @@ pub async fn fetch(node: &Arc<Node>, peer_id: &str, workspace_path: &str, rel_pa
     let rel = check_rel_path(rel_path)?;
     let target = resolve_workspace_path(workspace_path, &rel)?;
     let conn = node.connection(peer_id)?;
+    let (_transfer, mut cancel) = TransferGuard::start(node, peer_id, &rel);
 
     if let Some(parent) = target.parent() {
         tokio::fs::create_dir_all(parent)
@@ -199,7 +234,7 @@ pub async fn fetch(node: &Arc<Node>, peer_id: &str, workspace_path: &str, rel_pa
     };
 
     // On failure the partial file is kept so the next attempt can resume from it.
-    receive_into(&mut recv, &part, start, size, progress).await?;
+    receive_into(&mut recv, &part, start, size, &mut cancel, progress).await?;
     tokio::fs::rename(&part, &target)
         .await
         .map_err(|e| format!("Failed to save {rel}: {e}"))?;
@@ -244,6 +279,7 @@ async fn receive_into(
     part: &Path,
     start: u64,
     size: u64,
+    cancel: &mut watch::Receiver<bool>,
     progress: impl Fn(u64),
 ) -> Result<(), String> {
     let mut file = if start > 0 {
@@ -259,7 +295,13 @@ async fn receive_into(
 
     while received < size {
         let want = (size - received).min(BUFFER_SIZE as u64) as usize;
-        let n = match tokio::time::timeout(STALL_TIMEOUT, recv.read(&mut buf[..want])).await {
+        let read = tokio::select! {
+            Ok(()) = cancel.changed() => {
+                return Err("The transfer was cancelled. What arrived is kept, so it can resume later.".into());
+            }
+            read = tokio::time::timeout(STALL_TIMEOUT, recv.read(&mut buf[..want])) => read,
+        };
+        let n = match read {
             Err(_) => return Err("The transfer stalled and was cancelled.".into()),
             Ok(Err(e)) => return Err(format!("The transfer failed: {e}")),
             Ok(Ok(None)) => return Err("The collaborator stopped sending before the file was complete.".into()),
