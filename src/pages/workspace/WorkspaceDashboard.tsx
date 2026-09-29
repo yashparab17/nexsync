@@ -242,7 +242,7 @@ export default function WorkspaceDashboard() {
 										className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0 text-sm"
 									>
 										<div className="flex items-start gap-3 min-w-0">
-											<div className="p-2 rounded-lg bg-muted/60 mt-0.5">
+											<div className="p-2 rounded-none bg-muted/60 mt-0.5">
 												{getActivityIcon(event.target_type, event.action)}
 											</div>
 											<div className="min-w-0">

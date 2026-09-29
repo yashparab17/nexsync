@@ -141,13 +141,14 @@ export default function AssetPreviewModal({
 		<Dialog
 			isOpen={isOpen}
 			onOpenChange={(open) => !open && onClose()}
-			className="max-w-4xl max-h-[90vh] p-0 overflow-hidden bg-background/95 backdrop-blur-md border-border shadow-2xl"
+			showCloseButton={false}
+			className="h-[85vh] w-[95vw] gap-0 overflow-hidden p-0 sm:max-w-6xl grid-rows-[minmax(0,1fr)] [&>*]:grid-rows-[minmax(0,1fr)]"
 		>
-			<div className="flex flex-col h-full overflow-hidden">
+			<div className="flex h-full min-h-0 flex-col overflow-hidden">
 				{/* Top Bar */}
-				<DialogHeader className="flex flex-row items-center justify-between px-6 py-4 border-b border-border/60 bg-muted/20">
+				<DialogHeader className="flex flex-row items-center justify-between shrink-0 px-5 py-3 border-b bg-muted/20">
 					<div className="flex items-center gap-3">
-						<div className="p-2 rounded-md bg-primary/10 text-primary">
+						<div className="p-2 rounded-none bg-primary/10 text-primary">
 							{isImage ?
 								<ImageIcon className="size-5" />
 							: isVideo ?
@@ -190,18 +191,18 @@ export default function AssetPreviewModal({
 				</DialogHeader>
 
 				{/* Preview Workspace Area */}
-				<div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+				<div className="flex min-h-0 flex-1 flex-col md:flex-row overflow-hidden">
 					{/* Main Viewer */}
-					<div className="flex-1 bg-black/40 flex items-center justify-center p-6 relative min-h-[360px] overflow-auto">
+					<div className="relative flex min-h-0 min-w-0 flex-1 overflow-auto bg-muted/40 p-4">
 						{loading && (
-							<div className="flex flex-col items-center gap-3 text-muted-foreground">
+							<div className="m-auto flex flex-col items-center gap-3 text-muted-foreground">
 								<Loader2 className="size-8 animate-spin text-primary" />
 								<p className="text-xs font-mono">Loading binary data…</p>
 							</div>
 						)}
 
 						{error && (
-							<div className="flex flex-col items-center gap-2 text-destructive p-6 text-center max-w-md">
+							<div className="m-auto flex max-w-md flex-col items-center gap-2 p-6 text-center text-destructive">
 								<p className="text-sm font-semibold">
 									Failed to load asset preview
 								</p>
@@ -212,8 +213,8 @@ export default function AssetPreviewModal({
 						)}
 
 						{asset.syncStatus === "remote_placeholder" && (
-							<div className="flex flex-col items-center gap-4 text-center p-8 bg-card/60 border border-border/80 rounded-xl max-w-md shadow-lg">
-								<div className="p-3 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+							<div className="m-auto flex max-w-md flex-col items-center gap-4 border bg-card p-8 text-center">
+								<div className="p-3 rounded-none bg-amber-500/10 text-amber-500 border border-amber-500/20">
 									<Sparkles className="size-8" />
 								</div>
 								<div>
@@ -242,7 +243,7 @@ export default function AssetPreviewModal({
 							<>
 								{/* Image Preview */}
 								{isImage && (
-									<div className="relative flex items-center justify-center w-full h-full">
+									<div className="flex min-h-full min-w-full">
 										<img
 											src={dataUrl}
 											alt={asset.name}
@@ -253,16 +254,16 @@ export default function AssetPreviewModal({
 													height: img.naturalHeight,
 												});
 											}}
-											className={`transition-all duration-200 rounded-md shadow-lg ${
+											className={`m-auto bg-background shadow-md ${
 												isFitToScreen ?
-													"max-h-[50vh] max-w-full object-contain"
+													"max-h-full max-w-full object-contain"
 												:	"max-w-none"
 											}`}
 										/>
 										<button
 											onClick={() => setIsFitToScreen(!isFitToScreen)}
 											title={isFitToScreen ? "Original Size" : "Fit to Screen"}
-											className="absolute bottom-2 right-2 p-1.5 rounded-md bg-background/80 hover:bg-background text-foreground backdrop-blur border border-border/60 text-xs flex items-center gap-1 cursor-pointer transition-all"
+											className="absolute right-4 bottom-4 z-10 flex cursor-pointer items-center gap-1 border bg-background p-2 text-xs text-foreground shadow-sm hover:bg-muted"
 										>
 											{isFitToScreen ?
 												<Maximize2 className="size-3.5" />
@@ -273,20 +274,20 @@ export default function AssetPreviewModal({
 
 								{/* Video Preview */}
 								{isVideo && (
-									<div className="w-full max-w-2xl flex flex-col items-center">
+									<div className="m-auto flex w-full max-w-3xl flex-col items-center">
 										<video
 											src={dataUrl}
 											controls
 											autoPlay={false}
-											className="w-full max-h-[50vh] rounded-lg shadow-2xl border border-border/40 bg-black"
+											className="max-h-full w-full border bg-black"
 										/>
 									</div>
 								)}
 
 								{/* Audio Preview */}
 								{isAudio && (
-									<div className="w-full max-w-md p-6 bg-card/80 backdrop-blur border border-border rounded-xl shadow-xl flex flex-col items-center gap-4">
-										<div className="p-4 rounded-full bg-primary/10 text-primary animate-pulse">
+									<div className="m-auto flex w-full max-w-md flex-col items-center gap-4 border bg-card p-6">
+										<div className="p-4 rounded-none bg-primary/10 text-primary animate-pulse">
 											<Volume2 className="size-8" />
 										</div>
 										<div className="text-center">
@@ -304,13 +305,13 @@ export default function AssetPreviewModal({
 									<iframe
 										src={dataUrl}
 										title={asset.name}
-										className="w-full h-[55vh] rounded-md border border-border/50 bg-white"
+										className="h-full min-h-[60vh] w-full border bg-white"
 									/>
 								)}
 
 								{/* Generic Binary / Other */}
 								{!isImage && !isVideo && !isAudio && !isPdf && (
-									<div className="flex flex-col items-center gap-3 text-center p-8 bg-card/50 border border-border rounded-xl">
+									<div className="m-auto flex flex-col items-center gap-3 border bg-card p-8 text-center">
 										<FileText className="size-12 text-muted-foreground" />
 										<div>
 											<p className="font-semibold">{asset.name}</p>
@@ -334,7 +335,7 @@ export default function AssetPreviewModal({
 					</div>
 
 					{/* Metadata & Embed Inspector Sidebar */}
-					<div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-border/60 p-5 bg-card/30 flex flex-col gap-5 overflow-y-auto">
+					<div className="flex max-h-[40%] w-full shrink-0 flex-col gap-5 overflow-y-auto border-t bg-card p-5 md:max-h-none md:w-72 md:border-t-0 md:border-l">
 						<div>
 							<h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
 								Asset Details
@@ -405,7 +406,7 @@ export default function AssetPreviewModal({
 									{copiedKey === "markdown" ? "Copied" : "Copy"}
 								</Button>
 							</div>
-							<div className="p-2.5 rounded-md bg-muted/60 border border-border/60 font-mono text-xs break-all select-all text-muted-foreground">
+							<div className="p-2.5 rounded-none bg-muted/60 border border-border/60 font-mono text-xs break-all select-all text-muted-foreground">
 								{markdownSnippet}
 							</div>
 							<p className="text-[11px] text-muted-foreground">
@@ -432,7 +433,7 @@ export default function AssetPreviewModal({
 									{copiedKey === "path" ? "Copied" : "Copy"}
 								</Button>
 							</div>
-							<div className="p-2 rounded-md bg-muted/40 font-mono text-xs text-foreground/80 break-all select-all">
+							<div className="p-2 rounded-none bg-muted/40 font-mono text-xs text-foreground/80 break-all select-all">
 								{cleanRelPath}
 							</div>
 						</div>

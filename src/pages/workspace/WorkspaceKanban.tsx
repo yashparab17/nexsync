@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
+import { useOpenParam } from "@/hooks/useOpenParam";
 import {
 	createKanbanCard,
 	createKanbanColumn,
@@ -221,6 +222,12 @@ export default function WorkspaceKanban() {
 		setCardDesc(card.description || "");
 	};
 
+	// Deep link from workspace search
+	useOpenParam((id) => {
+		const card = columns.flatMap((c) => c.cards).find((k) => k.id === id);
+		if (card) handleOpenEditCard(card);
+	}, !loading);
+
 	// Edit Card Submit
 	const handleEditCardSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -319,7 +326,7 @@ export default function WorkspaceKanban() {
 	};
 
 	return (
-		<div className="flex h-[calc(100vh-8rem)] flex-col space-y-4">
+		<div className="flex h-[calc(100vh-10rem)] flex-col space-y-4">
 			{/* Header */}
 			<div className="flex shrink-0 items-center justify-between">
 				<div>
@@ -351,8 +358,8 @@ export default function WorkspaceKanban() {
 					</p>
 				</div>
 			) : columns.length === 0 ? (
-				<div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-border/80 p-12 text-center bg-card/10">
-					<div className="flex size-12 items-center justify-center rounded-full bg-muted/60">
+				<div className="flex flex-1 flex-col items-center justify-center rounded-none border border-dashed border-border/80 p-12 text-center bg-card/10">
+					<div className="flex size-12 items-center justify-center rounded-none bg-muted/60">
 						<Columns3 className="size-6 text-muted-foreground" />
 					</div>
 					<h3 className="mt-4 text-base font-semibold">No Columns Yet</h3>
@@ -392,15 +399,15 @@ export default function WorkspaceKanban() {
 						return (
 							<div
 								key={col.id}
-								className="flex w-80 shrink-0 flex-col rounded-xl border bg-muted/20 p-3 shadow-2xs"
+								className="flex w-80 shrink-0 flex-col border-t-2 border-primary bg-muted/30 p-3"
 							>
 								{/* Column Header */}
 								<div className="flex items-center justify-between pb-2">
 									<div className="flex items-center gap-2">
-										<h3 className="text-sm font-semibold tracking-wide text-foreground">
+										<h3 className="text-xs font-bold uppercase tracking-widest text-foreground">
 											{col.title}
 										</h3>
-										<span className="flex size-5 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-muted-foreground">
+										<span className="flex h-5 min-w-5 items-center justify-center bg-primary/10 px-1 text-[11px] font-bold text-primary">
 											{col.cards.length}
 										</span>
 									</div>
@@ -434,14 +441,14 @@ export default function WorkspaceKanban() {
 								{/* Cards Column Body */}
 								<div className="flex flex-1 flex-col gap-2.5 overflow-y-auto py-1">
 									{col.cards.length === 0 ? (
-										<div className="flex flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-border/60 p-6 text-center text-xs text-muted-foreground">
+										<div className="flex flex-1 flex-col items-center justify-center border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
 											No cards in this column.
 										</div>
 									) : (
 										col.cards.map((card) => (
 											<div
 												key={card.id}
-												className="group relative rounded-lg border bg-card p-3 shadow-xs transition-all hover:border-primary/40 hover:shadow-sm"
+												className="group relative border-l-2 border-l-transparent bg-card p-3 transition-colors hover:border-l-primary hover:bg-card/80"
 											>
 												<div className="flex items-start justify-between gap-2">
 													<h4 className="text-sm font-medium leading-snug text-foreground">

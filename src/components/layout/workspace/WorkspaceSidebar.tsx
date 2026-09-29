@@ -88,15 +88,16 @@ function NavigationItem({ item }: { item: NavigationItem }) {
 			to={item.path}
 			end={item.end}
 			className={({ isActive }) =>
-				`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+				`flex w-full items-center justify-center gap-3 rounded-none px-3 py-2 text-sm lg:justify-start font-medium transition-colors ${
 					isActive ?
 						"bg-primary/10 text-primary"
 					:	"text-foreground hover:bg-muted"
 				}`
 			}
+			title={item.name}
 		>
-			<Icon className="size-4" />
-			{item.name}
+			<Icon className="size-4 shrink-0" />
+			<span className="hidden lg:inline">{item.name}</span>
 		</NavLink>
 	);
 }
@@ -113,9 +114,9 @@ export default function WorkspaceSidebar() {
 	};
 
 	return (
-		<aside className="flex h-full w-64 flex-col border-r bg-muted/20">
+		<aside className="flex h-full w-14 shrink-0 flex-col border-r bg-muted/20 lg:w-64">
 			{/* Workspace identity */}
-			<div className="flex h-16 shrink-0 items-center gap-2 border-b px-3">
+			<div className="flex h-16 shrink-0 items-center justify-center gap-2 border-b lg:justify-start lg:px-3">
 				<Button
 					variant="ghost"
 					size="icon"
@@ -125,18 +126,18 @@ export default function WorkspaceSidebar() {
 					<ArrowLeft className="size-5" />
 				</Button>
 
-				<h2 className="truncate font-semibold">{workspace?.name}</h2>
+				<h2 className="hidden truncate font-semibold lg:block">{workspace?.name}</h2>
 			</div>
 
 			{/* Main Navigation */}
-			<nav className="flex-1 space-y-1 p-3">
+			<nav className="flex-1 space-y-1 overflow-y-auto p-1.5 lg:p-3">
 				{navigation.map((item) => (
 					<NavigationItem key={item.path} item={item} />
 				))}
 			</nav>
 
 			{/* Bottom Navigation */}
-			<nav className="space-y-1 border-t p-3">
+			<nav className="space-y-1 border-t p-1.5 lg:p-3">
 				{bottomNavigation.map((item) => (
 					<NavigationItem key={item.path} item={item} />
 				))}

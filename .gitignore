@@ -53,3 +53,6 @@ PROJECT_GUIDE.md
 SECURITY_AUDIT.md
 COMMENT_STYLE_GUIDE.md
 IMPLEMENTATION_PLAN.md
+# pnpm only
+package-lock.json
+yarn.lock

@@ -3,11 +3,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { Lock, Radio, Search, Settings } from "lucide-react";
+import { Lock, Radio, Settings } from "lucide-react";
 
 // Components
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import WorkspaceSearch from "@/components/layout/workspace/WorkspaceSearch";
 import { useP2P } from "@/store/p2p/P2PContext";
 import P2PConnectDialog from "@/components/dialogs/workspace/P2PConnectDialog";
 import { cn } from "@/lib/utils";
@@ -21,23 +21,14 @@ export default function WorkspaceHeader() {
 	const connectedCount = peers.filter((p) => p.status === "connected").length;
 
 	return (
-		<header className="relative flex h-16 shrink-0 items-center border-b px-6">
+		<header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 lg:px-6">
 			{/* Search */}
-			<div className="absolute left-1/2 -translate-x-1/2">
-				<div className="flex w-80 items-center border bg-background">
-					<Input
-						placeholder="Search workspace..."
-						className="flex-1 border-0 pl-3"
-					/>
-
-					<Button variant="outline" size="icon">
-						<Search className="size-4" />
-					</Button>
-				</div>
+			<div className="flex min-w-0 flex-1 justify-center">
+				<WorkspaceSearch />
 			</div>
 
 			{/* Right Actions: P2P Badge & Settings */}
-			<div className="ml-auto flex items-center gap-2">
+			<div className="flex shrink-0 items-center gap-2">
 				<Button
 					variant="outline"
 					size="sm"
@@ -46,7 +37,7 @@ export default function WorkspaceHeader() {
 				>
 					<span
 						className={cn(
-							"h-2 w-2 rounded-full",
+							"h-2 w-2 rounded-none",
 							connectedCount > 0
 								? "bg-emerald-400 animate-ping"
 								: connectionStatus === "connecting"
@@ -55,12 +46,12 @@ export default function WorkspaceHeader() {
 						)}
 					/>
 					<Radio className="h-3.5 w-3.5 text-sky-400" />
-					<span>
+					<span className="hidden md:inline">
 						{connectedCount > 0
 							? `${connectedCount} Peer${connectedCount > 1 ? "s" : ""}`
 							: "P2P Sync"}
 					</span>
-					<div className="flex items-center gap-0.5 text-[10px] text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20 ml-0.5">
+					<div className="hidden items-center gap-0.5 text-[10px] lg:flex text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded-none border border-emerald-500/20 ml-0.5">
 						<Lock className="h-2.5 w-2.5" />
 						<span>E2EE</span>
 					</div>

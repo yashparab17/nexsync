@@ -47,7 +47,7 @@ export default function WorkspaceLoader({ children }: { children: ReactNode }) {
 	// Show loading placeholder while checking startup workspace
 	if (!ready) {
 		return (
-			<div className="flex h-screen items-center justify-center">
+			<div className="flex h-full items-center justify-center">
 				<p className="text-muted-foreground">Starting up…</p>
 			</div>
 		);

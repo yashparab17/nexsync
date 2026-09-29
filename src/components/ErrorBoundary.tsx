@@ -44,7 +44,7 @@ export default class ErrorBoundary extends Component<
 	render() {
 		if (this.state.hasError) {
 			return (
-				<div className="flex h-screen items-center justify-center">
+				<div className="flex h-full items-center justify-center">
 					<div className="text-center">
 						<p className="text-2xl font-semibold">
 							Something went wrong

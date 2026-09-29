@@ -125,7 +125,7 @@ export default function EditorContainer({
 			className={cn(
 				"flex flex-col bg-background transition-all",
 				isFullscreen
-					? "fixed inset-0 z-50 p-6 backdrop-blur-md"
+					? "fixed inset-x-0 top-8 bottom-0 z-50 p-6"
 					: "h-full w-full",
 			)}
 		>
@@ -152,8 +152,8 @@ export default function EditorContainer({
 					</div>
 
 					{isDirty ? (
-						<span className="flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
-							<span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+						<span className="flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-none">
+							<span className="size-1.5 rounded-none bg-amber-400 animate-pulse" />
 							Unsaved changes
 						</span>
 					) : (
@@ -168,12 +168,12 @@ export default function EditorContainer({
 				<div className="flex items-center gap-2">
 					{/* Markdown Mode Toggle (Rich Text vs Raw Code) */}
 					{isMarkdown && (
-						<div className="flex items-center rounded-lg border bg-muted/40 p-0.5 text-xs">
+						<div className="flex items-center rounded-none border bg-muted/40 p-0.5 text-xs">
 							<button
 								type="button"
 								onClick={() => setMode("rich")}
 								className={cn(
-									"flex items-center gap-1 rounded-md px-2.5 py-1 transition-colors cursor-pointer",
+									"flex items-center gap-1 rounded-none px-2.5 py-1 transition-colors cursor-pointer",
 									mode === "rich"
 										? "bg-background text-foreground font-semibold shadow-xs"
 										: "text-muted-foreground hover:text-foreground",
@@ -186,7 +186,7 @@ export default function EditorContainer({
 								type="button"
 								onClick={() => setMode("raw")}
 								className={cn(
-									"flex items-center gap-1 rounded-md px-2.5 py-1 transition-colors cursor-pointer",
+									"flex items-center gap-1 rounded-none px-2.5 py-1 transition-colors cursor-pointer",
 									mode === "raw"
 										? "bg-background text-foreground font-semibold shadow-xs"
 										: "text-muted-foreground hover:text-foreground",
@@ -200,14 +200,14 @@ export default function EditorContainer({
 
 					{/* Live Collaboration Indicator */}
 					{isCollaborating && (
-						<span className="flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+						<span className="flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-none">
 							<Users className="size-3" />
 							Live
 						</span>
 					)}
 
 					{/* Stats Badge */}
-					<div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground font-mono bg-muted/20 px-2.5 py-1 rounded-md border">
+					<div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground font-mono bg-muted/20 px-2.5 py-1 rounded-none border">
 						<span>{stats.lines} lines</span>
 						<span>•</span>
 						<span>{stats.words} words</span>

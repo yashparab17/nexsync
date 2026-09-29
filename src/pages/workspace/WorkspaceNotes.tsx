@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
+import { useOpenParam } from "@/hooks/useOpenParam";
 import {
 	createWorkspaceFile,
 	deleteWorkspaceItem,
@@ -128,6 +129,12 @@ export default function WorkspaceNotes() {
 
 	const isViewer = useIsViewer();
 
+	// Deep link from workspace search
+	useOpenParam((path) => {
+		const note = notes.find((n) => n.path === path);
+		if (note) setSelectedNote(note);
+	}, notes.length > 0);
+
 	// Save note content to OS disk
 	const handleSaveNote = async (newText: string) => {
 		if (!workspace?.path || !selectedNote) return;
@@ -223,15 +230,15 @@ export default function WorkspaceNotes() {
 	}, [notes, searchQuery]);
 
 	return (
-		<div className="flex h-[calc(100vh-8rem)] gap-4">
+		<div className="-m-6 flex h-[calc(100vh-6rem)]">
 			{/* Left Column: Note Navigation List */}
-			<div className="flex w-80 shrink-0 flex-col rounded-xl border bg-muted/20 p-3 shadow-2xs">
+			<div className="flex w-52 shrink-0 flex-col border-r lg:w-72 bg-muted/20 p-3">
 				{/* Top Header & Search */}
 				<div className="flex items-center justify-between pb-3">
 					<div className="flex items-center gap-2">
 						<StickyNote className="size-5 text-primary" />
 						<h2 className="font-semibold text-base">Notes</h2>
-						<span className="flex size-5 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-muted-foreground">
+						<span className="flex h-5 min-w-5 items-center justify-center bg-primary/10 px-1 text-[11px] font-bold text-primary">
 							{notes.length}
 						</span>
 					</div>
@@ -262,13 +269,13 @@ export default function WorkspaceNotes() {
 				</div>
 
 				{/* Note List */}
-				<div className="flex-1 space-y-1.5 overflow-y-auto pr-1">
+				<div className="flex-1 space-y-px overflow-y-auto">
 					{loading ? (
 						<div className="flex h-32 items-center justify-center">
 							<Loader2 className="size-5 animate-spin text-muted-foreground" />
 						</div>
 					) : filteredNotes.length === 0 ? (
-						<div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/60 p-6 text-center text-xs text-muted-foreground">
+						<div className="flex flex-col items-center justify-center rounded-none border border-dashed border-border/60 p-6 text-center text-xs text-muted-foreground">
 							{searchQuery
 								? "No matching notes found."
 								: "No notes yet. Click New to create your first markdown note."}
@@ -281,10 +288,10 @@ export default function WorkspaceNotes() {
 									key={note.path}
 									onClick={() => setSelectedNote(note)}
 									className={cn(
-										"group flex items-center justify-between gap-2 rounded-lg border p-2.5 transition-all cursor-pointer",
+										"group flex items-center justify-between gap-2 border-l-2 px-3 py-2.5 transition-colors cursor-pointer",
 										isSelected
-											? "border-primary bg-primary/10 shadow-xs"
-											: "border-transparent bg-card/60 hover:border-border hover:bg-muted/40",
+											? "border-primary bg-primary/10"
+											: "border-transparent hover:bg-muted/50",
 									)}
 								>
 									<div className="min-w-0 flex-1">
@@ -318,10 +325,10 @@ export default function WorkspaceNotes() {
 			</div>
 
 			{/* Right Column: Embedded Rich Editor Container */}
-			<div className="flex flex-1 flex-col overflow-hidden rounded-xl border bg-card p-4 shadow-2xs">
+			<div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background p-5">
 				{!selectedNote ? (
 					<div className="flex flex-1 flex-col items-center justify-center text-center p-8">
-						<div className="flex size-12 items-center justify-center rounded-full bg-muted/60">
+						<div className="flex size-12 items-center justify-center rounded-none bg-muted/60">
 							<FileText className="size-6 text-muted-foreground" />
 						</div>
 						<h3 className="mt-4 font-semibold text-base">Select or create a note</h3>

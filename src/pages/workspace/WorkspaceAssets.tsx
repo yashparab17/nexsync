@@ -32,6 +32,7 @@ import { Label } from "@/components/ui/label";
 import AssetPreviewModal from "@/components/dialogs/workspace/AssetPreviewModal";
 import AssetUploadDialog from "@/components/dialogs/workspace/AssetUploadDialog";
 import { useErrorLog } from "@/hooks/useErrorLog";
+import { useOpenParam } from "@/hooks/useOpenParam";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { formatBytes } from "@/lib/utils";
 import {
@@ -87,6 +88,12 @@ export default function WorkspaceAssets() {
 	// Dialog states
 	const [isUploadOpen, setIsUploadOpen] = useState(false);
 	const [previewAsset, setPreviewAsset] = useState<AssetItem | null>(null);
+
+	// Deep link from workspace search
+	useOpenParam((path) => {
+		const asset = assets.find((a) => a.path === path);
+		if (asset) setPreviewAsset(asset);
+	}, assets.length > 0);
 	const [assetToDelete, setAssetToDelete] = useState<AssetItem | null>(null);
 	const [assetToRename, setAssetToRename] = useState<AssetItem | null>(null);
 	const [newName, setNewName] = useState("");
@@ -347,11 +354,11 @@ export default function WorkspaceAssets() {
 			}}
 			onDragLeave={() => setIsDraggingOver(false)}
 			onDrop={handlePageDrop}
-			className="space-y-6 relative min-h-[calc(100vh-8rem)]"
+			className="space-y-6 relative min-h-[calc(100vh-10rem)]"
 		>
 			{/* Drag & Drop Window Overlay */}
 			{isDraggingOver && (
-				<div className="absolute inset-0 z-50 bg-primary/20 backdrop-blur-sm border-2 border-dashed border-primary rounded-xl flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-150">
+				<div className="absolute inset-0 z-50 bg-primary/20 backdrop-blur-sm border-2 border-dashed border-primary rounded-none flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-150">
 					<UploadCloud className="size-16 text-primary animate-bounce mb-3" />
 					<h3 className="text-xl font-bold text-foreground">
 						Drop files to upload directly to assets/
@@ -368,7 +375,7 @@ export default function WorkspaceAssets() {
 					<h1 className="text-2xl font-bold tracking-tight">Workspace Assets</h1>
 					<p className="mt-1 text-sm text-muted-foreground">
 						Store and manage images, media, and binary files in your local{" "}
-						<code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono text-foreground">
+						<code className="bg-muted px-1.5 py-0.5 rounded-none text-xs font-mono text-foreground">
 							assets/
 						</code>{" "}
 						folder.
@@ -416,7 +423,7 @@ export default function WorkspaceAssets() {
 						<button
 							key={tab.key}
 							onClick={() => setSelectedCategory(tab.key as AssetCategory)}
-							className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1.5 cursor-pointer ${
+							className={`px-3 py-1.5 text-xs font-medium rounded-none transition-colors flex items-center gap-1.5 cursor-pointer ${
 								selectedCategory === tab.key ?
 									"bg-primary text-primary-foreground font-semibold shadow-sm"
 								:	"bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -424,7 +431,7 @@ export default function WorkspaceAssets() {
 						>
 							{tab.label}
 							<span
-								className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+								className={`text-[10px] px-1.5 py-0.2 rounded-none ${
 									selectedCategory === tab.key ?
 										"bg-primary-foreground/20 text-primary-foreground"
 									:	"bg-background/80 text-muted-foreground"
@@ -448,11 +455,11 @@ export default function WorkspaceAssets() {
 						/>
 					</div>
 
-					<div className="flex items-center border border-border rounded-lg p-0.5 bg-muted/30">
+					<div className="flex items-center border border-border rounded-none p-0.5 bg-muted/30">
 						<button
 							onClick={() => setViewMode("grid")}
 							title="Grid View"
-							className={`p-1.5 rounded-md transition-all cursor-pointer ${
+							className={`p-1.5 rounded-none transition-all cursor-pointer ${
 								viewMode === "grid" ?
 									"bg-background text-foreground shadow-sm"
 								:	"text-muted-foreground hover:text-foreground"
@@ -463,7 +470,7 @@ export default function WorkspaceAssets() {
 						<button
 							onClick={() => setViewMode("list")}
 							title="List View"
-							className={`p-1.5 rounded-md transition-all cursor-pointer ${
+							className={`p-1.5 rounded-none transition-all cursor-pointer ${
 								viewMode === "list" ?
 									"bg-background text-foreground shadow-sm"
 								:	"text-muted-foreground hover:text-foreground"
@@ -482,8 +489,8 @@ export default function WorkspaceAssets() {
 					<p className="text-xs font-mono">Loading workspace assets…</p>
 				</div>
 			: filteredAssets.length === 0 ?
-				<div className="flex flex-col items-center justify-center py-20 border border-dashed border-border rounded-xl text-center p-8 bg-card/20">
-					<div className="p-4 rounded-full bg-muted/60 text-muted-foreground mb-3">
+				<div className="flex flex-col items-center justify-center py-20 border border-dashed border-border rounded-none text-center p-8 bg-card/20">
+					<div className="p-4 rounded-none bg-muted/60 text-muted-foreground mb-3">
 						<ImageIcon className="size-8" />
 					</div>
 					<h3 className="font-semibold text-base text-foreground">
@@ -555,10 +562,10 @@ export default function WorkspaceAssets() {
 									{/* Status Badge */}
 									<div className="absolute top-2 left-2">
 										{isRemote ?
-											<span className="bg-amber-500/90 text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+											<span className="bg-amber-500/90 text-black text-[10px] font-bold px-2 py-0.5 rounded-none shadow-sm">
 												Remote
 											</span>
-										:	<span className="bg-black/60 backdrop-blur text-white text-[10px] font-mono px-2 py-0.5 rounded-full border border-white/10">
+										:	<span className="bg-black/60 backdrop-blur text-white text-[10px] font-mono px-2 py-0.5 rounded-none border border-white/10">
 												{asset.name.split(".").pop()?.toUpperCase()}
 											</span>
 										}
@@ -569,7 +576,7 @@ export default function WorkspaceAssets() {
 										<button
 											onClick={(e) => handleCopyMarkdown(e, asset)}
 											title="Copy Markdown Embed Link"
-											className="p-1.5 rounded-md bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
+											className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
 										>
 											{copiedKey === asset.name ?
 												<Check className="size-3.5 text-emerald-400" />
@@ -584,7 +591,7 @@ export default function WorkspaceAssets() {
 														setNewName(asset.name);
 													}}
 													title="Rename"
-													className="p-1.5 rounded-md bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
+													className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
 												>
 													<Pencil className="size-3.5" />
 												</button>
@@ -594,7 +601,7 @@ export default function WorkspaceAssets() {
 														setAssetToDelete(asset);
 													}}
 													title="Delete"
-													className="p-1.5 rounded-md bg-background/80 hover:bg-destructive text-foreground hover:text-destructive-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
+													className="p-1.5 rounded-none bg-background/80 hover:bg-destructive text-foreground hover:text-destructive-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
 												>
 													<Trash2 className="size-3.5" />
 												</button>
@@ -627,7 +634,7 @@ export default function WorkspaceAssets() {
 												},
 											)}
 										</span>
-										<span className="font-mono uppercase text-[9px] bg-muted px-1.5 py-0.5 rounded text-foreground/80">
+										<span className="font-mono uppercase text-[9px] bg-muted px-1.5 py-0.5 rounded-none text-foreground/80">
 											{asset.category}
 										</span>
 									</div>
@@ -637,7 +644,7 @@ export default function WorkspaceAssets() {
 					})}
 				</div>
 			:	/* List View */
-				<div className="border border-border rounded-xl overflow-hidden bg-card/60">
+				<div className="border border-border rounded-none overflow-hidden bg-card/60">
 					<table className="w-full text-left text-xs">
 						<thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase text-[10px] tracking-wider">
 							<tr>
@@ -661,7 +668,7 @@ export default function WorkspaceAssets() {
 										className="hover:bg-muted/40 cursor-pointer transition-colors group"
 									>
 										<td className="py-3 px-4 font-medium text-foreground flex items-center gap-3">
-											<div className="p-1.5 rounded bg-muted text-muted-foreground group-hover:text-primary">
+											<div className="p-1.5 rounded-none bg-muted text-muted-foreground group-hover:text-primary">
 												{asset.category === "image" ?
 													<ImageIcon className="size-4" />
 												: asset.category === "video" ?
@@ -673,7 +680,7 @@ export default function WorkspaceAssets() {
 											<span className="truncate max-w-xs">{asset.name}</span>
 										</td>
 										<td className="py-3 px-4">
-											<span className="font-mono text-[11px] bg-muted px-2 py-0.5 rounded text-foreground/80 capitalize">
+											<span className="font-mono text-[11px] bg-muted px-2 py-0.5 rounded-none text-foreground/80 capitalize">
 												{asset.category}
 											</span>
 										</td>
@@ -704,7 +711,7 @@ export default function WorkspaceAssets() {
 											<div className="flex items-center justify-end gap-1.5">
 												<button
 													onClick={(e) => handleCopyMarkdown(e, asset)}
-													className="h-7 px-2 text-[11px] rounded-md bg-muted/60 hover:bg-muted text-foreground flex items-center gap-1 cursor-pointer transition-all border border-border/40"
+													className="h-7 px-2 text-[11px] rounded-none bg-muted/60 hover:bg-muted text-foreground flex items-center gap-1 cursor-pointer transition-all border border-border/40"
 												>
 													{copiedKey === asset.name ?
 														<Check className="size-3 text-emerald-400" />
@@ -719,7 +726,7 @@ export default function WorkspaceAssets() {
 																setAssetToRename(asset);
 																setNewName(asset.name);
 															}}
-															className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-all"
+															className="p-1.5 rounded-none hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-all"
 														>
 															<Pencil className="size-3.5" />
 														</button>
@@ -728,7 +735,7 @@ export default function WorkspaceAssets() {
 																e.stopPropagation();
 																setAssetToDelete(asset);
 															}}
-															className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer transition-all"
+															className="p-1.5 rounded-none hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer transition-all"
 														>
 															<Trash2 className="size-3.5" />
 														</button>

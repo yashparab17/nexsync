@@ -113,7 +113,7 @@ export default function AssetUploadDialog({
 					</DialogTitle>
 					<DialogDescription>
 						Import images, media, or documents directly into your local{" "}
-						<code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono text-foreground">
+						<code className="bg-muted px-1.5 py-0.5 rounded-none text-xs font-mono text-foreground">
 							assets/
 						</code>{" "}
 						directory.
@@ -130,7 +130,7 @@ export default function AssetUploadDialog({
 						onDragLeave={() => setDragOver(false)}
 						onDrop={handleDrop}
 						onClick={() => fileInputRef.current?.click()}
-						className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center gap-3 text-center cursor-pointer transition-all ${
+						className={`border-2 border-dashed rounded-none p-8 flex flex-col items-center justify-center gap-3 text-center cursor-pointer transition-all ${
 							dragOver ?
 								"border-primary bg-primary/10 scale-[0.99]"
 							:	"border-border hover:border-primary/60 hover:bg-muted/30"
@@ -143,7 +143,7 @@ export default function AssetUploadDialog({
 							onChange={(e) => handleFileSelect(e.target.files)}
 							className="hidden"
 						/>
-						<div className="p-3 rounded-full bg-primary/10 text-primary">
+						<div className="p-3 rounded-none bg-primary/10 text-primary">
 							<FileUp className="size-6" />
 						</div>
 						<div>
@@ -165,7 +165,7 @@ export default function AssetUploadDialog({
 							{selectedFiles.map((f, idx) => (
 								<div
 									key={idx}
-									className="flex items-center justify-between px-3 py-1.5 rounded-md bg-muted/40 text-xs border border-border/50"
+									className="flex items-center justify-between px-3 py-1.5 rounded-none bg-muted/40 text-xs border border-border/50"
 								>
 									<span className="truncate max-w-[280px] font-medium text-foreground">
 										{f.name}
@@ -180,7 +180,7 @@ export default function AssetUploadDialog({
 												e.stopPropagation();
 												removeFile(idx);
 											}}
-											className="text-muted-foreground hover:text-destructive p-0.5 rounded cursor-pointer"
+											className="text-muted-foreground hover:text-destructive p-0.5 rounded-none cursor-pointer"
 										>
 											<X className="size-3.5" />
 										</button>
@@ -191,13 +191,13 @@ export default function AssetUploadDialog({
 					)}
 
 					{error && (
-						<div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs font-mono">
+						<div className="p-3 rounded-none bg-destructive/10 border border-destructive/20 text-destructive text-xs font-mono">
 							{error}
 						</div>
 					)}
 
 					{successCount !== null && (
-						<div className="p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
+						<div className="p-3 rounded-none bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
 							<Check className="size-4" />
 							Successfully uploaded {successCount} asset
 							{successCount > 1 ? "s" : ""}!

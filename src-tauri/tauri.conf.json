@@ -13,8 +13,11 @@
 		"windows": [
 			{
 				"title": "nexsync",
-				"width": 800,
-				"height": 600,
+				"decorations": false,
+				"width": 1100,
+				"height": 700,
+				"minWidth": 720,
+				"minHeight": 520,
 				"devtools": true,
 				"incognito": false
 			}

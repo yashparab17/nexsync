@@ -34,6 +34,7 @@ import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 
 // Hooks
 import { useErrorLog } from "@/hooks/useErrorLog";
+import { useOpenParam } from "@/hooks/useOpenParam";
 
 // Tauri IPC
 import {
@@ -196,6 +197,13 @@ export default function WorkspaceFiles() {
 		},
 		[workspacePath, logError],
 	);
+
+	// Deep link from workspace search: jump to the file's folder and open it
+	useOpenParam((path) => {
+		const rel = toRelPath(path);
+		setCurrentDir(rel.split("/").slice(0, -1).join("/"));
+		void handleOpenEntry({ name: rel.split("/").pop() ?? rel, path, is_dir: false, size: 0, modified_at: "" });
+	}, !!workspacePath);
 
 	// Close open file editor
 	const handleCloseFile = useCallback(() => {
@@ -431,7 +439,7 @@ export default function WorkspaceFiles() {
 						)}
 						<button
 							type="button"
-							className={`rounded px-1.5 py-0.5 transition-colors ${
+							className={`rounded-none px-1.5 py-0.5 transition-colors ${
 								i === crumbs.length - 1 ?
 									"font-medium text-foreground"
 								:	"text-muted-foreground hover:bg-muted hover:text-foreground"

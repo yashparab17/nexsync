@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
+import { useOpenParam } from "@/hooks/useOpenParam";
 import { createTask, deleteTask, getTasks, updateTask } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -156,6 +157,12 @@ export default function WorkspaceTasks() {
 		setFormPriority(task.priority);
 		setFormDueDate(task.due_date ? task.due_date.slice(0, 10) : "");
 	};
+
+	// Deep link from workspace search
+	useOpenParam((id) => {
+		const task = tasks.find((t) => t.id === id);
+		if (task) handleOpenEdit(task);
+	}, !loading);
 
 	// Submit Create Task
 	const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -385,7 +392,7 @@ export default function WorkspaceTasks() {
 			</div>
 
 			{/* Search and Filters Bar */}
-			<div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3 sm:flex-row sm:items-center">
+			<div className="flex flex-col gap-3 rounded-none border bg-muted/20 p-3 sm:flex-row sm:items-center">
 				<div className="relative flex-1">
 					<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 					<Input
@@ -407,7 +414,7 @@ export default function WorkspaceTasks() {
 							type="button"
 							onClick={() => setStatusFilter(s)}
 							className={cn(
-								"rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
+								"rounded-none px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
 								statusFilter === s
 									? "bg-primary text-primary-foreground font-semibold"
 									: "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
@@ -426,7 +433,7 @@ export default function WorkspaceTasks() {
 							type="button"
 							onClick={() => setPriorityFilter(p)}
 							className={cn(
-								"rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
+								"rounded-none px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
 								priorityFilter === p
 									? "bg-primary text-primary-foreground font-semibold"
 									: "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
@@ -446,8 +453,8 @@ export default function WorkspaceTasks() {
 					</p>
 				</div>
 			) : filteredTasks.length === 0 ? (
-				<div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 p-12 text-center bg-card/10">
-					<div className="flex size-12 items-center justify-center rounded-full bg-muted/60">
+				<div className="flex flex-col items-center justify-center rounded-none border border-dashed border-border/80 p-12 text-center bg-card/10">
+					<div className="flex size-12 items-center justify-center rounded-none bg-muted/60">
 						<Sparkles className="size-6 text-muted-foreground" />
 					</div>
 					<h3 className="mt-4 text-base font-semibold">No tasks found</h3>
@@ -493,7 +500,7 @@ export default function WorkspaceTasks() {
 							<div
 								key={task.id}
 								className={cn(
-									"group flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-xs",
+									"group flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-none border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-xs",
 									task.status === "done" && "opacity-75 bg-muted/10",
 								)}
 							>
@@ -509,7 +516,7 @@ export default function WorkspaceTasks() {
 												: "Click to cycle status (To Do -> In Progress -> Done)"
 										}
 										className={cn(
-											"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors",
+											"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-none border transition-colors",
 											isViewer ? "cursor-default" : "cursor-pointer",
 											task.status === "done"
 												? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
@@ -534,7 +541,7 @@ export default function WorkspaceTasks() {
 											</h4>
 											<span
 												className={cn(
-													"inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+													"inline-flex items-center rounded-none border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
 													priorityConf.color,
 													priorityConf.bg,
 													priorityConf.border,
@@ -544,7 +551,7 @@ export default function WorkspaceTasks() {
 											</span>
 											<span
 												className={cn(
-													"inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/30",
+													"inline-flex items-center rounded-none border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/30",
 													statusConf.border,
 												)}
 											>

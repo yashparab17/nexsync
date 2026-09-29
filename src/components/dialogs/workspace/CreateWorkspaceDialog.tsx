@@ -180,7 +180,7 @@ export default function CreateWorkspaceDialog({
 						</h3>
 
 						<div className="flex flex-col items-center gap-4">
-							<div className="grid h-20 w-20 place-items-center rounded-xl bg-primary">
+							<div className="grid h-20 w-20 place-items-center rounded-none bg-primary">
 								<Folder className="size-8" />
 							</div>
 

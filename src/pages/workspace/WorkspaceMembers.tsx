@@ -216,7 +216,7 @@ export default function WorkspaceMembers() {
 						<KeyRound className="size-4 text-sky-400" />
 						P2P Sync & Invite
 						{peers.length > 0 && (
-							<span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping ml-1" />
+							<span className="flex h-2 w-2 rounded-none bg-emerald-400 animate-ping ml-1" />
 						)}
 					</Button>
 					<Button
@@ -268,10 +268,10 @@ export default function WorkspaceMembers() {
 									return (
 										<div
 											key={member.id}
-											className="flex items-center justify-between rounded-lg border bg-muted/20 p-3.5 transition-colors hover:bg-muted/30"
+											className="flex items-center justify-between rounded-none border bg-muted/20 p-3.5 transition-colors hover:bg-muted/30"
 										>
 											<div className="flex items-center gap-3">
-												<div className="flex size-10 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">
+												<div className="flex size-10 items-center justify-center rounded-none bg-primary/10 font-bold text-primary">
 													{member.name.slice(0, 2).toUpperCase()}
 												</div>
 												<div>
@@ -286,7 +286,7 @@ export default function WorkspaceMembers() {
 														)}
 														{isOnline && (
 															<span className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
-																<span className="size-1.5 rounded-full bg-emerald-400" />
+																<span className="size-1.5 rounded-none bg-emerald-400" />
 																Online
 															</span>
 														)}
@@ -294,7 +294,7 @@ export default function WorkspaceMembers() {
 													<div className="flex items-center gap-2 mt-0.5">
 														<span
 															className={cn(
-																"inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+																"inline-flex items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
 																roleConf.color,
 																roleConf.bg,
 															)}
@@ -353,7 +353,7 @@ export default function WorkspaceMembers() {
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-4 text-xs">
-							<div className="rounded-lg border p-3 bg-muted/10">
+							<div className="rounded-none border p-3 bg-muted/10">
 								<div className="flex items-center gap-1.5 font-semibold text-amber-400">
 									<Crown className="size-3.5" />
 									Owner
@@ -364,7 +364,7 @@ export default function WorkspaceMembers() {
 								</p>
 							</div>
 
-							<div className="rounded-lg border p-3 bg-muted/10">
+							<div className="rounded-none border p-3 bg-muted/10">
 								<div className="flex items-center gap-1.5 font-semibold text-sky-400">
 									<Shield className="size-3.5" />
 									Editor
@@ -375,7 +375,7 @@ export default function WorkspaceMembers() {
 								</p>
 							</div>
 
-							<div className="rounded-lg border p-3 bg-muted/10">
+							<div className="rounded-none border p-3 bg-muted/10">
 								<div className="flex items-center gap-1.5 font-semibold text-emerald-400">
 									<UserCheck className="size-3.5" />
 									Viewer

@@ -114,7 +114,7 @@ export default function Settings() {
 	};
 
 	return (
-		<div className="min-h-screen bg-background p-8">
+		<div className="min-h-full bg-background p-8">
 			<div className="mx-auto max-w-4xl space-y-6">
 				{/* Top Navigation */}
 				<div className="flex items-center gap-3">
@@ -180,7 +180,7 @@ export default function Settings() {
 								{config.allowed_workspace_roots.map((root, index) => (
 									<div
 										key={root + index}
-										className="flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2 text-xs font-mono"
+										className="flex items-center justify-between rounded-none border bg-muted/20 px-3 py-2 text-xs font-mono"
 									>
 										<div className="flex items-center gap-2 truncate">
 											<HardDrive className="size-3.5 shrink-0 text-muted-foreground" />

@@ -199,7 +199,7 @@ export default function WorkspaceSettings() {
 								type="checkbox"
 								checked={autosave}
 								onChange={(e) => setAutosave(e.target.checked)}
-								className="size-4 rounded accent-primary cursor-pointer"
+								className="size-4 rounded-none accent-primary cursor-pointer"
 							/>
 						</div>
 
@@ -216,7 +216,7 @@ export default function WorkspaceSettings() {
 								type="checkbox"
 								checked={sync}
 								onChange={(e) => setSync(e.target.checked)}
-								className="size-4 rounded accent-primary cursor-pointer"
+								className="size-4 rounded-none accent-primary cursor-pointer"
 							/>
 						</div>
 

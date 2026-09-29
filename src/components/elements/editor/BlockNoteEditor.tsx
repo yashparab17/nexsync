@@ -201,7 +201,7 @@ export default function BlockNoteEditor({
 	};
 
 	return (
-		<div className="h-full w-full overflow-y-auto rounded-lg border bg-card p-4 transition-colors">
+		<div className="h-full w-full overflow-y-auto bg-background px-2 py-4 [&_.bn-container]:mx-auto [&_.bn-container]:max-w-3xl [&_.bn-editor]:bg-transparent">
 			{!isReady ? (
 				<div className="flex h-48 items-center justify-center">
 					<p className="text-xs uppercase tracking-widest text-muted-foreground animate-pulse">

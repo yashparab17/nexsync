@@ -90,7 +90,7 @@ export default function Welcome() {
 	};
 
 	return (
-		<main className="flex min-h-screen flex-col p-8">
+		<main className="flex min-h-full flex-col p-8">
 			{/* Header */}
 			<header className="relative flex items-center justify-center">
 				<div className="flex items-center gap-3">

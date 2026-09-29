@@ -16,7 +16,7 @@ export default function Workspace() {
 	// Show loader while workspace data is being fetched
 	if (isLoading) {
 		return (
-			<div className="flex h-screen items-center justify-center">
+			<div className="flex h-full items-center justify-center">
 				<p className="text-muted-foreground">Loading workspace…</p>
 			</div>
 		);
@@ -31,7 +31,7 @@ export default function Workspace() {
 	}
 
 	return (
-		<div className="flex h-screen">
+		<div className="flex h-full">
 			{/* Sidebar */}
 			<WorkspaceSidebar />
 

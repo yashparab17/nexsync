@@ -72,7 +72,7 @@
     --chart-3: oklch(0.6 0.118 184.704);
     --chart-4: oklch(0.511 0.096 186.391);
     --chart-5: oklch(0.437 0.078 188.216);
-    --radius: 0.625rem;
+    --radius: 0;
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.141 0.005 285.823);
     --sidebar-primary: oklch(0.6 0.118 184.704);
@@ -127,4 +127,14 @@
   html {
     @apply font-sans;
     }
+}
+/* App-wide: no rounded corners, including third-party widgets (BlockNote/Mantine, CodeMirror). */
+*, *::before, *::after {
+  border-radius: 0 !important;
+}
+
+/* Thin scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 40%, transparent) transparent;
 }

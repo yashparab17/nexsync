@@ -107,7 +107,7 @@ export default function CodeEditor({
 	}, [languageExtensions, collab, userName]);
 
 	return (
-		<div className="h-full w-full overflow-hidden rounded-lg border bg-background font-mono text-xs">
+		<div className="h-full w-full overflow-hidden border-t bg-background font-mono text-xs">
 			<CodeMirror
 				{...(collab ? {} : { value })}
 				height="100%"

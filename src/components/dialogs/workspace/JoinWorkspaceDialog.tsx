@@ -142,7 +142,7 @@ export default function JoinWorkspaceDialog({
 			<Dialog className="sm:max-w-xl">
 				<DialogHeader>
 					<div className="flex items-center gap-2">
-						<div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
+						<div className="flex h-9 w-9 items-center justify-center rounded-none bg-sky-500/10 text-sky-400 border border-sky-500/20">
 							<Radio className="h-5 w-5 animate-pulse" />
 						</div>
 						<div>
@@ -155,7 +155,7 @@ export default function JoinWorkspaceDialog({
 				</DialogHeader>
 
 				{/* Security banner */}
-				<div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-400">
+				<div className="flex items-center justify-between rounded-none border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-400">
 					<div className="flex items-center gap-2">
 						<ShieldCheck className="h-4 w-4" />
 						<span>End-to-end encrypted (QUIC + TLS 1.3 via Iroh)</span>
@@ -167,7 +167,7 @@ export default function JoinWorkspaceDialog({
 				</div>
 
 				{error && (
-					<div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+					<div className="rounded-none border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
 						{error}
 					</div>
 				)}
@@ -181,7 +181,7 @@ export default function JoinWorkspaceDialog({
 							value={ticket}
 							onChange={(e) => setTicket(e.target.value)}
 							rows={3}
-							className="font-mono text-[11px] break-all rounded-md border border-input px-3 py-2"
+							className="font-mono text-[11px] break-all rounded-none border border-input px-3 py-2"
 							autoFocus
 						/>
 					</div>
@@ -220,7 +220,7 @@ export default function JoinWorkspaceDialog({
 					</div>
 
 					{statusMessage && (
-						<div className="flex items-center gap-2 rounded-lg border border-sky-500/20 bg-sky-500/10 p-2.5 text-xs text-sky-400">
+						<div className="flex items-center gap-2 rounded-none border border-sky-500/20 bg-sky-500/10 p-2.5 text-xs text-sky-400">
 							{isSuccess ? (
 								<Sparkles className="h-4 w-4 text-emerald-400" />
 							) : (
