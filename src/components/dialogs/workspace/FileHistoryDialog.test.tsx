@@ -20,6 +20,7 @@ const version = (id: number, over: Partial<FileVersion> = {}): FileVersion => ({
 	size: 10,
 	source: "save",
 	label: null,
+	author: null,
 	createdAt: `2026-01-0${id}T10:00:00Z`,
 	...over,
 });
@@ -84,6 +85,32 @@ describe("FileHistoryDialog", () => {
 		fireEvent.change(screen.getByLabelText("Version name"), { target: { value: "Before review" } });
 		fireEvent.click(screen.getByRole("button", { name: /save version/i }));
 		await waitFor(() => expect(recordFileVersion).toHaveBeenCalledWith("/w", "notes/a.md", "one\nthree\nfour\n", { label: "Before review" }));
+	});
+
+	it("shares a named version and says so, crediting the person who named it", async () => {
+		const onNamed = vi.fn(() => true);
+		open({ authorName: "Ed", onNamed });
+		await screen.findByText("four");
+		fireEvent.change(screen.getByLabelText("Version name"), { target: { value: "Agreed" } });
+		fireEvent.click(screen.getByRole("button", { name: /save version/i }));
+		await waitFor(() => expect(recordFileVersion).toHaveBeenCalledWith("/w", "notes/a.md", "one\nthree\nfour\n", { label: "Agreed", author: "Ed" }));
+		expect(onNamed).toHaveBeenCalledWith("Agreed", "one\nthree\nfour\n");
+		expect(await screen.findByText(/shared with collaborators/i)).toBeTruthy();
+	});
+
+	it("says when a named version was too large to share", async () => {
+		open({ onNamed: () => false });
+		await screen.findByText("four");
+		fireEvent.change(screen.getByLabelText("Version name"), { target: { value: "Big" } });
+		fireEvent.click(screen.getByRole("button", { name: /save version/i }));
+		expect(await screen.findByText(/too large to share/i)).toBeTruthy();
+	});
+
+	it("shows who named a version", async () => {
+		vi.mocked(listFileVersions).mockResolvedValue([version(2, { source: "named", label: "Agreed draft", author: "Ann" }), version(1)]);
+		open();
+		expect(await screen.findByText("by Ann")).toBeTruthy();
+		expect(screen.getByText("Agreed draft")).toBeTruthy();
 	});
 
 	it("restores an attachment only after a confirmation", async () => {

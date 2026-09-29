@@ -11,5 +11,6 @@ export type {
 	WorkspaceSyncSnapshot,
 	WorkspaceSyncFileItem,
 	DataChange,
+	NamedVersion,
 } from "./types";
 export { applyDataChange, upsertTask, upsertKanbanCard } from "./sharedData";

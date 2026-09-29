@@ -92,11 +92,15 @@ interface FileHistoryDialogProps {
 	// Called after a binary file was put back on disk
 	onRestored?: () => void;
 	readOnly?: boolean;
+	// Who is naming versions here; shown next to them in the history
+	authorName?: string;
+	// Called after a version was named, to share it with collaborators. Returns false when it could not be shared.
+	onNamed?: (label: string, text: string) => boolean;
 	onClose: () => void;
 }
 
 // Timeline of a file's saved versions, with a diff against the current text or the version before, and restore
-export default function FileHistoryDialog({ workspacePath, path, currentText, onRestoreText, onRestored, readOnly = false, onClose }: FileHistoryDialogProps) {
+export default function FileHistoryDialog({ workspacePath, path, currentText, onRestoreText, onRestored, readOnly = false, authorName, onNamed, onClose }: FileHistoryDialogProps) {
 	const fileName = path.split("/").pop() ?? path;
 	const isText = !isBinaryFile(fileName) && !isDocumentFile(fileName);
 
@@ -111,6 +115,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 	const [busy, setBusy] = useState(false);
 	const [confirming, setConfirming] = useState(false);
 	const [restored, setRestored] = useState(false);
+	const [notice, setNotice] = useState<string | null>(null);
 
 	const load = useCallback(async () => {
 		try {
@@ -156,7 +161,9 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 		if (!label.trim() || current === null) return;
 		setBusy(true);
 		try {
-			await recordFileVersion(workspacePath, path, current, { label: label.trim() });
+			await recordFileVersion(workspacePath, path, current, { label: label.trim(), author: authorName });
+			const shared = onNamed?.(label.trim(), current);
+			setNotice(shared === false ? "Saved here. It is too large to share with collaborators." : onNamed ? "Saved, and shared with collaborators who are connected." : null);
 			setLabel("");
 			await load();
 		} catch (err) {
@@ -237,6 +244,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 											{SOURCES[v.source] ?? v.source} · {formatSize(v.size)}
 										</span>
 										{v.label && <span className="block truncate font-semibold text-primary">{v.label}</span>}
+										{v.author && <span className="block truncate text-muted-foreground">by {v.author}</span>}
 									</button>
 								</li>
 							))}
@@ -301,6 +309,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 									{isText && !onRestoreText && (
 										<span className="text-xs text-muted-foreground">Open the file in Notes or Editor to restore a version.</span>
 									)}
+									{notice && <span role="status" className="text-xs text-muted-foreground">{notice}</span>}
 									{restored && <span className="text-xs text-emerald-400">Restored.</span>}
 									{!isText && confirming ? (
 										<>

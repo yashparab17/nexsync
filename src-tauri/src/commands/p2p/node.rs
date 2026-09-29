@@ -64,16 +64,29 @@ const KIND_WORKSPACE_DELETED: &str = "WORKSPACE_DELETED";
 const KIND_HOST_HANDOFF: &str = "HOST_HANDOFF";
 /// The host telling guests where the new host is; accepted only from the host
 const KIND_HOST_MOVED: &str = "HOST_MOVED";
+/// A collaborator naming a version of a file, so the others keep it too; dropped from Viewer guests
+const KIND_VERSION_NAMED: &str = "VERSION_NAMED";
 /// Catch-up content for a note that was closed while apart; dropped from Viewer guests like live edits
 const KIND_YDOC_UPDATE: &str = "YDOC_UPDATE";
 /// An Admin guest asking the host to change someone's role; dropped from everyone else
 const KIND_ROLE_REQUEST: &str = "ROLE_REQUEST";
+/// Puts the sender's name on a message. The one exception is a guest hearing from the host, which already
+/// stamped a relayed message with whoever sent it.
+fn stamp_author(message: &mut serde_json::Value, sender: &str, keep_existing: bool) {
+    let stamped = message.get("author").and_then(|a| a.as_str()).is_some_and(|a| !a.is_empty());
+    if keep_existing && stamped {
+        return;
+    }
+    message["author"] = serde_json::Value::String(sender.to_string());
+}
+
 /// App messages a host forwards from one guest to the others. Yjs sync messages are included
 /// so live co-editing reaches every guest even when the host has the document closed: guests
 /// only ever connect to the host (a star topology), so without this a guest's edits would stop
 /// at the host and never reach a third peer.
 const RELAYED_KINDS: &[&str] = &[
     KIND_DATA_CHANGE,
+    KIND_VERSION_NAMED,
     "ACTIVITY_EVENT",
     "SYNC_STEP_1",
     "SYNC_STEP_2",
@@ -737,7 +750,7 @@ impl Node {
     }
 
     fn dispatch_message(self: &Arc<Self>, from: &EndpointId, bytes: &[u8]) {
-        let message: serde_json::Value = match serde_json::from_slice(bytes) {
+        let mut message: serde_json::Value = match serde_json::from_slice(bytes) {
             Ok(value) => value,
             Err(_) => {
                 eprintln!("[P2P] Dropping non-JSON message from {}", from.fmt_short());
@@ -770,17 +783,18 @@ impl Node {
             return;
         }
 
-        let Some((from_host, may_write, is_admin, hosting)) = ({
+        let kind = kind.to_owned();
+        let Some((from_host, may_write, is_admin, hosting, sender)) = ({
             let st = self.lock();
-            st.peers
-                .get(from)
-                .map(|p| (p.is_host, p.is_host || p.role != "Viewer", p.role == "Admin", is_hosting(&st)))
+            st.peers.get(from).map(|p| {
+                (p.is_host, p.is_host || p.role != "Viewer", p.role == "Admin", is_hosting(&st), p.name.clone())
+            })
         }) else {
             return;
         };
-        match kind {
-            KIND_DATA_CHANGE if !may_write => {
-                eprintln!("[P2P] Ignoring a data change from Viewer {}", from.fmt_short());
+        match kind.as_str() {
+            KIND_DATA_CHANGE | KIND_VERSION_NAMED if !may_write => {
+                eprintln!("[P2P] Ignoring a change from Viewer {}", from.fmt_short());
                 return;
             }
             // A Viewer's readOnly editor is a UI nicety, not a security boundary: a modified
@@ -800,8 +814,14 @@ impl Node {
             _ => {}
         }
         // Only the host passes changes on; guests linked directly to each other would otherwise loop them
-        if !from_host && hosting && RELAYED_KINDS.contains(&kind) {
-            self.relay(from, bytes.to_vec());
+        // Who named a version is decided here, not by the sender, so nobody can sign as someone else
+        let mut relayed = bytes.to_vec();
+        if kind == KIND_VERSION_NAMED {
+            stamp_author(&mut message, &sender, from_host && !hosting);
+            relayed = serde_json::to_vec(&message).unwrap_or(relayed);
+        }
+        if !from_host && hosting && RELAYED_KINDS.contains(&kind.as_str()) {
+            self.relay(from, relayed);
         }
 
         self.emit(
@@ -1802,6 +1822,71 @@ mod tests {
         host.node.send(None, &members).await.unwrap();
         assert!(next_shared_message(&mut editor, Duration::from_secs(20)).await.is_some());
         assert!(next_shared_message(&mut viewer, Duration::from_secs(20)).await.is_some());
+    }
+
+    // Next message of `kind` this node's frontend receives, if any within `wait`
+    async fn next_of_kind(test: &mut TestNode, kind: &str, wait: Duration) -> Option<serde_json::Value> {
+        tokio::time::timeout(wait, async {
+            loop {
+                let (event, payload) = test.events.recv().await?;
+                if event == EVENT_MESSAGE && payload["message"]["kind"].as_str() == Some(kind) {
+                    return Some(payload);
+                }
+            }
+        })
+        .await
+        .ok()
+        .flatten()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_named_versions_are_signed_relayed_and_role_checked() {
+        let mut host = start_test_node("ver_host").await;
+        let mut editor = start_test_node("ver_editor").await;
+        let mut viewer = start_test_node("ver_viewer").await;
+        for (guest, role, name) in [(&editor, "Editor", "Ed"), (&viewer, "Viewer", "Vi")] {
+            let invite = host
+                .node
+                .create_invite(role.into(), "ws".into(), "Demo".into(), "Host".into())
+                .await
+                .unwrap();
+            guest.node.join(&invite.ticket, name).await.unwrap();
+        }
+        wait_until("both guests are connected", || host.node.peers().len() == 2).await;
+
+        // An Editor's named version reaches the host and is relayed to the other guest, signed with the
+        // Editor's real name even though the message claimed another author
+        let message = serde_json::json!({ "kind": KIND_VERSION_NAMED, "timestamp": 1, "author": "Someone Else", "payload": "{}" });
+        editor.node.send(None, &message).await.unwrap();
+        for node in [&mut host, &mut viewer] {
+            let heard = next_of_kind(node, KIND_VERSION_NAMED, Duration::from_secs(20)).await.expect("not delivered");
+            assert_eq!(heard["message"]["author"], "Ed");
+        }
+        assert!(next_of_kind(&mut editor, KIND_VERSION_NAMED, Duration::from_secs(2)).await.is_none());
+
+        // A Viewer's is dropped by the host and never relayed
+        viewer.node.send(None, &message).await.unwrap();
+        assert!(next_of_kind(&mut host, KIND_VERSION_NAMED, Duration::from_secs(3)).await.is_none());
+        assert!(next_of_kind(&mut editor, KIND_VERSION_NAMED, Duration::from_secs(1)).await.is_none());
+    }
+
+    #[test]
+    fn test_author_is_stamped_by_the_receiver_and_a_hosts_stamp_is_kept() {
+        // A host or a directly linked guest names the sender itself, whatever the message claims
+        let mut message = serde_json::json!({ "kind": KIND_VERSION_NAMED, "author": "Someone Else" });
+        stamp_author(&mut message, "Ed", false);
+        assert_eq!(message["author"], "Ed");
+
+        // A guest hearing from the host keeps the name the host stamped, and names the host if there is none
+        stamp_author(&mut message, "Host", true);
+        assert_eq!(message["author"], "Ed");
+        let mut plain = serde_json::json!({ "kind": KIND_VERSION_NAMED });
+        stamp_author(&mut plain, "Host", true);
+        assert_eq!(plain["author"], "Host");
+        let mut empty = serde_json::json!({ "kind": KIND_VERSION_NAMED, "author": "" });
+        stamp_author(&mut empty, "Host", true);
+        assert_eq!(empty["author"], "Host");
     }
 
     #[test]

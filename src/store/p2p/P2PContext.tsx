@@ -23,6 +23,7 @@ import {
 	type JoinRequest,
 	type JoinResult,
 	type ShortCodeInfo,
+	type NamedVersion,
 	type P2PMessage,
 	type WorkspaceSyncSnapshot,
 } from "@/lib/p2p";
@@ -38,6 +39,7 @@ import {
 	getKanban,
 	createKanbanColumn,
 	loadConfig,
+	receiveNamedVersion,
 } from "@/lib/tauri";
 import type { Member } from "@/types/workspace";
 import { bindGuestMember, canChangeRole, roleTable } from "@/lib/roles";
@@ -147,6 +149,7 @@ interface P2PContextType {
 	declineHandoff: () => void;
 	transferHost: (peerId: string) => Promise<void>; // Owner only: hand ownership and hosting to a connected member
 	publishDataChange: (change: DataChange) => void;
+	shareNamedVersion: (path: string, label: string, content: string) => boolean; // False when the text is too large to send
 	createInvite: (role?: string) => Promise<InviteInfo>;
 	createShortCode: (role?: string) => Promise<ShortCodeInfo>;
 	joinRequests: JoinRequest[]; // Guests waiting for this host to allow or deny them
@@ -167,6 +170,14 @@ interface P2PContextType {
 const P2PContext = createContext<P2PContextType | null>(null);
 
 const stripLeadingSlash = (path: string) => (path.startsWith("/") ? path.slice(1) : path);
+
+// Largest file text sent to collaborators when a version is named; it must fit in one message
+const MAX_SHARED_VERSION_CHARS = 4 * 1024 * 1024;
+
+function isNamedVersion(value: unknown): value is NamedVersion {
+	const v = value as Partial<NamedVersion> | null;
+	return !!v && typeof v.path === "string" && typeof v.label === "string" && typeof v.content === "string";
+}
 
 // Provides P2P state and actions to the whole app
 export function P2PProvider({ children }: { children: React.ReactNode }) {
@@ -474,6 +485,19 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		[send],
 	);
 
+	// Tell collaborators a version was named, so they keep it too. Only what is named from now on is sent:
+	// nobody who joins later receives the history from before.
+	const shareNamedVersion = useCallback(
+		(path: string, label: string, content: string) => {
+			if (content.length > MAX_SHARED_VERSION_CHARS) return false;
+			if (peersRef.current.length > 0) {
+				send({ kind: "VERSION_NAMED", timestamp: Date.now(), payload: JSON.stringify({ path, label, content }) });
+			}
+			return true;
+		},
+		[send],
+	);
+
 	// Handle an incoming app message from a peer
 	const handleMessage = useCallback(
 		async (peerId: string, message: P2PMessage) => {
@@ -530,6 +554,20 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 						setDataVersion((v) => v + 1);
 					} catch (err) {
 						console.error("[P2P] Failed to apply a collaborator's change:", err);
+					}
+					break;
+				}
+
+				case "VERSION_NAMED": {
+					// The backend has already dropped these from Viewers and stamped who sent them
+					const path = workspaceRef.current?.path;
+					if (!path || !message.payload) break;
+					try {
+						const named: unknown = JSON.parse(message.payload);
+						if (!isNamedVersion(named)) break;
+						await receiveNamedVersion(path, stripLeadingSlash(named.path), named.content, named.label, message.author ?? "A collaborator");
+					} catch (err) {
+						console.error("[P2P] Failed to keep a version a collaborator named:", err);
 					}
 					break;
 				}
@@ -1041,6 +1079,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				declineHandoff,
 				transferHost,
 				publishDataChange,
+				shareNamedVersion,
 				createInvite,
 				createShortCode,
 				joinRequests,

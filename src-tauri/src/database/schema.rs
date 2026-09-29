@@ -202,6 +202,13 @@ CREATE TABLE IF NOT EXISTS file_versions (
 CREATE INDEX IF NOT EXISTS idx_file_versions_path ON file_versions(workspace_id, path, id DESC);
 "##,
 	},
+	Migration {
+		version: 6,
+		description: "file version author",
+		up: r##"
+ALTER TABLE file_versions ADD COLUMN author TEXT;
+"##,
+	},
 ];
 
 /// Initialises the schema on a fresh database, running pending migrations

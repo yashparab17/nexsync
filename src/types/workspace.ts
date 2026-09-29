@@ -258,5 +258,7 @@ export interface FileVersion {
 	// save, sync, import, auto (periodic snapshot), named, restore or before-restore
 	source: string;
 	label: string | null;
+	// Who named it, for versions a collaborator named
+	author: string | null;
 	createdAt: string;
 }

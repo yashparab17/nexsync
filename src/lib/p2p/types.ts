@@ -18,6 +18,7 @@ export type P2PMessageKind =
 	| "HOST_READY" // The chosen guest's answer to a handoff: a fresh invite ticket, or none if declined
 	| "YDOC_INVENTORY" // State summary of every stored note, sent on connect so the peer can send what is missing
 	| "YDOC_UPDATE" // What one note is missing on the peer, answering an inventory
+	| "VERSION_NAMED" // A collaborator naming a version of a file; hosts drop these from Viewers and relay the rest
 	| "HOST_MOVED"; // The host telling guests the ticket of the new host; only accepted from the host
 
 // JSON envelope carried over a peer's encrypted control stream
@@ -26,6 +27,14 @@ export interface P2PMessage {
 	timestamp: number;
 	docId?: string; // Yjs document scope for SYNC_* messages
 	payload?: string; // JSON string or base64 Yjs update
+	author?: string; // Who sent a VERSION_NAMED message; stamped by the receiving backend, never trusted from the sender
+}
+
+// The payload of a VERSION_NAMED message: the text of a file at the moment someone named it
+export interface NamedVersion {
+	path: string;
+	label: string;
+	content: string;
 }
 
 // One file listed in a workspace snapshot; contents are streamed separately by Rust

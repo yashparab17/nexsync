@@ -42,7 +42,7 @@ interface CodeTabProps {
 // One open file in the Editor tab: a live shared document with format, find, save, problem markers and blame
 export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChange }: CodeTabProps) {
 	const { workspace, metadata, addActivityEvent } = useWorkspace();
-	const { selfName } = useP2P();
+	const { selfName, shareNamedVersion } = useP2P();
 	const logError = useErrorLog();
 	const workspacePath = workspace?.path ?? "";
 	const fileName = path.split("/").pop() ?? path;
@@ -340,6 +340,8 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 					workspacePath={workspacePath}
 					path={path}
 					currentText={content}
+					authorName={userName}
+					onNamed={(label, text) => shareNamedVersion(path, label, text)}
 					onRestoreText={readOnly ? undefined : restoreText}
 					readOnly={readOnly}
 					onClose={() => setHistoryOpen(false)}

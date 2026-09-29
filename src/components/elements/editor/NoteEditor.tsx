@@ -35,7 +35,7 @@ const sameNote = (a: string, b: string) => a.replace(/\s+$/, "") === b.replace(/
 // editor and are saved as plain text.
 export default function NoteEditor({ fileName, initialContent, onSave, onClose, readOnly = false, workspacePath, docId }: NoteEditorProps) {
 	const isMarkdown = isMarkdownFile(fileName);
-	const { peers, selfName } = useP2P();
+	const { peers, selfName, shareNamedVersion } = useP2P();
 	const { metadata } = useWorkspace();
 	const userName = selfName ?? metadata?.members.members.find((m) => m.role === "Owner")?.name ?? "You";
 	const collab = useCollabDoc(workspacePath, docId);
@@ -253,6 +253,8 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 					workspacePath={workspacePath}
 					path={docId}
 					currentText={content}
+					authorName={userName}
+					onNamed={(label, text) => shareNamedVersion(docId, label, text)}
 					onRestoreText={readOnly ? undefined : restoreText}
 					readOnly={readOnly}
 					onClose={() => setHistoryOpen(false)}

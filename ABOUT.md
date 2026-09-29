@@ -12,7 +12,7 @@ Most collaborative tools ask you to hand your files to someone else's server. Ne
 - **Tasks & Kanban** — stored in a local SQLite database per workspace, synced live with collaborators.
 - **Files & Assets** — a real file explorer over your OS filesystem, with previews and on-demand download of large files.
 - **P2P collaboration** — invite someone with a single pasteable ticket; connections punch through NATs directly when possible and fall back to an encrypted relay when not.
-- **History & export** — a per-file timeline of versions with diffs and restore, and export to Markdown, PDF or zip.
+- **History & export** — a per-file timeline of versions with diffs and restore (versions you name are shared with collaborators), and export to Markdown, PDF or zip.
 - **Roles** — Owner, Editor and Viewer, enforced both in the UI and on the wire.
 - **Auto-updates** — signed release builds, checked and installed from inside the app.
 

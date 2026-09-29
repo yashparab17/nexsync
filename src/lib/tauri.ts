@@ -514,7 +514,7 @@ export function recordFileVersion(
 	path: string,
 	relPath: string,
 	content: string,
-	options: { label?: string } = {},
+	options: { label?: string; author?: string } = {},
 ): Promise<void> {
 	return invoke("record_file_version", {
 		path,
@@ -522,7 +522,19 @@ export function recordFileVersion(
 		content,
 		source: options.label ? "named" : "auto",
 		label: options.label ?? null,
+		author: options.author ?? null,
 	});
+}
+
+// Keep a version a collaborator named, if this device has the file; resolves to whether it was added
+export function receiveNamedVersion(
+	path: string,
+	relPath: string,
+	content: string,
+	label: string,
+	author: string,
+): Promise<boolean> {
+	return invoke("receive_named_version", { path, relPath, content, label, author });
 }
 
 // A version read as text, for the preview and the diff

@@ -49,6 +49,7 @@ pub fn run() {
             commands::workspace::versions::record_file_version,
             commands::workspace::versions::read_file_version,
             commands::workspace::versions::restore_file_version,
+            commands::workspace::versions::receive_named_version,
             commands::workspace::export::export_zip,
             commands::workspace::export::write_export_file,
             commands::workspace::read_workspace_binary_file,
