@@ -33,7 +33,7 @@ strum = { version = "0.26", features = ["derive"] }
 rand = "0.8"
 base64 = "0.22"
 iroh = "1.2"
-tokio = { version = "1", features = ["rt", "sync", "time", "macros", "fs", "io-util"] }
+tokio = { version = "1", features = ["rt", "sync", "time", "macros", "fs", "io-util", "process"] }
 data-encoding = "2"
 subtle = "2"
 postcard = { version = "1", default-features = false, features = ["use-std"] }

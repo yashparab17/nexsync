@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+	ExternalLink,
 	FileText,
 	Loader2,
 	Plus,
@@ -21,10 +22,12 @@ import { Input } from "@/components/ui/input";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
+import { isDocumentFile, isNoteFile } from "@/lib/editor/languages";
 import {
 	createWorkspaceFile,
 	deleteWorkspaceItem,
 	listWorkspaceFiles,
+	openWorkspaceFile,
 	readWorkspaceFile,
 	writeWorkspaceFile,
 } from "@/lib/tauri";
@@ -33,7 +36,8 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type { WorkspaceFile } from "@/types/workspace";
 
-// Filtered Notes workspace view managing .md documents with rich BlockNote and CodeMirror editing
+// Notes: text documents (.md, .txt) edited live, plus office documents (.docx, .pdf, ...) that open in their own app.
+// Code belongs in the Editor tab.
 export default function WorkspaceNotes() {
 	const { workspace, refreshMetadata, addActivityEvent } = useWorkspace();
 	const logError = useErrorLog();
@@ -68,7 +72,7 @@ export default function WorkspaceNotes() {
 			const all = [...notesFiles, ...rootFiles].filter(
 				(f) =>
 					!f.is_dir &&
-					(f.name.endsWith(".md") || f.name.endsWith(".markdown")),
+					(isNoteFile(f.name) || isDocumentFile(f.name)),
 			);
 
 			// Deduplicate by path
@@ -99,7 +103,7 @@ export default function WorkspaceNotes() {
 	// Load selected note content from OS disk
 	useEffect(() => {
 		async function fetchContent() {
-			if (!workspace?.path || !selectedNote) {
+			if (!workspace?.path || !selectedNote || isDocumentFile(selectedNote.name)) {
 				setNoteContent("");
 				return;
 			}
@@ -164,7 +168,7 @@ export default function WorkspaceNotes() {
 		try {
 			setSubmitting(true);
 			let filename = newNoteTitle.trim();
-			if (!filename.endsWith(".md") && !filename.endsWith(".markdown")) {
+			if (!isNoteFile(filename)) {
 				filename += ".md";
 			}
 
@@ -278,7 +282,7 @@ export default function WorkspaceNotes() {
 						<div className="flex flex-col items-center justify-center rounded-none border border-dashed border-border/60 p-6 text-center text-xs text-muted-foreground">
 							{searchQuery
 								? "No matching notes found."
-								: "No notes yet. Click New to create your first markdown note."}
+								: "No notes yet. Click New to create your first note. Code goes in the Editor tab."}
 						</div>
 					) : (
 						filteredNotes.map((note) => {
@@ -298,7 +302,7 @@ export default function WorkspaceNotes() {
 										<div className="flex items-center gap-1.5">
 											<FileText className="size-3.5 shrink-0 text-sky-400" />
 											<p className="truncate text-xs font-semibold text-foreground">
-												{note.name.replace(/\.md$/, "")}
+												{note.name.replace(/\.(md|markdown)$/i, "")}
 											</p>
 										</div>
 										<p className="mt-0.5 text-[10px] text-muted-foreground truncate">
@@ -347,6 +351,27 @@ export default function WorkspaceNotes() {
 							</Button>
 						)}
 					</div>
+				) : isDocumentFile(selectedNote.name) ? (
+					<div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+						<FileText className="size-8 text-muted-foreground" />
+						<h3 className="mt-3 text-base font-semibold">{selectedNote.name}</h3>
+						<p className="mt-1 max-w-sm text-xs text-muted-foreground">
+							This document is edited in its own app. Changes you save there sync to collaborators like any
+							other file.
+						</p>
+						<Button
+							size="sm"
+							className="mt-4 gap-1.5"
+							onPress={() =>
+								openWorkspaceFile(workspace?.path ?? "", selectedNote.path.replace(/^\/+/, "")).catch((err) =>
+									logError(err, { source: "notes" }),
+								)
+							}
+						>
+							<ExternalLink className="size-4" />
+							Open in App
+						</Button>
+					</div>
 				) : contentLoading ? (
 					<div className="flex flex-1 items-center justify-center">
 						<Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -376,7 +401,7 @@ export default function WorkspaceNotes() {
 						<DialogHeader>
 							<DialogTitle>New Note</DialogTitle>
 							<DialogDescription>
-								Create a new Markdown document on the local file system.
+								Create a Markdown note, or end the name with .txt for plain text.
 							</DialogDescription>
 						</DialogHeader>
 

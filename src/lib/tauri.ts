@@ -3,6 +3,7 @@
 // P2P commands live in src/lib/p2p/transport.ts
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 import type {
 	WorkspaceInfo,
@@ -458,4 +459,42 @@ export function deleteYjsDoc(
 		workspacePath,
 		docId,
 	});
+}
+
+// ────────────────────────────
+// Editor: run output and system files
+// ────────────────────────────
+
+// One line of output from a command started with runCommand
+export interface RunOutput {
+	runId: string;
+	stream: "stdout" | "stderr";
+	text: string;
+}
+
+export interface RunExit {
+	runId: string;
+	code: number | null;
+	stopped: boolean;
+	error: string | null;
+}
+
+// Start a command inside a folder of the editor area; output arrives through onRunOutput
+export function runCommand(workspacePath: string, dir: string, command: string): Promise<string> {
+	return invoke("run_command", { workspacePath, dir, command });
+}
+
+export function killRun(runId: string): Promise<void> {
+	return invoke("kill_run", { runId });
+}
+
+export const onRunOutput = (handler: (event: RunOutput) => void) =>
+	listen<RunOutput>("editor://run-output", (e) => handler(e.payload));
+
+export const onRunExit = (handler: (event: RunExit) => void) =>
+	listen<RunExit>("editor://run-exit", (e) => handler(e.payload));
+
+// Open a workspace file, such as a Word document, in the default app for its type
+export function openWorkspaceFile(workspacePath: string, relPath: string): Promise<void> {
+	return invoke("open_workspace_file", { workspacePath, relPath });
 }

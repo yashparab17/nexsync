@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { codeBlockOptions, syntaxHighlighter } from "@blocknote/code-block";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import { withCollaboration } from "@blocknote/core/yjs";
@@ -118,6 +119,8 @@ export default function BlockNoteEditor({
 	const editor = useCreateBlockNote(
 		collab
 			? withCollaboration({
+						codeBlock: codeBlockOptions,
+						extensions: [syntaxHighlighter],
 					resolveFileUrl,
 					uploadFile,
 					collaboration: {
@@ -126,7 +129,7 @@ export default function BlockNoteEditor({
 						provider: { awareness: collab.awareness },
 					},
 				})
-			: { resolveFileUrl, uploadFile },
+			: { resolveFileUrl, uploadFile, codeBlock: codeBlockOptions, extensions: [syntaxHighlighter] },
 		[resolveFileUrl, uploadFile, collab?.doc],
 	);
 

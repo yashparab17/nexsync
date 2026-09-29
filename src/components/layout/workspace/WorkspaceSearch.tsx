@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { File, FileText, KanbanSquare, ListTodo, Search, X } from "lucide-react";
+import { Code2, File, FileText, KanbanSquare, ListTodo, Search, X } from "lucide-react";
 
+import { isBinaryFile, isDocumentFile, isNoteFile } from "@/lib/editor/languages";
 import { getKanban, getTasks, listWorkspaceFiles, readWorkspaceFile } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { WorkspaceFile } from "@/types/workspace";
 
 interface Hit {
 	key: string;
-	kind: "Note" | "File" | "Asset" | "Task" | "Card";
+	kind: "Note" | "Code" | "File" | "Asset" | "Task" | "Card";
 	title: string;
 	sub: string;
 	to: string;
@@ -41,7 +42,7 @@ async function walk(path: string, dir = "", depth = 0): Promise<WorkspaceFile[]>
 	return [...entries.filter((e) => !e.is_dir), ...nested.flat()];
 }
 
-const ICONS = { Note: FileText, File, Asset: File, Task: ListTodo, Card: KanbanSquare };
+const ICONS = { Note: FileText, Code: Code2, File, Asset: File, Task: ListTodo, Card: KanbanSquare };
 
 // Header search: matches file names, task and kanban card titles/descriptions
 export default function WorkspaceSearch() {
@@ -71,16 +72,17 @@ export default function WorkspaceSearch() {
 		);
 		setIndex([
 			...files.map((f, i): Hit => {
-				const isNote = /\.(md|markdown)$/i.test(f.name) && /^\/(notes|files)\/[^/]+$/.test(f.path);
+				const isNote = (isNoteFile(f.name) || isDocumentFile(f.name)) && /^\/(notes|files)\/[^/]+$/.test(f.path);
 				const isAsset = /^\/assets\/[^/]+$/.test(f.path);
+				const isCode = !isNote && !isAsset && /^\/(editor|files)\//.test(f.path) && !isBinaryFile(f.name) && !isDocumentFile(f.name);
 				const open = encodeURIComponent(f.path);
 				return {
 					key: `f:${f.path}`,
-					kind: isNote ? "Note" : isAsset ? "Asset" : "File",
+					kind: isNote ? "Note" : isAsset ? "Asset" : isCode ? "Code" : "File",
 					title: f.name,
 					sub: f.path,
 					body: bodies[i],
-					to: `/workspace/${isNote ? "notes" : isAsset ? "assets" : "files"}?open=${open}`,
+					to: `/workspace/${isNote ? "notes" : isAsset ? "assets" : isCode ? "editor" : "files"}?open=${open}`,
 				};
 			}),
 			...tasks.map((t): Hit => ({

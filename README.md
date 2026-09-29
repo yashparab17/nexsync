@@ -7,7 +7,7 @@ Built with [Tauri 2](https://tauri.app) (Rust) + React 19 + TypeScript, with pee
 ## Features
 
 - **Workspaces on your own disk.** Each workspace is a regular folder (`notes/`, `files/`, `assets/`, `editor/`) plus a hidden `.nexsync/` database.
-- **Files, Notes and Editor.** File explorer with a BlockNote rich-text editor for Markdown and CodeMirror for code.
+- **Files, Notes and Editor.** Files is the file manager. Notes holds text documents (`.md` in a BlockNote rich-text editor, `.txt` as plain text) and lists office documents that open in their own app. Editor is the code tab: an explorer, several files open as tabs, syntax highlighting for about 100 languages, formatting, problem markers, blame and contributions per file, and a Run panel that streams a command's output.
 - **Tasks and Kanban** stored in SQLite, with a dashboard and activity feed.
 - **Assets** with previews, uploads and lazy on-demand download of large files from collaborators.
 - **P2P collaboration:**

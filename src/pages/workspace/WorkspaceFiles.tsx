@@ -1,5 +1,6 @@
 // React
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 // Icons
 import {
@@ -15,7 +16,6 @@ import {
 } from "lucide-react";
 
 // Components
-import EditorContainer from "@/components/elements/editor/EditorContainer";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -35,6 +35,7 @@ import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 // Hooks
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
+import { editorRouteFor } from "@/lib/editor/languages";
 
 // Tauri IPC
 import {
@@ -42,10 +43,9 @@ import {
 	createWorkspaceFolder,
 	deleteWorkspaceItem,
 	listWorkspaceFiles,
-	readWorkspaceFile,
+	openWorkspaceFile,
 	renameWorkspaceItem,
 	renameYjsDoc,
-	writeWorkspaceFile,
 } from "@/lib/tauri";
 
 // Types
@@ -127,10 +127,7 @@ export default function WorkspaceFiles() {
 	const [entries, setEntries] = useState<WorkspaceFile[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 
-	// File editor state
-	const [openFilePath, setOpenFilePath] = useState<string | null>(null);
-	const [openFileContent, setOpenFileContent] = useState("");
-	const [isFileLoading, setIsFileLoading] = useState(false);
+	const navigate = useNavigate();
 
 	// Modal dialog state
 	const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
@@ -174,28 +171,27 @@ export default function WorkspaceFiles() {
 		setCurrentDir(dir);
 	}, []);
 
-	// Read file contents from backend and open editor modal
+	// Open a file where it belongs: text documents in Notes, code in the Editor tab, everything else in its own app
 	const handleOpenEntry = useCallback(
 		async (entry: WorkspaceFile) => {
 			if (!workspacePath || entry.is_dir) return;
 
 			const relPath = toRelPath(entry.path);
+			let target = editorRouteFor(entry.name);
+			// Notes lists only the top level of the notes and files folders, so deeper documents open as text in the Editor
+			if (target === "notes" && !/^(notes|files)\/[^/]+$/.test(relPath)) target = "editor";
 
-			setIsFileLoading(true);
-			try {
-				const content = await readWorkspaceFile(workspacePath, relPath);
-				setOpenFilePath(relPath);
-				setOpenFileContent(content);
-			} catch (err) {
-				logError(err, {
-					source: "files",
-					workspace: workspacePath,
-				});
-			} finally {
-				setIsFileLoading(false);
+			if (target === "system") {
+				try {
+					await openWorkspaceFile(workspacePath, relPath);
+				} catch (err) {
+					logError(err, { source: "files", workspace: workspacePath });
+				}
+				return;
 			}
+			navigate(`/workspace/${target}?open=${encodeURIComponent(`/${relPath}`)}`);
 		},
-		[workspacePath, logError],
+		[workspacePath, logError, navigate],
 	);
 
 	// Deep link from workspace search: jump to the file's folder and open it
@@ -204,12 +200,6 @@ export default function WorkspaceFiles() {
 		setCurrentDir(rel.split("/").slice(0, -1).join("/"));
 		void handleOpenEntry({ name: rel.split("/").pop() ?? rel, path, is_dir: false, size: 0, modified_at: "" });
 	}, !!workspacePath);
-
-	// Close open file editor
-	const handleCloseFile = useCallback(() => {
-		setOpenFilePath(null);
-		setOpenFileContent("");
-	}, []);
 
 	// Open dialog to create file or folder
 	const openCreateDialog = useCallback((kind: "file" | "folder") => {
@@ -265,19 +255,9 @@ export default function WorkspaceFiles() {
 					);
 				}
 
-				// Auto-open created file in editor
+				// Open the new file where it belongs
 				if (dialog.kind === "file") {
-					setIsFileLoading(true);
-					try {
-						const content = await readWorkspaceFile(
-							workspacePath,
-							itemRel,
-						);
-						setOpenFilePath(itemRel);
-						setOpenFileContent(content);
-					} finally {
-						setIsFileLoading(false);
-					}
+					void handleOpenEntry({ name, path: `/${itemRel}`, is_dir: false, size: 0, modified_at: "" });
 				}
 			} else if (dialog.mode === "rename" && dialog.item) {
 				const relPath = toRelPath(dialog.item.path);
@@ -295,10 +275,6 @@ export default function WorkspaceFiles() {
 				// stranding it under the old doc id
 				if (!dialog.item.is_dir) {
 					renameYjsDoc(workspacePath, relPath, newRelPath).catch(() => {});
-				}
-
-				if (openFilePath === relPath) {
-					setOpenFilePath(newRelPath);
 				}
 			}
 
@@ -318,9 +294,9 @@ export default function WorkspaceFiles() {
 		nameDialog,
 		workspacePath,
 		currentDir,
-		openFilePath,
 		isViewer,
 		addActivityEvent,
+		handleOpenEntry,
 		loadEntries,
 		refreshStats,
 		logError,
@@ -342,11 +318,6 @@ export default function WorkspaceFiles() {
 				deleteItem.is_dir ? "folder" : "file",
 			);
 
-			if (openFilePath === relPath) {
-				setOpenFilePath(null);
-				setOpenFileContent("");
-			}
-
 			setDeleteItem(null);
 			void loadEntries();
 			void refreshStats();
@@ -361,7 +332,6 @@ export default function WorkspaceFiles() {
 	}, [
 		deleteItem,
 		workspacePath,
-		openFilePath,
 		isViewer,
 		addActivityEvent,
 		loadEntries,
@@ -547,51 +517,6 @@ export default function WorkspaceFiles() {
 					</ul>
 				</div>
 			}
-
-			{/* File Editor Modal */}
-			<Dialog
-				isOpen={openFilePath !== null}
-				onOpenChange={(isOpen) => {
-					if (!isOpen) handleCloseFile();
-				}}
-				showCloseButton={false}
-				className="sm:max-w-5xl h-[85vh] p-4 flex flex-col"
-			>
-				{openFilePath && (
-					<>
-						{isFileLoading ? (
-							<div className="flex flex-1 items-center justify-center">
-								<Loader2 className="size-6 animate-spin text-muted-foreground" />
-							</div>
-						) : (
-							<EditorContainer
-								fileName={openFilePath.split("/").pop() || "file.txt"}
-								initialContent={openFileContent}
-								readOnly={isViewer}
-								workspacePath={workspacePath}
-								docId={openFilePath}
-								onSave={async (newContent) => {
-									if (!workspacePath || !openFilePath) return;
-									await writeWorkspaceFile(
-										workspacePath,
-										openFilePath,
-										newContent,
-									);
-									setOpenFileContent(newContent);
-									addActivityEvent(
-										"Saved file",
-										`Edited ${openFilePath}`,
-										`/${openFilePath}`,
-										"file",
-									);
-									void loadEntries();
-								}}
-								onClose={handleCloseFile}
-							/>
-						)}
-					</>
-				)}
-			</Dialog>
 
 			{/* Create / Rename Dialog */}
 			<Dialog

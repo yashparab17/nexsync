@@ -1,17 +1,14 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
-import { css } from "@codemirror/lang-css";
-import { html } from "@codemirror/lang-html";
-import { javascript } from "@codemirror/lang-javascript";
-import { json } from "@codemirror/lang-json";
-import { markdown } from "@codemirror/lang-markdown";
-import { rust } from "@codemirror/lang-rust";
-import { oneDark } from "@codemirror/theme-one-dark";
-import { keymap } from "@codemirror/view";
+import { lintGutter } from "@codemirror/lint";
+import { EditorView, keymap } from "@codemirror/view";
+import { vscodeDark, vscodeLight } from "@uiw/codemirror-theme-vscode";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
 
 import { useThemeContext } from "@/store/ThemeContext";
 import { colorForName } from "@/lib/collabColor";
+import { loadLanguage, type LoadedLanguage } from "@/lib/editor/languages";
+import { syntaxLinter } from "@/lib/editor/syntax";
 import { useSeedOnce } from "@/hooks/useSeedOnce";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
 
@@ -25,42 +22,15 @@ interface CodeEditorProps {
 	// "content" Y.Text instead of the controlled `value` prop
 	collab?: CollabDoc | null;
 	userName?: string;
+	// Called with the editor view once it exists, so a page can format, search or jump to a line
+	onReady?: (view: EditorView) => void;
+	// Called when the language for the file is known
+	onLanguage?: (language: LoadedLanguage) => void;
 }
 
-// Determines the CodeMirror language extension from the file extension
-function getLanguageExtension(fileName: string) {
-	const ext = fileName.split(".").pop()?.toLowerCase() || "";
-	switch (ext) {
-		case "js":
-		case "mjs":
-		case "cjs":
-			return [javascript({ jsx: false, typescript: false })];
-		case "jsx":
-			return [javascript({ jsx: true, typescript: false })];
-		case "ts":
-			return [javascript({ jsx: false, typescript: true })];
-		case "tsx":
-			return [javascript({ jsx: true, typescript: true })];
-		case "json":
-			return [json()];
-		case "rs":
-			return [rust()];
-		case "html":
-		case "htm":
-			return [html()];
-		case "css":
-		case "scss":
-		case "less":
-			return [css()];
-		case "md":
-		case "markdown":
-			return [markdown()];
-		default:
-			return [];
-	}
-}
+const PLAIN: LoadedLanguage = { name: "Plain Text", support: null };
 
-// CodeMirror code editor supporting multiple programming languages, dark theme, and optional live Yjs collaboration
+// CodeMirror code editor with lazily loaded language support, syntax problem markers, a VS Code theme and optional live Yjs collaboration
 export default function CodeEditor({
 	value,
 	fileName = "file.txt",
@@ -69,13 +39,31 @@ export default function CodeEditor({
 	minHeight = "400px",
 	collab = null,
 	userName = "You",
+	onReady,
+	onLanguage,
 }: CodeEditorProps) {
 	const { isDark } = useThemeContext();
 
-	// Configure syntax highlighting extensions based on filename
-	const languageExtensions = useMemo(() => {
-		return getLanguageExtension(fileName);
+	// The grammar for this file type is fetched the first time a file of that type is opened
+	const [language, setLanguage] = useState<LoadedLanguage>(PLAIN);
+	useEffect(() => {
+		let current = true;
+		void loadLanguage(fileName).then((loaded) => {
+			if (!current) return;
+			setLanguage(loaded);
+			onLanguage?.(loaded);
+		});
+		return () => {
+			current = false;
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [fileName]);
+
+	const languageExtensions = useMemo(() => {
+		if (!language.support) return [];
+		const wraps = language.name === "Markdown";
+		return [language.support, syntaxLinter, lintGutter(), ...(wraps ? [EditorView.lineWrapping] : [])];
+	}, [language]);
 
 	// Seed the shared text from on-disk content the first time it's ever opened
 	useSeedOnce(
@@ -112,9 +100,10 @@ export default function CodeEditor({
 				{...(collab ? {} : { value })}
 				height="100%"
 				minHeight={minHeight}
-				theme={isDark ? oneDark : "light"}
+				theme={isDark ? vscodeDark : vscodeLight}
 				extensions={extensions}
 				onChange={onChange}
+				onCreateEditor={onReady}
 				readOnly={readOnly}
 				basicSetup={{
 					lineNumbers: true,

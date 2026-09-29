@@ -6,6 +6,7 @@ mod database;
 pub fn run() {
     tauri::Builder::default()
         .manage(commands::p2p::P2pState::default())
+        .manage(commands::editor_run::RunState::default())
         .setup(|app| {
             // Initialize the session auth registry
             commands::auth::init();
@@ -95,6 +96,9 @@ pub fn run() {
             commands::p2p::p2p_send,
             commands::p2p::p2p_list_peers,
             commands::workspace::list_yjs_docs,
+            commands::editor_run::run_command,
+            commands::editor_run::kill_run,
+            commands::system_open::open_workspace_file,
             commands::p2p::p2p_self_id,
             commands::p2p::p2p_cancel_transfers,
             commands::p2p::p2p_set_roles,
