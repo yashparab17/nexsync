@@ -7,7 +7,7 @@ Built with [Tauri 2](https://tauri.app) (Rust) + React 19 + TypeScript, with pee
 ## Features
 
 - **Workspaces on your own disk.** Each workspace is a regular folder (`notes/`, `files/`, `assets/`, `editor/`) plus a hidden `.nexsync/` database.
-- **Files, Notes and Editor.** Files is the file manager. Notes holds text documents (`.md` in a BlockNote rich-text editor, `.txt` as plain text) and lists office documents that open in their own app. Editor is the code tab: an explorer, several files open as tabs, syntax highlighting for about 100 languages, formatting, problem markers, blame and contributions per file, and a Run panel that streams a command's output.
+- **Files, Notes and Editor.** Files is the file manager. Notes holds Markdown notes (`.md`, edited as Markdown with syntax highlighting) and text notes (`.txt`, edited in a rich-text editor and saved as plain text), and lists office documents that open in their own app. Line and word counts follow what is in the editor, without Markdown markup. Editor is the code tab: an explorer, several files open as tabs, syntax highlighting for about 100 languages, formatting, problem markers, blame and contributions per file, and a Run panel that streams a command's output.
 - **Tasks and Kanban** stored in SQLite, with a dashboard and activity feed.
 - **Assets** with previews, uploads and lazy on-demand download of large files from collaborators.
 - **P2P collaboration:**
@@ -15,7 +15,7 @@ Built with [Tauri 2](https://tauri.app) (Rust) + React 19 + TypeScript, with pee
     - Connects across NATs and firewalls, with end-to-end encryption.
     - The guest gets a full copy of the workspace; after that, notes, files, tasks and kanban boards sync live in both directions.
     - Guests appear in the host's **Members** list automatically, with their invite role and an **Online** badge while connected.
-- **Live co-editing.** Open the same note or file as a collaborator and edit it together in real time — a Yjs CRDT keeps BlockNote and CodeMirror in sync character-by-character, persisted locally so a reload never loses in-flight edits.
+- **Live co-editing.** Open the same note or file as a collaborator and edit it together in real time — a Yjs CRDT keeps the rich-text and code editors in sync character-by-character, persisted locally so a reload never loses in-flight edits.
 - **Roles that are actually enforced.** Owner, Editor and Viewer are checked both in the UI (a Viewer never sees create/edit/delete controls) and on the wire (the host drops a Viewer's changes even if a modified client tries to send them anyway).
 - **Auto-updates.** Signed release builds are checked for and installed from inside the app (Settings → About).
 
@@ -139,7 +139,7 @@ If you already have the synced workspace open, use **P2P Sync → Join with Invi
 ```
 src/                         React frontend
   components/                UI components and dialogs (P2PConnectDialog, JoinWorkspaceDialog, …)
-  components/elements/editor/ BlockNote + CodeMirror editors, collaboration-aware (EditorContainer)
+  components/elements/editor/ NoteEditor, RichTextEditor (BlockNote), CodeEditor (CodeMirror), collaboration-aware
   pages/                     Welcome, Settings and workspace pages
   store/workspace/           Workspace state (WorkspaceContext)
   store/p2p/                 P2P state: peers, invites, snapshot sync, roles (P2PContext)

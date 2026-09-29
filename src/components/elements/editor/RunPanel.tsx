@@ -76,13 +76,16 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 		setLines((prev) => [...prev.slice(-(MAX_LINES - 1)), { id: nextId.current++, stream, text: text.replace(ANSI, "") }]);
 
 	useEffect(() => {
+		// The listeners register asynchronously; if this effect is cleaned up first (StrictMode runs it twice),
+		// the late ones must be removed at once or every line prints twice
+		let cancelled = false;
 		let offOutput = () => {};
 		let offExit = () => {};
 		void onRunOutput((e) => {
 			// Output can arrive before the run id is returned, so the first output of a starting run claims it
 			if (startingRef.current && !runIdRef.current) runIdRef.current = e.runId;
 			if (e.runId === runIdRef.current) push(e.stream, e.text);
-		}).then((off) => (offOutput = off));
+		}).then((off) => (cancelled ? off() : (offOutput = off)));
 		void onRunExit((e) => {
 			if (startingRef.current && !runIdRef.current) runIdRef.current = e.runId;
 			if (e.runId !== runIdRef.current) return;
@@ -90,8 +93,9 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 			setRunning(false);
 			if (e.error) push("stderr", e.error);
 			push("info", e.stopped ? "Stopped." : `Finished with exit code ${e.code ?? "unknown"}.`);
-		}).then((off) => (offExit = off));
+		}).then((off) => (cancelled ? off() : (offExit = off)));
 		return () => {
+			cancelled = true;
 			offOutput();
 			offExit();
 		};

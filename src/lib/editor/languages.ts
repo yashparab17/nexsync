@@ -19,6 +19,7 @@ export function extensionOf(fileName: string): string {
 	return dot > 0 ? fileName.slice(dot + 1).toLowerCase() : "";
 }
 
+export const isMarkdownFile = (fileName: string) => ["md", "markdown"].includes(extensionOf(fileName));
 export const isNoteFile = (fileName: string) => NOTE_EXTENSIONS.includes(extensionOf(fileName));
 export const isDocumentFile = (fileName: string) => DOCUMENT_EXTENSIONS.includes(extensionOf(fileName));
 export const isBinaryFile = (fileName: string) => BINARY_EXTENSIONS.includes(extensionOf(fileName));

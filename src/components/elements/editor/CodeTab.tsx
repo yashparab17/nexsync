@@ -7,6 +7,7 @@ import { AlertTriangle, Check, Loader2, Save, Search, Sparkles } from "lucide-re
 import CodeEditor from "./CodeEditor";
 import { Button } from "@/components/ui/button";
 import { useCollabDoc } from "@/hooks/useCollabDoc";
+import { useSeededText } from "@/hooks/useSeededText";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { colorForName } from "@/lib/collabColor";
 import {
@@ -74,17 +75,12 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 		};
 	}, [workspacePath, path, logError]);
 
-	// The editor must be built with the shared text already in it, because the sync layer only applies later
-	// changes. So wait for the stored text to load, fill an empty document from the file, then show the editor.
-	const [seededDoc, setSeededDoc] = useState<Y.Doc | null>(null);
+	// Wait for the stored text, fill an empty document from the file, then build the editor with that text in it
+	const seeded = useSeededText(collab, saved);
 	useEffect(() => {
-		if (!collab?.synced || saved === null) return;
-		const ytext = collab.doc.getText("content");
-		if (ytext.length === 0 && saved) ytext.insert(0, saved);
 		// What the shared text holds may differ from disk, so unsaved changes show as such.
-		setContent(ytext.toString());
-		setSeededDoc(collab.doc);
-	}, [collab, saved]);
+		if (seeded) setContent(seeded.text);
+	}, [seeded]);
 
 	const dirty = saved !== null && content !== saved;
 	useEffect(() => onDirtyChange(path, dirty), [path, dirty, onDirtyChange]);
@@ -253,7 +249,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 
 			<div className="flex min-h-0 flex-1">
 				<div className="min-w-0 flex-1">
-					{saved === null || !collab || seededDoc !== collab.doc ? (
+					{saved === null || !collab || !seeded ? (
 						<div className="flex h-full items-center justify-center">
 							<Loader2 className="size-5 animate-spin text-muted-foreground" />
 						</div>

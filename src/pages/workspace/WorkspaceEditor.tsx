@@ -69,6 +69,7 @@ export default function WorkspaceEditor() {
 	const [newItem, setNewItem] = useState<NewItemDialog | null>(null);
 	const [itemError, setItemError] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState<WorkspaceFile | null>(null);
+	const [closing, setClosing] = useState<string | null>(null);
 
 	const loadDir = useCallback(
 		async (dir: string) => {
@@ -100,8 +101,14 @@ export default function WorkspaceEditor() {
 
 	useOpenParam((path) => openPath(toRel(path)), !!workspacePath);
 
+	// window.confirm is unreliable in the desktop webview, so unsaved tabs ask in a dialog
 	const closeTab = (path: string) => {
-		if (dirty.has(path) && !window.confirm(`${path.split("/").pop()} has unsaved changes. Close it anyway?`)) return;
+		if (dirty.has(path)) return setClosing(path);
+		discardTab(path);
+	};
+
+	const discardTab = (path: string) => {
+		setClosing(null);
 		setTabs((prev) => {
 			const next = prev.filter((p) => p !== path);
 			setActive((current) => (current === path ? (next[Math.max(0, prev.indexOf(path) - 1)] ?? null) : current));
@@ -358,6 +365,28 @@ export default function WorkspaceEditor() {
 							<Button type="submit">Create</Button>
 						</DialogFooter>
 					</form>
+				</Dialog>
+			)}
+
+			{closing && (
+				<Dialog isOpen onOpenChange={(open) => !open && setClosing(null)}>
+					<div className="space-y-4">
+						<DialogHeader>
+							<DialogTitle>Unsaved changes</DialogTitle>
+							<DialogDescription>
+								<span className="font-semibold text-foreground">{closing.split("/").pop()}</span> has changes that are
+								not saved to the file. Close it anyway?
+							</DialogDescription>
+						</DialogHeader>
+						<DialogFooter>
+							<Button variant="outline" onPress={() => setClosing(null)}>
+								Keep open
+							</Button>
+							<Button variant="destructive" onPress={() => discardTab(closing)}>
+								Close
+							</Button>
+						</DialogFooter>
+					</div>
 				</Dialog>
 			)}
 

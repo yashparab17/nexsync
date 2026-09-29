@@ -873,6 +873,12 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			const provider = new P2PSyncProvider(doc, (message, peerId) => send(message, peerId), docId, awareness);
 			peersRef.current.forEach((peer) => provider.addPeer(peer.id));
 			syncProvidersRef.current.add(provider);
+			// A closed editor must leave the list, or catch-up would treat its stale document as open
+			const destroy = provider.destroy.bind(provider);
+			provider.destroy = () => {
+				syncProvidersRef.current.delete(provider);
+				destroy();
+			};
 			return provider;
 		},
 		[send],

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 import { SqlitePersistenceProvider } from "@/lib/yjs";
@@ -47,5 +47,6 @@ export function useCollabDoc(
 		};
 	}, [workspacePath, docId, createSyncProvider]);
 
-	return state ? { doc: state.doc, awareness: state.awareness, synced } : null;
+	// A stable object: callers put it in effect and memo dependencies, and a new one each render would loop them
+	return useMemo(() => (state ? { doc: state.doc, awareness: state.awareness, synced } : null), [state, synced]);
 }

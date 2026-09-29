@@ -83,12 +83,14 @@ export default function CodeEditor({
 		[collab, value],
 	);
 
+	// Presence is announced from an effect, not while rendering, because it makes the editor update
+	const awareness = collab?.awareness;
+	useEffect(() => {
+		awareness?.setLocalStateField("user", { name: userName, color: colorForName(userName) });
+	}, [awareness, userName]);
+
 	const extensions = useMemo(() => {
 		if (!collab) return languageExtensions;
-		collab.awareness.setLocalStateField("user", {
-			name: userName,
-			color: colorForName(userName),
-		});
 		return [
 			...languageExtensions,
 			yCollab(collab.doc.getText("content"), collab.awareness),

@@ -8,7 +8,7 @@ Most collaborative tools ask you to hand your files to someone else's server. Ne
 
 ## What it does
 
-- **Notes & code** — Notes for `.md` and `.txt` documents (BlockNote rich text for Markdown), and a separate Editor tab for code with tabs, highlighting, formatting, blame and run output, all with live multi-cursor co-editing over a Yjs CRDT.
+- **Notes & code** — Notes for Markdown (`.md`, edited as Markdown) and text (`.txt`, rich-text editor) documents, and a separate Editor tab for code with tabs, highlighting, formatting, blame and run output, all with live multi-cursor co-editing over a Yjs CRDT.
 - **Tasks & Kanban** — stored in a local SQLite database per workspace, synced live with collaborators.
 - **Files & Assets** — a real file explorer over your OS filesystem, with previews and on-demand download of large files.
 - **P2P collaboration** — invite someone with a single pasteable ticket; connections punch through NATs directly when possible and fall back to an encrypted relay when not.

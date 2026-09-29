@@ -9,7 +9,7 @@ import {
 	Trash2,
 } from "lucide-react";
 
-import EditorContainer from "@/components/elements/editor/EditorContainer";
+import NoteEditor from "@/components/elements/editor/NoteEditor";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -36,7 +36,8 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type { WorkspaceFile } from "@/types/workspace";
 
-// Notes: text documents (.md, .txt) edited live, plus office documents (.docx, .pdf, ...) that open in their own app.
+// Notes: Markdown notes (.md) edited as Markdown, text notes (.txt) in a rich-text editor, plus office documents
+// (.docx, .pdf, ...) that open in their own app.
 // Code belongs in the Editor tab.
 export default function WorkspaceNotes() {
 	const { workspace, refreshMetadata, addActivityEvent } = useWorkspace();
@@ -337,8 +338,8 @@ export default function WorkspaceNotes() {
 						</div>
 						<h3 className="mt-4 font-semibold text-base">Select or create a note</h3>
 						<p className="mt-1 max-w-sm text-xs text-muted-foreground">
-							Choose a note from the left sidebar to edit with BlockNote rich-text or
-							CodeMirror markdown code.
+							Choose a note from the left sidebar. Markdown notes (.md) are edited as
+							Markdown, and text notes (.txt) in a rich-text editor.
 						</p>
 						{!isViewer && (
 							<Button
@@ -377,7 +378,7 @@ export default function WorkspaceNotes() {
 						<Loader2 className="size-6 animate-spin text-muted-foreground" />
 					</div>
 				) : (
-					<EditorContainer
+					<NoteEditor
 						key={selectedNote.path}
 						fileName={selectedNote.name}
 						initialContent={noteContent}
@@ -401,7 +402,7 @@ export default function WorkspaceNotes() {
 						<DialogHeader>
 							<DialogTitle>New Note</DialogTitle>
 							<DialogDescription>
-								Create a Markdown note, or end the name with .txt for plain text.
+								Names ending in .txt make a rich-text note; anything else becomes a Markdown (.md) note.
 							</DialogDescription>
 						</DialogHeader>
 

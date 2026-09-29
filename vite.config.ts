@@ -30,7 +30,6 @@ export default defineConfig(async () => ({
 			"@codemirror/search",
 			"@codemirror/lint",
 			"@uiw/codemirror-theme-vscode",
-			"@blocknote/code-block",
 			"prettier/standalone",
 			"prettier/plugins/babel",
 			"prettier/plugins/estree",
