@@ -17,7 +17,8 @@ Built with [Tauri 2](https://tauri.app) (Rust) + React 19 + TypeScript, with pee
     - Guests appear in the host's **Members** list automatically, with their invite role and an **Online** badge while connected.
 - **Live co-editing.** Open the same note or file as a collaborator and edit it together in real time — a Yjs CRDT keeps the rich-text and code editors in sync character-by-character, persisted locally so a reload never loses in-flight edits.
 - **Roles that are actually enforced.** Owner, Editor and Viewer are checked both in the UI (a Viewer never sees create/edit/delete controls) and on the wire (the host drops a Viewer's changes even if a modified client tries to send them anyway).
-- **Auto-updates.** Signed release builds are checked for and installed from inside the app (Settings → About).
+- **Settings.** One page for your display name, theme (light, dark or follow the system), editor look (font size, tab width, line wrapping), the folders workspaces may live in, updates and the error log. Name and folder changes are saved together from a bar that appears when there is something to save, with Discard and Ctrl+S.
+- **Auto-updates.** Signed release builds are checked for and installed from inside the app (Settings → Updates & About).
 
 ## How peer-to-peer works
 
@@ -84,7 +85,7 @@ CI is split into two workflows:
 
 ### Auto-updates
 
-The app checks GitHub Releases for a newer signed build from **Settings → About → Check for Updates**, downloads it, and relaunches. Releases are signed with a minisign keypair (the public half lives in `src-tauri/tauri.conf.json`); `release.yml` needs `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` set as repo secrets to produce a release the updater will trust. Windows/macOS code signing is wired the same way (`WINDOWS_CERTIFICATE*`, `APPLE_*` secrets) but no signing identity is configured yet — builds are unsigned until those are added.
+The app checks GitHub Releases for a newer signed build from **Settings → Updates & About → Check for updates**, downloads it, and relaunches. Releases are signed with a minisign keypair (the public half lives in `src-tauri/tauri.conf.json`); `release.yml` needs `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` set as repo secrets to produce a release the updater will trust. Windows/macOS code signing is wired the same way (`WINDOWS_CERTIFICATE*`, `APPLE_*` secrets) but no signing identity is configured yet — builds are unsigned until those are added.
 
 ## Collaborating with someone
 

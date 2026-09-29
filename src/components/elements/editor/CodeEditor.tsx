@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { lintGutter } from "@codemirror/lint";
+import { EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { vscodeDark, vscodeLight } from "@uiw/codemirror-theme-vscode";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
@@ -9,6 +10,7 @@ import { useThemeContext } from "@/store/ThemeContext";
 import { colorForName } from "@/lib/collabColor";
 import { loadLanguage, type LoadedLanguage } from "@/lib/editor/languages";
 import { syntaxLinter } from "@/lib/editor/syntax";
+import { useEditorPrefs } from "@/lib/editorPrefs";
 import { useSeedOnce } from "@/hooks/useSeedOnce";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
 
@@ -66,9 +68,19 @@ export default function CodeEditor({
 
 	const languageExtensions = useMemo(() => {
 		if (!language.support) return [];
-		const wraps = language.name === "Markdown";
-		return [language.support, syntaxLinter, lintGutter(), ...(wraps ? [EditorView.lineWrapping] : [])];
+		return [language.support, syntaxLinter, lintGutter()];
 	}, [language]);
+
+	// Look and feel from Settings; Markdown always wraps, since its lines are prose
+	const { fontSize, tabSize, wrap } = useEditorPrefs();
+	const lookExtensions = useMemo(
+		() => [
+			EditorView.theme({ "&": { fontSize: `${fontSize}px` } }),
+			EditorState.tabSize.of(tabSize),
+			...(wrap || language.name === "Markdown" ? [EditorView.lineWrapping] : []),
+		],
+		[fontSize, tabSize, wrap, language.name],
+	);
 
 	// Seed the shared text from on-disk content the first time it's ever opened
 	useSeedOnce(
@@ -90,16 +102,17 @@ export default function CodeEditor({
 	}, [awareness, userName]);
 
 	const extensions = useMemo(() => {
-		if (!collab) return languageExtensions;
+		if (!collab) return [...languageExtensions, ...lookExtensions];
 		return [
 			...languageExtensions,
+			...lookExtensions,
 			yCollab(collab.doc.getText("content"), collab.awareness),
 			// Route Ctrl+Z/Ctrl+Y through yCollab's Y.UndoManager instead of CodeMirror's own
 			// history (disabled below via basicSetup), so undo only reverts local edits rather
 			// than fighting the shared CRDT state.
 			keymap.of(yUndoManagerKeymap),
 		];
-	}, [languageExtensions, collab, userName]);
+	}, [languageExtensions, lookExtensions, collab]);
 
 	return (
 		<div className="h-full w-full overflow-hidden border-t bg-background font-mono text-xs">

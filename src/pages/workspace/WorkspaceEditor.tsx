@@ -1,19 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-	ChevronDown,
-	ChevronRight,
-	Code2,
-	File,
-	FilePlus,
-	Folder,
-	FolderPlus,
-	Terminal,
-	Trash2,
-	UsersRound,
-	X,
-} from "lucide-react";
+import { Code2, Terminal, UsersRound, X } from "lucide-react";
 
 import CodeTab from "@/components/elements/editor/CodeTab";
+import FileExplorer from "@/components/elements/editor/FileExplorer";
 import RunPanel from "@/components/elements/editor/RunPanel";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +22,8 @@ import {
 	deleteWorkspaceItem,
 	listWorkspaceFiles,
 	openWorkspaceFile,
+	renameWorkspaceItem,
+	renameYjsDoc,
 } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useIsViewer, useP2P } from "@/store/p2p/P2PContext";
@@ -52,7 +43,7 @@ interface NewItemDialog {
 
 // Code editor tab: an explorer, several open files as tabs, blame and contributions, and run output
 export default function WorkspaceEditor() {
-	const { workspace, refreshStats } = useWorkspace();
+	const { workspace, refreshStats, addActivityEvent } = useWorkspace();
 	const isViewer = useIsViewer();
 	const logError = useErrorLog();
 	const { lastSyncedFile } = useP2P();
@@ -70,6 +61,7 @@ export default function WorkspaceEditor() {
 	const [itemError, setItemError] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState<WorkspaceFile | null>(null);
 	const [closing, setClosing] = useState<string | null>(null);
+	const [renaming, setRenaming] = useState<{ entry: WorkspaceFile; value: string } | null>(null);
 
 	const loadDir = useCallback(
 		async (dir: string) => {
@@ -85,6 +77,23 @@ export default function WorkspaceEditor() {
 		for (const dir of new Set([...ROOTS, ...expanded])) void loadDir(dir);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [loadDir, expanded, lastSyncedFile]);
+
+	// Load every folder under the roots, so the explorer filter can search files that are not expanded
+	const loadTree = useCallback(async () => {
+		if (!workspacePath) return;
+		const queue = [...ROOTS];
+		const found: Record<string, WorkspaceFile[]> = {};
+		for (let loaded = 0; queue.length > 0 && loaded < 300; loaded++) {
+			const dir = queue.shift()!;
+			found[dir] = await listWorkspaceFiles(workspacePath, dir).catch(() => []);
+			for (const entry of found[dir]) if (entry.is_dir) queue.push(toRel(entry.path));
+		}
+		setEntries((prev) => ({ ...prev, ...found }));
+	}, [workspacePath]);
+
+	const refresh = () => {
+		for (const dir of new Set([...ROOTS, ...expanded])) void loadDir(dir);
+	};
 
 	const openPath = useCallback(
 		(rel: string) => {
@@ -161,6 +170,38 @@ export default function WorkspaceEditor() {
 		}
 	};
 
+	const renameItem = async () => {
+		if (!renaming || !workspacePath) return;
+		const { entry } = renaming;
+		const name = renaming.value.trim();
+		if (!name) return setItemError("Name is required.");
+		if (name === entry.name) return setRenaming(null);
+		const rel = toRel(entry.path);
+		const inside = (p: string) => p === rel || p.startsWith(`${rel}/`);
+		// An open file with unsaved changes would come back from disk without them under its new name
+		if (tabs.some((p) => inside(p) && dirty.has(p))) {
+			return setItemError("Save or close the open files with unsaved changes first.");
+		}
+		try {
+			await renameWorkspaceItem(workspacePath, rel, name);
+			const parent = rel.split("/").slice(0, -1).join("/");
+			const moved = (p: string) => `${parent}/${name}${p.slice(rel.length)}`;
+			// Open files keep their shared editing state under the new name
+			for (const p of tabs.filter(inside)) void renameYjsDoc(workspacePath, p, moved(p)).catch(() => {});
+			setTabs((prev) => prev.map((p) => (inside(p) ? moved(p) : p)));
+			setActive((current) => (current && inside(current) ? moved(current) : current));
+			setExpanded((prev) => new Set([...prev].map((p) => (inside(p) ? moved(p) : p))));
+			setTargetDir((current) => (inside(current) ? moved(current) : current));
+			setEntries((prev) => Object.fromEntries(Object.entries(prev).filter(([dir]) => !inside(dir))));
+			addActivityEvent("Renamed item", `Renamed ${entry.name} to ${name}`, `/${parent}/${name}`, entry.is_dir ? "folder" : "file");
+			await loadDir(parent);
+			void refreshStats();
+			setRenaming(null);
+		} catch (err) {
+			setItemError(err instanceof Error ? err.message : String(err));
+		}
+	};
+
 	const deleteItem = async () => {
 		if (!deleting || !workspacePath) return;
 		const rel = toRel(deleting.path);
@@ -176,108 +217,35 @@ export default function WorkspaceEditor() {
 		}
 	};
 
-	const renderDir = (dir: string, depth: number): React.ReactNode =>
-		(entries[dir] ?? []).map((entry) => {
-			const rel = toRel(entry.path);
-			const isOpen = expanded.has(rel);
-			return (
-				<div key={entry.path}>
-					<div
-						className={cn(
-							"group flex items-center gap-1 py-1 pr-1 text-xs hover:bg-muted/50",
-							active === rel && "bg-primary/10",
-						)}
-						style={{ paddingLeft: 8 + depth * 12 }}
-					>
-						<button
-							type="button"
-							className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-							onClick={() => (entry.is_dir ? toggleDir(rel) : openPath(rel))}
-						>
-							{entry.is_dir ? (
-								<>
-									{isOpen ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
-									<Folder className="size-3.5 shrink-0 text-primary/70" />
-								</>
-							) : (
-								<File className="ml-4 size-3.5 shrink-0 text-muted-foreground" />
-							)}
-							<span className="truncate">{entry.name}</span>
-						</button>
-						{!isViewer && (
-							<Button
-								variant="ghost"
-								size="icon-xs"
-								className="opacity-0 group-hover:opacity-100"
-								aria-label={`Delete ${entry.name}`}
-								onPress={() => setDeleting(entry)}
-							>
-								<Trash2 className="size-3 text-destructive" />
-							</Button>
-						)}
-					</div>
-					{entry.is_dir && isOpen && renderDir(rel, depth + 1)}
-				</div>
-			);
-		});
-
 	return (
 		<div className="-m-6 flex h-[calc(100vh-6rem)]">
-			{/* Explorer */}
-			<div className="flex w-52 shrink-0 flex-col border-r bg-muted/20 lg:w-64">
-				<div className="flex items-center justify-between p-3">
-					<div className="flex items-center gap-2">
-						<Code2 className="size-5 text-primary" />
-						<h2 className="text-base font-semibold">Editor</h2>
-					</div>
-					{!isViewer && (
-						<div className="flex">
-							<Button
-								variant="ghost"
-								size="icon-xs"
-								aria-label="New file"
-								onPress={() => {
-									setItemError(null);
-									setNewItem({ kind: "file", dir: targetDir, value: "" });
-								}}
-							>
-								<FilePlus className="size-4" />
-							</Button>
-							<Button
-								variant="ghost"
-								size="icon-xs"
-								aria-label="New folder"
-								onPress={() => {
-									setItemError(null);
-									setNewItem({ kind: "folder", dir: targetDir, value: "" });
-								}}
-							>
-								<FolderPlus className="size-4" />
-							</Button>
-						</div>
-					)}
-				</div>
-				<div className="flex-1 overflow-y-auto pb-3">
-					{ROOTS.map((root) => (
-						<div key={root}>
-							<button
-								type="button"
-								className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-[11px] font-semibold uppercase tracking-widest text-muted-foreground hover:bg-muted/50"
-								onClick={() => toggleDir(root)}
-							>
-								{expanded.has(root) ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-								{root}
-							</button>
-							{expanded.has(root) &&
-								((entries[root] ?? []).length === 0 ? (
-									<p className="px-6 py-1 text-xs text-muted-foreground">Empty</p>
-								) : (
-									renderDir(root, 1)
-								))}
-						</div>
-					))}
-				</div>
-			</div>
+			<FileExplorer
+				roots={ROOTS}
+				entries={entries}
+				expanded={expanded}
+				targetDir={targetDir}
+				activePath={active}
+				openPaths={tabs}
+				dirtyPaths={dirty}
+				readOnly={isViewer}
+				onToggleDir={toggleDir}
+				onOpenFile={openPath}
+				onNew={(kind, dir) => {
+					setItemError(null);
+					setNewItem({ kind, dir, value: "" });
+				}}
+				onRename={(entry) => {
+					setItemError(null);
+					setRenaming({ entry, value: entry.name });
+				}}
+				onDelete={setDeleting}
+				onRefresh={refresh}
+				onCollapseAll={() => {
+					setExpanded(new Set());
+					setTargetDir("editor");
+				}}
+				onFilterStart={() => void loadTree()}
+			/>
 
 			{/* Tabs, editor and run output */}
 			<div className="flex min-w-0 flex-1 flex-col bg-background">
@@ -363,6 +331,36 @@ export default function WorkspaceEditor() {
 								Cancel
 							</Button>
 							<Button type="submit">Create</Button>
+						</DialogFooter>
+					</form>
+				</Dialog>
+			)}
+
+			{renaming && (
+				<Dialog isOpen onOpenChange={(open) => !open && setRenaming(null)} className="max-w-md">
+					<form
+						className="space-y-4"
+						onSubmit={(e) => {
+							e.preventDefault();
+							void renameItem();
+						}}
+					>
+						<DialogHeader>
+							<DialogTitle>Rename {renaming.entry.is_dir ? "Folder" : "File"}</DialogTitle>
+							<DialogDescription>{toRel(renaming.entry.path)}</DialogDescription>
+						</DialogHeader>
+						<Input
+							value={renaming.value}
+							onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
+							aria-label="New name"
+							autoFocus
+						/>
+						{itemError && <p className="text-xs text-destructive">{itemError}</p>}
+						<DialogFooter>
+							<Button type="button" variant="outline" onPress={() => setRenaming(null)}>
+								Cancel
+							</Button>
+							<Button type="submit">Rename</Button>
 						</DialogFooter>
 					</form>
 				</Dialog>

@@ -444,6 +444,31 @@ fn persist_metadata(db: &WorkspaceDb, canonical_path_str: &str, metadata: &Works
 // Tauri commands — Workspace stats
 // ────────────────────────────
 
+/// Deepest folder level counted, so a runaway tree cannot stall the dashboard
+const MAX_COUNT_DEPTH: usize = 12;
+
+/// Counts the files in a folder and all its subfolders, skipping hidden entries and symlinks
+fn count_files(dir: &Path, depth: usize) -> usize {
+    if depth > MAX_COUNT_DEPTH {
+        return 0;
+    }
+    let Ok(entries) = fs::read_dir(dir) else { return 0 };
+    entries
+        .filter_map(Result::ok)
+        .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
+        .filter_map(|e| e.file_type().ok().map(|t| (e.path(), t)))
+        .map(|(path, kind)| {
+            if kind.is_file() {
+                1
+            } else if kind.is_dir() {
+                count_files(&path, depth + 1)
+            } else {
+                0
+            }
+        })
+        .sum()
+}
+
 /// Retrieves aggregate metrics for files, tasks, and members in the workspace
 #[tauri::command]
 pub fn get_workspace_stats(app_handle: tauri::AppHandle, path: String) -> Result<super::models::WorkspaceStats, String> {
@@ -455,13 +480,7 @@ pub fn get_workspace_stats(app_handle: tauri::AppHandle, path: String) -> Result
         return Err("The workspace path does not exist.".to_string());
     }
 
-    let count_entries = |subdir: &str| -> usize {
-        let dir = workspace_path.join(subdir);
-        match fs::read_dir(&dir) {
-            Ok(entries) => entries.filter_map(Result::ok).filter(|e| e.path().is_file()).count(),
-            Err(_) => 0,
-        }
-    };
+    let count_entries = |subdir: &str| count_files(&workspace_path.join(subdir), 0);
 
     let db = WorkspaceDb::open_existing(&path)?;
     let ws_id: String = get_workspace_id(&db)?;
@@ -498,6 +517,20 @@ pub fn get_workspace_stats(app_handle: tauri::AppHandle, path: String) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn counts_files_inside_subfolders_but_not_hidden_ones() {
+        let dir = std::env::temp_dir().join(format!("nexsync-count-{}", Uuid::new_v4()));
+        let nested = dir.join("src").join("deep");
+        fs::create_dir_all(&nested).unwrap();
+        fs::create_dir_all(dir.join(".git")).unwrap();
+        for file in ["main.py", "src/app.py", "src/deep/util.py", ".git/config", ".env"] {
+            fs::write(dir.join(file), "x").unwrap();
+        }
+        assert_eq!(count_files(&dir, 0), 3);
+        assert_eq!(count_files(&dir.join("missing"), 0), 0);
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     fn metadata(members: serde_json::Value) -> WorkspaceMetadata {
         serde_json::from_value(serde_json::json!({
