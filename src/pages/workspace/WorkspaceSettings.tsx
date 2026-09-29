@@ -423,7 +423,7 @@ export default function WorkspaceSettings() {
 
 			{/* Leave Workspace (guests) */}
 			{isLeaveOpen && (
-				<Dialog isOpen={isLeaveOpen} onOpenChange={(o) => !busy && setIsLeaveOpen(o)}>
+				<Dialog className="sm:max-w-xl" isOpen={isLeaveOpen} onOpenChange={(o) => !busy && setIsLeaveOpen(o)}>
 					<div className="space-y-4">
 						<DialogHeader>
 							<DialogTitle>Leave Workspace</DialogTitle>
