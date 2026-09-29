@@ -36,6 +36,8 @@ pub fn run() {
             commands::workspace::write_workspace_metadata,
             commands::workspace::get_workspace_stats,
             commands::workspace::log_error,
+            commands::workspace::get_error_log,
+            commands::workspace::clear_error_log,
 
             // Workspace filesystem operations
             commands::workspace::list_workspace_files,
@@ -46,6 +48,10 @@ pub fn run() {
             commands::workspace::write_workspace_binary_file,
             commands::workspace::import_asset_from_path,
             commands::workspace::delete_workspace_item,
+            commands::workspace::list_trash,
+            commands::workspace::restore_trash_item,
+            commands::workspace::purge_trash_item,
+            commands::workspace::empty_trash,
             commands::workspace::rename_workspace_item,
 
             // Workspace registry & session restoration

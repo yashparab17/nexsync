@@ -13,11 +13,11 @@ use std::{
 
 use iroh::{
     endpoint::{presets, Connection, RecvStream, SendStream},
-    Endpoint, EndpointId,
+    Endpoint, EndpointId, SecretKey,
 };
 use serde::Serialize;
 use subtle::ConstantTimeEq;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::{
     io::AsyncReadExt,
     sync::{mpsc, Mutex as AsyncMutex},
@@ -34,10 +34,14 @@ pub const EVENT_PEERS: &str = "p2p://peers";
 pub const EVENT_PEER_JOINED: &str = "p2p://peer-joined";
 pub const EVENT_PEER_LEFT: &str = "p2p://peer-left";
 pub const EVENT_MESSAGE: &str = "p2p://message";
+pub const EVENT_RECONNECTING: &str = "p2p://reconnecting";
+pub const EVENT_RECONNECT_FAILED: &str = "p2p://reconnect-failed";
 
 const ONLINE_TIMEOUT: Duration = Duration::from_secs(15);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(15);
+const RECONNECT_ATTEMPTS: u32 = 8;
+const RECONNECT_MAX_DELAY: Duration = Duration::from_secs(30);
 const REJECT_LINGER: Duration = Duration::from_secs(3);
 const STATS_INTERVAL: Duration = Duration::from_secs(2);
 const OUTBOX_CAPACITY: usize = 256;
@@ -86,11 +90,17 @@ impl P2pState {
         if let Some(node) = guard.as_ref() {
             return Ok(node.clone());
         }
+        // A missing or unwritable key file only costs a stable address, so fall back to a random key.
+        let secret = app
+            .path()
+            .app_data_dir()
+            .ok()
+            .and_then(|dir| load_or_create_identity(&dir.join("nexsync").join("p2p_identity.key")).ok());
         let app = app.clone();
         let events: EventSink = Arc::new(move |event, payload| {
             let _ = app.emit(event, payload);
         });
-        let node = Node::start(events, self.workspace.clone()).await?;
+        let node = Node::start(events, self.workspace.clone(), secret).await?;
         *guard = Some(node.clone());
         Ok(node)
     }
@@ -107,6 +117,21 @@ impl P2pState {
             node.sync.watch(path.as_deref());
         }
     }
+}
+
+/// Loads this device's P2P identity key, creating and saving one on first run.
+fn load_or_create_identity(path: &std::path::Path) -> std::io::Result<SecretKey> {
+    if let Ok(bytes) = std::fs::read(path) {
+        if let Ok(bytes) = <[u8; 32]>::try_from(bytes.as_slice()) {
+            return Ok(SecretKey::from_bytes(&bytes));
+        }
+    }
+    let key = SecretKey::generate();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, key.to_bytes())?;
+    Ok(key)
 }
 
 /// Live state of one connected peer, as shown in the UI
@@ -179,6 +204,15 @@ struct Peer {
 struct NodeState {
     invite: Option<Invite>,
     peers: HashMap<EndpointId, Peer>,
+    /// Ticket and display name of the host we last joined, kept so a dropped link can be re-dialed
+    last_join: Option<(String, String)>,
+    reconnecting: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct Reconnecting {
+    attempt: u32,
+    max: u32,
 }
 
 pub struct Node {
@@ -191,9 +225,12 @@ pub struct Node {
 
 impl Node {
     /// Binds the Iroh endpoint and spawns the accept, stats and live-sync loops
-    async fn start(events: EventSink, workspace: SharedWorkspace) -> Result<Arc<Self>, String> {
-        let endpoint = Endpoint::builder(presets::N0)
-            .alpns(vec![wire::ALPN.to_vec()])
+    async fn start(events: EventSink, workspace: SharedWorkspace, secret: Option<SecretKey>) -> Result<Arc<Self>, String> {
+        let mut builder = Endpoint::builder(presets::N0).alpns(vec![wire::ALPN.to_vec()]);
+        if let Some(secret) = secret {
+            builder = builder.secret_key(secret);
+        }
+        let endpoint = builder
             .bind()
             .await
             .map_err(|e| format!("Failed to start the P2P network: {e}"))?;
@@ -216,6 +253,12 @@ impl Node {
 
     pub fn sync(&self) -> &LiveSync {
         &self.sync
+    }
+
+    /// Whether a connected peer is the host we joined, or `None` if it isn't connected
+    pub fn peer_is_host(&self, peer_id: &str) -> Option<bool> {
+        let id = parse_peer_id(peer_id).ok()?;
+        self.lock().peers.get(&id).map(|p| p.is_host)
     }
 
     pub fn has_peers(&self) -> bool {
@@ -388,19 +431,24 @@ impl Node {
 
     /// Dials the host named in `ticket_str` and completes the invite handshake
     pub async fn join(self: &Arc<Self>, ticket_str: &str, display_name: &str) -> Result<JoinResult, String> {
-        let ticket = Ticket::decode(ticket_str)?;
+        self.join_impl(ticket_str, display_name).await.map_err(|(error, _)| error)
+    }
+
+    /// Like [`Node::join`], but the error also says whether retrying can never succeed
+    async fn join_impl(self: &Arc<Self>, ticket_str: &str, display_name: &str) -> Result<JoinResult, (String, bool)> {
+        let ticket = Ticket::decode(ticket_str).map_err(|e| (e, true))?;
         let host_id = ticket.addr.id;
         if host_id == self.endpoint.id() {
-            return Err("That invite was created on this device. Share it with your collaborator instead.".into());
+            return Err(("That invite was created on this device. Share it with your collaborator instead.".into(), true));
         }
 
         let conn = tokio::time::timeout(CONNECT_TIMEOUT, self.endpoint.connect(ticket.addr, wire::ALPN))
             .await
-            .map_err(|_| "Timed out reaching the host. Make sure they're online and still have NexSync open.".to_string())?
-            .map_err(|e| format!("Couldn't reach the host: {e}"))?;
+            .map_err(|_| ("Timed out reaching the host. Make sure they're online and still have NexSync open.".to_string(), false))?
+            .map_err(|e| (format!("Couldn't reach the host: {e}"), false))?;
 
-        let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
-        send.write_all(&[wire::STREAM_CONTROL]).await.map_err(|e| e.to_string())?;
+        let (mut send, mut recv) = conn.open_bi().await.map_err(|e| (e.to_string(), false))?;
+        send.write_all(&[wire::STREAM_CONTROL]).await.map_err(|e| (e.to_string(), false))?;
         wire::write_json(
             &mut send,
             &Hello {
@@ -409,14 +457,16 @@ impl Node {
                 name: sanitize_name(display_name),
             },
         )
-        .await?;
+        .await
+        .map_err(|e| (e, false))?;
 
         let reply: HandshakeReply = tokio::time::timeout(
             HANDSHAKE_TIMEOUT,
             wire::read_json(&mut recv, wire::MAX_SMALL_FRAME),
         )
         .await
-        .map_err(|_| "The host didn't answer the invite in time.".to_string())??;
+        .map_err(|_| ("The host didn't answer the invite in time.".to_string(), false))?
+        .map_err(|e| (e, false))?;
 
         match reply {
             HandshakeReply::Welcome {
@@ -428,9 +478,10 @@ impl Node {
             } => {
                 if v != wire::PROTOCOL_VERSION {
                     conn.close(CLOSE_REJECTED.into(), b"version mismatch");
-                    return Err("The host is running a different version of NexSync. Update both apps and try again.".into());
+                    return Err(("The host is running a different version of NexSync. Update both apps and try again.".into(), true));
                 }
                 let host_name = sanitize_name(&host_name);
+                self.lock().last_join = Some((ticket_str.to_string(), display_name.to_string()));
                 self.register_peer(conn, send, recv, host_name.clone(), role.clone(), true);
                 Ok(JoinResult {
                     peer_id: host_id.to_string(),
@@ -442,7 +493,7 @@ impl Node {
             }
             HandshakeReply::Reject { error } => {
                 conn.close(CLOSE_REJECTED.into(), b"rejected");
-                Err(error)
+                Err((error, true))
             }
         }
     }
@@ -483,6 +534,7 @@ impl Node {
 
         tokio::spawn(write_loop(send, rx));
         tokio::spawn(self.clone().run_peer(conn, recv));
+        tokio::spawn(sync::send_catch_up(self.clone(), id.to_string()));
     }
 
     /// Reads app messages and serves file requests until the connection ends
@@ -515,7 +567,50 @@ impl Node {
         }
 
         conn.close(CLOSE_NORMAL.into(), b"bye");
-        self.remove_peer(&id, conn.stable_id());
+        let was_host = self.remove_peer(&id, conn.stable_id());
+        // Once nobody is connected, later local edits count as changes made while apart.
+        if !self.has_peers() {
+            if let Some(workspace) = self.workspace_path() {
+                sync::mark_synced(&workspace);
+            }
+        }
+        if was_host {
+            self.start_reconnect();
+        }
+    }
+
+    /// Re-dials the host after an unexpected drop, backing off between attempts
+    fn start_reconnect(self: &Arc<Self>) {
+        {
+            let mut st = self.lock();
+            if st.last_join.is_none() || st.reconnecting {
+                return;
+            }
+            st.reconnecting = true;
+        }
+        let node = self.clone();
+        tokio::spawn(async move {
+            let mut delay = Duration::from_secs(2);
+            for attempt in 1..=RECONNECT_ATTEMPTS {
+                node.emit(EVENT_RECONNECTING, Reconnecting { attempt, max: RECONNECT_ATTEMPTS });
+                tokio::time::sleep(delay).await;
+                // The user disconnecting on purpose clears the saved ticket and ends the loop.
+                let Some((ticket, name)) = node.lock().last_join.clone() else { break };
+                match node.join_impl(&ticket, &name).await {
+                    Ok(_) => {
+                        node.lock().reconnecting = false;
+                        return;
+                    }
+                    Err((_, true)) => break,
+                    Err((_, false)) => delay = (delay * 2).min(RECONNECT_MAX_DELAY),
+                }
+            }
+            let mut st = node.lock();
+            st.reconnecting = false;
+            st.last_join = None;
+            drop(st);
+            node.emit(EVENT_RECONNECT_FAILED, ());
+        });
     }
 
     fn dispatch_message(self: &Arc<Self>, from: &EndpointId, bytes: &[u8]) {
@@ -600,7 +695,8 @@ impl Node {
     }
 
     /// Removes a peer only if the map still holds this exact connection
-    fn remove_peer(&self, id: &EndpointId, stable_id: usize) {
+    /// Removes a peer whose connection ended; returns true when it was the host we joined
+    fn remove_peer(&self, id: &EndpointId, stable_id: usize) -> bool {
         let removed = {
             let mut st = self.lock();
             match st.peers.get(id) {
@@ -608,16 +704,23 @@ impl Node {
                 _ => None,
             }
         };
-        if removed.is_some() {
-            self.emit(EVENT_PEER_LEFT, PeerLeft { peer_id: id.to_string() });
-            self.emit_peers();
-        }
+        let Some(peer) = removed else { return false };
+        self.emit(EVENT_PEER_LEFT, PeerLeft { peer_id: id.to_string() });
+        self.emit_peers();
+        peer.is_host
     }
 
     /// Closes the connection to one peer
     pub fn disconnect(&self, peer_id: &str) -> Result<(), String> {
         let id = parse_peer_id(peer_id)?;
-        let removed = self.lock().peers.remove(&id);
+        let removed = {
+            let mut st = self.lock();
+            let removed = st.peers.remove(&id);
+            if removed.as_ref().is_some_and(|p| p.is_host) {
+                st.last_join = None;
+            }
+            removed
+        };
         if let Some(peer) = removed {
             peer.conn.close(CLOSE_NORMAL.into(), b"disconnected");
             self.emit(EVENT_PEER_LEFT, PeerLeft { peer_id: id.to_string() });
@@ -631,6 +734,7 @@ impl Node {
         let peers: Vec<(EndpointId, Peer)> = {
             let mut st = self.lock();
             st.invite = None;
+            st.last_join = None;
             st.peers.drain().collect()
         };
         for (id, peer) in peers {
@@ -787,6 +891,15 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_identity_key_is_stable_across_loads() {
+        let path = std::env::temp_dir().join(format!("nexsync_identity_{}", uuid::Uuid::new_v4())).join("id.key");
+        let first = load_or_create_identity(&path).unwrap();
+        let second = load_or_create_identity(&path).unwrap();
+        assert_eq!(first.public(), second.public());
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
     async fn start_test_node(label: &str) -> TestNode {
         let dir = std::env::temp_dir().join(format!("nexsync_p2p_{label}_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(dir.join("notes")).unwrap();
@@ -795,7 +908,7 @@ mod tests {
             let _ = tx.send((event, payload));
         });
         let workspace: SharedWorkspace = Arc::new(Mutex::new(Some(dir.to_string_lossy().into_owned())));
-        let node = Node::start(sink, workspace).await.unwrap();
+        let node = Node::start(sink, workspace, None).await.unwrap();
         TestNode { node, events, dir }
     }
 
@@ -813,6 +926,72 @@ mod tests {
         })
         .await
         .unwrap_or_else(|_| panic!("timed out waiting for {name}"))
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_guest_reconnects_after_the_link_drops() {
+        let mut host = start_test_node("rc-host").await;
+        let mut guest = start_test_node("rc-guest").await;
+        let invite = host
+            .node
+            .create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into())
+            .await
+            .unwrap();
+        let joined = guest.node.join(&invite.ticket, "Guesty").await.unwrap();
+        let guest_id = next_event(&mut host.events, EVENT_PEER_JOINED).await["id"].as_str().unwrap().to_string();
+
+        // The host drops the link without the guest asking, so the guest re-dials on its own.
+        host.node.disconnect(&guest_id).unwrap();
+        next_event(&mut guest.events, EVENT_RECONNECTING).await;
+        next_event(&mut host.events, EVENT_PEER_JOINED).await;
+
+        // Leaving on purpose must not trigger another reconnect.
+        while guest.events.try_recv().is_ok() {}
+        guest.node.disconnect(&joined.peer_id).unwrap();
+        let retried = tokio::time::timeout(Duration::from_secs(5), next_event(&mut guest.events, EVENT_RECONNECTING)).await;
+        assert!(retried.is_err(), "a deliberate disconnect should not reconnect");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_interrupted_download_resumes_only_for_the_same_file_version() {
+        let host = start_test_node("rs-host").await;
+        let mut guest = start_test_node("rs-guest").await;
+        // No open workspace, so the guest ignores the host's connect-time catch-up and only fetches by hand.
+        *guest.node.workspace.lock().unwrap() = None;
+        let data: Vec<u8> = (0..1_000_000u32).map(|i| (i % 251) as u8).collect();
+        let source = host.dir.join("notes").join("big.bin");
+        std::fs::write(&source, &data).unwrap();
+        let version = files::version_of(&std::fs::metadata(&source).unwrap());
+
+        let invite = host
+            .node
+            .create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into())
+            .await
+            .unwrap();
+        let joined = guest.node.join(&invite.ticket, "Guesty").await.unwrap();
+        let guest_ws = guest.dir.to_string_lossy().into_owned();
+        let target = guest.dir.join("notes").join("big.bin");
+        let part = |v: u64| guest.dir.join("notes").join(format!(".big.bin.{v}.nexsync-part"));
+
+        // A partial from this exact version continues where it stopped.
+        std::fs::write(part(version), &data[..300_000]).unwrap();
+        files::fetch(&guest.node, &joined.peer_id, &guest_ws, "notes/big.bin").await.unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), data);
+        let first = next_event(&mut guest.events, files::EVENT_FILE_PROGRESS).await;
+        assert_eq!(first["receivedBytes"], 300_000);
+        assert!(!part(version).exists());
+
+        // A partial from a different version is thrown away and the download starts over.
+        std::fs::remove_file(&target).unwrap();
+        while guest.events.try_recv().is_ok() {}
+        std::fs::write(part(version + 1), vec![9u8; 300_000]).unwrap();
+        files::fetch(&guest.node, &joined.peer_id, &guest_ws, "notes/big.bin").await.unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), data);
+        let first = next_event(&mut guest.events, files::EVENT_FILE_PROGRESS).await;
+        assert_eq!(first["receivedBytes"], 0);
+        assert!(!part(version + 1).exists());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -895,6 +1074,129 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
         panic!("timed out waiting until {what}");
+    }
+
+    // Creates the workspace database for a test node and seeds it with `tasks`
+    fn seed_workspace(node: &TestNode, tasks: Vec<crate::commands::workspace::models::Task>) {
+        use crate::commands::workspace::data_sync::{merge_state, DataState};
+        let dir = node.dir.to_string_lossy().into_owned();
+        let db = crate::database::WorkspaceDb::open(&dir).unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO workspace (id, name, description, path, created_at, updated_at) VALUES ('ws', 'w', '', ?1, 't', 't')",
+                [&dir],
+            )
+            .unwrap();
+        merge_state(&db.conn, "ws", DataState { tasks, ..Default::default() }).unwrap();
+    }
+
+    fn test_task(id: &str, title: &str, updated_at: &str) -> crate::commands::workspace::models::Task {
+        crate::commands::workspace::models::Task {
+            id: id.into(),
+            title: title.into(),
+            description: String::new(),
+            status: "todo".into(),
+            priority: "medium".into(),
+            due_date: None,
+            assignee_id: None,
+            created_at: "2026-01-01T00:00:00Z".into(),
+            updated_at: updated_at.into(),
+        }
+    }
+
+    fn task_titles(node: &TestNode) -> Vec<String> {
+        let mut titles: Vec<String> = crate::commands::workspace::data_sync::export_for(&node.dir.to_string_lossy())
+            .unwrap()
+            .tasks
+            .into_iter()
+            .map(|t| t.title)
+            .collect();
+        titles.sort();
+        titles
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_reconnect_catches_up_offline_edits() {
+        let host = start_test_node("cu-host").await;
+        let guest = start_test_node("cu-guest").await;
+        let notes = |n: &TestNode, f: &str| n.dir.join("notes").join(f);
+
+        // Both sides worked while apart: different tasks, one task edited on both, files on each side,
+        // and one note changed on both (the host's edit is newer).
+        seed_workspace(
+            &host,
+            vec![test_task("a", "host task", "2026-01-02T00:00:00Z"), test_task("shared", "host edit", "2026-01-09T00:00:00Z")],
+        );
+        seed_workspace(
+            &guest,
+            vec![test_task("b", "guest task", "2026-01-02T00:00:00Z"), test_task("shared", "guest edit", "2026-01-05T00:00:00Z")],
+        );
+        std::fs::write(notes(&host, "only-host.md"), "host only").unwrap();
+        std::fs::write(notes(&guest, "only-guest.md"), "guest only").unwrap();
+        std::fs::write(notes(&guest, "both.md"), "guest version").unwrap();
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        std::fs::write(notes(&host, "both.md"), "host version").unwrap();
+
+        let invite = host
+            .node
+            .create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into())
+            .await
+            .unwrap();
+        guest.node.join(&invite.ticket, "Guesty").await.unwrap();
+
+        wait_until("tasks converge", || {
+            task_titles(&host) == task_titles(&guest) && task_titles(&host).len() == 3
+        })
+        .await;
+        assert!(task_titles(&host).contains(&"host edit".to_string()), "the newer edit should win");
+
+        wait_until("files are exchanged", || {
+            notes(&guest, "only-host.md").exists() && notes(&host, "only-guest.md").exists()
+        })
+        .await;
+        wait_until("the newer note wins on the guest", || {
+            std::fs::read_to_string(notes(&guest, "both.md")).map(|c| c == "host version").unwrap_or(false)
+        })
+        .await;
+        // The guest's losing version is kept next to it instead of being lost.
+        let kept = std::fs::read_dir(guest.dir.join("notes"))
+            .unwrap()
+            .flatten()
+            .any(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                name.starts_with("both.conflict-") && std::fs::read_to_string(e.path()).unwrap() == "guest version"
+            });
+        assert!(kept, "the overwritten version should survive as a conflict copy");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_catch_up_backs_up_files_it_overwrites() {
+        let host = start_test_node("bk-host").await;
+        let guest = start_test_node("bk-guest").await;
+        let note = |n: &TestNode| n.dir.join("notes").join("stale.md");
+        std::fs::write(note(&guest), "old").unwrap();
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        std::fs::write(note(&host), "new").unwrap();
+        // The guest last synced after its copy was made, so only the host changed the note.
+        let future = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() + 3_600_000;
+        std::fs::create_dir_all(guest.dir.join(".nexsync")).unwrap();
+        std::fs::write(guest.dir.join(".nexsync").join("last_sync"), future.to_string()).unwrap();
+
+        let invite = host
+            .node
+            .create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into())
+            .await
+            .unwrap();
+        guest.node.join(&invite.ticket, "Guesty").await.unwrap();
+
+        wait_until("the guest takes the host copy", || std::fs::read_to_string(note(&guest)).map(|c| c == "new").unwrap_or(false)).await;
+        let backed_up = std::fs::read_dir(guest.dir.join(".nexsync").join("trash"))
+            .unwrap()
+            .flatten()
+            .any(|e| std::fs::read_to_string(e.path().join("notes").join("stale.md")).map(|c| c == "old").unwrap_or(false));
+        assert!(backed_up, "the replaced version should be recoverable from the trash");
     }
 
     #[tokio::test(flavor = "multi_thread")]

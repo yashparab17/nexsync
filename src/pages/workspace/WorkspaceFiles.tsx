@@ -326,7 +326,7 @@ export default function WorkspaceFiles() {
 		logError,
 	]);
 
-	// Delete item permanently from disk
+	// Move item to the trash
 	const handleDelete = useCallback(async () => {
 		if (isViewer || !deleteItem || !workspacePath) return;
 
@@ -704,15 +704,14 @@ export default function WorkspaceFiles() {
 								Delete {deleteItem.is_dir ? "Folder" : "File"}
 							</DialogTitle>
 							<DialogDescription>
-								Are you sure you want to permanently delete{" "}
+								Move{" "}
 								<span className="font-semibold text-foreground">
 									{deleteItem.name}
 									{deleteItem.is_dir && "/"}
 								</span>
-								?
-								{deleteItem.is_dir &&
-									" All nested files and folders will be removed too."}
-								This action cannot be undone.
+								{" "}to the Trash?
+								{deleteItem.is_dir && " Everything inside it moves too."} You can
+								restore it from there.
 							</DialogDescription>
 						</DialogHeader>
 

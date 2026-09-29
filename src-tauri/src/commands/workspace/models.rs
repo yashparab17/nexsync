@@ -91,7 +91,7 @@ pub struct History {
 // ────────────────────────────
 
 /// A single task model
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Task {
     pub id: String,
     pub title: String,
@@ -116,7 +116,7 @@ pub struct KanbanColumn {
 }
 
 /// A single Kanban card model
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct KanbanCard {
     pub id: String,
     pub title: String,

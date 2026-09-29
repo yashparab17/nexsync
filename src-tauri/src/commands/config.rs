@@ -13,6 +13,9 @@ const CONFIG_FILE_NAME: &str = "nexsync_config.json";
 pub struct NexsyncConfig {
     /// Allowed root directories for workspace creation/import
     pub allowed_workspace_roots: Vec<String>,
+    /// Name shown to collaborators; empty means use the default
+    #[serde(default)]
+    pub display_name: String,
 }
 
 impl Default for NexsyncConfig {
@@ -34,6 +37,7 @@ impl Default for NexsyncConfig {
 
         Self {
             allowed_workspace_roots: defaults,
+            display_name: String::new(),
         }
     }
 }
@@ -374,12 +378,9 @@ mod tests {
 
     #[test]
     fn test_expand_tilde() {
-        match expand_and_resolve("~/test") {
-            Ok(path) => {
-                assert!(path.is_absolute());
-                assert!(path.to_string_lossy().contains("test"));
-            }
-            Err(_) => {}
+        if let Ok(path) = expand_and_resolve("~/test") {
+            assert!(path.is_absolute());
+            assert!(path.to_string_lossy().contains("test"));
         }
     }
 

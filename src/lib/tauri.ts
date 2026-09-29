@@ -10,6 +10,7 @@ import type {
 	WorkspaceFile,
 	WorkspaceStats,
 	ErrorRecord,
+	TrashItem,
 	CreateWorkspaceRequest,
 	UpdateMetadataRequest,
 	Task,
@@ -72,6 +73,40 @@ export function getCurrentSessionInfo(
 // Append an error record to app-level error log
 export function logError(entry: ErrorRecord): Promise<void> {
 	return invoke("log_error", { entry });
+}
+
+// Read the most recent error records, newest first
+export function getErrorLog(limit = 200): Promise<ErrorRecord[]> {
+	return invoke("get_error_log", { limit });
+}
+
+// Delete the app-level error log
+export function clearErrorLog(): Promise<void> {
+	return invoke("clear_error_log");
+}
+
+// ────────────────────────────
+// Trash
+// ────────────────────────────
+
+// List deleted items, newest first
+export function listTrash(path: string): Promise<TrashItem[]> {
+	return invoke("list_trash", { path });
+}
+
+// Move a trashed item back to where it was
+export function restoreTrashItem(path: string, id: string): Promise<void> {
+	return invoke("restore_trash_item", { path, id });
+}
+
+// Permanently delete one trashed item
+export function purgeTrashItem(path: string, id: string): Promise<void> {
+	return invoke("purge_trash_item", { path, id });
+}
+
+// Permanently delete everything in the trash
+export function emptyTrash(path: string): Promise<void> {
+	return invoke("empty_trash", { path });
 }
 
 // ────────────────────────────

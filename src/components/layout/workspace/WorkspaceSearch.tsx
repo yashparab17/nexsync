@@ -23,7 +23,7 @@ const MAX_TEXT_FILES = 300;
 const TEXT_EXT = /\.(md|markdown|txt|json|csv|toml|ya?ml|html?|css|js|ts|tsx|jsx|rs)$/i;
 
 // Text around the first match, for showing why a result matched
-function snippet(text: string, q: string): string {
+export function snippet(text: string, q: string): string {
 	const i = text.toLowerCase().indexOf(q);
 	if (i < 0) return "";
 	const s = Math.max(0, i - 30);

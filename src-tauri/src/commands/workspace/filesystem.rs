@@ -186,7 +186,7 @@ pub fn rename_workspace_item(
     Ok(())
 }
 
-/// Deletes a file or directory permanently
+/// Moves a file or directory into the workspace trash
 #[tauri::command]
 pub fn delete_workspace_item(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
@@ -195,12 +195,7 @@ pub fn delete_workspace_item(app_handle: tauri::AppHandle, path: String, rel_pat
     if !target.exists() {
         return Err(format!("Item not found: /{rel_path}"));
     }
-    if target.is_dir() {
-        fs::remove_dir_all(&target).map_err(|e| e.to_string())?;
-    } else {
-        fs::remove_file(&target).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    super::trash::move_to_trash(&path, &target, rel_path.trim_matches('/')).map_err(|e| e.to_string())
 }
 
 /// Reads a workspace binary file and returns its base64-encoded string

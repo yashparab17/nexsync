@@ -26,7 +26,7 @@ import {
 
 import { open } from "@tauri-apps/plugin-dialog";
 import { documentDir } from "@tauri-apps/api/path";
-import { createWorkspace, importWorkspace } from "@/lib/tauri";
+import { createWorkspace, importWorkspace, loadConfig } from "@/lib/tauri";
 import { errorText } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -49,6 +49,13 @@ export default function JoinWorkspaceDialog({
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [isSuccess, setIsSuccess] = useState(false);
+
+	// Prefill the name saved in Settings
+	useEffect(() => {
+		loadConfig()
+			.then((c) => c.display_name && setUserName(c.display_name))
+			.catch(() => {});
+	}, []);
 
 	// Default storage location to user Documents directory
 	useEffect(() => {

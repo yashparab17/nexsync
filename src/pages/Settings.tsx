@@ -25,6 +25,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import ErrorLogCard from "@/components/elements/ErrorLogCard";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useAppUpdater } from "@/hooks/useAppUpdater";
@@ -40,6 +41,7 @@ export default function Settings() {
 
 	const [config, setConfig] = useState<NexsyncConfig>({
 		allowed_workspace_roots: [],
+		display_name: "",
 	});
 	const [loading, setLoading] = useState(true);
 	const [newRootInput, setNewRootInput] = useState("");
@@ -155,6 +157,25 @@ export default function Settings() {
 						<div className="flex items-center gap-2">
 							<ThemeToggle />
 						</div>
+					</CardContent>
+				</Card>
+
+				{/* Profile */}
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-base">Display Name</CardTitle>
+						<CardDescription>
+							Shown to collaborators when you join a workspace. Saved with the Save button below.
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<Input
+							value={config.display_name}
+							maxLength={40}
+							onChange={(e) => setConfig((prev) => ({ ...prev, display_name: e.target.value }))}
+							placeholder="Collaborator"
+							aria-label="Display name"
+						/>
 					</CardContent>
 				</Card>
 
@@ -317,6 +338,8 @@ export default function Settings() {
 						</div>
 					</CardContent>
 				</Card>
+
+				<ErrorLogCard />
 			</div>
 		</div>
 	);

@@ -40,7 +40,7 @@ export default function WorkspaceHeader() {
 							"h-2 w-2 rounded-none",
 							connectedCount > 0
 								? "bg-emerald-400 animate-ping"
-								: connectionStatus === "connecting"
+								: connectionStatus === "connecting" || connectionStatus === "reconnecting"
 									? "bg-amber-400 animate-pulse"
 									: "bg-muted-foreground",
 						)}

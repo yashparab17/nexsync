@@ -148,7 +148,7 @@ export default function P2PConnectDialog({
 								"h-2 w-2 rounded-none",
 								connectionStatus === "connected"
 									? "bg-emerald-400 animate-ping"
-									: connectionStatus === "connecting"
+									: connectionStatus === "connecting" || connectionStatus === "reconnecting"
 										? "bg-amber-400 animate-pulse"
 										: "bg-muted-foreground",
 							)}

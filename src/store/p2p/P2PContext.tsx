@@ -34,6 +34,7 @@ import {
 	getTasks,
 	getKanban,
 	createKanbanColumn,
+	loadConfig,
 } from "@/lib/tauri";
 import type { Member } from "@/types/workspace";
 
@@ -99,7 +100,7 @@ function isMemberList(value: unknown): value is Member[] {
 
 interface P2PContextType {
 	peers: ConnectedPeerInfo[];
-	connectionStatus: "offline" | "connecting" | "connected";
+	connectionStatus: "offline" | "connecting" | "reconnecting" | "connected";
 	placeholders: PlaceholderItem[];
 	syncProgress: SyncProgress | null;
 	lastSyncedFile: SyncedFile | null;
@@ -128,6 +129,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
 	const [lastSyncedFile, setLastSyncedFile] = useState<SyncedFile | null>(null);
 	const [isJoining, setIsJoining] = useState(false);
+	const [reconnecting, setReconnecting] = useState(false);
 	const [dataVersion, setDataVersion] = useState(0);
 	const [selfNameVersion, setSelfNameVersion] = useState(0);
 	const syncVersionRef = useRef(0);
@@ -212,7 +214,14 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		p2p.listPeers().then(updatePeers).catch(() => {});
 
 		const offPeers = p2p.onPeers(updatePeers);
+		const offDataChanged = p2p.onDataChanged(() => {
+			setDataVersion((v) => v + 1);
+			void refreshMetadataRef.current();
+		});
+		const offReconnecting = p2p.onReconnecting(() => setReconnecting(true));
+		const offReconnectFailed = p2p.onReconnectFailed(() => setReconnecting(false));
 		const offJoined = p2p.onPeerJoined((peer) => {
+			setReconnecting(false);
 			syncProvidersRef.current.forEach((provider) => provider.addPeer(peer.id));
 			if (!peer.isHost) void addGuestMember(peer);
 		});
@@ -224,6 +233,9 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			offPeers();
 			offJoined();
 			offLeft();
+			offReconnecting();
+			offReconnectFailed();
+			offDataChanged();
 		};
 	}, [addGuestMember]);
 
@@ -549,11 +561,15 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const revokeInvite = useCallback(() => p2p.revokeInvite(), []);
 
 	// Connect to a host from an invite ticket
-	const joinWithTicket = useCallback(async (ticket: string, displayName = "Collaborator") => {
+	const joinWithTicket = useCallback(async (ticket: string, displayName?: string) => {
 		setIsJoining(true);
 		try {
-			const result = await p2p.joinWithTicket(ticket.trim(), displayName);
-			pendingSelfNameRef.current = displayName.trim() || "Collaborator";
+			const name =
+				displayName?.trim() ||
+				(await loadConfig().catch(() => null))?.display_name.trim() ||
+				"Collaborator";
+			const result = await p2p.joinWithTicket(ticket.trim(), name);
+			pendingSelfNameRef.current = name;
 			return result;
 		} finally {
 			setIsJoining(false);
@@ -623,7 +639,10 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	);
 
 	const connectionStatus: P2PContextType["connectionStatus"] =
-		peers.length > 0 ? "connected" : isJoining ? "connecting" : "offline";
+		peers.length > 0 ? "connected"
+		: reconnecting ? "reconnecting"
+		: isJoining ? "connecting"
+		: "offline";
 
 	return (
 		<P2PContext.Provider

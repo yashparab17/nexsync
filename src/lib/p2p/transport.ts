@@ -114,6 +114,18 @@ export const onPeerJoined = (handler: (peer: ConnectedPeerInfo) => void) =>
 export const onPeerLeft = (handler: (event: { peerId: string }) => void) =>
 	subscribe<{ peerId: string }>("p2p://peer-left", handler);
 
+// A catch-up merge changed tasks or kanban in the local database
+export const onDataChanged = (handler: () => void) =>
+	subscribe<null>("p2p://data-changed", () => handler());
+
+// The link to the host dropped and the backend is re-dialing it
+export const onReconnecting = (handler: (event: { attempt: number; max: number }) => void) =>
+	subscribe<{ attempt: number; max: number }>("p2p://reconnecting", handler);
+
+// The backend gave up re-dialing the host
+export const onReconnectFailed = (handler: () => void) =>
+	subscribe<null>("p2p://reconnect-failed", () => handler());
+
 export const onMessage = (handler: (event: IncomingMessage) => void) =>
 	subscribe<IncomingMessage>("p2p://message", handler);
 

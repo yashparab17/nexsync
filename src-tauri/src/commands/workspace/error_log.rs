@@ -63,3 +63,25 @@ pub fn log_error(app_handle: tauri::AppHandle, mut entry: ErrorRecord) -> Result
         .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+/// Returns the most recent error records, newest first
+#[tauri::command]
+pub fn get_error_log(app_handle: tauri::AppHandle, limit: Option<usize>) -> Result<Vec<ErrorRecord>, String> {
+    let path = error_log_path(&app_handle)?;
+    let content = fs::read_to_string(&path).unwrap_or_default();
+    Ok(content
+        .lines()
+        .rev()
+        .filter_map(|line| serde_json::from_str(line).ok())
+        .take(limit.unwrap_or(200).min(1000))
+        .collect())
+}
+
+/// Deletes the application error log
+#[tauri::command]
+pub fn clear_error_log(app_handle: tauri::AppHandle) -> Result<(), String> {
+    match fs::remove_file(error_log_path(&app_handle)?) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
+        _ => Ok(()),
+    }
+}

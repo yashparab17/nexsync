@@ -53,13 +53,26 @@ pub enum HandshakeReply {
 #[serde(rename_all = "camelCase")]
 pub struct FileRequest {
     pub rel_path: String,
+    /// Bytes the requester already has; honored only when `version` still matches the source
+    #[serde(default)]
+    pub offset: u64,
+    /// `version` from the earlier reply that produced those bytes
+    #[serde(default)]
+    pub version: u64,
 }
 
 /// Sent back on a file stream before the raw file bytes
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum FileReply {
-    Ok { size: u64 },
+    /// `size` is the whole file, `offset` is where the bytes that follow start (0 unless resuming)
+    Ok {
+        size: u64,
+        #[serde(default)]
+        version: u64,
+        #[serde(default)]
+        offset: u64,
+    },
     Error { error: String },
 }
 

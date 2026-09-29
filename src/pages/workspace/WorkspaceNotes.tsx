@@ -420,11 +420,11 @@ export default function WorkspaceNotes() {
 						<DialogHeader>
 							<DialogTitle>Delete Note</DialogTitle>
 							<DialogDescription>
-								Are you sure you want to delete{" "}
+								Move{" "}
 								<span className="font-semibold text-foreground">
 									{deletingNote.name}
 								</span>{" "}
-								from the disk? This action cannot be undone.
+								to the Trash? You can restore it from there.
 							</DialogDescription>
 						</DialogHeader>
 

@@ -165,6 +165,19 @@ ALTER TABLE yjs_documents_v2 RENAME TO yjs_documents;
 CREATE INDEX IF NOT EXISTS idx_yjs_workspace_doc ON yjs_documents(workspace_id, doc_id);
 "##,
 	},
+	Migration {
+		version: 3,
+		description: "tombstones for catch-up sync",
+		up: r##"
+CREATE TABLE IF NOT EXISTS tombstones (
+    workspace_id TEXT NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,
+    entity       TEXT NOT NULL,
+    id           TEXT NOT NULL,
+    deleted_at   TEXT NOT NULL,
+    PRIMARY KEY (entity, id)
+);
+"##,
+	},
 ];
 
 /// Initialises the schema on a fresh database, running pending migrations

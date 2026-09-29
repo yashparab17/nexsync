@@ -14,6 +14,7 @@ import {
 	ListTodo,
 	Settings,
 	StickyNote,
+	Trash2,
 	UsersRound,
 } from "lucide-react";
 
@@ -71,6 +72,11 @@ const bottomNavigation: NavigationItem[] = [
 		name: "Members",
 		path: "/workspace/members",
 		icon: UsersRound,
+	},
+	{
+		name: "Trash",
+		path: "/workspace/trash",
+		icon: Trash2,
 	},
 	{
 		name: "Settings",

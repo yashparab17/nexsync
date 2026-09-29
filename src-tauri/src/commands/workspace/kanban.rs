@@ -86,6 +86,7 @@ pub fn create_kanban_column(app_handle: tauri::AppHandle, request: KanbanColumnR
         rusqlite::params![&col.id, &ws_id, &col.title, &col.position, &now, &now],
     )
     .map_err(|e| e.to_string())?;
+    super::data_sync::clear_tombstone(&db.conn, super::data_sync::ENTITY_COLUMN, &col.id)?;
     Ok(col)
 }
 
@@ -119,6 +120,7 @@ pub fn create_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
         ],
     )
     .map_err(|e| e.to_string())?;
+    super::data_sync::clear_tombstone(&db.conn, super::data_sync::ENTITY_CARD, &card.id)?;
     Ok(card)
 }
 
@@ -166,9 +168,9 @@ pub fn move_kanban_card(app_handle: tauri::AppHandle, request: MoveCardRequest) 
     let ws_id = get_workspace_id(&db)?;
     db.conn
         .execute(
-            "UPDATE kanban_cards SET column_id = ?1, position = ?2
+            "UPDATE kanban_cards SET column_id = ?1, position = ?2, updated_at = ?5
              WHERE id = ?3 AND workspace_id = ?4",
-            rusqlite::params![&request.column_id, &request.position, &request.card_id, &ws_id],
+            rusqlite::params![&request.column_id, &request.position, &request.card_id, &ws_id, Utc::now().to_rfc3339()],
         )
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -182,12 +184,25 @@ pub fn delete_kanban_column(app_handle: tauri::AppHandle, request: TaskIdRequest
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let ws_id = get_workspace_id(&db)?;
+    // Cards die with their column, so mark them deleted too.
+    let card_ids: Vec<String> = db
+        .conn
+        .prepare("SELECT id FROM kanban_cards WHERE column_id = ?1")
+        .map_err(|e| e.to_string())?
+        .query_map([&request.id], |r| r.get(0))
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+    for id in &card_ids {
+        super::data_sync::record_tombstone(&db.conn, &ws_id, super::data_sync::ENTITY_CARD, id)?;
+    }
     db.conn
         .execute(
             "DELETE FROM kanban_columns WHERE id = ?1 AND workspace_id = ?2",
             [&request.id, &ws_id],
         )
         .map_err(|e| e.to_string())?;
+    super::data_sync::record_tombstone(&db.conn, &ws_id, super::data_sync::ENTITY_COLUMN, &request.id)?;
     Ok(())
 }
 
@@ -205,5 +220,6 @@ pub fn delete_kanban_card(app_handle: tauri::AppHandle, request: TaskIdRequest) 
             [&request.id, &ws_id],
         )
         .map_err(|e| e.to_string())?;
+    super::data_sync::record_tombstone(&db.conn, &ws_id, super::data_sync::ENTITY_CARD, &request.id)?;
     Ok(())
 }

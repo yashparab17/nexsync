@@ -128,9 +128,19 @@
     @apply font-sans;
     }
 }
-/* App-wide: no rounded corners, including third-party widgets (BlockNote/Mantine, CodeMirror). */
-*, *::before, *::after {
-  border-radius: 0 !important;
+/* App-wide: no rounded corners. Base layer covers our own elements, the Mantine variables cover BlockNote. */
+@layer base {
+  *, *::before, *::after {
+    border-radius: 0;
+  }
+}
+:root {
+  --mantine-radius-xs: 0;
+  --mantine-radius-sm: 0;
+  --mantine-radius-md: 0;
+  --mantine-radius-lg: 0;
+  --mantine-radius-xl: 0;
+  --mantine-radius-default: 0;
 }
 
 /* Thin scrollbars */

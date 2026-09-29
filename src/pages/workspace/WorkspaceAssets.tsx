@@ -839,11 +839,11 @@ export default function WorkspaceAssets() {
 						<DialogHeader>
 							<DialogTitle>Delete Asset</DialogTitle>
 							<DialogDescription>
-								Are you sure you want to permanently delete{" "}
+								Move{" "}
 								<span className="font-semibold text-foreground">
 									{assetToDelete.name}
 								</span>{" "}
-								from the disk? This action cannot be undone.
+								to the Trash? You can restore it from there.
 							</DialogDescription>
 						</DialogHeader>
 

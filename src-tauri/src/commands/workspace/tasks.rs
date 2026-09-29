@@ -78,6 +78,7 @@ pub fn create_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
         ],
     )
     .map_err(|e| e.to_string())?;
+    super::data_sync::clear_tombstone(&db.conn, super::data_sync::ENTITY_TASK, &task.id)?;
     Ok(task)
 }
 
@@ -132,5 +133,6 @@ pub fn delete_task(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Resu
             [&request.id, &ws_id],
         )
         .map_err(|e| e.to_string())?;
+    super::data_sync::record_tombstone(&db.conn, &ws_id, super::data_sync::ENTITY_TASK, &request.id)?;
     Ok(())
 }

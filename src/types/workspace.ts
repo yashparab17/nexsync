@@ -117,6 +117,15 @@ export interface AssetItem extends WorkspaceFile {
 // Error logging types
 // ────────────────────────────
 
+// Deleted item in .nexsync/trash
+export interface TrashItem {
+	id: string;
+	relPath: string;
+	isDir: boolean;
+	size: number;
+	deletedAt: number;
+}
+
 // App-level error record stored in errors.jsonl
 export interface ErrorRecord {
 	timestamp: string;
@@ -224,5 +233,7 @@ export interface MoveCardRequest {
 
 export interface NexsyncConfig {
 	allowed_workspace_roots: string[];
+	// Name shown to collaborators; empty means "Collaborator"
+	display_name: string;
 }
 

@@ -19,9 +19,11 @@ use tokio::sync::mpsc;
 
 use super::{files, node::Node};
 use crate::commands::path_utils::resolve_workspace_path;
+use crate::commands::workspace::data_sync::{self, DataState};
 
 pub const EVENT_FILES_CHANGED: &str = "p2p://files-changed";
 pub const EVENT_REMOTE_FILE: &str = "p2p://remote-file";
+pub const EVENT_DATA_CHANGED: &str = "p2p://data-changed";
 
 /// Files above this size are announced but only downloaded on demand
 pub const LAZY_FILE_BYTES: u64 = 10 * 1024 * 1024;
@@ -39,12 +41,31 @@ pub enum SyncMessage {
     },
     #[serde(rename = "FILE_DELETED", rename_all = "camelCase")]
     Deleted { rel_path: String },
+    /// Every syncable file this peer has, sent on connect so both sides can catch up
+    #[serde(rename = "FILE_MANIFEST")]
+    Manifest { files: Vec<ManifestEntry> },
+    /// This peer's tasks and kanban, sent on connect and merged by the receiver
+    #[serde(rename = "DATA_SYNC")]
+    Data { state: DataState },
+}
+
+/// One file in a [`SyncMessage::Manifest`]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManifestEntry {
+    pub rel_path: String,
+    pub size: u64,
+    pub hash: Option<String>,
+    /// Last modified time in milliseconds since the Unix epoch
+    pub modified: u64,
+    /// True if the sender changed the file after its last sync with anyone
+    pub dirty: bool,
 }
 
 impl SyncMessage {
     /// True if a JSON message on the control stream belongs to file sync
     pub fn is_sync_kind(kind: &str) -> bool {
-        kind == "FILE_CHANGED" || kind == "FILE_DELETED"
+        matches!(kind, "FILE_CHANGED" | "FILE_DELETED" | "FILE_MANIFEST" | "DATA_SYNC")
     }
 }
 
@@ -224,6 +245,162 @@ pub async fn handle_remote(node: Arc<Node>, peer_id: String, message: SyncMessag
                 Err(e) => eprintln!("[P2P] Could not apply deletion of {rel}: {e}"),
             }
         }
+        SyncMessage::Manifest { files } => handle_manifest(&node, &peer_id, &workspace, files).await,
+        SyncMessage::Data { state } => handle_data(&node, &peer_id, &workspace, state).await,
+    }
+}
+
+// ────────────────────────────
+// Catch-up on connect
+// ────────────────────────────
+
+fn now_ms() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+fn modified_ms(meta: &std::fs::Metadata) -> u64 {
+    meta.modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+fn last_sync_path(workspace: &str) -> PathBuf {
+    Path::new(workspace).join(".nexsync").join("last_sync")
+}
+
+/// When this device last finished syncing with a peer; 0 if it never has.
+fn read_last_sync(workspace: &str) -> u64 {
+    std::fs::read_to_string(last_sync_path(workspace)).ok().and_then(|s| s.trim().parse().ok()).unwrap_or(0)
+}
+
+/// Records that everything up to now was in sync, so later edits count as offline changes.
+pub fn mark_synced(workspace: &str) {
+    let _ = std::fs::write(last_sync_path(workspace), now_ms().to_string());
+}
+
+/// Sends this device's tasks/kanban and file list to a newly connected peer.
+pub async fn send_catch_up(node: Arc<Node>, peer_id: String) {
+    let Some(workspace) = node.workspace_path() else { return };
+
+    let ws = workspace.clone();
+    if let Ok(Ok(state)) = tokio::task::spawn_blocking(move || data_sync::export_for(&ws)).await {
+        if let Ok(value) = serde_json::to_value(SyncMessage::Data { state }) {
+            let _ = node.send(Some(&peer_id), &value).await;
+        }
+    }
+    let files = build_manifest(&workspace).await;
+    if let Ok(value) = serde_json::to_value(SyncMessage::Manifest { files }) {
+        let _ = node.send(Some(&peer_id), &value).await;
+    }
+}
+
+async fn build_manifest(workspace: &str) -> Vec<ManifestEntry> {
+    let last_sync = read_last_sync(workspace);
+    let ws = workspace.to_string();
+    let listed = tokio::task::spawn_blocking(move || files::list_shareable_files(&ws))
+        .await
+        .ok()
+        .and_then(Result::ok)
+        .unwrap_or_default();
+    let mut out = Vec::with_capacity(listed.len());
+    for f in listed {
+        let Ok(path) = resolve_workspace_path(workspace, &f.rel_path) else { continue };
+        let Ok(meta) = tokio::fs::metadata(&path).await else { continue };
+        let modified = modified_ms(&meta);
+        // ponytail: hashes every small file on each connect, add a (path, size, mtime) cache if that gets slow.
+        out.push(ManifestEntry {
+            hash: hash_file(&path, f.size).await,
+            size: f.size,
+            modified,
+            dirty: modified > last_sync,
+            rel_path: f.rel_path,
+        });
+    }
+    out
+}
+
+/// Downloads a file, or offers it as a placeholder when it is too large to fetch eagerly.
+async fn pull(node: &Arc<Node>, peer_id: &str, workspace: &str, rel: String, size: u64) {
+    if size > LAZY_FILE_BYTES {
+        node.emit(EVENT_REMOTE_FILE, RemoteFile { peer_id, rel_path: &rel, size });
+        return;
+    }
+    fetch_coalesced(node, peer_id, workspace, rel).await;
+}
+
+/// Brings this device up to date with a peer's file list without ever losing an edit.
+async fn handle_manifest(node: &Arc<Node>, peer_id: &str, workspace: &str, entries: Vec<ManifestEntry>) {
+    let last_sync = read_last_sync(workspace);
+    for entry in entries {
+        let Ok(rel) = files::check_rel_path(&entry.rel_path) else { continue };
+        let Ok(local) = resolve_workspace_path(workspace, &rel) else { continue };
+        let meta = tokio::fs::metadata(&local).await.ok().filter(|m| m.is_file());
+        if let Some(meta) = meta {
+            if already_matches(&local, entry.size, entry.hash.as_deref()).await {
+                continue;
+            }
+            let local_modified = modified_ms(&meta);
+            if local_modified > last_sync {
+                // Edited here while apart: keep it unless the peer also edited and is newer, in
+                // which case both versions survive. Otherwise the peer pulls ours from its side.
+                if !entry.dirty || entry.modified <= local_modified {
+                    continue;
+                }
+                if let Err(e) = keep_conflict_copy(&local).await {
+                    eprintln!("[P2P] Could not keep a copy of {rel}, skipping it: {e}");
+                    continue;
+                }
+            } else if let Err(e) = copy_to_trash(workspace, &local, &rel).await {
+                eprintln!("[P2P] Could not back up {rel} before updating it, skipping: {e}");
+                continue;
+            }
+        }
+        pull(node, peer_id, workspace, rel, entry.size).await;
+    }
+}
+
+/// Saves the current file next to itself as `name.conflict-<time>.ext`.
+async fn keep_conflict_copy(local: &Path) -> std::io::Result<()> {
+    let stem = local.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let ext = local.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
+    let copy = local.with_file_name(format!("{stem}.conflict-{}{ext}", now_ms()));
+    tokio::fs::copy(local, copy).await.map(|_| ())
+}
+
+/// Backs up a file into the trash before a sync replaces it.
+async fn copy_to_trash(workspace: &str, local: &Path, rel: &str) -> std::io::Result<()> {
+    let (workspace, local, rel) = (workspace.to_string(), local.to_path_buf(), rel.to_string());
+    tokio::task::spawn_blocking(move || crate::commands::workspace::trash::copy_to_trash(&workspace, &local, &rel))
+        .await
+        .map_err(std::io::Error::other)?
+}
+
+/// Merges a peer's tasks and kanban; a host also passes what it learned on to its other guests.
+async fn handle_data(node: &Arc<Node>, peer_id: &str, workspace: &str, state: DataState) {
+    let ws = workspace.to_string();
+    let changed = match tokio::task::spawn_blocking(move || data_sync::merge_into(&ws, state)).await {
+        Ok(Ok(changed)) => changed,
+        Ok(Err(e)) => return eprintln!("[P2P] Could not merge a peer's tasks and kanban: {e}"),
+        Err(_) => return,
+    };
+    if !changed {
+        return;
+    }
+    node.emit(EVENT_DATA_CHANGED, serde_json::json!({}));
+
+    let others: Vec<String> = node.peers().into_iter().filter(|p| p.id != peer_id).map(|p| p.id).collect();
+    if others.is_empty() || !node.peer_is_host(peer_id).is_some_and(|is_host| !is_host) {
+        return;
+    }
+    let ws = workspace.to_string();
+    if let Ok(Ok(merged)) = tokio::task::spawn_blocking(move || data_sync::export_for(&ws)).await {
+        if let Ok(value) = serde_json::to_value(SyncMessage::Data { state: merged }) {
+            for id in others {
+                let _ = node.send(Some(&id), &value).await;
+            }
+        }
     }
 }
 
@@ -259,23 +436,12 @@ async fn fetch_coalesced(node: &Arc<Node>, peer_id: &str, workspace: &str, rel: 
     }
 }
 
-/// Moves a deleted file or folder into `.nexsync/trash/<timestamp>/` so it can be recovered
+/// Moves a deleted file or folder into the workspace trash so it can be recovered
 async fn move_to_trash(workspace: &str, local: &Path, rel: &str) -> std::io::Result<()> {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    let mut dest = PathBuf::from(workspace)
-        .join(".nexsync")
-        .join("trash")
-        .join(stamp.to_string());
-    for part in rel.split('/') {
-        dest.push(part);
-    }
-    if let Some(parent) = dest.parent() {
-        tokio::fs::create_dir_all(parent).await?;
-    }
-    tokio::fs::rename(local, dest).await
+    let (workspace, local, rel) = (workspace.to_string(), local.to_path_buf(), rel.to_string());
+    tokio::task::spawn_blocking(move || crate::commands::workspace::trash::move_to_trash(&workspace, &local, &rel))
+        .await
+        .map_err(std::io::Error::other)?
 }
 
 #[cfg(test)]

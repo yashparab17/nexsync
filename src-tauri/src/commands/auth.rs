@@ -25,6 +25,8 @@ pub struct WorkspaceSession {
 #[strum(serialize_all = "snake_case")]
 pub enum UserRole {
     Owner,
+    // Reserved for local role gating; guest roles are enforced in the P2P layer.
+    #[allow(dead_code)]
     Editor,
     #[default]
     Viewer,

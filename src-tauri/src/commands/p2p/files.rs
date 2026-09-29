@@ -13,7 +13,7 @@ use std::{
 
 use iroh::endpoint::{RecvStream, SendStream};
 use serde::Serialize;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 use super::{
     node::Node,
@@ -137,23 +137,6 @@ pub async fn fetch(node: &Arc<Node>, peer_id: &str, workspace_path: &str, rel_pa
     let target = resolve_workspace_path(workspace_path, &rel)?;
     let conn = node.connection(peer_id)?;
 
-    let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
-    send.write_all(&[wire::STREAM_FILE]).await.map_err(|e| e.to_string())?;
-    wire::write_json(&mut send, &FileRequest { rel_path: rel.clone() }).await?;
-    let _ = send.finish();
-
-    let reply: FileReply = tokio::time::timeout(REPLY_TIMEOUT, wire::read_json(&mut recv, wire::MAX_SMALL_FRAME))
-        .await
-        .map_err(|_| "The collaborator didn't respond to the file request.".to_string())??;
-    let size = match reply {
-        FileReply::Ok { size } => size,
-        FileReply::Error { error } => return Err(error),
-    };
-    if size > MAX_TRANSFER_BYTES {
-        let _ = recv.stop(0u32.into());
-        return Err(format!("{rel} is too large to transfer ({size} bytes)."));
-    }
-
     if let Some(parent) = target.parent() {
         tokio::fs::create_dir_all(parent)
             .await
@@ -163,8 +146,45 @@ pub async fn fetch(node: &Arc<Node>, peer_id: &str, workspace_path: &str, rel_pa
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .ok_or_else(|| format!("Invalid file path: {rel}"))?;
+
+    // An interrupted earlier attempt left bytes behind; ask the owner to continue after them.
+    let partial = find_partial(&target, &file_name).await;
+    let (offset, version) = partial.as_ref().map(|p| (p.len, p.version)).unwrap_or((0, 0));
+
+    let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+    send.write_all(&[wire::STREAM_FILE]).await.map_err(|e| e.to_string())?;
+    wire::write_json(&mut send, &FileRequest { rel_path: rel.clone(), offset, version }).await?;
+    let _ = send.finish();
+
+    let reply: FileReply = tokio::time::timeout(REPLY_TIMEOUT, wire::read_json(&mut recv, wire::MAX_SMALL_FRAME))
+        .await
+        .map_err(|_| "The collaborator didn't respond to the file request.".to_string())??;
+    let (size, version, start) = match reply {
+        FileReply::Ok { size, version, offset } => (size, version, offset),
+        FileReply::Error { error } => {
+            if let Some(p) = &partial {
+                let _ = tokio::fs::remove_file(&p.path).await;
+            }
+            return Err(error);
+        }
+    };
+    if size > MAX_TRANSFER_BYTES {
+        let _ = recv.stop(0u32.into());
+        return Err(format!("{rel} is too large to transfer ({size} bytes)."));
+    }
+
     // Hidden temp file so a partial download never shows up in the file list
-    let part = target.with_file_name(format!(".{file_name}.nexsync-part"));
+    let part = target.with_file_name(format!(".{file_name}.{version}.nexsync-part"));
+    if start != 0 && partial.as_ref().map(|p| (p.path.as_path(), p.len)) != Some((part.as_path(), start)) {
+        let _ = recv.stop(0u32.into());
+        return Err("The collaborator resumed from an unexpected position.".into());
+    }
+    // Bytes from a different version of the file, or from a restart, are useless.
+    if let Some(p) = &partial {
+        if start == 0 || p.path != part {
+            let _ = tokio::fs::remove_file(&p.path).await;
+        }
+    }
 
     let progress = |received: u64| {
         node.emit(
@@ -178,33 +198,64 @@ pub async fn fetch(node: &Arc<Node>, peer_id: &str, workspace_path: &str, rel_pa
         );
     };
 
-    match receive_into(&mut recv, &part, size, progress).await {
-        Ok(()) => {
-            tokio::fs::rename(&part, &target)
-                .await
-                .map_err(|e| format!("Failed to save {rel}: {e}"))?;
-            Ok(size)
-        }
-        Err(e) => {
-            let _ = tokio::fs::remove_file(&part).await;
-            Err(e)
+    // On failure the partial file is kept so the next attempt can resume from it.
+    receive_into(&mut recv, &part, start, size, progress).await?;
+    tokio::fs::rename(&part, &target)
+        .await
+        .map_err(|e| format!("Failed to save {rel}: {e}"))?;
+    Ok(size)
+}
+
+/// A hidden partial download left by an interrupted transfer
+struct Partial {
+    path: PathBuf,
+    version: u64,
+    len: u64,
+}
+
+/// Looks next to `target` for `.{file_name}.{version}.nexsync-part`
+async fn find_partial(target: &Path, file_name: &str) -> Option<Partial> {
+    let prefix = format!(".{file_name}.");
+    let mut entries = tokio::fs::read_dir(target.parent()?).await.ok()?;
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let version = name
+            .strip_prefix(&prefix)
+            .and_then(|rest| rest.strip_suffix(".nexsync-part"))
+            .and_then(|v| v.parse::<u64>().ok());
+        if let (Some(version), Ok(meta)) = (version, entry.metadata().await) {
+            return Some(Partial { path: entry.path(), version, len: meta.len() });
         }
     }
+    None
+}
+
+/// Identifies one revision of a source file; resuming is only safe while it is unchanged.
+pub(super) fn version_of(meta: &std::fs::Metadata) -> u64 {
+    meta.modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 async fn receive_into(
     recv: &mut RecvStream,
     part: &Path,
+    start: u64,
     size: u64,
     progress: impl Fn(u64),
 ) -> Result<(), String> {
-    let mut file = tokio::fs::File::create(part)
-        .await
-        .map_err(|e| format!("Failed to create file: {e}"))?;
+    let mut file = if start > 0 {
+        tokio::fs::OpenOptions::new().append(true).open(part).await
+    } else {
+        tokio::fs::File::create(part).await
+    }
+    .map_err(|e| format!("Failed to create file: {e}"))?;
     let mut buf = vec![0u8; BUFFER_SIZE];
-    let mut received: u64 = 0;
+    let mut received: u64 = start;
     let mut last_report = Instant::now();
-    progress(0);
+    progress(received);
 
     while received < size {
         let want = (size - received).min(BUFFER_SIZE as u64) as usize;
@@ -252,9 +303,16 @@ async fn serve_inner(node: &Arc<Node>, send: &mut SendStream, recv: &mut RecvStr
         .map_err(|_| "request timed out".to_string())??;
 
     match open_for_serving(node, &request.rel_path).await {
-        Ok((file, size)) => {
-            wire::write_json(send, &FileReply::Ok { size }).await?;
-            let mut limited = file.take(size);
+        Ok((mut file, size, version)) => {
+            // Resume only when the requester's bytes came from this exact revision of the file.
+            let offset = if version != 0 && request.version == version && request.offset <= size {
+                request.offset
+            } else {
+                0
+            };
+            file.seek(std::io::SeekFrom::Start(offset)).await.map_err(|e| e.to_string())?;
+            wire::write_json(send, &FileReply::Ok { size, version, offset }).await?;
+            let mut limited = file.take(size - offset);
             tokio::io::copy(&mut limited, send).await.map_err(|e| e.to_string())?;
         }
         Err(error) => {
@@ -265,7 +323,7 @@ async fn serve_inner(node: &Arc<Node>, send: &mut SendStream, recv: &mut RecvStr
     Ok(())
 }
 
-async fn open_for_serving(node: &Arc<Node>, rel_path: &str) -> Result<(tokio::fs::File, u64), String> {
+async fn open_for_serving(node: &Arc<Node>, rel_path: &str) -> Result<(tokio::fs::File, u64, u64), String> {
     let workspace = node
         .workspace_path()
         .ok_or("The collaborator doesn't have this workspace open right now.")?;
@@ -284,7 +342,7 @@ async fn open_for_serving(node: &Arc<Node>, rel_path: &str) -> Result<(tokio::fs
     let file = tokio::fs::File::open(&path)
         .await
         .map_err(|e| format!("Failed to open {rel}: {e}"))?;
-    Ok((file, meta.len()))
+    Ok((file, meta.len(), version_of(&meta)))
 }
 
 #[cfg(test)]

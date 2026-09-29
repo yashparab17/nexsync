@@ -11,6 +11,8 @@ pub mod tasks;
 pub mod kanban;
 pub mod yjs;
 pub mod error_log;
+pub mod trash;
+pub mod data_sync;
 
 // Re-exports for command invocation surface
 pub use workspace::*;
@@ -18,5 +20,6 @@ pub use filesystem::*;
 pub use registry::*;
 pub use tasks::*;
 pub use kanban::*;
+pub use trash::*;
 pub use yjs::*;
 pub use error_log::*;
