@@ -11,6 +11,7 @@ import type {
 	WorkspaceStats,
 	ErrorRecord,
 	TrashItem,
+	DeleteOutcome,
 	CreateWorkspaceRequest,
 	UpdateMetadataRequest,
 	Task,
@@ -83,6 +84,11 @@ export function getErrorLog(limit = 200): Promise<ErrorRecord[]> {
 // Delete the app-level error log
 export function clearErrorLog(): Promise<void> {
 	return invoke("clear_error_log");
+}
+
+// Move a whole workspace to the operating system recycle bin
+export function deleteWorkspace(path: string): Promise<DeleteOutcome> {
+	return invoke("delete_workspace", { path });
 }
 
 // ────────────────────────────

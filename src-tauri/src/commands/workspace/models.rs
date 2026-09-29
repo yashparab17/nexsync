@@ -42,6 +42,9 @@ pub struct Member {
     pub id: String,
     pub name: String,
     pub role: String,
+    /// The collaborator's P2P device key, which is what roles are enforced against
+    #[serde(default, rename = "deviceId", skip_serializing_if = "Option::is_none")]
+    pub device_id: Option<String>,
 }
 
 /// List of workspace collaborators

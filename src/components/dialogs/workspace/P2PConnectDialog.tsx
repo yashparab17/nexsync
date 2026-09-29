@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	AlertTriangle,
 	Check,
@@ -25,7 +25,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useP2P, describeSyncProgress } from "@/store/p2p/P2PContext";
-import type { InviteInfo } from "@/lib/p2p";
+import { p2p, type InviteInfo, type ShortCodeInfo } from "@/lib/p2p";
 import { cn, errorText } from "@/lib/utils";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 
@@ -44,8 +44,10 @@ export default function P2PConnectDialog({
 		connectionStatus,
 		syncProgress,
 		createInvite,
+		createShortCode,
 		revokeInvite,
 		joinWithTicket,
+		joinWithCode,
 		requestWorkspaceSnapshot,
 		disconnectPeer,
 	} = useP2P();
@@ -56,7 +58,22 @@ export default function P2PConnectDialog({
 	const [hostRole, setHostRole] = useState("Editor");
 	const [invite, setInvite] = useState<InviteInfo | null>(null);
 	const [isGenerating, setIsGenerating] = useState(false);
+	const [shortCode, setShortCode] = useState<ShortCodeInfo | null>(null);
+	const [secondsLeft, setSecondsLeft] = useState(0);
 	const { copiedKey, copy } = useCopyToClipboard();
+
+	// Count down the short code and hide it once it expires
+	useEffect(() => {
+		if (!shortCode) return;
+		const tick = () => {
+			const left = Math.max(0, Math.round((shortCode.expiresAt - Date.now()) / 1000));
+			setSecondsLeft(left);
+			if (left === 0) setShortCode(null);
+		};
+		tick();
+		const timer = setInterval(tick, 1000);
+		return () => clearInterval(timer);
+	}, [shortCode]);
 
 	// Join flow state
 	const [ticketInput, setTicketInput] = useState("");
@@ -81,9 +98,24 @@ export default function P2PConnectDialog({
 		}
 	};
 
+	// A 6-digit code that lasts 2 minutes; the host must allow the guest when they use it
+	const handleGenerateShortCode = async () => {
+		try {
+			setIsGenerating(true);
+			setErrorMessage(null);
+			setShortCode(await createShortCode(hostRole));
+			setInvite(null);
+		} catch (err) {
+			setErrorMessage(errorText(err, "Failed to create a code."));
+		} finally {
+			setIsGenerating(false);
+		}
+	};
+
 	const handleStopInviting = async () => {
 		await revokeInvite().catch(() => {});
 		setInvite(null);
+		setShortCode(null);
 	};
 
 	// Join a host and pull its workspace into the one that's open
@@ -94,7 +126,7 @@ export default function P2PConnectDialog({
 		try {
 			setIsJoining(true);
 			setErrorMessage(null);
-			const joined = await joinWithTicket(ticket);
+			const joined = await (p2p.isShortCode(ticket) ? joinWithCode : joinWithTicket)(ticket);
 			await requestWorkspaceSnapshot(joined.peerId);
 			setJoinSuccess(true);
 			setTicketInput("");
@@ -206,24 +238,62 @@ export default function P2PConnectDialog({
 							</div>
 						</div>
 
-						{!invite ? (
-							<Button
-								onPress={handleGenerateInvite}
-								isDisabled={isGenerating}
-								className="w-full h-9 text-xs gap-2"
-							>
-								{isGenerating ? (
-									<>
-										<RefreshCw className="h-3.5 w-3.5 animate-spin" />
-										Connecting to the relay network…
-									</>
-								) : (
-									<>
-										<KeyRound className="h-3.5 w-3.5" />
-										Create Invite
-									</>
+						{shortCode ? (
+							<div className="space-y-3 rounded-none border bg-muted/30 p-4 text-center">
+								<Label className="text-xs text-muted-foreground font-medium">
+									Tell your collaborator this code:
+								</Label>
+								<div className="font-mono text-4xl font-bold tracking-[0.3em] text-primary select-all">
+									{shortCode.code.slice(0, 3)} {shortCode.code.slice(3)}
+								</div>
+								<p className="text-xs text-muted-foreground">
+									Expires in {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}.
+									You will be asked to allow them when they use it.
+								</p>
+								{!shortCode.relayConnected && (
+									<p className="text-[11px] text-amber-400">
+										Couldn't reach the relay network, so only collaborators on your local network can join.
+									</p>
 								)}
-							</Button>
+								<div className="flex justify-center gap-2">
+									<Button size="sm" variant="secondary" onPress={() => copy(shortCode.code, "code")} className="h-8 px-3 text-xs gap-1.5">
+										{copiedKey === "code" ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+										{copiedKey === "code" ? "Copied" : "Copy"}
+									</Button>
+									<Button size="sm" variant="ghost" onPress={handleStopInviting} className="h-8 text-xs text-muted-foreground hover:text-destructive">
+										Cancel
+									</Button>
+								</div>
+							</div>
+						) : !invite ? (
+							<div className="flex gap-2">
+								<Button
+									onPress={handleGenerateShortCode}
+									isDisabled={isGenerating}
+									className="flex-1 h-9 text-xs gap-2"
+								>
+									{isGenerating ? (
+										<>
+											<RefreshCw className="h-3.5 w-3.5 animate-spin" />
+											Connecting…
+										</>
+									) : (
+										<>
+											<KeyRound className="h-3.5 w-3.5" />
+											6-digit Code
+										</>
+									)}
+								</Button>
+								<Button
+									variant="outline"
+									onPress={handleGenerateInvite}
+									isDisabled={isGenerating}
+									className="flex-1 h-9 text-xs gap-2"
+								>
+									<Copy className="h-3.5 w-3.5" />
+									Long Invite
+								</Button>
+							</div>
 						) : (
 							<div className="space-y-3 rounded-none border bg-muted/30 p-4">
 								<div className="flex items-center justify-between">
@@ -308,9 +378,9 @@ export default function P2PConnectDialog({
 				{activeTab === "join" && (
 					<div className="space-y-4 pt-1">
 						<div className="space-y-2">
-							<Label className="text-xs">Paste the host's invite</Label>
+							<Label className="text-xs">Paste the host's invite or enter their 6-digit code</Label>
 							<Textarea
-								placeholder="nexsync…"
+								placeholder="nexsync… or 123 456"
 								value={ticketInput}
 								onChange={(e) => setTicketInput(e.target.value)}
 								rows={4}

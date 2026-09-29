@@ -4,6 +4,7 @@ import {
 	KeyRound,
 	Pencil,
 	Shield,
+	ShieldCheck,
 	Trash2,
 	UserCheck,
 	UserPlus,
@@ -31,8 +32,9 @@ import { Label } from "@/components/ui/label";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { writeWorkspaceMetadata } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
+import { ASSIGNABLE_ROLES, canChangeRole } from "@/lib/roles";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
-import { useP2P } from "@/store/p2p/P2PContext";
+import { useP2P, useSelfRole } from "@/store/p2p/P2PContext";
 import P2PConnectDialog from "@/components/dialogs/workspace/P2PConnectDialog";
 import type { Member } from "@/types/workspace";
 
@@ -45,6 +47,12 @@ const ROLE_CONFIG: Record<
 		icon: Crown,
 		color: "text-amber-400",
 		bg: "bg-amber-500/10 border-amber-500/20",
+	},
+	Admin: {
+		label: "Admin",
+		icon: ShieldCheck,
+		color: "text-violet-400",
+		bg: "bg-violet-500/10 border-violet-500/20",
 	},
 	Editor: {
 		label: "Editor",
@@ -77,11 +85,33 @@ export default function WorkspaceMembers() {
 	const [deletingMember, setDeletingMember] = useState<Member | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 
-	const { peers, selfName } = useP2P();
+	const { peers, selfName, selfId, requestRoleChange, disconnectPeer, transferHost } = useP2P();
+	const [hostTarget, setHostTarget] = useState<Member | null>(null);
+	const [handoffBusy, setHandoffBusy] = useState(false);
+	const [handoffError, setHandoffError] = useState<string | null>(null);
+
+	// Owner only: hands ownership and hosting to a connected member, then this device becomes a guest
+	const handleTransferHost = async () => {
+		if (!hostTarget?.deviceId) return;
+		try {
+			setHandoffBusy(true);
+			setHandoffError(null);
+			await transferHost(hostTarget.deviceId);
+			setHostTarget(null);
+		} catch (err) {
+			setHandoffError(err instanceof Error ? err.message : "Could not transfer hosting.");
+		} finally {
+			setHandoffBusy(false);
+		}
+	};
+	const selfRole = useSelfRole();
 	const members = metadata?.members.members ?? [];
 	// In a copy joined from someone else, the host manages the member list
 	const isJoinedCopy = selfName !== null;
+	const onlineIds = new Set(peers.map((p) => p.id));
 	const onlineNames = new Set(peers.map((p) => p.name.toLowerCase()));
+	// Roles a member may be moved to by this device: anything for the host, Editor or Viewer for an Admin guest
+	const rolesFor = (member: Member) => ASSIGNABLE_ROLES.filter((r) => canChangeRole(selfRole, member.role, r));
 
 
 	// Add Member directly
@@ -127,6 +157,12 @@ export default function WorkspaceMembers() {
 	// Save Role Edit
 	const handleEditRoleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
+		// An Admin guest only asks; the host applies the change and the new list comes back to us
+		if (isJoinedCopy) {
+			if (editingMember?.deviceId) requestRoleChange(editingMember.deviceId, editRole);
+			setEditingMember(null);
+			return;
+		}
 		const name = editName.trim();
 		if (!workspace?.path || !metadata || !editingMember || !name) return;
 		if (members.some((m) => m.id !== editingMember.id && m.name.toLowerCase() === name.toLowerCase())) {
@@ -187,6 +223,8 @@ export default function WorkspaceMembers() {
 				undefined,
 				"member",
 			);
+			// Removing someone also drops their connection, so they can't keep editing
+			if (deletingMember.deviceId) await disconnectPeer(deletingMember.deviceId).catch(() => {});
 			setDeletingMember(null);
 			await refreshMetadata();
 		} catch (err) {
@@ -249,7 +287,9 @@ export default function WorkspaceMembers() {
 						<CardContent className="space-y-3">
 							{isJoinedCopy && (
 								<p className="text-xs text-muted-foreground">
-									You joined this workspace, so its host manages the member list.
+									{selfRole === "Admin"
+										? "You are an Admin here, so you can ask the host to change Editors and Viewers."
+										: "You joined this workspace, so its host manages the member list."}
 								</p>
 							)}
 							{members.length === 0 ? (
@@ -262,8 +302,13 @@ export default function WorkspaceMembers() {
 										ROLE_CONFIG[member.role] || ROLE_CONFIG.Viewer;
 									const RoleIcon = roleConf.icon;
 									const isOwner = member.role.toLowerCase() === "owner";
-									const isYou = isJoinedCopy ? member.name === selfName : isOwner;
-									const isOnline = !isYou && onlineNames.has(member.name.toLowerCase());
+									const isYou = isJoinedCopy
+										? selfId ? member.deviceId === selfId : member.name === selfName
+										: isOwner;
+									const isOnline =
+										!isYou &&
+										(member.deviceId ? onlineIds.has(member.deviceId) : onlineNames.has(member.name.toLowerCase()));
+									const canEdit = !isJoinedCopy || (!!member.deviceId && rolesFor(member).length > 0);
 
 									return (
 										<div
@@ -306,7 +351,7 @@ export default function WorkspaceMembers() {
 												</div>
 											</div>
 
-											{!isJoinedCopy && (
+											{canEdit && (
 												<div className="flex items-center gap-1">
 													<Button
 														variant="ghost"
@@ -320,7 +365,20 @@ export default function WorkspaceMembers() {
 													>
 														<Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
 													</Button>
-													{!isOwner && (
+													{!isOwner && !isJoinedCopy && isOnline && member.deviceId && (
+	<Button
+		variant="ghost"
+		size="icon-xs"
+		onPress={() => {
+			setHandoffError(null);
+			setHostTarget(member);
+		}}
+		aria-label="Make Host"
+	>
+		<Crown className="size-3.5 text-muted-foreground hover:text-amber-400" />
+	</Button>
+)}
+{!isOwner && !isJoinedCopy && (
 														<Button
 															variant="ghost"
 															size="icon-xs"
@@ -361,6 +419,17 @@ export default function WorkspaceMembers() {
 								<p className="mt-1 text-muted-foreground">
 									Full access to file system, SQLite database, member
 									management, P2P sync, and workspace settings.
+								</p>
+							</div>
+
+							<div className="rounded-none border p-3 bg-muted/10">
+								<div className="flex items-center gap-1.5 font-semibold text-violet-400">
+									<ShieldCheck className="size-3.5" />
+									Admin
+								</div>
+								<p className="mt-1 text-muted-foreground">
+									Everything an Editor can do, plus changing Editors and Viewers to
+									one another. Only the Owner can make or change Admins.
 								</p>
 							</div>
 
@@ -432,9 +501,9 @@ export default function WorkspaceMembers() {
 									onChange={(e) => setNewMemberRole(e.target.value)}
 									className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 								>
-									<option value="Editor">Editor</option>
-									<option value="Viewer">Viewer</option>
-									<option value="Owner">Owner</option>
+									{ASSIGNABLE_ROLES.map((r) => (
+										<option key={r} value={r}>{r}</option>
+									))}
 								</select>
 							</div>
 						</div>
@@ -478,6 +547,7 @@ export default function WorkspaceMembers() {
 							</DialogDescription>
 						</DialogHeader>
 
+						{!isJoinedCopy && (
 						<div>
 							<Label htmlFor="edit-member-name">Name</Label>
 							<Input
@@ -493,6 +563,7 @@ export default function WorkspaceMembers() {
 								</p>
 							)}
 						</div>
+						)}
 
 						{editingMember.role.toLowerCase() !== "owner" && (
 							<div>
@@ -503,9 +574,9 @@ export default function WorkspaceMembers() {
 								onChange={(e) => setEditRole(e.target.value)}
 								className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 							>
-								<option value="Editor">Editor</option>
-								<option value="Viewer">Viewer</option>
-								<option value="Owner">Owner</option>
+								{rolesFor(editingMember).map((r) => (
+									<option key={r} value={r}>{r}</option>
+								))}
 							</select>
 							</div>
 						)}
@@ -519,7 +590,7 @@ export default function WorkspaceMembers() {
 							>
 								Cancel
 							</Button>
-							<Button type="submit" isDisabled={submitting || !editName.trim()}>
+							<Button type="submit" isDisabled={submitting || (!isJoinedCopy && !editName.trim())}>
 								{submitting ? "Saving…" : "Save Changes"}
 							</Button>
 						</DialogFooter>
@@ -527,7 +598,31 @@ export default function WorkspaceMembers() {
 				</Dialog>
 			)}
 
-			{/* Remove Member Confirmation Dialog */}
+			{/* Transfer Host Dialog */}
+{hostTarget && (
+	<Dialog isOpen onOpenChange={(open) => !open && !handoffBusy && setHostTarget(null)}>
+		<div className="space-y-4">
+			<DialogHeader>
+				<DialogTitle>Make {hostTarget.name} the Host</DialogTitle>
+				<DialogDescription>
+					{hostTarget.name} becomes the Owner and hosts this workspace from their device. You stay as an
+					Admin, and everyone reconnects to them automatically. They have to accept first.
+				</DialogDescription>
+			</DialogHeader>
+			{handoffError && <p className="text-xs text-destructive">{handoffError}</p>}
+			<DialogFooter>
+				<Button variant="outline" isDisabled={handoffBusy} onPress={() => setHostTarget(null)}>
+					Cancel
+				</Button>
+				<Button isDisabled={handoffBusy} onPress={handleTransferHost}>
+					{handoffBusy ? "Waiting for them…" : "Transfer Host"}
+				</Button>
+			</DialogFooter>
+		</div>
+	</Dialog>
+)}
+
+{/* Remove Member Confirmation Dialog */}
 			{deletingMember && (
 				<Dialog
 					isOpen={!!deletingMember}

@@ -7,6 +7,9 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 // Components
 import WorkspaceSidebar from "@/components/layout/workspace/WorkspaceSidebar";
 import WorkspaceHeader from "@/components/layout/workspace/WorkspaceHeader";
+import JoinRequestDialog from "@/components/dialogs/workspace/JoinRequestDialog";
+import WorkspaceDeletedDialog from "@/components/dialogs/workspace/WorkspaceDeletedDialog";
+import HostHandoffDialog from "@/components/dialogs/workspace/HostHandoffDialog";
 
 // Shell layout for all workspace sub-routes
 export default function Workspace() {
@@ -45,6 +48,15 @@ export default function Workspace() {
 					<Outlet />
 				</main>
 			</div>
+
+			{/* Guests joining with a short code wait here for the host to allow them */}
+			<JoinRequestDialog />
+
+			{/* Shown to guests when the host deletes the workspace */}
+			<WorkspaceDeletedDialog />
+
+			{/* Shown to a guest the host wants to hand hosting to */}
+			<HostHandoffDialog />
 		</div>
 	);
 }

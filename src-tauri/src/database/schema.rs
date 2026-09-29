@@ -178,6 +178,13 @@ CREATE TABLE IF NOT EXISTS tombstones (
 );
 "##,
 	},
+	Migration {
+		version: 4,
+		description: "member device keys",
+		up: r##"
+ALTER TABLE members ADD COLUMN device_id TEXT;
+"##,
+	},
 ];
 
 /// Initialises the schema on a fresh database, running pending migrations

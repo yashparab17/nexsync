@@ -25,6 +25,7 @@ use tokio::{
 
 use super::{
     files,
+    short_code::ShortCodes,
     sync::{self, LiveSync, SyncMessage},
     ticket::{self, Ticket, SECRET_LEN},
     wire::{self, HandshakeReply, Hello},
@@ -37,9 +38,9 @@ pub const EVENT_MESSAGE: &str = "p2p://message";
 pub const EVENT_RECONNECTING: &str = "p2p://reconnecting";
 pub const EVENT_RECONNECT_FAILED: &str = "p2p://reconnect-failed";
 
-const ONLINE_TIMEOUT: Duration = Duration::from_secs(15);
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(15);
+pub(super) const ONLINE_TIMEOUT: Duration = Duration::from_secs(15);
+pub(super) const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+pub(super) const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(15);
 const RECONNECT_ATTEMPTS: u32 = 8;
 const RECONNECT_MAX_DELAY: Duration = Duration::from_secs(30);
 const REJECT_LINGER: Duration = Duration::from_secs(3);
@@ -54,6 +55,14 @@ const CLOSE_REPLACED: u32 = 2;
 const KIND_DATA_CHANGE: &str = "DATA_CHANGE";
 /// The host's member list; accepted only from the host
 const KIND_MEMBERS_UPDATE: &str = "MEMBERS_UPDATE";
+/// The host telling guests the workspace was deleted; accepted only from the host
+const KIND_WORKSPACE_DELETED: &str = "WORKSPACE_DELETED";
+/// The host offering a guest to take over hosting; accepted only from the host
+const KIND_HOST_HANDOFF: &str = "HOST_HANDOFF";
+/// The host telling guests where the new host is; accepted only from the host
+const KIND_HOST_MOVED: &str = "HOST_MOVED";
+/// An Admin guest asking the host to change someone's role; dropped from everyone else
+const KIND_ROLE_REQUEST: &str = "ROLE_REQUEST";
 /// App messages a host forwards from one guest to the others. Yjs sync messages are included
 /// so live co-editing reaches every guest even when the host has the document closed: guests
 /// only ever connect to the host (a star topology), so without this a guest's edits would stop
@@ -69,6 +78,8 @@ const RELAYED_KINDS: &[&str] = &[
 
 /// Roles a host may grant through an invite
 const INVITE_ROLES: &[&str] = &["Editor", "Viewer"];
+/// Roles a guest can hold once the host has promoted or demoted them
+const GUEST_ROLES: &[&str] = &["Admin", "Editor", "Viewer"];
 
 /// Workspace folder this device shares with peers (`None` when no workspace is open)
 type SharedWorkspace = Arc<Mutex<Option<String>>>;
@@ -81,6 +92,8 @@ pub type EventSink = Arc<dyn Fn(&'static str, serde_json::Value) + Send + Sync>;
 pub struct P2pState {
     node: AsyncMutex<Option<Arc<Node>>>,
     workspace: SharedWorkspace,
+    /// Latest role table, kept here so a node that starts later still enforces it
+    roles: Mutex<Vec<(String, String)>>,
 }
 
 impl P2pState {
@@ -101,8 +114,17 @@ impl P2pState {
             let _ = app.emit(event, payload);
         });
         let node = Node::start(events, self.workspace.clone(), secret).await?;
+        node.set_roles(self.roles.lock().unwrap_or_else(|p| p.into_inner()).clone());
         *guard = Some(node.clone());
         Ok(node)
+    }
+
+    /// Records the role table and applies it to the running node, if there is one
+    pub async fn set_roles(&self, roles: Vec<(String, String)>) {
+        *self.roles.lock().unwrap_or_else(|p| p.into_inner()) = roles.clone();
+        if let Some(node) = self.existing().await {
+            node.set_roles(roles);
+        }
     }
 
     /// Returns the node only if it has already been started
@@ -207,6 +229,8 @@ struct NodeState {
     /// Ticket and display name of the host we last joined, kept so a dropped link can be re-dialed
     last_join: Option<(String, String)>,
     reconnecting: bool,
+    /// Roles the host has assigned by device key; these win over the role on the invite used to join
+    roles: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -221,6 +245,7 @@ pub struct Node {
     workspace: SharedWorkspace,
     sync: LiveSync,
     state: Mutex<NodeState>,
+    short_codes: ShortCodes,
 }
 
 impl Node {
@@ -242,6 +267,7 @@ impl Node {
             workspace,
             sync: live_sync,
             state: Mutex::new(NodeState::default()),
+            short_codes: ShortCodes::default(),
         });
 
         tokio::spawn(node.clone().accept_loop());
@@ -249,6 +275,14 @@ impl Node {
         tokio::spawn(sync::run_local_changes(node.clone(), local_changes));
         node.sync.watch(node.workspace_path().as_deref());
         Ok(node)
+    }
+
+    pub(super) fn endpoint(&self) -> &Endpoint {
+        &self.endpoint
+    }
+
+    pub(super) fn short_codes(&self) -> &ShortCodes {
+        &self.short_codes
     }
 
     pub fn sync(&self) -> &LiveSync {
@@ -259,6 +293,29 @@ impl Node {
     pub fn peer_is_host(&self, peer_id: &str) -> Option<bool> {
         let id = parse_peer_id(peer_id).ok()?;
         self.lock().peers.get(&id).map(|p| p.is_host)
+    }
+
+    /// This device's own key, which hosts record as the device's identity in the member list
+    pub fn self_id(&self) -> String {
+        self.endpoint.id().to_string()
+    }
+
+    /// Replaces the roles the host has assigned by device key and applies them to connected guests
+    pub fn set_roles(&self, roles: Vec<(String, String)>) {
+        let roles: HashMap<String, String> = roles
+            .into_iter()
+            .filter(|(_, role)| GUEST_ROLES.contains(&role.as_str()))
+            .collect();
+        let mut st = self.lock();
+        for (id, peer) in st.peers.iter_mut() {
+            if peer.is_host {
+                continue;
+            }
+            if let Some(role) = roles.get(&id.to_string()) {
+                peer.role = role.clone();
+            }
+        }
+        st.roles = roles;
     }
 
     pub fn has_peers(&self) -> bool {
@@ -330,6 +387,7 @@ impl Node {
     /// Stops accepting new guests; already connected peers stay connected
     pub fn revoke_invite(&self) {
         self.lock().invite = None;
+        self.short_codes.cancel();
     }
 
     async fn accept_loop(self: Arc<Self>) {
@@ -382,7 +440,7 @@ impl Node {
         let verdict = if hello.v != wire::PROTOCOL_VERSION {
             Err("You're running a different version of NexSync than the host. Update both apps and try again.".to_string())
         } else {
-            self.check_invite(&hello.secret)
+            self.check_invite(&hello.secret, &conn.remote_id())
         };
 
         match verdict {
@@ -406,7 +464,7 @@ impl Node {
         }
     }
 
-    fn check_invite(&self, presented: &str) -> Result<HandshakeReply, String> {
+    fn check_invite(&self, presented: &str, guest: &EndpointId) -> Result<HandshakeReply, String> {
         let st = self.lock();
         let invite = st
             .invite
@@ -416,10 +474,12 @@ impl Node {
         if !bool::from(presented.ct_eq(&invite.secret)) {
             return Err("This invite has expired or been replaced. Ask the host for a new one.".into());
         }
+        // A device the host already assigned a role keeps it, whatever the invite says
+        let role = st.roles.get(&guest.to_string()).unwrap_or(&invite.role).clone();
         Ok(HandshakeReply::Welcome {
             v: wire::PROTOCOL_VERSION,
             host_name: invite.host_name.clone(),
-            role: invite.role.clone(),
+            role,
             workspace_id: invite.workspace_id.clone(),
             workspace_name: invite.workspace_name.clone(),
         })
@@ -637,11 +697,11 @@ impl Node {
             return;
         }
 
-        let Some((from_host, may_write)) = self
+        let Some((from_host, may_write, is_admin)) = self
             .lock()
             .peers
             .get(from)
-            .map(|p| (p.is_host, p.is_host || p.role != "Viewer"))
+            .map(|p| (p.is_host, p.is_host || p.role != "Viewer", p.role == "Admin"))
         else {
             return;
         };
@@ -658,7 +718,12 @@ impl Node {
                 return;
             }
             // Only the host decides who is in the workspace
-            KIND_MEMBERS_UPDATE if !from_host => return,
+            KIND_MEMBERS_UPDATE | KIND_WORKSPACE_DELETED | KIND_HOST_HANDOFF | KIND_HOST_MOVED if !from_host => return,
+            // Only Admin guests may ask for role changes, and only a host acts on them
+            KIND_ROLE_REQUEST if from_host || !is_admin => {
+                eprintln!("[P2P] Ignoring a role request from {}", from.fmt_short());
+                return;
+            }
             _ => {}
         }
         // A host passes guests' changes on so every guest sees them
@@ -734,6 +799,7 @@ impl Node {
         let peers: Vec<(EndpointId, Peer)> = {
             let mut st = self.lock();
             st.invite = None;
+            self.short_codes.cancel();
             st.last_join = None;
             st.peers.drain().collect()
         };
@@ -857,7 +923,7 @@ fn parse_peer_id(peer_id: &str) -> Result<EndpointId, String> {
 }
 
 /// Trims a display name received from a peer to something safe to show
-fn sanitize_name(name: &str) -> String {
+pub(super) fn sanitize_name(name: &str) -> String {
     let cleaned: String = name.chars().filter(|c| !c.is_control()).take(64).collect();
     let cleaned = cleaned.trim();
     if cleaned.is_empty() {
@@ -867,7 +933,7 @@ fn sanitize_name(name: &str) -> String {
     }
 }
 
-fn now_ms() -> u64 {
+pub(super) fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
@@ -1074,6 +1140,179 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
         panic!("timed out waiting until {what}");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_workspace_deleted_notice_only_comes_from_the_host() {
+        let mut host = start_test_node("wd-host").await;
+        let mut guest = start_test_node("wd-guest").await;
+        let invite = host
+            .node
+            .create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into())
+            .await
+            .unwrap();
+        guest.node.join(&invite.ticket, "Guesty").await.unwrap();
+        wait_until("the guest is connected", || host.node.peers().len() == 1).await;
+
+        // A guest cannot claim the workspace was deleted or hand hosting to anyone.
+        let notice = serde_json::json!({ "kind": "WORKSPACE_DELETED", "timestamp": 1 });
+        for kind in ["WORKSPACE_DELETED", KIND_HOST_HANDOFF, KIND_HOST_MOVED] {
+            guest.node.send(None, &serde_json::json!({ "kind": kind, "timestamp": 1 })).await.unwrap();
+        }
+        let spoofed = tokio::time::timeout(Duration::from_secs(3), next_event(&mut host.events, EVENT_MESSAGE)).await;
+        assert!(spoofed.is_err(), "the host must ignore host-only notices from a guest");
+
+        // The host can, and the guest hears it.
+        host.node.send(None, &notice).await.unwrap();
+        let heard = next_event(&mut guest.events, EVENT_MESSAGE).await;
+        assert_eq!(heard["message"]["kind"], "WORKSPACE_DELETED");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_roles_follow_the_device_and_only_admins_can_ask_for_changes() {
+        let mut host = start_test_node("role-host").await;
+        let guest = start_test_node("role-guest").await;
+        let invite = host
+            .node
+            .create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into())
+            .await
+            .unwrap();
+        guest.node.join(&invite.ticket, "Guesty").await.unwrap();
+        wait_until("the guest is connected", || host.node.peers().len() == 1).await;
+        let request = serde_json::json!({ "kind": "ROLE_REQUEST", "timestamp": 1, "payload": "{}" });
+
+        // An Editor cannot ask for role changes.
+        guest.node.send(None, &request).await.unwrap();
+        let ignored = tokio::time::timeout(Duration::from_secs(3), next_event(&mut host.events, EVENT_MESSAGE)).await;
+        assert!(ignored.is_err(), "the host must ignore a role request from an Editor");
+
+        // Once the host promotes the device, its requests reach the host.
+        let device = guest.node.self_id();
+        host.node.set_roles(vec![(device.clone(), "Admin".into())]);
+        assert_eq!(host.node.peers()[0].role, "Admin");
+        guest.node.send(None, &request).await.unwrap();
+        let heard = next_event(&mut host.events, EVENT_MESSAGE).await;
+        assert_eq!(heard["message"]["kind"], "ROLE_REQUEST");
+
+        // A host cannot receive a request from itself, and a guest never acts on one.
+        host.node.send(None, &request).await.unwrap();
+        let mut guest = guest;
+        let echoed = tokio::time::timeout(Duration::from_secs(3), next_event(&mut guest.events, EVENT_MESSAGE)).await;
+        assert!(echoed.is_err(), "a guest must ignore a role request from the host");
+
+        // A demoted device keeps its role when it rejoins with a fresh Editor invite.
+        host.node.set_roles(vec![(device, "Viewer".into())]);
+        guest.node.disconnect_all();
+        wait_until("the guest is gone", || host.node.peers().is_empty()).await;
+        let invite = host
+            .node
+            .create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into())
+            .await
+            .unwrap();
+        let rejoined = guest.node.join(&invite.ticket, "Guesty").await.unwrap();
+        assert_eq!(rejoined.role, "Viewer");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_hosting_can_move_to_a_guest_and_everyone_follows() {
+        let old_host = start_test_node("move-old").await;
+        let new_host = start_test_node("move-new").await;
+        let other = start_test_node("move-other").await;
+        let invite = old_host
+            .node
+            .create_invite("Editor".into(), "ws".into(), "Demo".into(), "Old".into())
+            .await
+            .unwrap();
+        new_host.node.join(&invite.ticket, "New").await.unwrap();
+        other.node.join(&invite.ticket, "Other").await.unwrap();
+        wait_until("both guests are connected", || old_host.node.peers().len() == 2).await;
+
+        // The chosen guest takes over: it gets the role table, a fresh invite, and drops the old host.
+        let old_id = old_host.node.self_id();
+        new_host.node.set_roles(vec![(old_id.clone(), "Admin".into())]);
+        let moved = new_host
+            .node
+            .create_invite("Editor".into(), "ws".into(), "Demo".into(), "New".into())
+            .await
+            .unwrap();
+        new_host.node.disconnect(&old_host.node.self_id()).unwrap();
+
+        // Another guest leaves the old host on purpose and follows, so it must not fight a reconnect.
+        other.node.disconnect(&old_id).unwrap();
+        other.node.join(&moved.ticket, "Other").await.unwrap();
+
+        // The old host steps down and joins as a guest, keeping the Admin role it was given.
+        old_host.node.disconnect_all();
+        let rejoined = old_host.node.join(&moved.ticket, "Old").await.unwrap();
+        assert_eq!(rejoined.role, "Admin");
+        wait_until("everyone is on the new host", || new_host.node.peers().len() == 2).await;
+        assert!(new_host.node.peers().iter().all(|p| !p.is_host));
+        assert!(other.node.peers().iter().all(|p| p.is_host && p.id == new_host.node.self_id()));
+    }
+
+    async fn short_code_for(host: &TestNode, ttl: Duration) -> String {
+        host.node
+            .create_short_code_with_ttl("Editor".into(), "ws".into(), "Demo".into(), "Host".into(), ttl)
+            .await
+            .unwrap()
+            .code
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_short_code_join_needs_host_approval_and_works_once() {
+        let mut host = start_test_node("sc-host").await;
+        let guest = start_test_node("sc-guest").await;
+        let second = start_test_node("sc-second").await;
+        let code = short_code_for(&host, Duration::from_secs(120)).await;
+        assert_eq!(code.len(), 6);
+
+        // The guest types the code with a dash; nothing happens until the host allows it.
+        let dashed = format!("{}-{}", &code[..3], &code[3..]);
+        let g = guest.node.clone();
+        let join = tokio::spawn(async move { g.join_with_code(&dashed, "Guesty").await });
+        let request = next_event(&mut host.events, crate::commands::p2p::short_code::EVENT_JOIN_REQUEST).await;
+        assert_eq!(request["name"], "Guesty");
+        assert!(host.node.peers().is_empty(), "no one may join before approval");
+
+        assert!(host.node.resolve_join_request(request["requestId"].as_str().unwrap(), true));
+        let joined = join.await.unwrap().unwrap();
+        assert_eq!(joined.role, "Editor");
+        wait_until("the guest is connected", || host.node.peers().len() == 1).await;
+
+        // The code is spent: a second guest cannot use it.
+        assert!(second.node.join_with_code(&code, "Late").await.is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_short_code_denied_wrong_and_expired() {
+        let mut host = start_test_node("sd-host").await;
+        let guest = start_test_node("sd-guest").await;
+
+        // Denied: the guest is told no and never connects.
+        let code = short_code_for(&host, Duration::from_secs(120)).await;
+        let g = guest.node.clone();
+        let c = code.clone();
+        let join = tokio::spawn(async move { g.join_with_code(&c, "Guesty").await });
+        let request = next_event(&mut host.events, crate::commands::p2p::short_code::EVENT_JOIN_REQUEST).await;
+        host.node.resolve_join_request(request["requestId"].as_str().unwrap(), false);
+        let err = join.await.unwrap().unwrap_err();
+        assert!(err.contains("declined"), "unexpected error: {err}");
+        assert!(host.node.peers().is_empty());
+
+        // Wrong digits and malformed codes fail.
+        let wrong = if code == "000000" { "000001" } else { "000000" };
+        assert!(guest.node.join_with_code(wrong, "Guesty").await.is_err());
+        assert!(guest.node.join_with_code("12", "Guesty").await.is_err());
+
+        // Expired: the code stops working after its lifetime.
+        let short_lived = short_code_for(&host, Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(4)).await;
+        assert!(guest.node.join_with_code(&short_lived, "Guesty").await.is_err());
     }
 
     // Creates the workspace database for a test node and seeds it with `tasks`

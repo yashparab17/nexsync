@@ -38,6 +38,7 @@ export interface Member {
 	id: string;
 	name: string;
 	role: string;
+	deviceId?: string; // P2P device key; roles are enforced against this, not the name
 }
 
 // List of workspace collaborators
@@ -116,6 +117,12 @@ export interface AssetItem extends WorkspaceFile {
 // ────────────────────────────
 // Error logging types
 // ────────────────────────────
+
+// Result of moving a workspace to the recycle bin
+export interface DeleteOutcome {
+	wholeFolder: boolean; // False if other files in the folder were left in place
+	kept: string[]; // Names of the files that were left behind
+}
 
 // Deleted item in .nexsync/trash
 export interface TrashItem {

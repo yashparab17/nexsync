@@ -11,7 +11,12 @@ export type P2PMessageKind =
 	| "WORKSPACE_SYNC_RESPONSE"
 	| "ACTIVITY_EVENT"
 	| "DATA_CHANGE" // Task/kanban edit; hosts drop these from Viewers and relay the rest
-	| "MEMBERS_UPDATE"; // Host's member list; only accepted from the host
+	| "MEMBERS_UPDATE" // Host's member list; only accepted from the host
+	| "WORKSPACE_DELETED" // The host deleted the workspace; only accepted from the host
+	| "ROLE_REQUEST" // An Admin guest asking the host to change a role; only delivered to the host
+	| "HOST_HANDOFF" // The host offering a guest to take over hosting; only accepted from the host
+	| "HOST_READY" // The chosen guest's answer to a handoff: a fresh invite ticket, or none if declined
+	| "HOST_MOVED"; // The host telling guests the ticket of the new host; only accepted from the host
 
 // JSON envelope carried over a peer's encrypted control stream
 export interface P2PMessage {

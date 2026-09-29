@@ -8,6 +8,7 @@
 
 mod files;
 mod node;
+pub(crate) mod short_code;
 mod sync;
 mod ticket;
 mod wire;
@@ -17,6 +18,7 @@ use tauri::{AppHandle, State};
 use crate::commands::config::validate_allowed_root;
 pub use node::P2pState;
 use node::{InviteInfo, JoinResult, PeerInfo};
+use short_code::ShortCodeInfo;
 use files::ShareableFile;
 
 /// Sets (or clears) the workspace folder shared with peers and kept in live sync
@@ -45,6 +47,58 @@ pub async fn p2p_create_invite(
 ) -> Result<InviteInfo, String> {
     let node = state.node(&app).await?;
     node.create_invite(role, workspace_id, workspace_name, host_name).await
+}
+
+/// Creates an invite plus a 6-digit code that works for 2 minutes and needs the host to approve
+#[tauri::command]
+pub async fn p2p_create_short_code(
+    app: AppHandle,
+    state: State<'_, P2pState>,
+    role: String,
+    workspace_id: String,
+    workspace_name: String,
+    host_name: String,
+) -> Result<ShortCodeInfo, String> {
+    let node = state.node(&app).await?;
+    node.create_short_code(role, workspace_id, workspace_name, host_name).await
+}
+
+/// Answers a guest's request to join with a short code
+#[tauri::command]
+pub async fn p2p_resolve_join_request(
+    state: State<'_, P2pState>,
+    request_id: String,
+    approve: bool,
+) -> Result<bool, String> {
+    Ok(match state.existing().await {
+        Some(node) => node.resolve_join_request(&request_id, approve),
+        None => false,
+    })
+}
+
+/// Connects to a host using a short code, once the host approves
+#[tauri::command]
+pub async fn p2p_join_with_code(
+    app: AppHandle,
+    state: State<'_, P2pState>,
+    code: String,
+    display_name: String,
+) -> Result<JoinResult, String> {
+    let node = state.node(&app).await?;
+    node.join_with_code(&code, &display_name).await
+}
+
+/// This device's own P2P key, used as its identity in the member list
+#[tauri::command]
+pub async fn p2p_self_id(app: AppHandle, state: State<'_, P2pState>) -> Result<String, String> {
+    Ok(state.node(&app).await?.self_id())
+}
+
+/// Tells the node which role each device key holds, so the host enforces the member list
+#[tauri::command]
+pub async fn p2p_set_roles(state: State<'_, P2pState>, roles: Vec<(String, String)>) -> Result<(), String> {
+    state.set_roles(roles).await;
+    Ok(())
 }
 
 /// Stops accepting new guests with the current invite

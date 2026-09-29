@@ -30,6 +30,7 @@ import { createWorkspace, importWorkspace, loadConfig } from "@/lib/tauri";
 import { errorText } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
+import { p2p } from "@/lib/p2p";
 
 interface JoinWorkspaceDialogProps {
 	children: ReactNode;
@@ -40,7 +41,7 @@ export default function JoinWorkspaceDialog({
 }: JoinWorkspaceDialogProps) {
 	const navigate = useNavigate();
 	const { loadWorkspace } = useWorkspace();
-	const { joinWithTicket, requestWorkspaceSnapshot } = useP2P();
+	const { joinWithTicket, joinWithCode, requestWorkspaceSnapshot } = useP2P();
 
 	const [ticket, setTicket] = useState("");
 	const [workspaceParentPath, setWorkspaceParentPath] = useState("");
@@ -95,8 +96,10 @@ export default function JoinWorkspaceDialog({
 			setError(null);
 			setStatusMessage("Connecting to host…");
 
-			// 1. Dial the host and prove we hold its invite
-			const { workspaceName, peerId } = await joinWithTicket(
+			// 1. Dial the host and prove we hold its invite (or wait for it to allow our 6-digit code)
+			const usingCode = p2p.isShortCode(cleanTicket);
+			if (usingCode) setStatusMessage("Waiting for the host to allow you…");
+			const { workspaceName, peerId } = await (usingCode ? joinWithCode : joinWithTicket)(
 				cleanTicket,
 				userName.trim() || "Collaborator",
 			);
@@ -182,9 +185,9 @@ export default function JoinWorkspaceDialog({
 				<div className="space-y-4 pt-1">
 					{/* Invite ticket input */}
 					<div className="space-y-1.5">
-						<Label className="text-xs">Host's Invite *</Label>
+						<Label className="text-xs">Host's Invite or 6-digit Code *</Label>
 						<Textarea
-							placeholder="nexsync…"
+							placeholder="nexsync… or 123 456"
 							value={ticket}
 							onChange={(e) => setTicket(e.target.value)}
 							rows={3}

@@ -55,6 +55,7 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
             id: "owner".to_string(),
             name: "User".to_string(),
             role: "Owner".to_string(),
+            device_id: None,
         }],
     };
 
@@ -97,8 +98,8 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
     for m in &members.members {
         validate_member_role(&m.role).map_err(|e| e.to_string())?;
         tx.execute(
-            "INSERT INTO members (id, workspace_id, name, role) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![&m.id, &workspace.id, &m.name, &m.role],
+            "INSERT INTO members (id, workspace_id, name, role, device_id) VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![&m.id, &workspace.id, &m.name, &m.role, &m.device_id],
         )
         .map_err(|e| e.to_string())?;
     }
@@ -232,13 +233,14 @@ pub fn read_workspace_metadata(app_handle: tauri::AppHandle, path: String) -> Re
     };
 
     let members: Vec<Member> = tx
-        .prepare("SELECT id, name, role FROM members WHERE workspace_id = ?1")
+        .prepare("SELECT id, name, role, device_id FROM members WHERE workspace_id = ?1")
         .map_err(|e| e.to_string())?
         .query_map([&workspace.id], |r| {
             Ok(Member {
                 id: r.get(0)?,
                 name: r.get(1)?,
                 role: r.get(2)?,
+                device_id: r.get(3)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -344,9 +346,9 @@ fn persist_metadata(db: &WorkspaceDb, canonical_path_str: &str, metadata: &Works
     for m in &metadata.members.members {
         validate_member_role(&m.role).map_err(|e| e.to_string())?;
         tx.execute(
-            "INSERT INTO members (id, workspace_id, name, role) VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT(id) DO UPDATE SET name = excluded.name, role = excluded.role",
-            rusqlite::params![&m.id, &metadata.workspace.id, &m.name, &m.role],
+            "INSERT INTO members (id, workspace_id, name, role, device_id) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(id) DO UPDATE SET name = excluded.name, role = excluded.role, device_id = excluded.device_id",
+            rusqlite::params![&m.id, &metadata.workspace.id, &m.name, &m.role, &m.device_id],
         )
         .map_err(|e| e.to_string())?;
     }

@@ -22,6 +22,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
+import { useLeaveWorkspace } from "@/hooks/useLeaveWorkspace";
+import { errorText } from "@/lib/utils";
 import { removeRecentWorkspace, writeWorkspaceMetadata } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -36,7 +38,8 @@ export default function WorkspaceSettings() {
 	} = useWorkspace();
 	const logError = useErrorLog();
 	const navigate = useNavigate();
-	const { selfName } = useP2P();
+	const { selfName, peers, announceWorkspaceDeleted } = useP2P();
+	const leaveWorkspace = useLeaveWorkspace();
 	// Only the workspace owner may change settings; a joined copy's local edits would just
 	// get overwritten by the next full snapshot pull anyway, same rule as the Members page.
 	const isJoinedCopy = selfName !== null;
@@ -54,6 +57,25 @@ export default function WorkspaceSettings() {
 	const [saving, setSaving] = useState(false);
 	const [savedSuccess, setSavedSuccess] = useState(false);
 	const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
+	const [isLeaveOpen, setIsLeaveOpen] = useState(false);
+	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+	const [confirmName, setConfirmName] = useState("");
+	const [busy, setBusy] = useState(false);
+	const [actionError, setActionError] = useState<string | null>(null);
+	const guestCount = peers.filter((p) => !p.isHost).length;
+
+	// Leaves (guest) or deletes (owner) the workspace; the page unmounts once it succeeds
+	const runAction = async (deleteFiles: boolean, announce = false) => {
+		try {
+			setBusy(true);
+			setActionError(null);
+			if (announce && guestCount > 0) await announceWorkspaceDeleted();
+			await leaveWorkspace({ deleteFiles });
+		} catch (err) {
+			setActionError(errorText(err, "Something went wrong."));
+			setBusy(false);
+		}
+	};
 
 	const handleSaveSettings = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -273,7 +295,7 @@ export default function WorkspaceSettings() {
 						Danger Zone
 					</CardTitle>
 					<CardDescription>
-						Remove this workspace from your app registry.
+						Leave, remove or delete this workspace.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="flex items-center justify-between">
@@ -294,6 +316,34 @@ export default function WorkspaceSettings() {
 						Remove Workspace
 					</Button>
 				</CardContent>
+				{isJoinedCopy ? (
+					<CardContent className="flex items-center justify-between border-t pt-4">
+						<div>
+							<p className="text-sm font-medium">Leave Workspace</p>
+							<p className="text-xs text-muted-foreground">
+								Disconnect from the host and remove this workspace from the app. You can keep your
+								copy of the files or move it to the recycle bin.
+							</p>
+						</div>
+						<Button variant="destructive" size="sm" onPress={() => setIsLeaveOpen(true)} className="gap-1.5">
+							<Trash2 className="size-3.5" />
+							Leave
+						</Button>
+					</CardContent>
+				) : (
+					<CardContent className="flex items-center justify-between border-t pt-4">
+						<div>
+							<p className="text-sm font-medium">Delete Workspace</p>
+							<p className="text-xs text-muted-foreground">
+								Move this workspace to the recycle bin. Collaborators keep their own copies.
+							</p>
+						</div>
+						<Button variant="destructive" size="sm" onPress={() => setIsDeleteOpen(true)} className="gap-1.5">
+							<Trash2 className="size-3.5" />
+							Delete Workspace
+						</Button>
+					</CardContent>
+				)}
 			</Card>
 
 			{/* Remove Workspace Modal */}
@@ -324,6 +374,76 @@ export default function WorkspaceSettings() {
 							</Button>
 							<Button variant="destructive" onPress={handleRemoveWorkspace}>
 								Remove
+							</Button>
+						</DialogFooter>
+					</div>
+				</Dialog>
+			)}
+
+			{/* Leave Workspace (guests) */}
+			{isLeaveOpen && (
+				<Dialog isOpen={isLeaveOpen} onOpenChange={(o) => !busy && setIsLeaveOpen(o)}>
+					<div className="space-y-4">
+						<DialogHeader>
+							<DialogTitle>Leave Workspace</DialogTitle>
+							<DialogDescription>
+								You will disconnect from the host and this workspace will disappear from the app.
+								Choose what happens to your copy of the files.
+							</DialogDescription>
+						</DialogHeader>
+						{actionError && <p className="text-xs text-destructive">{actionError}</p>}
+						<DialogFooter>
+							<Button variant="outline" isDisabled={busy} onPress={() => setIsLeaveOpen(false)}>
+								Cancel
+							</Button>
+							<Button variant="outline" isDisabled={busy} onPress={() => runAction(false)}>
+								Leave, Keep Files
+							</Button>
+							<Button variant="destructive" isDisabled={busy} onPress={() => runAction(true)}>
+								Leave and Recycle Copy
+							</Button>
+						</DialogFooter>
+					</div>
+				</Dialog>
+			)}
+
+			{/* Delete Workspace (owner) */}
+			{isDeleteOpen && (
+				<Dialog isOpen={isDeleteOpen} onOpenChange={(o) => !busy && setIsDeleteOpen(o)}>
+					<div className="space-y-4">
+						<DialogHeader>
+							<DialogTitle>Delete Workspace</DialogTitle>
+							<DialogDescription>
+								<span className="font-semibold text-foreground">{workspace?.name}</span> will be moved to
+								the recycle bin, so you can still restore it from there.
+								{guestCount > 0 &&
+									` ${guestCount} connected collaborator${guestCount > 1 ? "s" : ""} will be told it was deleted; their copies stay on their devices.`}
+								{" "}Other files in the same folder are never touched.
+							</DialogDescription>
+						</DialogHeader>
+						<div className="space-y-1.5">
+							<Label htmlFor="confirm-name" className="text-xs">
+								Type the workspace name to confirm
+							</Label>
+							<Input
+								id="confirm-name"
+								value={confirmName}
+								onChange={(e) => setConfirmName(e.target.value)}
+								placeholder={workspace?.name}
+								autoFocus
+							/>
+						</div>
+						{actionError && <p className="text-xs text-destructive">{actionError}</p>}
+						<DialogFooter>
+							<Button variant="outline" isDisabled={busy} onPress={() => setIsDeleteOpen(false)}>
+								Cancel
+							</Button>
+							<Button
+								variant="destructive"
+								isDisabled={busy || confirmName.trim() !== workspace?.name}
+								onPress={() => runAction(true, true)}
+							>
+								{busy ? "Deleting…" : "Delete Workspace"}
 							</Button>
 						</DialogFooter>
 					</div>

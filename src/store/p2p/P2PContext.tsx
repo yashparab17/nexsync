@@ -20,7 +20,9 @@ import {
 	type ConnectedPeerInfo,
 	type DataChange,
 	type InviteInfo,
+	type JoinRequest,
 	type JoinResult,
+	type ShortCodeInfo,
 	type P2PMessage,
 	type WorkspaceSyncSnapshot,
 } from "@/lib/p2p";
@@ -37,6 +39,7 @@ import {
 	loadConfig,
 } from "@/lib/tauri";
 import type { Member } from "@/types/workspace";
+import { bindGuestMember, canChangeRole, roleTable } from "@/lib/roles";
 
 // Files above this size are listed as placeholders during sync and downloaded on demand
 export const LAZY_LOAD_THRESHOLD_BYTES = 10 * 1024 * 1024;
@@ -85,6 +88,25 @@ function readSelfName(workspaceId: string | undefined): string | null {
 	}
 }
 
+function setSelfName(workspaceId: string, name: string | null) {
+	try {
+		if (name === null) localStorage.removeItem(selfNameKey(workspaceId));
+		else localStorage.setItem(selfNameKey(workspaceId), name);
+	} catch {
+		// Only affects whether this copy shows the host's controls
+	}
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const HANDOFF_TIMEOUT_MS = 60_000;
+
+// What the host sends a guest it wants to hand hosting to: the member list with the roles already swapped
+export interface HandoffOffer {
+	from: string; // Peer id of the current host
+	hostName: string;
+	members: Member[];
+}
+
 function isMemberList(value: unknown): value is Member[] {
 	return (
 		Array.isArray(value) &&
@@ -106,10 +128,23 @@ interface P2PContextType {
 	lastSyncedFile: SyncedFile | null;
 	dataVersion: number; // Changes whenever a collaborator's task/kanban edit is applied
 	selfName: string | null; // Our member name in a workspace we joined; null in our own workspaces
+	selfId: string | null; // Our device key, set once we have joined a workspace
+	requestRoleChange: (deviceId: string, role: string) => void; // Admin guests only; the host decides
+	handoffOffer: HandoffOffer | null; // The host asked this device to take over hosting
+	acceptHandoff: () => Promise<void>;
+	declineHandoff: () => void;
+	transferHost: (peerId: string) => Promise<void>; // Owner only: hand ownership and hosting to a connected member
 	publishDataChange: (change: DataChange) => void;
 	createInvite: (role?: string) => Promise<InviteInfo>;
+	createShortCode: (role?: string) => Promise<ShortCodeInfo>;
+	joinRequests: JoinRequest[]; // Guests waiting for this host to allow or deny them
+	resolveJoinRequest: (requestId: string, approve: boolean) => Promise<void>;
+	workspaceDeleted: boolean; // The host told us they deleted this workspace
+	dismissWorkspaceDeleted: () => void;
+	announceWorkspaceDeleted: () => Promise<void>;
 	revokeInvite: () => Promise<void>;
 	joinWithTicket: (ticket: string, displayName?: string) => Promise<JoinResult>;
+	joinWithCode: (code: string, displayName?: string) => Promise<JoinResult>;
 	createSyncProvider: (doc: Y.Doc, docId?: string, awareness?: Awareness | null) => P2PSyncProvider;
 	requestWorkspaceSnapshot: (peerId?: string, targetWorkspacePath?: string) => Promise<void>;
 	downloadFileOnDemand: (relPath: string) => Promise<void>;
@@ -130,6 +165,11 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const [lastSyncedFile, setLastSyncedFile] = useState<SyncedFile | null>(null);
 	const [isJoining, setIsJoining] = useState(false);
 	const [reconnecting, setReconnecting] = useState(false);
+	const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+	const [workspaceDeleted, setWorkspaceDeleted] = useState(false);
+	const [handoffOffer, setHandoffOffer] = useState<HandoffOffer | null>(null);
+	// The guest the host is waiting on to answer a handoff, and how to deliver the answer
+	const handoffWaitRef = useRef<{ peerId: string; resolve: (ticket: string | null) => void } | null>(null);
 	const [dataVersion, setDataVersion] = useState(0);
 	const [selfNameVersion, setSelfNameVersion] = useState(0);
 	const syncVersionRef = useRef(0);
@@ -192,12 +232,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		if (!path) return;
 		try {
 			const meta = await readWorkspaceMetadata(path);
-			const current = meta.members.members;
-			const existing = current.find((m) => m.name.toLowerCase() === peer.name.toLowerCase());
-			if (existing && (existing.role === peer.role || existing.role === "Owner")) return;
-			const members = existing
-				? current.map((m) => (m.id === existing.id ? { ...m, role: peer.role } : m))
-				: [...current, { id: crypto.randomUUID(), name: peer.name, role: peer.role }];
+			const members = bindGuestMember(meta.members.members, peer);
+			if (members === meta.members.members) return;
 			await writeWorkspaceMetadata({ path, metadata: { ...meta, members: { members } } });
 			await refreshMetadataRef.current(path);
 		} catch (err) {
@@ -218,6 +254,12 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			setDataVersion((v) => v + 1);
 			void refreshMetadataRef.current();
 		});
+		const offJoinRequest = p2p.onJoinRequest((request) =>
+			setJoinRequests((prev) => [...prev.filter((r) => r.requestId !== request.requestId), request]),
+		);
+		const offJoinRequestClosed = p2p.onJoinRequestClosed(({ requestId }) =>
+			setJoinRequests((prev) => prev.filter((r) => r.requestId !== requestId)),
+		);
 		const offReconnecting = p2p.onReconnecting(() => setReconnecting(true));
 		const offReconnectFailed = p2p.onReconnectFailed(() => setReconnecting(false));
 		const offJoined = p2p.onPeerJoined((peer) => {
@@ -233,6 +275,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			offPeers();
 			offJoined();
 			offLeft();
+			offJoinRequest();
+			offJoinRequestClosed();
 			offReconnecting();
 			offReconnectFailed();
 			offDataChanged();
@@ -445,6 +489,72 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 					break;
 				}
 
+				case "WORKSPACE_DELETED":
+					// The backend only delivers this from the host we joined
+					setWorkspaceDeleted(true);
+					break;
+
+				case "HOST_HANDOFF": {
+					// The backend only delivers this from the host we joined
+					try {
+						const offer = JSON.parse(message.payload ?? "null");
+						if (!isMemberList(offer?.members) || typeof offer.hostName !== "string") break;
+						setHandoffOffer({ from: peerId, hostName: offer.hostName, members: offer.members });
+					} catch {
+						console.warn("[P2P] Ignoring a malformed host handoff.");
+					}
+					break;
+				}
+
+				case "HOST_READY": {
+					// Only the guest the host is waiting on can answer
+					const wait = handoffWaitRef.current;
+					if (!wait || wait.peerId !== peerId) break;
+					try {
+						const { ticket } = JSON.parse(message.payload ?? "{}");
+						wait.resolve(typeof ticket === "string" ? ticket : null);
+					} catch {
+						wait.resolve(null);
+					}
+					break;
+				}
+
+				case "HOST_MOVED": {
+					// The backend only delivers this from the host we joined; follow it to the new host
+					const workspaceId = workspaceRef.current?.id;
+					try {
+						const { ticket } = JSON.parse(message.payload ?? "{}");
+						if (typeof ticket !== "string") break;
+						const name = readSelfName(workspaceId) ?? "Collaborator";
+						await p2p.disconnectPeer(peerId).catch(() => {});
+						await p2p.joinWithTicket(ticket, name);
+					} catch (err) {
+						console.error("[P2P] Failed to follow the workspace to its new host:", err);
+					}
+					break;
+				}
+
+				case "ROLE_REQUEST": {
+					// The backend only delivers this from an Admin guest, but what they may change is checked here
+					const path = workspaceRef.current?.path;
+					if (!path || !message.payload) break;
+					try {
+						const request: { deviceId?: unknown; role?: unknown } = JSON.parse(message.payload);
+						if (typeof request.deviceId !== "string" || typeof request.role !== "string") break;
+						const meta = await readWorkspaceMetadata(path);
+						const members = meta.members.members;
+						const actor = members.find((m) => m.deviceId === peerId);
+						const target = members.find((m) => m.deviceId === request.deviceId);
+						if (!actor || !target || !canChangeRole(actor.role, target.role, request.role)) break;
+						const updated = members.map((m) => (m.id === target.id ? { ...m, role: request.role as string } : m));
+						await writeWorkspaceMetadata({ path, metadata: { ...meta, members: { members: updated } } });
+						await refreshMetadataRef.current(path);
+					} catch (err) {
+						console.error("[P2P] Failed to apply a role request:", err);
+					}
+					break;
+				}
+
 				case "MEMBERS_UPDATE": {
 					// The backend only delivers this from the host we joined
 					const path = workspaceRef.current?.path;
@@ -558,7 +668,40 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		});
 	}, []);
 
-	const revokeInvite = useCallback(() => p2p.revokeInvite(), []);
+	// Create a 6-digit code that lasts 2 minutes and needs this host to allow the guest
+	const createShortCode = useCallback(async (role: string = "Editor") => {
+		const ws = workspaceRef.current;
+		if (!ws) {
+			throw new Error("Open a workspace before inviting collaborators.");
+		}
+		const owner = metadataRef.current?.members.members.find(
+			(m) => m.role.toLowerCase() === "owner",
+		);
+		return p2p.createShortCode({
+			role,
+			workspaceId: ws.id,
+			workspaceName: ws.name,
+			hostName: owner?.name || "Host",
+		});
+	}, []);
+
+	const resolveJoinRequest = useCallback(async (requestId: string, approve: boolean) => {
+		setJoinRequests((prev) => prev.filter((r) => r.requestId !== requestId));
+		await p2p.resolveJoinRequest(requestId, approve).catch(() => false);
+	}, []);
+
+	// Tell every guest the workspace is being deleted, then give the message time to arrive
+	const announceWorkspaceDeleted = useCallback(async () => {
+		await p2p.sendMessage({ kind: "WORKSPACE_DELETED", timestamp: Date.now() }).catch(() => 0);
+		await new Promise((resolve) => setTimeout(resolve, 700));
+	}, []);
+
+	const dismissWorkspaceDeleted = useCallback(() => setWorkspaceDeleted(false), []);
+
+	const revokeInvite = useCallback(async () => {
+		setJoinRequests([]);
+		await p2p.revokeInvite();
+	}, []);
 
 	// Connect to a host from an invite ticket
 	const joinWithTicket = useCallback(async (ticket: string, displayName?: string) => {
@@ -569,6 +712,22 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				(await loadConfig().catch(() => null))?.display_name.trim() ||
 				"Collaborator";
 			const result = await p2p.joinWithTicket(ticket.trim(), name);
+			pendingSelfNameRef.current = name;
+			return result;
+		} finally {
+			setIsJoining(false);
+		}
+	}, []);
+
+	// Connect to a host from a 6-digit code; resolves once the host allows the request
+	const joinWithCode = useCallback(async (code: string, displayName?: string) => {
+		setIsJoining(true);
+		try {
+			const name =
+				displayName?.trim() ||
+				(await loadConfig().catch(() => null))?.display_name.trim() ||
+				"Collaborator";
+			const result = await p2p.joinWithCode(code, name);
 			pendingSelfNameRef.current = name;
 			return result;
 		} finally {
@@ -638,6 +797,121 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		[workspace?.id, selfNameVersion],
 	);
 
+	// The host enforces roles by device key, so it hands the current member list to the backend
+	useEffect(() => {
+		if (selfName !== null || membersJson === "null") return;
+		p2p.setRoles(roleTable(JSON.parse(membersJson))).catch((err) =>
+			console.error("[P2P] Failed to apply member roles:", err),
+		);
+	}, [membersJson, selfName]);
+
+	// A joined copy identifies itself in the member list by its device key
+	const [selfId, setSelfId] = useState<string | null>(null);
+	useEffect(() => {
+		if (selfName === null) return;
+		p2p.selfId().then(setSelfId).catch(() => {});
+	}, [selfName]);
+
+	// Owner: offer hosting to a connected member, and once they are ready move everyone else to them
+	const transferHost = useCallback(
+		async (peerId: string) => {
+			const ws = workspaceRef.current;
+			if (!ws) throw new Error("Open a workspace first.");
+			const meta = await readWorkspaceMetadata(ws.path);
+			const owner = meta.members.members.find((m) => m.role === "Owner");
+			const target = meta.members.members.find((m) => m.deviceId === peerId);
+			if (!owner || !target) throw new Error("That collaborator isn't a member yet.");
+
+			// The Owner becomes an Admin under their own device key; the chosen member becomes the Owner
+			const selfDeviceId = await p2p.selfId();
+			const members = meta.members.members.map((m) =>
+				m.id === owner.id
+					? { ...m, role: "Admin", deviceId: selfDeviceId }
+					: m.id === target.id
+						? { ...m, role: "Owner" }
+						: m,
+			);
+
+			const ticket = await new Promise<string | null>((resolve, reject) => {
+				const timer = setTimeout(() => {
+					handoffWaitRef.current = null;
+					reject(new Error(`${target.name} didn't answer in time.`));
+				}, HANDOFF_TIMEOUT_MS);
+				handoffWaitRef.current = {
+					peerId,
+					resolve: (t) => {
+						clearTimeout(timer);
+						handoffWaitRef.current = null;
+						resolve(t);
+					},
+				};
+				send(
+					{ kind: "HOST_HANDOFF", timestamp: Date.now(), payload: JSON.stringify({ members, hostName: owner.name }) },
+					peerId,
+				);
+			});
+			if (!ticket) throw new Error(`${target.name} declined to become the host.`);
+
+			await writeWorkspaceMetadata({ path: ws.path, metadata: { ...meta, members: { members } } });
+			// Everyone else follows the new host, then this device joins it as a guest too
+			for (const peer of peersRef.current) {
+				if (peer.id !== peerId && !peer.isHost) {
+					send({ kind: "HOST_MOVED", timestamp: Date.now(), payload: JSON.stringify({ ticket }) }, peer.id);
+				}
+			}
+			await sleep(700);
+			setSelfName(ws.id, owner.name);
+			setSelfNameVersion((v) => v + 1);
+			await p2p.disconnectAll();
+			await p2p.joinWithTicket(ticket, owner.name);
+			await refreshMetadataRef.current(ws.path);
+		},
+		[send],
+	);
+
+	// Guest: take over hosting from the current host, then hand them a fresh invite to join
+	const acceptHandoff = useCallback(async () => {
+		const offer = handoffOffer;
+		const ws = workspaceRef.current;
+		if (!offer || !ws) return;
+		try {
+			const newOwner = offer.members.find((m) => m.role === "Owner");
+			const invite = await p2p.createInvite({
+				role: "Editor",
+				workspaceId: ws.id,
+				workspaceName: ws.name,
+				hostName: newOwner?.name || "Host",
+			});
+			const meta = await readWorkspaceMetadata(ws.path);
+			await writeWorkspaceMetadata({ path: ws.path, metadata: { ...meta, members: { members: offer.members } } });
+			await p2p.setRoles(roleTable(offer.members));
+			setSelfName(ws.id, null);
+			setSelfNameVersion((v) => v + 1);
+			await refreshMetadataRef.current(ws.path);
+			send({ kind: "HOST_READY", timestamp: Date.now(), payload: JSON.stringify({ ticket: invite.ticket }) }, offer.from);
+			// Let the ticket arrive before leaving the old host, whose link would otherwise be retried
+			await sleep(500);
+			await p2p.disconnectPeer(offer.from).catch(() => {});
+		} catch (err) {
+			send({ kind: "HOST_READY", timestamp: Date.now(), payload: "{}" }, offer.from);
+			throw err;
+		} finally {
+			setHandoffOffer(null);
+		}
+	}, [handoffOffer, send]);
+
+	const declineHandoff = useCallback(() => {
+		if (handoffOffer) send({ kind: "HOST_READY", timestamp: Date.now(), payload: "{}" }, handoffOffer.from);
+		setHandoffOffer(null);
+	}, [handoffOffer, send]);
+
+	// An Admin guest asks the host to change a role; the host decides
+	const requestRoleChange = useCallback(
+		(deviceId: string, role: string) =>
+			send({ kind: "ROLE_REQUEST", timestamp: Date.now(), payload: JSON.stringify({ deviceId, role }) }),
+		[send],
+	);
+
 	const connectionStatus: P2PContextType["connectionStatus"] =
 		peers.length > 0 ? "connected"
 		: reconnecting ? "reconnecting"
@@ -654,10 +928,23 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				lastSyncedFile,
 				dataVersion,
 				selfName,
+				selfId,
+				requestRoleChange,
+				handoffOffer,
+				acceptHandoff,
+				declineHandoff,
+				transferHost,
 				publishDataChange,
 				createInvite,
+				createShortCode,
+				joinRequests,
+				resolveJoinRequest,
+				workspaceDeleted,
+				dismissWorkspaceDeleted,
+				announceWorkspaceDeleted,
 				revokeInvite,
 				joinWithTicket,
+				joinWithCode,
 				createSyncProvider,
 				requestWorkspaceSnapshot,
 				downloadFileOnDemand,
@@ -678,14 +965,17 @@ export function useP2P() {
 	return context;
 }
 
+// The role this device holds here: Owner in its own workspaces, otherwise what the host assigned it
+export function useSelfRole(): string {
+	const { metadata } = useWorkspace();
+	const { selfName, selfId } = useP2P();
+	if (selfName === null) return "Owner";
+	const members = metadata?.members.members ?? [];
+	const me = members.find((m) => (selfId ? m.deviceId === selfId : m.name === selfName));
+	return me?.role ?? "Viewer";
+}
+
 // True if this device joined someone else's workspace with the Viewer role
 export function useIsViewer(): boolean {
-	const { metadata } = useWorkspace();
-	const { selfName } = useP2P();
-	if (selfName === null) return false;
-	return (
-		metadata?.members.members.some(
-			(m) => m.name === selfName && m.role === "Viewer",
-		) ?? false
-	);
+	return useSelfRole() === "Viewer";
 }

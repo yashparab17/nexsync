@@ -49,7 +49,7 @@ interface WorkspaceContextType {
 	setWorkspace: (workspace: WorkspaceInfo) => void;
 	loadWorkspace: (workspace: WorkspaceInfo) => Promise<void>;
 	saveWorkspace: () => Promise<void>;
-	clearWorkspace: () => Promise<void>;
+	clearWorkspace: (options?: { save?: boolean }) => Promise<void>;
 	refreshStats: (customPath?: string) => Promise<void>;
 	refreshMetadata: (customPath?: string) => Promise<void>;
 
@@ -209,8 +209,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 	);
 
 	// Save and unload current workspace, clearing session tracking
-	const clearWorkspace = useCallback(async () => {
-		if (metadata) {
+	const clearWorkspace = useCallback(async (options?: { save?: boolean }) => {
+		if (metadata && options?.save !== false) {
 			await saveWorkspace();
 		}
 		// Clear last workspace file so app reopens to Welcome page

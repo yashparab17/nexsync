@@ -19,8 +19,8 @@ pub fn validate_task_priority(priority: &str) -> Result<(), String> {
 /// Validates a member role string
 pub fn validate_member_role(role: &str) -> Result<(), String> {
 	match role.to_lowercase().as_str() {
-		"owner" | "editor" | "viewer" => Ok(()),
-		_ => Err(format!("Invalid member role: '{}'. Must be one of: owner, editor, viewer", role)),
+		"owner" | "admin" | "editor" | "viewer" => Ok(()),
+		_ => Err(format!("Invalid member role: '{}'. Must be one of: owner, admin, editor, viewer", role)),
 	}
 }
 
@@ -57,10 +57,11 @@ mod tests {
 		assert!(validate_member_role("owner").is_ok());
 		assert!(validate_member_role("editor").is_ok());
 		assert!(validate_member_role("viewer").is_ok());
+		assert!(validate_member_role("admin").is_ok());
 	}
 
 	#[test]
 	fn test_invalid_role() {
-		assert!(validate_member_role("admin").is_err());
+		assert!(validate_member_role("superuser").is_err());
 	}
 }

@@ -17,6 +17,18 @@ export interface JoinResult {
 	hostName: string;
 }
 
+export interface ShortCodeInfo {
+	code: string;
+	expiresAt: number; // Milliseconds since the Unix epoch
+	relayConnected: boolean;
+}
+
+// A guest asking to join with a short code, waiting for the host to allow or deny
+export interface JoinRequest {
+	requestId: string;
+	name: string;
+}
+
 export interface ShareableFile {
 	relPath: string;
 	size: number;
@@ -39,6 +51,16 @@ export function setSharedWorkspace(workspacePath: string | null): Promise<void> 
 	return invoke("p2p_set_workspace", { workspacePath });
 }
 
+// This device's own P2P key, which hosts record as the device's identity
+export function selfId(): Promise<string> {
+	return invoke("p2p_self_id");
+}
+
+// Tell the backend which role each device key holds so the host enforces the member list
+export function setRoles(roles: [string, string][]): Promise<void> {
+	return invoke("p2p_set_roles", { roles });
+}
+
 // Invoke backend command to mint an invite ticket for the active workspace
 export function createInvite(args: {
 	role: string;
@@ -52,6 +74,31 @@ export function createInvite(args: {
 // Invoke backend command to stop admitting guests with the current ticket
 export function revokeInvite(): Promise<void> {
 	return invoke("p2p_revoke_invite");
+}
+
+// True if the text looks like a 6-digit short code rather than a full invite ticket
+export function isShortCode(input: string): boolean {
+	return /^\s*\d{3}[\s-]?\d{3}\s*$/.test(input);
+}
+
+// Invoke backend command to mint a 6-digit code (with its invite) for the active workspace
+export function createShortCode(args: {
+	role: string;
+	workspaceId: string;
+	workspaceName: string;
+	hostName: string;
+}): Promise<ShortCodeInfo> {
+	return invoke("p2p_create_short_code", args);
+}
+
+// Invoke backend command to join a host with a short code once the host allows it
+export function joinWithCode(code: string, displayName: string): Promise<JoinResult> {
+	return invoke("p2p_join_with_code", { code, displayName });
+}
+
+// Invoke backend command to answer a guest's request to join
+export function resolveJoinRequest(requestId: string, approve: boolean): Promise<boolean> {
+	return invoke("p2p_resolve_join_request", { requestId, approve });
 }
 
 // Invoke backend command to dial a host and complete the invite handshake
@@ -113,6 +160,14 @@ export const onPeerJoined = (handler: (peer: ConnectedPeerInfo) => void) =>
 
 export const onPeerLeft = (handler: (event: { peerId: string }) => void) =>
 	subscribe<{ peerId: string }>("p2p://peer-left", handler);
+
+// A guest is asking to join with a short code
+export const onJoinRequest = (handler: (request: JoinRequest) => void) =>
+	subscribe<JoinRequest>("p2p://join-request", handler);
+
+// A join request was answered, expired or cancelled
+export const onJoinRequestClosed = (handler: (event: { requestId: string }) => void) =>
+	subscribe<{ requestId: string }>("p2p://join-request-closed", handler);
 
 // A catch-up merge changed tasks or kanban in the local database
 export const onDataChanged = (handler: () => void) =>
