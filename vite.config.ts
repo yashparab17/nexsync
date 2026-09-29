@@ -22,6 +22,26 @@ export default defineConfig(async () => ({
 	// 1. prevent Vite from obscuring rust errors
 	clearScreen: false,
 
+	// The Editor loads languages and formatters on demand. Left to Vite it finds them only when the tab
+	// first opens and re-bundles mid-session, which can leave the page with two copies of React.
+	optimizeDeps: {
+		include: [
+			"@codemirror/language-data",
+			"@codemirror/search",
+			"@codemirror/lint",
+			"@uiw/codemirror-theme-vscode",
+			"@blocknote/code-block",
+			"prettier/standalone",
+			"prettier/plugins/babel",
+			"prettier/plugins/estree",
+			"prettier/plugins/typescript",
+			"prettier/plugins/postcss",
+			"prettier/plugins/html",
+			"prettier/plugins/markdown",
+			"prettier/plugins/yaml",
+		],
+	},
+
 	test: {
 		environment: "jsdom",
 		include: ["src/**/*.test.{ts,tsx}"],

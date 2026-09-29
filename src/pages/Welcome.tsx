@@ -207,7 +207,7 @@ export default function Welcome() {
 
 			{/* Footer */}
 			<footer className="mt-auto space-y-1 pb-4 text-center text-muted-foreground">
-				<p className="text-2xl">Nexsync 0.0.1</p>
+				<p className="text-2xl">Nexsync 0.6.7</p>
 				<p className="text-xs">
 					Local First • Open Source • Built with Tauri
 				</p>

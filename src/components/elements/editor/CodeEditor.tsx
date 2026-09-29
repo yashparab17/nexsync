@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { lintGutter } from "@codemirror/lint";
 import { EditorView, keymap } from "@codemirror/view";
@@ -43,6 +43,11 @@ export default function CodeEditor({
 	onLanguage,
 }: CodeEditorProps) {
 	const { isDark } = useThemeContext();
+
+	// A live document that already exists when the editor is created must be its starting text: the sync
+	// layer applies only later changes, so an editor started empty would stay blank.
+	const startedWithCollab = useRef(!!collab);
+	const startingText = useRef(collab ? collab.doc.getText("content").toString() : "");
 
 	// The grammar for this file type is fetched the first time a file of that type is opened
 	const [language, setLanguage] = useState<LoadedLanguage>(PLAIN);
@@ -97,7 +102,7 @@ export default function CodeEditor({
 	return (
 		<div className="h-full w-full overflow-hidden border-t bg-background font-mono text-xs">
 			<CodeMirror
-				{...(collab ? {} : { value })}
+				{...(collab ? (startedWithCollab.current ? { value: startingText.current } : {}) : { value })}
 				height="100%"
 				minHeight={minHeight}
 				theme={isDark ? vscodeDark : vscodeLight}

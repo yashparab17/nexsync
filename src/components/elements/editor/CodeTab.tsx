@@ -74,6 +74,18 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 		};
 	}, [workspacePath, path, logError]);
 
+	// The editor must be built with the shared text already in it, because the sync layer only applies later
+	// changes. So wait for the stored text to load, fill an empty document from the file, then show the editor.
+	const [seededDoc, setSeededDoc] = useState<Y.Doc | null>(null);
+	useEffect(() => {
+		if (!collab?.synced || saved === null) return;
+		const ytext = collab.doc.getText("content");
+		if (ytext.length === 0 && saved) ytext.insert(0, saved);
+		// What the shared text holds may differ from disk, so unsaved changes show as such.
+		setContent(ytext.toString());
+		setSeededDoc(collab.doc);
+	}, [collab, saved]);
+
 	const dirty = saved !== null && content !== saved;
 	useEffect(() => onDirtyChange(path, dirty), [path, dirty, onDirtyChange]);
 
@@ -241,12 +253,13 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 
 			<div className="flex min-h-0 flex-1">
 				<div className="min-w-0 flex-1">
-					{saved === null ? (
+					{saved === null || !collab || seededDoc !== collab.doc ? (
 						<div className="flex h-full items-center justify-center">
 							<Loader2 className="size-5 animate-spin text-muted-foreground" />
 						</div>
 					) : (
 						<CodeEditor
+							key={collab.doc.guid}
 							value={saved}
 							fileName={fileName}
 							onChange={setContent}

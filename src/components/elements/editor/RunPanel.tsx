@@ -97,7 +97,9 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 		};
 	}, []);
 
-	useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [lines]);
+	useEffect(() => {
+		endRef.current?.scrollIntoView?.({ block: "end" });
+	}, [lines]);
 
 	const start = async () => {
 		if (!command.trim() || running) return;
