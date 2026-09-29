@@ -126,6 +126,11 @@ export function disconnectAll(): Promise<void> {
 	return invoke("p2p_disconnect_all");
 }
 
+// Invoke backend command to re-dial the host after the automatic attempts gave up
+export function retryConnection(): Promise<void> {
+	return invoke("p2p_retry_connection");
+}
+
 // Invoke backend command to stream a file from a peer into the local workspace
 // Cancel the download of one file, or every download; what arrived is kept so it can resume
 export function cancelTransfers(relPath?: string): Promise<number> {

@@ -262,6 +262,8 @@ struct NodeState {
     peers: HashMap<EndpointId, Peer>,
     /// Ticket and display name of the host we last joined, kept so a dropped link can be re-dialed
     last_join: Option<(String, String)>,
+    /// The host we gave up re-dialing, kept so the user can retry by hand
+    lost_host: Option<(String, String)>,
     reconnecting: bool,
     /// Roles the host has assigned by device key; these win over the role on the invite used to join
     roles: HashMap<String, String>,
@@ -743,10 +745,28 @@ impl Node {
             }
             let mut st = node.lock();
             st.reconnecting = false;
-            st.last_join = None;
+            st.lost_host = st.last_join.take();
             drop(st);
             node.emit(EVENT_RECONNECT_FAILED, ());
         });
+    }
+
+    /// Manual retry after the automatic attempts gave up (or while they are backing off)
+    pub fn retry_connection(self: &Arc<Self>) -> Result<(), String> {
+        {
+            let mut st = self.lock();
+            if st.reconnecting || st.peers.values().any(|p| p.is_host) {
+                return Ok(());
+            }
+            if st.last_join.is_none() {
+                st.last_join = st.lost_host.take();
+            }
+            if st.last_join.is_none() {
+                return Err("There is no host to reconnect to. Join again with an invite or code.".into());
+            }
+        }
+        self.start_reconnect();
+        Ok(())
     }
 
     fn dispatch_message(self: &Arc<Self>, from: &EndpointId, bytes: &[u8]) {
@@ -1004,6 +1024,7 @@ impl Node {
             let removed = st.peers.remove(&id);
             if removed.as_ref().is_some_and(|p| p.is_host) {
                 st.last_join = None;
+                st.lost_host = None;
             }
             removed
         };
@@ -1024,6 +1045,7 @@ impl Node {
             st.invite = None;
             self.short_codes.cancel();
             st.last_join = None;
+            st.lost_host = None;
             st.mesh_allow.clear();
             st.mesh_tokens.clear();
             st.peers.drain().collect()

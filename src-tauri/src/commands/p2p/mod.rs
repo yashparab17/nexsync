@@ -157,6 +157,15 @@ pub async fn p2p_disconnect(state: State<'_, P2pState>, peer_id: String) -> Resu
     }
 }
 
+/// Re-dials the host after the automatic attempts gave up
+#[tauri::command]
+pub async fn p2p_retry_connection(state: State<'_, P2pState>) -> Result<(), String> {
+    match state.existing().await {
+        Some(node) => node.retry_connection(),
+        None => Err("There is no host to reconnect to. Join again with an invite or code.".into()),
+    }
+}
+
 /// Disconnects every peer and revokes the current invite
 #[tauri::command]
 pub async fn p2p_disconnect_all(state: State<'_, P2pState>) -> Result<(), String> {

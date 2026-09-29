@@ -50,6 +50,7 @@ export default function P2PConnectDialog({
 		joinWithCode,
 		requestWorkspaceSnapshot,
 		disconnectPeer,
+		retryConnection,
 	} = useP2P();
 
 	const [activeTab, setActiveTab] = useState<"invite" | "join" | "peers">("invite");
@@ -109,6 +110,16 @@ export default function P2PConnectDialog({
 			setErrorMessage(errorText(err, "Failed to create a code."));
 		} finally {
 			setIsGenerating(false);
+		}
+	};
+
+	// Re-dial the host by hand, e.g. after the network came back
+	const handleRetry = async () => {
+		setErrorMessage(null);
+		try {
+			await retryConnection();
+		} catch (err) {
+			setErrorMessage(errorText(err, "Couldn't retry the connection."));
 		}
 	};
 
@@ -186,6 +197,12 @@ export default function P2PConnectDialog({
 							)}
 						/>
 						<span className="capitalize">{connectionStatus}</span>
+						{connectionStatus !== "connected" && (
+							<Button variant="outline" size="sm" className="ml-2 h-6 gap-1 px-2 text-[11px]" onPress={handleRetry}>
+								<RefreshCw className="h-3 w-3" />
+								Retry
+							</Button>
+						)}
 					</div>
 				</div>
 

@@ -50,10 +50,16 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
         sync: true,
     };
 
+    let owner_name = crate::commands::config::load_config(&app_handle)
+        .map(|c| c.display_name.trim().to_string())
+        .ok()
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| "User".to_string());
     let members = Members {
         members: vec![Member {
             id: "owner".to_string(),
-            name: "User".to_string(),
+            // The name set in Settings, so collaborators see who owns the workspace
+            name: owner_name,
             role: "Owner".to_string(),
             device_id: None,
         }],

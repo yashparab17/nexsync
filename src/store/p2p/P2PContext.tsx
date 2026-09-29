@@ -165,6 +165,7 @@ interface P2PContextType {
 	downloadFileOnDemand: (relPath: string) => Promise<void>;
 	disconnectPeer: (peerId: string) => Promise<void>;
 	disconnectAll: () => Promise<void>;
+	retryConnection: () => Promise<void>;
 }
 
 const P2PContext = createContext<P2PContextType | null>(null);
@@ -924,6 +925,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 
 	const disconnectPeer = useCallback((peerId: string) => p2p.disconnectPeer(peerId), []);
 	const disconnectAll = useCallback(() => p2p.disconnectAll(), []);
+	const retryConnection = useCallback(() => p2p.retryConnection(), []);
 
 	// While hosting, push the member list to guests whenever it changes or someone joins
 	const membersJson = JSON.stringify(metadata?.members.members ?? null);
@@ -1095,6 +1097,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				downloadFileOnDemand,
 				disconnectPeer,
 				disconnectAll,
+				retryConnection,
 			}}
 		>
 			{children}

@@ -111,6 +111,7 @@ pub fn run() {
             commands::p2p::p2p_set_roles,
             commands::p2p::p2p_disconnect,
             commands::p2p::p2p_disconnect_all,
+            commands::p2p::p2p_retry_connection,
             commands::p2p::p2p_fetch_file,
             commands::p2p::p2p_list_shareable_files,
         ])
