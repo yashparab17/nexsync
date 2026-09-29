@@ -185,6 +185,23 @@ CREATE TABLE IF NOT EXISTS tombstones (
 ALTER TABLE members ADD COLUMN device_id TEXT;
 "##,
 	},
+	Migration {
+		version: 5,
+		description: "file version history",
+		up: r##"
+CREATE TABLE IF NOT EXISTS file_versions (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id TEXT NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,
+    path         TEXT NOT NULL,
+    hash         TEXT NOT NULL,
+    size         INTEGER NOT NULL,
+    source       TEXT NOT NULL,
+    label        TEXT,
+    created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_file_versions_path ON file_versions(workspace_id, path, id DESC);
+"##,
+	},
 ];
 
 /// Initialises the schema on a fresh database, running pending migrations

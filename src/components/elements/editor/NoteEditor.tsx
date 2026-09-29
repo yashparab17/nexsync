@@ -1,12 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, FileText, Loader2, Save, Type, Users, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { EditorView } from "@codemirror/view";
+import { Check, Download, FileText, History, Loader2, Save, Type, Users, X } from "lucide-react";
 
 import CodeEditor from "./CodeEditor";
 import RichTextEditor from "./RichTextEditor";
+import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
+import { useAutoSnapshot } from "@/hooks/useAutoSnapshot";
 import { useCollabDoc } from "@/hooks/useCollabDoc";
 import { useSeededText } from "@/hooks/useSeededText";
+import { minimalChange } from "@/lib/editor/format";
 import { isMarkdownFile } from "@/lib/editor/languages";
+import { exportNote, type NoteFormat } from "@/lib/export";
 import { markdownStats, textStats } from "@/lib/notes/text";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -40,6 +45,14 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 	const [content, setContent] = useState(saved);
 	const [saving, setSaving] = useState(false);
 	const [justSaved, setJustSaved] = useState(false);
+	const [historyOpen, setHistoryOpen] = useState(false);
+	const [exportMenu, setExportMenu] = useState(false);
+	const [exportNotice, setExportNotice] = useState<{ ok: boolean; text: string } | null>(null);
+	const viewRef = useRef<EditorView | null>(null);
+	const replaceRef = useRef<((text: string) => void) | null>(null);
+	const onRichReady = useCallback((replace: (text: string) => void) => {
+		replaceRef.current = replace;
+	}, []);
 
 	// Markdown: wait for the stored text, fill an empty document from the file, then build the editor with it
 	const seeded = useSeededText(isMarkdown ? collab : null, saved);
@@ -67,6 +80,35 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 			setSaving(false);
 		}
 	}, [saving, readOnly, dirty, isMarkdown, collab, content, onSave]);
+
+	// Work that was never saved with the Save button still ends up in the file history
+	useAutoSnapshot(workspacePath, docId, content, !readOnly);
+
+	// An older version goes into the live editor, so collaborators see it and it can be undone
+	const restoreText = (text: string) => {
+		if (isMarkdown) {
+			const view = viewRef.current;
+			const change = view && minimalChange(view.state.doc.toString(), text);
+			if (view && change) view.dispatch({ changes: change });
+		} else replaceRef.current?.(text);
+	};
+
+	const runExport = async (format: NoteFormat) => {
+		setExportMenu(false);
+		if (!workspacePath) return;
+		const text = isMarkdown && collab ? collab.doc.getText("content").toString() : content;
+		try {
+			const dest = await exportNote(workspacePath, fileName, text, format);
+			if (dest) setExportNotice({ ok: true, text: `Exported to ${dest}` });
+		} catch (err) {
+			setExportNotice({ ok: false, text: err instanceof Error ? err.message : String(err) });
+		}
+	};
+	useEffect(() => {
+		if (!exportNotice) return;
+		const timer = setTimeout(() => setExportNotice(null), 6000);
+		return () => clearTimeout(timer);
+	}, [exportNotice]);
 
 	// Ctrl+S / Cmd+S saves
 	useEffect(() => {
@@ -128,6 +170,33 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 							{stats.chars} {stats.chars === 1 ? "char" : "chars"}
 						</span>
 					</div>
+					{workspacePath && docId && (
+						<>
+							<Button variant="ghost" size="sm" onPress={() => setHistoryOpen(true)} className="gap-1.5">
+								<History className="size-3.5" />
+								History
+							</Button>
+							<div className="relative">
+								<Button variant="ghost" size="sm" onPress={() => setExportMenu((open) => !open)} className="gap-1.5" aria-expanded={exportMenu}>
+									<Download className="size-3.5" />
+									Export
+								</Button>
+								{exportMenu && (
+									<>
+										<button type="button" aria-label="Close export menu" className="fixed inset-0 z-10 cursor-default" onClick={() => setExportMenu(false)} />
+										<div className="absolute right-0 z-20 mt-1 w-44 border bg-popover p-1 shadow-md">
+											<Button variant="ghost" size="sm" className="w-full justify-start" onPress={() => void runExport("md")}>
+												Markdown (.md)
+											</Button>
+											<Button variant="ghost" size="sm" className="w-full justify-start" onPress={() => void runExport("pdf")}>
+												PDF document
+											</Button>
+										</div>
+									</>
+								)}
+							</div>
+						</>
+					)}
 					{!readOnly && (
 						<Button size="sm" onPress={() => void save()} isDisabled={saving || !dirty} className="gap-1.5">
 							{saving ? <Loader2 className="size-3.5 animate-spin" /> : justSaved ? <Check className="size-3.5 text-emerald-400" /> : <Save className="size-3.5" />}
@@ -153,6 +222,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 							collab={collab}
 							userName={userName}
 							minHeight="0px"
+							onReady={(view) => (viewRef.current = view)}
 						/>
 					)
 				) : !collab ? (
@@ -167,9 +237,27 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 						readOnly={readOnly}
 						collab={collab}
 						userName={userName}
+						onReady={onRichReady}
 					/>
 				)}
 			</div>
+
+			{exportNotice && (
+				<p role={exportNotice.ok ? "status" : "alert"} className={`mt-2 truncate text-xs ${exportNotice.ok ? "text-emerald-400" : "text-destructive"}`}>
+					{exportNotice.text}
+				</p>
+			)}
+
+			{historyOpen && workspacePath && docId && (
+				<FileHistoryDialog
+					workspacePath={workspacePath}
+					path={docId}
+					currentText={content}
+					onRestoreText={readOnly ? undefined : restoreText}
+					readOnly={readOnly}
+					onClose={() => setHistoryOpen(false)}
+				/>
+			)}
 		</div>
 	);
 }

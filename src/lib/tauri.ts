@@ -10,6 +10,7 @@ import type {
 	WorkspaceMetadata,
 	WorkspaceFile,
 	WorkspaceStats,
+	FileVersion,
 	ErrorRecord,
 	TrashItem,
 	DeleteOutcome,
@@ -497,4 +498,49 @@ export const onRunExit = (handler: (event: RunExit) => void) =>
 // Open a workspace file, such as a Word document, in the default app for its type
 export function openWorkspaceFile(workspacePath: string, relPath: string): Promise<void> {
 	return invoke("open_workspace_file", { workspacePath, relPath });
+}
+
+// ────────────────────────────
+// Version history and export
+// ────────────────────────────
+
+// The saved versions of a file, newest first
+export function listFileVersions(path: string, relPath: string): Promise<FileVersion[]> {
+	return invoke("list_file_versions", { path, relPath });
+}
+
+// Keep the text an editor holds now as a version: a periodic snapshot, or a named one
+export function recordFileVersion(
+	path: string,
+	relPath: string,
+	content: string,
+	options: { label?: string } = {},
+): Promise<void> {
+	return invoke("record_file_version", {
+		path,
+		relPath,
+		content,
+		source: options.label ? "named" : "auto",
+		label: options.label ?? null,
+	});
+}
+
+// A version read as text, for the preview and the diff
+export function readFileVersion(path: string, id: number): Promise<string> {
+	return invoke("read_file_version", { path, id });
+}
+
+// Put a version back on disk (what was there is kept as a version first); returns the file's path
+export function restoreFileVersion(path: string, id: number): Promise<string> {
+	return invoke("restore_file_version", { path, id });
+}
+
+// Zip workspace folders to a path chosen in the save dialog; returns how many files went in
+export function exportZip(path: string, roots: string[], dest: string): Promise<number> {
+	return invoke("export_zip", { path, roots, dest });
+}
+
+// Save a finished export, such as a note as Markdown or PDF, to a path chosen in the save dialog
+export function writeExportFile(path: string, dest: string, contentBase64: string): Promise<void> {
+	return invoke("write_export_file", { path, dest, contentBase64 });
 }

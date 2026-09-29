@@ -238,6 +238,12 @@ pub async fn fetch(node: &Arc<Node>, peer_id: &str, workspace_path: &str, rel_pa
     tokio::fs::rename(&part, &target)
         .await
         .map_err(|e| format!("Failed to save {rel}: {e}"))?;
+    // Keep what arrived as a version, off the async threads since it reads the file back
+    let (workspace, rel_copy, saved) = (workspace_path.to_string(), rel.clone(), target.clone());
+    let _ = tokio::task::spawn_blocking(move || {
+        crate::commands::workspace::versions::record_file(&workspace, &rel_copy, &saved, "sync")
+    })
+    .await;
     Ok(size)
 }
 

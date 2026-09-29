@@ -9,6 +9,7 @@ import {
 	FilePlus,
 	FolderInput,
 	FolderOpen,
+	History,
 	Loader2,
 	Pencil,
 	RefreshCw,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 
 // Components
+import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -134,6 +136,7 @@ export default function WorkspaceFiles() {
 	const [nameError, setNameError] = useState<string | null>(null);
 	const [isNameSubmitting, setIsNameSubmitting] = useState(false);
 	const [deleteItem, setDeleteItem] = useState<WorkspaceFile | null>(null);
+	const [historyItem, setHistoryItem] = useState<WorkspaceFile | null>(null);
 	const [isDeleting, setIsDeleting] = useState(false);
 
 	// Load directory entries from backend
@@ -485,6 +488,18 @@ export default function WorkspaceFiles() {
 											{formatDate(entry.modified_at)}
 										</span>
 
+										{!entry.is_dir && (
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+												onPress={() => setHistoryItem(entry)}
+												aria-label={`History of ${entry.name}`}
+											>
+												<History className="size-3.5" />
+											</Button>
+										)}
+
 										{/* Row actions */}
 										{!isViewer && (
 											<div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
@@ -660,6 +675,16 @@ export default function WorkspaceFiles() {
 					</>
 				)}
 			</Dialog>
+
+			{historyItem && workspace && (
+				<FileHistoryDialog
+					workspacePath={workspace.path}
+					path={toRelPath(historyItem.path)}
+					readOnly={isViewer}
+					onRestored={() => void loadEntries()}
+					onClose={() => setHistoryItem(null)}
+				/>
+			)}
 		</div>
 	);
 }

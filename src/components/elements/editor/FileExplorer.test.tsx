@@ -36,6 +36,8 @@ const setup = (over: Partial<React.ComponentProps<typeof FileExplorer>> = {}) =>
 		onRefresh: vi.fn(),
 		onCollapseAll: vi.fn(),
 		onFilterStart: vi.fn(),
+		onExport: vi.fn(),
+		notice: null,
 		...over,
 	};
 	render(<FileExplorer {...props} />);

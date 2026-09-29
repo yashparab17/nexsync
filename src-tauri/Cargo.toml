@@ -40,6 +40,7 @@ postcard = { version = "1", default-features = false, features = ["use-std"] }
 notify = "8"
 blake3 = "1"
 trash = "5"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

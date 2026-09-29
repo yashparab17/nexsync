@@ -244,3 +244,19 @@ export interface NexsyncConfig {
 	display_name: string;
 }
 
+
+// ────────────────────────────
+// Version history
+// ────────────────────────────
+
+// One saved state of a file; history is kept per device
+export interface FileVersion {
+	id: number;
+	path: string;
+	hash: string;
+	size: number;
+	// save, sync, import, auto (periodic snapshot), named, restore or before-restore
+	source: string;
+	label: string | null;
+	createdAt: string;
+}

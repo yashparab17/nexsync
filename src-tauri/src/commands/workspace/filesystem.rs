@@ -151,7 +151,10 @@ pub fn write_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    fs::write(&target, content.as_bytes()).map_err(|e| e.to_string())
+    fs::write(&target, content.as_bytes()).map_err(|e| e.to_string())?;
+    // History is a convenience; a save never fails because of it
+    let _ = super::versions::record_bytes(&path, &rel_path, content.as_bytes(), "save", None);
+    Ok(())
 }
 
 /// Renames a workspace file or directory
@@ -183,6 +186,11 @@ pub fn rename_workspace_item(
         return Err(format!("An item named `{new_name}` already exists here."));
     }
     fs::rename(&target, &new_path).map_err(|e| e.to_string())?;
+    let new_rel = match rel_path.trim_matches('/').rsplit_once('/') {
+        Some((dir, _)) => format!("{dir}/{new_name}"),
+        None => new_name.clone(),
+    };
+    let _ = super::versions::rename_path(&path, &rel_path, &new_rel);
     Ok(())
 }
 
@@ -250,7 +258,9 @@ pub fn write_workspace_binary_file(
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    fs::write(&target, bytes).map_err(|e| e.to_string())
+    fs::write(&target, &bytes).map_err(|e| e.to_string())?;
+    let _ = super::versions::record_bytes(&path, &rel_path, &bytes, "save", None);
+    Ok(())
 }
 
 /// Imports an external file from disk into the workspace assets/ folder
@@ -306,6 +316,7 @@ pub fn import_asset_from_path(
 
     let dest = assets_dir.join(&final_name);
     fs::copy(src, &dest).map_err(|e| format!("Failed to copy file: {}", e))?;
+    let _ = super::versions::record_file(&workspace_path, &format!("assets/{final_name}"), &dest, "import");
 
     let metadata = dest.metadata().map_err(|e| e.to_string())?;
     let modified_at = metadata

@@ -9,6 +9,7 @@ import {
 	LayoutGrid,
 	List,
 	Loader2,
+	History,
 	Pencil,
 	Search,
 	Sparkles,
@@ -30,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import AssetPreviewModal from "@/components/dialogs/workspace/AssetPreviewModal";
+import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import AssetUploadDialog from "@/components/dialogs/workspace/AssetUploadDialog";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
@@ -96,6 +98,7 @@ export default function WorkspaceAssets() {
 	}, assets.length > 0);
 	const [assetToDelete, setAssetToDelete] = useState<AssetItem | null>(null);
 	const [assetToRename, setAssetToRename] = useState<AssetItem | null>(null);
+	const [historyAsset, setHistoryAsset] = useState<AssetItem | null>(null);
 	const [newName, setNewName] = useState("");
 	const [isRenaming, setIsRenaming] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
@@ -582,6 +585,16 @@ export default function WorkspaceAssets() {
 												<Check className="size-3.5 text-emerald-400" />
 											:	<Copy className="size-3.5" />}
 										</button>
+										<button
+											onClick={(e) => {
+												e.stopPropagation();
+												setHistoryAsset(asset);
+											}}
+											title="History"
+											className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
+										>
+											<History className="size-3.5" />
+										</button>
 										{!isViewer && (
 											<>
 												<button
@@ -717,6 +730,16 @@ export default function WorkspaceAssets() {
 														<Check className="size-3 text-emerald-400" />
 													:	<Copy className="size-3" />}
 													{copiedKey === asset.name ? "Copied" : "Copy"}
+												</button>
+												<button
+													onClick={(e) => {
+														e.stopPropagation();
+														setHistoryAsset(asset);
+													}}
+													title="History"
+													className="p-1.5 rounded-none hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-all"
+												>
+													<History className="size-3.5" />
 												</button>
 												{!isViewer && (
 													<>
@@ -865,6 +888,16 @@ export default function WorkspaceAssets() {
 						</DialogFooter>
 					</div>
 				</Dialog>
+			)}
+
+			{historyAsset && workspace && (
+				<FileHistoryDialog
+					workspacePath={workspace.path}
+					path={historyAsset.path.replace(/^\/+/, "")}
+					readOnly={isViewer}
+					onRestored={() => void loadAssets()}
+					onClose={() => setHistoryAsset(null)}
+				/>
 			)}
 		</div>
 	);

@@ -2,10 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import { openSearchPanel } from "@codemirror/search";
 import { EditorView } from "@codemirror/view";
-import { AlertTriangle, Check, Loader2, Save, Search, Sparkles } from "lucide-react";
+import { AlertTriangle, Check, History, Loader2, Save, Search, Sparkles } from "lucide-react";
 
 import CodeEditor from "./CodeEditor";
+import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
+import { useAutoSnapshot } from "@/hooks/useAutoSnapshot";
 import { useCollabDoc } from "@/hooks/useCollabDoc";
 import { useSeededText } from "@/hooks/useSeededText";
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -55,6 +57,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 	const [problems, setProblems] = useState(0);
 	const [notice, setNotice] = useState<string | null>(null);
 	const [mergeWarning, setMergeWarning] = useState<number | null>(null);
+	const [historyOpen, setHistoryOpen] = useState(false);
 	const [blame, setBlame] = useState<{ ranges: BlameRange[]; people: Contribution[] } | null>(null);
 
 	// Read the file from disk; the shared document is seeded from it the first time it is opened
@@ -84,6 +87,17 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 
 	const dirty = saved !== null && content !== saved;
 	useEffect(() => onDirtyChange(path, dirty), [path, dirty, onDirtyChange]);
+
+	// Work that was never saved with the Save button still ends up in the file history
+	useAutoSnapshot(workspacePath, path, content, !readOnly && saved !== null);
+
+	// An older version goes into the live editor as a small edit, so collaborators see it and it can be undone
+	const restoreText = (text: string) => {
+		const view = viewRef.current;
+		if (!view) return;
+		const change = minimalChange(view.state.doc.toString(), text);
+		if (change) view.dispatch({ changes: change });
+	};
 
 	const refreshProblems = useCallback(() => {
 		if (viewRef.current) setProblems(errorRanges(viewRef.current.state, 99).length);
@@ -205,6 +219,10 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 				)}
 				{notice && <span className="truncate text-destructive">{notice}</span>}
 				<div className="ml-auto flex items-center gap-1">
+					<Button variant="ghost" size="xs" onPress={() => setHistoryOpen(true)}>
+						<History className="size-3.5" />
+						History
+					</Button>
 					<Button variant="ghost" size="xs" onPress={() => viewRef.current && (openSearchPanel(viewRef.current), viewRef.current.focus())}>
 						<Search className="size-3.5" />
 						Find
@@ -316,6 +334,17 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 					</aside>
 				)}
 			</div>
+
+			{historyOpen && (
+				<FileHistoryDialog
+					workspacePath={workspacePath}
+					path={path}
+					currentText={content}
+					onRestoreText={readOnly ? undefined : restoreText}
+					readOnly={readOnly}
+					onClose={() => setHistoryOpen(false)}
+				/>
+			)}
 		</div>
 	);
 }

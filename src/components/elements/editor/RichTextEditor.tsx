@@ -22,6 +22,8 @@ interface RichTextEditorProps {
 	// Live P2P-synced document; the editor mirrors its "blocknote" fragment
 	collab?: CollabDoc | null;
 	userName?: string;
+	// Hands over a function that replaces the whole note, so an older version can be put back
+	onReady?: (replaceText: (text: string) => void) => void;
 }
 
 // A plain text file can hold paragraphs, headings and lists, but not images or code blocks
@@ -38,6 +40,7 @@ export default function RichTextEditor({
 	readOnly = false,
 	collab = null,
 	userName = "You",
+	onReady,
 }: RichTextEditorProps) {
 	const { isDark } = useThemeContext();
 	const lastReported = useRef<string | null>(null);
@@ -58,6 +61,10 @@ export default function RichTextEditor({
 		[collab, userName],
 	);
 	const editor = useCreateBlockNote(options, [collab?.doc]);
+
+	useEffect(() => {
+		onReady?.((text) => editor.replaceBlocks(editor.document, plainTextToBlocks(text) as never));
+	}, [editor, onReady]);
 
 	// Tell the note what the editor holds, but only when that changed
 	const report = useCallback(() => {

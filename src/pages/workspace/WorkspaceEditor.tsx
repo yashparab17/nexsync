@@ -13,6 +13,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { exportFolders } from "@/lib/export";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
 import { isBinaryFile, isDocumentFile } from "@/lib/editor/languages";
@@ -61,6 +62,7 @@ export default function WorkspaceEditor() {
 	const [itemError, setItemError] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState<WorkspaceFile | null>(null);
 	const [closing, setClosing] = useState<string | null>(null);
+	const [exportNotice, setExportNotice] = useState<{ ok: boolean; text: string } | null>(null);
 	const [renaming, setRenaming] = useState<{ entry: WorkspaceFile; value: string } | null>(null);
 
 	const loadDir = useCallback(
@@ -245,6 +247,17 @@ export default function WorkspaceEditor() {
 					setTargetDir("editor");
 				}}
 				onFilterStart={() => void loadTree()}
+				notice={exportNotice}
+				onExport={async () => {
+					setExportNotice(null);
+					try {
+						const name = `${workspace?.name ?? "workspace"}-${targetDir.replace(/\//g, "-")}`;
+						const result = await exportFolders(workspacePath, [targetDir], name);
+						if (result) setExportNotice({ ok: true, text: `Saved ${result.count} ${result.count === 1 ? "file" : "files"} to ${result.dest}` });
+					} catch (err) {
+						setExportNotice({ ok: false, text: err instanceof Error ? err.message : String(err) });
+					}
+				}}
 			/>
 
 			{/* Tabs, editor and run output */}

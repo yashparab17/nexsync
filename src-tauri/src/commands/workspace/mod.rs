@@ -14,6 +14,8 @@ pub mod error_log;
 pub mod trash;
 pub mod data_sync;
 pub mod workspace_delete;
+pub mod versions;
+pub mod export;
 
 // Re-exports for command invocation surface
 pub use workspace::*;

@@ -3,6 +3,7 @@ import {
 	ChevronDown,
 	ChevronRight,
 	ChevronsDownUp,
+	Download,
 	File,
 	FileCode,
 	FilePlus,
@@ -55,6 +56,9 @@ interface FileExplorerProps {
 	onCollapseAll: () => void;
 	// Called when a filter is first typed, so the whole tree can be loaded and searched
 	onFilterStart: () => void;
+	// Zips the folder that new files go in; the result or its error shows under the filter
+	onExport: () => void;
+	notice: { ok: boolean; text: string } | null;
 }
 
 // The Editor tab's file browser: a tree with folder actions, rename, delete, a filter and keyboard control
@@ -75,6 +79,8 @@ export default function FileExplorer({
 	onRefresh,
 	onCollapseAll,
 	onFilterStart,
+	onExport,
+	notice,
 }: FileExplorerProps) {
 	const [query, setQuery] = useState("");
 	const treeRef = useRef<HTMLDivElement>(null);
@@ -220,6 +226,9 @@ export default function FileExplorer({
 					<Button variant="ghost" size="icon-xs" aria-label="Refresh files" onPress={onRefresh}>
 						<RefreshCw className="size-3.5" />
 					</Button>
+					<Button variant="ghost" size="icon-xs" aria-label={`Export ${targetDir} as zip`} onPress={onExport}>
+						<Download className="size-3.5" />
+					</Button>
 					<Button variant="ghost" size="icon-xs" aria-label="Collapse all folders" onPress={onCollapseAll}>
 						<ChevronsDownUp className="size-3.5" />
 					</Button>
@@ -248,6 +257,11 @@ export default function FileExplorer({
 						</button>
 					)}
 				</div>
+				{notice && (
+					<p role={notice.ok ? "status" : "alert"} className={cn("mt-1.5 break-words text-[11px]", notice.ok ? "text-emerald-400" : "text-destructive")}>
+						{notice.text}
+					</p>
+				)}
 				{!readOnly && !filtering && (
 					<p className="mt-1.5 truncate text-[11px] text-muted-foreground" title={`New files go in ${targetDir}`}>
 						New items go in <span className="font-mono text-foreground">{targetDir}</span>

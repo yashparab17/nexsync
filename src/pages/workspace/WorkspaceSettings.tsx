@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Check, Save, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, Download, Loader2, Save, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useLeaveWorkspace } from "@/hooks/useLeaveWorkspace";
+import { exportFolders } from "@/lib/export";
 import { errorText } from "@/lib/utils";
 import { removeRecentWorkspace, writeWorkspaceMetadata } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -54,6 +55,8 @@ export default function WorkspaceSettings() {
 	const [sync, setSync] = useState(metadata?.settings.sync ?? true);
 	const [theme, setTheme] = useState(metadata?.settings.theme ?? "dark");
 
+	const [exporting, setExporting] = useState(false);
+	const [exportResult, setExportResult] = useState<{ ok: boolean; text: string } | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [savedSuccess, setSavedSuccess] = useState(false);
 	const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
@@ -286,6 +289,44 @@ export default function WorkspaceSettings() {
 					)}
 				</div>
 			</form>
+
+			{/* Export */}
+			<Card>
+				<CardHeader>
+					<CardTitle className="text-base">Export</CardTitle>
+					<CardDescription>
+						Save a copy of the workspace files as one zip: notes, files, assets and code, in their folders. Tasks and the
+						Kanban board are stored in the workspace database and are not part of the zip.
+					</CardDescription>
+				</CardHeader>
+				<CardContent className="flex flex-wrap items-center gap-3">
+					<Button
+						variant="outline"
+						isDisabled={exporting || !workspace}
+						onPress={async () => {
+							if (!workspace) return;
+							setExporting(true);
+							setExportResult(null);
+							try {
+								const result = await exportFolders(workspace.path, ["notes", "files", "assets", "editor"], workspace.name);
+								if (result) setExportResult({ ok: true, text: `Saved ${result.count} ${result.count === 1 ? "file" : "files"} to ${result.dest}` });
+							} catch (err) {
+								setExportResult({ ok: false, text: errorText(err, "Could not export the workspace.") });
+							} finally {
+								setExporting(false);
+							}
+						}}
+					>
+						{exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+						Export workspace as zip
+					</Button>
+					{exportResult && (
+						<span role={exportResult.ok ? "status" : "alert"} className={`text-xs ${exportResult.ok ? "text-emerald-400" : "text-destructive"}`}>
+							{exportResult.text}
+						</span>
+					)}
+				</CardContent>
+			</Card>
 
 			{/* Danger Zone */}
 			<Card className="border-destructive/30 bg-destructive/5">

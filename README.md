@@ -18,6 +18,7 @@ Built with [Tauri 2](https://tauri.app) (Rust) + React 19 + TypeScript, with pee
 - **Live co-editing.** Open the same note or file as a collaborator and edit it together in real time — a Yjs CRDT keeps the rich-text and code editors in sync character-by-character, persisted locally so a reload never loses in-flight edits.
 - **Roles that are actually enforced.** Owner, Editor and Viewer are checked both in the UI (a Viewer never sees create/edit/delete controls) and on the wire (the host drops a Viewer's changes even if a modified client tries to send them anyway).
 - **Settings.** One page for your display name, theme (light, dark or follow the system), editor look (font size, tab width, line wrapping), the folders workspaces may live in, updates and the error log. Name and folder changes are saved together from a bar that appears when there is something to save, with Discard and Ctrl+S.
+- **History and export.** Every file keeps a timeline of versions on your device (saves, snapshots while you edit, synced and imported files), with a line and word diff and restore. Notes export as Markdown or PDF, the workspace or any Editor folder exports as a zip.
 - **Auto-updates.** Signed release builds are checked for and installed from inside the app (Settings → Updates & About).
 
 ## How peer-to-peer works
