@@ -31,6 +31,7 @@ import {
 	useWorkspace,
 	subscribeToActivityEvents,
 } from "@/store/workspace/WorkspaceContext";
+import { useNotifications } from "@/store/notifications/NotificationContext";
 import {
 	base64ToUint8Array,
 	readWorkspaceMetadata,
@@ -44,6 +45,8 @@ import {
 import type { Member } from "@/types/workspace";
 import { bindGuestMember, canChangeRole, roleTable } from "@/lib/roles";
 import { applyCatchUp, buildInventory, updatesFor, type Inventory } from "@/lib/p2p/yjsCatchUp";
+import { readSelfName, setSelfName } from "@/lib/p2p/selfName";
+import { newMentions } from "@/lib/comments";
 
 // Files above this size are listed as placeholders during sync and downloaded on demand
 export const LAZY_LOAD_THRESHOLD_BYTES = 10 * 1024 * 1024;
@@ -66,7 +69,7 @@ export interface SyncProgress {
 // One-line summary of an in-progress workspace sync
 export function describeSyncProgress(progress: SyncProgress): string {
 	const { filesDone, filesTotal, currentFile, currentFileBytes, currentFileTotal } = progress;
-	if (!currentFile) return "Syncing workspace…";
+	if (!currentFile) return "Updating the workspace…";
 	const percent =
 		currentFileTotal && currentFileBytes !== undefined
 			? ` (${Math.round((currentFileBytes / currentFileTotal) * 100)}%)`
@@ -78,27 +81,6 @@ export function describeSyncProgress(progress: SyncProgress): string {
 export interface SyncedFile {
 	relPath: string; // Empty after a full workspace sync
 	version: number;
-}
-
-// Name this device joined a workspace under, keyed by the local copy's id (paths vary in spelling)
-const selfNameKey = (workspaceId: string) => `nexsync.selfName:${workspaceId}`;
-
-function readSelfName(workspaceId: string | undefined): string | null {
-	if (!workspaceId) return null;
-	try {
-		return localStorage.getItem(selfNameKey(workspaceId));
-	} catch {
-		return null;
-	}
-}
-
-function setSelfName(workspaceId: string, name: string | null) {
-	try {
-		if (name === null) localStorage.removeItem(selfNameKey(workspaceId));
-		else localStorage.setItem(selfNameKey(workspaceId), name);
-	} catch {
-		// Only affects whether this copy shows the host's controls
-	}
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -166,6 +148,7 @@ interface P2PContextType {
 	disconnectPeer: (peerId: string) => Promise<void>;
 	disconnectAll: () => Promise<void>;
 	retryConnection: () => Promise<void>;
+	network: p2p.NetworkStatus; // Whether the relay is reachable, and why not
 }
 
 const P2PContext = createContext<P2PContextType | null>(null);
@@ -183,12 +166,17 @@ function isNamedVersion(value: unknown): value is NamedVersion {
 // Provides P2P state and actions to the whole app
 export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const { workspace, metadata, refreshMetadata } = useWorkspace();
+	const { notify } = useNotifications();
+	const notifyRef = useRef(notify);
+	notifyRef.current = notify;
+	const selfIdRef = useRef<string | null>(null);
 	const [peers, setPeers] = useState<ConnectedPeerInfo[]>([]);
 	const [placeholders, setPlaceholders] = useState<PlaceholderItem[]>([]);
 	const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
 	const [lastSyncedFile, setLastSyncedFile] = useState<SyncedFile | null>(null);
 	const [isJoining, setIsJoining] = useState(false);
 	const [reconnecting, setReconnecting] = useState(false);
+	const [network, setNetwork] = useState<p2p.NetworkStatus>({ online: navigator.onLine, detail: null });
 	const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
 	const [workspaceDeleted, setWorkspaceDeleted] = useState(false);
 	// Read inside handlers: guests can now see other guests, so only the host may act on them
@@ -225,6 +213,47 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	placeholdersRef.current = placeholders;
 
 	const peersRef = useRef<ConnectedPeerInfo[]>([]);
+
+	// The member this device is: the owner in our own workspace, otherwise the one that carries our name or device key
+	const myMemberId = () => {
+		const members = metadataRef.current?.members.members ?? [];
+		if (selfNameRef.current === null) return members.find((m) => m.role === "Owner")?.id;
+		const id = selfIdRef.current;
+		return members.find((m) => (id ? m.deviceId === id : m.name === selfNameRef.current))?.id;
+	};
+
+	// The title of a task or card that a collaborator's change assigns to us for the first time, or null
+	const newAssignmentTitle = async (path: string, change: DataChange): Promise<string | null> => {
+		const mine = myMemberId();
+		if (!mine || change.op !== "upsert") return null;
+		if (change.entity === "task") {
+			if (change.task.assignee_id !== mine) return null;
+			const before = (await getTasks(path).catch(() => [])).find((t) => t.id === change.task.id);
+			return before?.assignee_id === mine ? null : change.task.title;
+		}
+		if (change.entity === "card") {
+			if (change.card.assignee_id !== mine) return null;
+			const before = (await getKanban(path).catch(() => [])).flatMap((c) => c.cards).find((k) => k.id === change.card.id);
+			return before?.assignee_id === mine ? null : change.card.title;
+		}
+		return null;
+	};
+
+	// The title of a task or card that a collaborator's change newly mentions us in, or null
+	const newMentionTitle = async (path: string, change: DataChange): Promise<string | null> => {
+		if (change.op !== "upsert") return null;
+		const me = metadataRef.current?.members.members.find((m) => m.id === myMemberId())?.name;
+		if (!me) return null;
+		if (change.entity === "task") {
+			const before = (await getTasks(path).catch(() => [])).find((t) => t.id === change.task.id);
+			return newMentions(before?.comments, change.task.comments, me).length ? change.task.title : null;
+		}
+		if (change.entity === "card") {
+			const before = (await getKanban(path).catch(() => [])).flatMap((c) => c.cards).find((k) => k.id === change.card.id);
+			return newMentions(before?.comments, change.card.comments, me).length ? change.card.title : null;
+		}
+		return null;
+	};
 	const syncProvidersRef = useRef<Set<P2PSyncProvider>>(new Set());
 	// Peers we asked for a snapshot, mapped to the local workspace path to apply it to
 	const pendingSnapshotsRef = useRef<Map<string, string | null>>(new Map());
@@ -241,6 +270,22 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			console.error("[P2P] Failed to set shared workspace:", err),
 		);
 	}, [workspace?.path]);
+
+	// The OS knows the network changed before Iroh does: show offline at once, and make Iroh re-probe when it returns.
+	// The backend then confirms reachability of the relay itself and re-dials a lost host.
+	useEffect(() => {
+		const offNetwork = p2p.onNetwork(setNetwork);
+		const goOffline = () => setNetwork({ online: false, detail: "No network connection." });
+		const goOnline = () => p2p.networkChange().catch(() => {});
+		window.addEventListener("offline", goOffline);
+		window.addEventListener("online", goOnline);
+		p2p.networkStatus().then((status) => status && setNetwork(status)).catch(() => {});
+		return () => {
+			offNetwork();
+			window.removeEventListener("offline", goOffline);
+			window.removeEventListener("online", goOnline);
+		};
+	}, []);
 
 	// Leaving a workspace drops its collaborators so they can't reach the next one opened
 	const prevWorkspaceIdRef = useRef<string | null>(null);
@@ -296,6 +341,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		const offReconnectFailed = p2p.onReconnectFailed(() => setReconnecting(false));
 		const offJoined = p2p.onPeerJoined((peer) => {
 			setReconnecting(false);
+			if (!peer.isHost) notifyRef.current(`${peer.name} joined the workspace`);
 			syncProvidersRef.current.forEach((provider) => provider.addPeer(peer.id));
 			sendInventoryRef.current(peer.id);
 			if (!peer.isHost && selfNameRef.current === null) void addGuestMember(peer);
@@ -372,7 +418,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				const local = await readWorkspaceMetadata(path);
 				if (pendingSelfNameRef.current) {
 					try {
-						localStorage.setItem(selfNameKey(local.workspace.id), pendingSelfNameRef.current);
+						setSelfName(local.workspace.id, pendingSelfNameRef.current);
 					} catch {
 						// Only affects the "(You)" label
 					}
@@ -551,8 +597,12 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 					if (!path || !message.payload) break;
 					try {
 						const change: DataChange = JSON.parse(message.payload);
+						const assigned = await newAssignmentTitle(path, change);
+						const mentioned = await newMentionTitle(path, change);
 						await applyDataChange(path, change);
 						setDataVersion((v) => v + 1);
+						if (assigned) notifyRef.current(`${message.author ?? "A collaborator"} assigned you "${assigned}"`);
+						if (mentioned) notifyRef.current(`${message.author ?? "A collaborator"} mentioned you on "${mentioned}"`);
 					} catch (err) {
 						console.error("[P2P] Failed to apply a collaborator's change:", err);
 					}
@@ -691,6 +741,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 					if (!path || !message.payload) break;
 					try {
 						const event = JSON.parse(message.payload);
+						// The receiving side knows who really sent it, so that name replaces whatever the event claims
+						if (message.author) event.author = message.author;
 						const meta = await readWorkspaceMetadata(path);
 						if (meta.activity.events.some((e) => e.id === event.id)) break;
 						await writeWorkspaceMetadata({
@@ -951,6 +1003,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 
 	// A joined copy identifies itself in the member list by its device key
 	const [selfId, setSelfId] = useState<string | null>(null);
+	selfIdRef.current = selfId;
 	useEffect(() => {
 		if (selfName === null) return;
 		p2p.selfId().then(setSelfId).catch(() => {});
@@ -1098,6 +1151,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				disconnectPeer,
 				disconnectAll,
 				retryConnection,
+				network,
 			}}
 		>
 			{children}

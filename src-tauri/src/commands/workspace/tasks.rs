@@ -2,7 +2,7 @@
 
 use crate::commands::config::validate_allowed_root;
 use super::helpers::get_workspace_id;
-use super::models::{Task, TaskIdRequest, TaskRequest};
+use super::models::{json_list, to_json, valid_comments, valid_tags, Task, TaskIdRequest, TaskRequest};
 use crate::commands::validation::{validate_task_priority, validate_task_status};
 
 // ────────────────────────────
@@ -21,7 +21,7 @@ pub fn get_tasks(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Task>
         .conn
         .prepare(
             "SELECT id, title, description, status, priority, due_date, assignee_id,
-             created_at, updated_at
+             created_at, updated_at, tags, comments
              FROM tasks WHERE workspace_id = ?1 ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?
@@ -36,6 +36,8 @@ pub fn get_tasks(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Task>
                 assignee_id: r.get(6).ok(),
                 created_at: r.get(7)?,
                 updated_at: r.get(8)?,
+                tags: json_list(&r.get::<_, String>(9)?),
+                comments: json_list(&r.get::<_, String>(10)?),
             })
         })
         .map_err(|e| e.to_string())?
@@ -52,6 +54,12 @@ pub fn create_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     validate_task_status(&request.task.status)?;
     validate_task_priority(&request.task.priority)?;
+    if !valid_tags(&request.task.tags) {
+        return Err("A task can have up to 10 tags of 32 characters each.".to_string());
+    }
+    if !valid_comments(&request.task.comments) {
+        return Err("A task can have up to 200 comments of 2000 characters each.".to_string());
+    }
 
     // Enforce field bounds
     if request.task.title.is_empty() || request.task.title.len() > 256 {
@@ -69,12 +77,13 @@ pub fn create_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
     let ws_id = get_workspace_id(&db)?;
     db.conn.execute(
         "INSERT INTO tasks (id, workspace_id, title, description, status, priority,
-         due_date, assignee_id, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+         due_date, assignee_id, created_at, updated_at, tags, comments)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         rusqlite::params![
             &task.id, &ws_id, &task.title, &task.description,
             &task.status, &task.priority, &task.due_date,
-            &task.assignee_id, &task.created_at, &task.updated_at,
+            &task.assignee_id, &task.created_at, &task.updated_at, to_json(&task.tags),
+            to_json(&task.comments),
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -90,6 +99,12 @@ pub fn update_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     validate_task_status(&request.task.status)?;
     validate_task_priority(&request.task.priority)?;
+    if !valid_tags(&request.task.tags) {
+        return Err("A task can have up to 10 tags of 32 characters each.".to_string());
+    }
+    if !valid_comments(&request.task.comments) {
+        return Err("A task can have up to 200 comments of 2000 characters each.".to_string());
+    }
 
     if request.task.title.is_empty() || request.task.title.len() > 256 {
         return Err("Task title must be between 1 and 256 characters.".to_string());
@@ -107,12 +122,12 @@ pub fn update_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
     db.conn
         .execute(
             "UPDATE tasks SET title = ?1, description = ?2, status = ?3, priority = ?4,
-             due_date = ?5, assignee_id = ?6, updated_at = ?7
+             due_date = ?5, assignee_id = ?6, updated_at = ?7, tags = ?10, comments = ?11
              WHERE id = ?8 AND workspace_id = ?9",
             rusqlite::params![
                 &task.title, &task.description, &task.status, &task.priority,
                 &task.due_date, &task.assignee_id, &task.updated_at,
-                &task.id, &ws_id,
+                &task.id, &ws_id, to_json(&task.tags), to_json(&task.comments),
             ],
         )
         .map_err(|e| e.to_string())?;

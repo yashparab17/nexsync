@@ -336,3 +336,68 @@ pub fn import_asset_from_path(
         modified_at,
     })
 }
+
+// ────────────────────────────
+// Search
+// ────────────────────────────
+
+/// A workspace file with its text, for the header search
+#[derive(serde::Serialize)]
+pub struct SearchFile {
+    pub name: String,
+    /// Like list_workspace_files: starts with `/`
+    pub path: String,
+    pub size: u64,
+    /// Lower-case text of small text files, otherwise empty
+    pub body: String,
+}
+
+const SEARCH_MAX_DEPTH: usize = 5;
+const SEARCH_MAX_FILES: usize = 20_000;
+const SEARCH_MAX_TEXT_FILES: usize = 300;
+const SEARCH_MAX_TEXT_BYTES: u64 = 256 * 1024;
+const SEARCH_TEXT_EXTENSIONS: &[&str] = &[
+    "md", "markdown", "txt", "json", "csv", "toml", "yml", "yaml", "html", "htm", "css", "js", "ts", "tsx", "jsx", "rs",
+];
+
+fn search_walk(dir: &std::path::Path, rel: &str, depth: usize, out: &mut Vec<SearchFile>, text_files: &mut usize) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        if out.len() >= SEARCH_MAX_FILES {
+            return;
+        }
+        let Some(name) = entry.file_name().to_str().map(str::to_owned) else { continue };
+        let Ok(meta) = entry.path().symlink_metadata() else { continue };
+        if name.starts_with('.') || meta.is_symlink() {
+            continue;
+        }
+        let path = format!("{rel}/{name}");
+        if meta.is_dir() {
+            if depth < SEARCH_MAX_DEPTH {
+                search_walk(&entry.path(), &path, depth + 1, out, text_files);
+            }
+            continue;
+        }
+        let is_text = std::path::Path::new(&name)
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| SEARCH_TEXT_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()));
+        let body = if is_text && meta.len() <= SEARCH_MAX_TEXT_BYTES && *text_files < SEARCH_MAX_TEXT_FILES {
+            *text_files += 1;
+            fs::read_to_string(entry.path()).map(|t| t.to_lowercase()).unwrap_or_default()
+        } else {
+            String::new()
+        };
+        out.push(SearchFile { name, path, size: meta.len(), body });
+    }
+}
+
+/// Every file in the workspace with the text of the small text ones, in one call
+#[tauri::command]
+pub fn search_workspace_files(app_handle: tauri::AppHandle, path: String) -> Result<Vec<SearchFile>, String> {
+    validate_allowed_root(&app_handle, &path)?;
+    let root = crate::commands::path_utils::resolve_workspace_path(&path, ".")?;
+    let mut files = Vec::new();
+    search_walk(&root, "", 0, &mut files, &mut 0);
+    Ok(files)
+}

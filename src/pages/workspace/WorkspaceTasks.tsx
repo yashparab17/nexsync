@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	AlertCircle,
-	Calendar,
+	CalendarDays,
 	CheckCircle2,
 	Clock,
 	Filter,
+	List,
 	ListTodo,
 	Pencil,
 	Plus,
@@ -25,6 +26,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DueBadge, TagChip, TagInput } from "@/components/elements/PlanningFields";
+import TaskCalendar from "@/components/elements/TaskCalendar";
+import { collectTags } from "@/lib/planning";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
@@ -33,6 +37,12 @@ import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type { Task, TaskPriority, TaskStatus } from "@/types/workspace";
+import Loading from "@/components/Loading";
+import { itemTarget } from "@/lib/insights";
+import Comments from "@/components/elements/Comments";
+import NoteLinks from "@/components/elements/NoteLinks";
+import { myName } from "@/lib/p2p/selfName";
+import type { Comment } from "@/types/workspace";
 
 // ────────────────────────────
 // Priority & Status Styling Helpers
@@ -87,7 +97,9 @@ const STATUS_CONFIG: Record<
 };
 
 export default function WorkspaceTasks() {
-	const { workspace, refreshMetadata, addActivityEvent } = useWorkspace();
+	const { workspace, metadata, refreshMetadata, addActivityEvent } = useWorkspace();
+	const members = metadata?.members.members ?? [];
+	const memberName = (id: string) => members.find((m) => m.id === id)?.name ?? "a removed member";
 	const { dataVersion, publishDataChange } = useP2P();
 	const isViewer = useIsViewer();
 	const logError = useErrorLog();
@@ -111,6 +123,10 @@ export default function WorkspaceTasks() {
 	const [formStatus, setFormStatus] = useState<TaskStatus>("todo");
 	const [formPriority, setFormPriority] = useState<TaskPriority>("medium");
 	const [formDueDate, setFormDueDate] = useState("");
+	const [formTags, setFormTags] = useState<string[]>([]);
+	const [formAssignee, setFormAssignee] = useState("");
+	const [tagFilter, setTagFilter] = useState<string | null>(null);
+	const [view, setView] = useState<"list" | "calendar">("list");
 	const [formSubmitting, setFormSubmitting] = useState(false);
 
 	// Fetch Tasks from SQLite backend
@@ -145,6 +161,8 @@ export default function WorkspaceTasks() {
 		setFormStatus("todo");
 		setFormPriority("medium");
 		setFormDueDate("");
+		setFormTags([]);
+		setFormAssignee("");
 		setIsCreateOpen(true);
 	};
 
@@ -156,6 +174,8 @@ export default function WorkspaceTasks() {
 		setFormStatus(task.status);
 		setFormPriority(task.priority);
 		setFormDueDate(task.due_date ? task.due_date.slice(0, 10) : "");
+		setFormTags(task.tags ?? []);
+		setFormAssignee(task.assignee_id ?? "");
 	};
 
 	// Deep link from workspace search
@@ -179,6 +199,8 @@ export default function WorkspaceTasks() {
 				status: formStatus,
 				priority: formPriority,
 				due_date: formDueDate ? new Date(formDueDate).toISOString() : undefined,
+				assignee_id: formAssignee || undefined,
+				tags: formTags,
 				created_at: now,
 				updated_at: now,
 			};
@@ -188,7 +210,7 @@ export default function WorkspaceTasks() {
 			await addActivityEvent(
 				"Created task",
 				`Created task: ${newTask.title}`,
-				undefined,
+				itemTarget("task", newTask.id),
 				"task",
 			);
 			setIsCreateOpen(false);
@@ -216,6 +238,8 @@ export default function WorkspaceTasks() {
 				status: formStatus,
 				priority: formPriority,
 				due_date: formDueDate ? new Date(formDueDate).toISOString() : undefined,
+				assignee_id: formAssignee || undefined,
+				tags: formTags,
 				updated_at: new Date().toISOString(),
 			};
 
@@ -224,7 +248,7 @@ export default function WorkspaceTasks() {
 			await addActivityEvent(
 				"Updated task",
 				`Updated task: ${updated.title}`,
-				undefined,
+				itemTarget("task", updated.id),
 				"task",
 			);
 			setEditingTask(null);
@@ -257,13 +281,29 @@ export default function WorkspaceTasks() {
 			await addActivityEvent(
 				"Updated task status",
 				`Changed "${task.title}" to ${updated.status}`,
-				undefined,
+				itemTarget("task", updated.id),
 				"task",
 			);
 			await loadTasks();
 			await refreshMetadata();
 		} catch (err) {
 			console.error("Failed to toggle task status:", err);
+			logError(err, { source: "tasks" });
+		}
+	};
+
+	const me = myName(workspace?.id, members.find((m) => m.role === "Owner")?.name);
+
+	// Comments are saved and shared as soon as they are added, without waiting for Save Changes
+	const saveComments = async (comments: Comment[]) => {
+		if (isViewer || !workspace?.path || !editingTask) return;
+		const updated: Task = { ...editingTask, comments, updated_at: new Date().toISOString() };
+		try {
+			await updateTask({ path: workspace.path, task: updated });
+			publishDataChange({ entity: "task", op: "upsert", task: updated });
+			setEditingTask(updated);
+			setTasks((all) => all.map((x) => (x.id === updated.id ? updated : x)));
+		} catch (err) {
 			logError(err, { source: "tasks" });
 		}
 	};
@@ -278,7 +318,7 @@ export default function WorkspaceTasks() {
 			await addActivityEvent(
 				"Deleted task",
 				`Deleted task: ${deleted?.title || "Task"}`,
-				undefined,
+				itemTarget("task", deletingTaskId),
 				"task",
 			);
 			setDeletingTaskId(null);
@@ -300,9 +340,12 @@ export default function WorkspaceTasks() {
 				statusFilter === "all" || t.status === statusFilter;
 			const matchesPriority =
 				priorityFilter === "all" || t.priority === priorityFilter;
-			return matchesSearch && matchesStatus && matchesPriority;
+			const matchesTag = !tagFilter || (t.tags ?? []).includes(tagFilter);
+			return matchesSearch && matchesStatus && matchesPriority && matchesTag;
 		});
-	}, [tasks, searchQuery, statusFilter, priorityFilter]);
+	}, [tasks, searchQuery, statusFilter, priorityFilter, tagFilter]);
+
+	const allTags = useMemo(() => collectTags(tasks), [tasks]);
 
 	// Stats Computations
 	const stats = useMemo(() => {
@@ -312,6 +355,32 @@ export default function WorkspaceTasks() {
 		const done = tasks.filter((t) => t.status === "done").length;
 		return { total, todo, inProgress, done };
 	}, [tasks]);
+
+	// Assignee and tags, shared by the create and edit dialogs
+	const renderExtras = (prefix: string) => (
+		<>
+			<div>
+				<Label htmlFor={`${prefix}-assignee`}>Assignee</Label>
+				<select
+					id={`${prefix}-assignee`}
+					value={formAssignee}
+					onChange={(e) => setFormAssignee(e.target.value)}
+					className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+				>
+					<option value="">Unassigned</option>
+					{members.map((m) => (
+						<option key={m.id} value={m.id}>
+							{m.name}
+						</option>
+					))}
+				</select>
+			</div>
+			<div>
+				<Label htmlFor={`${prefix}-tags`}>Tags</Label>
+				<TagInput id={`${prefix}-tags`} value={formTags} onChange={setFormTags} suggestions={allTags} />
+			</div>
+		</>
+	);
 
 	return (
 		<div className="space-y-6">
@@ -403,6 +472,26 @@ export default function WorkspaceTasks() {
 					/>
 				</div>
 
+				<div className="flex items-center border" role="group" aria-label="View">
+					{(["list", "calendar"] as const).map((v) => (
+						<button
+							key={v}
+							type="button"
+							aria-pressed={view === v}
+							onClick={() => setView(v)}
+							className={cn(
+								"flex cursor-pointer items-center gap-1 px-2.5 py-1 text-xs font-medium transition-colors",
+								view === v
+									? "bg-primary text-primary-foreground"
+									: "bg-muted text-muted-foreground hover:text-foreground",
+							)}
+						>
+							{v === "list" ? <List className="size-3.5" /> : <CalendarDays className="size-3.5" />}
+							{v === "list" ? "List" : "Calendar"}
+						</button>
+					))}
+				</div>
+
 				<div className="flex flex-wrap items-center gap-2">
 					<div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
 						<Filter className="size-3.5" />
@@ -445,13 +534,25 @@ export default function WorkspaceTasks() {
 				</div>
 			</div>
 
+			{allTags.length > 0 && (
+				<div className="flex flex-wrap items-center gap-1.5">
+					<span className="text-xs font-medium text-muted-foreground">Tags:</span>
+					{allTags.map((tag) => (
+						<TagChip
+							key={tag}
+							tag={tag}
+							active={tagFilter === tag}
+							onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
+						/>
+					))}
+				</div>
+			)}
+
 			{/* Tasks List */}
 			{loading ? (
-				<div className="flex h-48 items-center justify-center">
-					<p className="text-xs uppercase tracking-widest text-muted-foreground animate-pulse">
-						Loading tasks from SQLite…
-					</p>
-				</div>
+				<Loading className="h-48" />
+			) : view === "calendar" ? (
+				<TaskCalendar tasks={filteredTasks} onOpen={handleOpenEdit} />
 			) : filteredTasks.length === 0 ? (
 				<div className="flex flex-col items-center justify-center rounded-none border border-dashed border-border/80 p-12 text-center bg-card/10">
 					<div className="flex size-12 items-center justify-center rounded-none bg-muted/60">
@@ -459,11 +560,11 @@ export default function WorkspaceTasks() {
 					</div>
 					<h3 className="mt-4 text-base font-semibold">No tasks found</h3>
 					<p className="mt-1 text-sm text-muted-foreground max-w-sm">
-						{searchQuery || statusFilter !== "all" || priorityFilter !== "all"
+						{searchQuery || statusFilter !== "all" || priorityFilter !== "all" || tagFilter
 							? "No tasks match your current search or active filters."
 							: "You have no tasks created yet. Create one to begin tracking."}
 					</p>
-					{searchQuery || statusFilter !== "all" || priorityFilter !== "all" ? (
+					{searchQuery || statusFilter !== "all" || priorityFilter !== "all" || tagFilter ? (
 						<Button
 							variant="outline"
 							size="sm"
@@ -472,6 +573,7 @@ export default function WorkspaceTasks() {
 								setSearchQuery("");
 								setStatusFilter("all");
 								setPriorityFilter("all");
+								setTagFilter(null);
 							}}
 						>
 							Clear Filters
@@ -565,12 +667,18 @@ export default function WorkspaceTasks() {
 											</p>
 										)}
 
-										{task.due_date && (
-											<div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-												<Calendar className="size-3 text-muted-foreground/70" />
-												<span>
-													Due {new Date(task.due_date).toLocaleDateString()}
-												</span>
+										{(task.due_date || task.assignee_id || (task.tags ?? []).length > 0) && (
+											<div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+												<DueBadge due={task.due_date} done={task.status === "done"} />
+												{task.assignee_id && <span>Assigned to {memberName(task.assignee_id)}</span>}
+												{(task.tags ?? []).map((tag) => (
+													<TagChip
+														key={tag}
+														tag={tag}
+														active={tagFilter === tag}
+														onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
+													/>
+												))}
 											</div>
 										)}
 									</div>
@@ -614,8 +722,7 @@ export default function WorkspaceTasks() {
 						<DialogHeader>
 							<DialogTitle>Create New Task</DialogTitle>
 							<DialogDescription>
-								Add a structured task stored directly in the workspace SQLite
-								database.
+								Add a task to this workspace.
 							</DialogDescription>
 						</DialogHeader>
 
@@ -627,7 +734,7 @@ export default function WorkspaceTasks() {
 									required
 									value={formTitle}
 									onChange={(e) => setFormTitle(e.target.value)}
-									placeholder="e.g. Implement WebRTC signaling protocol"
+									placeholder="e.g. Prepare the project proposal"
 									className="mt-1"
 									autoFocus
 								/>
@@ -689,6 +796,7 @@ export default function WorkspaceTasks() {
 									className="mt-1"
 								/>
 							</div>
+							{renderExtras("create")}
 						</div>
 
 						<DialogFooter>
@@ -722,7 +830,7 @@ export default function WorkspaceTasks() {
 						<DialogHeader>
 							<DialogTitle>Edit Task</DialogTitle>
 							<DialogDescription>
-								Update task details in the workspace SQLite database.
+								Update this task's details.
 							</DialogDescription>
 						</DialogHeader>
 
@@ -748,6 +856,7 @@ export default function WorkspaceTasks() {
 									rows={3}
 									className="mt-1"
 								/>
+								<NoteLinks text={formDescription} />
 							</div>
 
 							<div className="grid grid-cols-2 gap-3">
@@ -794,7 +903,16 @@ export default function WorkspaceTasks() {
 									className="mt-1"
 								/>
 							</div>
+							{renderExtras("edit")}
 						</div>
+
+						<Comments
+							comments={editingTask.comments ?? []}
+							me={me}
+							memberNames={members.map((m) => m.name)}
+							canComment={!isViewer}
+							onChange={saveComments}
+						/>
 
 						<DialogFooter>
 							<Button

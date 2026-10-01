@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Code2, File, FileText, KanbanSquare, ListTodo, Search, X } from "lucide-react";
+import { Clock, Code2, Compass, File, FileText, KanbanSquare, ListTodo, Search, X } from "lucide-react";
 
 import { isBinaryFile, isDocumentFile, isNoteFile } from "@/lib/editor/languages";
-import { getKanban, getTasks, listWorkspaceFiles, readWorkspaceFile } from "@/lib/tauri";
+import { getKanban, getTasks, searchWorkspaceFiles } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
-import type { WorkspaceFile } from "@/types/workspace";
 
 interface Hit {
 	key: string;
-	kind: "Note" | "Code" | "File" | "Asset" | "Task" | "Card";
+	kind: "Note" | "Code" | "File" | "Asset" | "Task" | "Card" | "Go to";
 	title: string;
 	sub: string;
 	to: string;
@@ -17,11 +16,7 @@ interface Hit {
 	body?: string;
 }
 
-const MAX_DEPTH = 4;
 const MAX_RESULTS = 30;
-const MAX_TEXT_BYTES = 256 * 1024;
-const MAX_TEXT_FILES = 300;
-const TEXT_EXT = /\.(md|markdown|txt|json|csv|toml|ya?ml|html?|css|js|ts|tsx|jsx|rs)$/i;
 
 // Text around the first match, for showing why a result matched
 export function snippet(text: string, q: string): string {
@@ -31,18 +26,49 @@ export function snippet(text: string, q: string): string {
 	return (s > 0 ? "…" : "") + text.slice(s, i + q.length + 60).replace(/\s+/g, " ");
 }
 
-// Recursively list every file in the workspace (hidden entries are already skipped by the backend)
-async function walk(path: string, dir = "", depth = 0): Promise<WorkspaceFile[]> {
-	const entries = await listWorkspaceFiles(path, dir).catch(() => []);
-	const nested = await Promise.all(
-		entries
-			.filter((e) => e.is_dir && depth < MAX_DEPTH)
-			.map((e) => walk(path, e.path.replace(/^\/+/, ""), depth + 1)),
-	);
-	return [...entries.filter((e) => !e.is_dir), ...nested.flat()];
-}
+const ICONS = { Note: FileText, Code: Code2, File, Asset: File, Task: ListTodo, Card: KanbanSquare, "Go to": Compass };
 
-const ICONS = { Note: FileText, Code: Code2, File, Asset: File, Task: ListTodo, Card: KanbanSquare };
+// Pages the palette can jump to
+const PAGES: [string, string][] = [
+	["Dashboard", "/workspace/dashboard"],
+	["Notes", "/workspace/notes"],
+	["Tasks", "/workspace/tasks"],
+	["Kanban board", "/workspace/kanban"],
+	["Editor", "/workspace/editor"],
+	["Files", "/workspace/files"],
+	["Assets", "/workspace/assets"],
+	["Insights", "/workspace/insights"],
+	["Members", "/workspace/members"],
+	["Trash", "/workspace/trash"],
+	["Workspace settings", "/workspace/settings"],
+];
+const COMMANDS: Hit[] = PAGES.map(([title, to]) => ({ key: `go:${to}`, kind: "Go to", title, sub: "Open page", to }));
+
+const FILTERS = ["All", "Note", "Task", "Card", "Code", "File", "Asset", "Go to"] as const;
+type Filter = (typeof FILTERS)[number];
+
+// The last few results opened, per workspace, kept in this browser only
+const MAX_RECENT = 8;
+const recentKey = (workspaceId?: string) => `nexsync.recent:${workspaceId ?? ""}`;
+function readRecent(workspaceId?: string): Hit[] {
+	try {
+		const saved = JSON.parse(localStorage.getItem(recentKey(workspaceId)) ?? "[]");
+		return Array.isArray(saved)
+			? saved.filter((h) => h && typeof h.key === "string" && typeof h.title === "string" && typeof h.to === "string").slice(0, MAX_RECENT)
+			: [];
+	} catch {
+		return [];
+	}
+}
+function writeRecent(workspaceId: string | undefined, hit: Hit) {
+	try {
+		const { key, kind, title, sub, to } = hit;
+		const next = [{ key, kind, title, sub, to }, ...readRecent(workspaceId).filter((h) => h.key !== key)].slice(0, MAX_RECENT);
+		localStorage.setItem(recentKey(workspaceId), JSON.stringify(next));
+	} catch {
+		// Storage can be blocked; recents are a convenience
+	}
+}
 
 // Header search: matches file names, task and kanban card titles/descriptions
 export default function WorkspaceSearch() {
@@ -52,26 +78,21 @@ export default function WorkspaceSearch() {
 	const [index, setIndex] = useState<Hit[]>([]);
 	const [open, setOpen] = useState(false);
 	const [active, setActive] = useState(0);
+	const [filter, setFilter] = useState<Filter>("All");
+	const [recent, setRecent] = useState<Hit[]>([]);
 	const box = useRef<HTMLDivElement>(null);
+	const inputRef = useRef<HTMLInputElement>(null);
 
 	// Rebuild the index each time the box is focused so results are never stale
 	const loadIndex = async () => {
 		if (!workspace?.path) return;
 		const [files, tasks, columns] = await Promise.all([
-			walk(workspace.path),
+			searchWorkspaceFiles(workspace.path).catch(() => []),
 			getTasks(workspace.path).catch(() => []),
 			getKanban(workspace.path).catch(() => []),
 		]);
-		// ponytail: reads every small text file on focus, add a Rust-side index if workspaces get huge
-		const bodies = await Promise.all(
-			files.map((f, i) =>
-				TEXT_EXT.test(f.name) && f.size <= MAX_TEXT_BYTES && i < MAX_TEXT_FILES
-					? readWorkspaceFile(workspace.path, f.path.replace(/^\/+/, "")).catch(() => "")
-					: "",
-			),
-		);
 		setIndex([
-			...files.map((f, i): Hit => {
+			...files.map((f): Hit => {
 				const isNote = (isNoteFile(f.name) || isDocumentFile(f.name)) && /^\/(notes|files)\/[^/]+$/.test(f.path);
 				const isAsset = /^\/assets\/[^/]+$/.test(f.path);
 				const isCode = !isNote && !isAsset && /^\/(editor|files)\//.test(f.path) && !isBinaryFile(f.name) && !isDocumentFile(f.name);
@@ -81,7 +102,7 @@ export default function WorkspaceSearch() {
 					kind: isNote ? "Note" : isAsset ? "Asset" : isCode ? "Code" : "File",
 					title: f.name,
 					sub: f.path,
-					body: bodies[i],
+					body: f.body,
 					to: `/workspace/${isNote ? "notes" : isAsset ? "assets" : isCode ? "editor" : "files"}?open=${open}`,
 				};
 			}),
@@ -100,7 +121,8 @@ export default function WorkspaceSearch() {
 
 	const q = query.trim().toLowerCase();
 	const results = q
-		? index
+		? [...COMMANDS, ...index]
+				.filter((h) => filter === "All" || h.kind === filter)
 				.map((h) => {
 					const inTitle = h.title.toLowerCase().includes(q);
 					const inMeta = `${h.title} ${h.sub}`.toLowerCase().includes(q);
@@ -111,7 +133,9 @@ export default function WorkspaceSearch() {
 				.sort((a, b) => b.score - a.score)
 				.slice(0, MAX_RESULTS)
 				.map((r) => r.hit)
-		: [];
+		: filter === "All"
+			? recent
+			: [];
 
 	useEffect(() => setActive(0), [query]);
 
@@ -123,7 +147,21 @@ export default function WorkspaceSearch() {
 		return () => document.removeEventListener("mousedown", close);
 	}, []);
 
+	// Ctrl or Cmd+K jumps to the box from anywhere in the workspace
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "k") {
+				e.preventDefault();
+				inputRef.current?.focus();
+				inputRef.current?.select();
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, []);
+
 	const go = (h: Hit) => {
+		writeRecent(workspace?.id, h);
 		setOpen(false);
 		setQuery("");
 		navigate(h.to);
@@ -141,11 +179,12 @@ export default function WorkspaceSearch() {
 			<div className="flex items-center border bg-background px-3">
 				<Search className="size-4 shrink-0 text-muted-foreground" />
 				<input
+					ref={inputRef}
 					value={query}
 					onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-					onFocus={() => { setOpen(true); void loadIndex(); }}
+					onFocus={() => { setOpen(true); setRecent(readRecent(workspace?.id)); void loadIndex(); }}
 					onKeyDown={onKeyDown}
-					placeholder="Search workspace…"
+					placeholder="Search workspace… (Ctrl+K)"
 					aria-label="Search workspace"
 					className="h-9 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-muted-foreground"
 				/>
@@ -156,8 +195,28 @@ export default function WorkspaceSearch() {
 				)}
 			</div>
 
-			{open && q && (
+			{open && (q || recent.length > 0) && (
 				<ul className="absolute top-full left-0 z-40 mt-1 max-h-96 w-full overflow-y-auto border bg-popover shadow-md">
+					<li className="flex flex-wrap gap-1 border-b p-2">
+						{FILTERS.map((f) => (
+							<button
+								key={f}
+								type="button"
+								aria-pressed={filter === f}
+								onClick={() => setFilter(f)}
+								className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+									filter === f ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+								}`}
+							>
+								{f}
+							</button>
+						))}
+					</li>
+					{!q && results.length > 0 && (
+						<li className="flex items-center gap-1.5 px-3 pt-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+							<Clock className="size-3" /> Recent
+						</li>
+					)}
 					{results.length === 0 ? (
 						<li className="p-3 text-xs text-muted-foreground">No results for “{query}”.</li>
 					) : (

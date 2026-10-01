@@ -8,7 +8,6 @@ import {
 	Image as ImageIcon,
 	LayoutGrid,
 	List,
-	Loader2,
 	History,
 	Pencil,
 	Search,
@@ -51,6 +50,7 @@ import type {
 	AssetItem,
 	WorkspaceFile,
 } from "@/types/workspace";
+import Loading from "@/components/Loading";
 
 // Determine category from filename
 function getAssetCategory(fileName: string): AssetCategory {
@@ -298,20 +298,6 @@ export default function WorkspaceAssets() {
 		}
 	};
 
-	// Add remote simulated peer placeholder for testing lazy loading
-	const handleAddPlaceholderDemo = () => {
-		const placeholder: AssetItem = {
-			name: `peer_mock_diagram_${Date.now().toString().slice(-4)}.png`,
-			path: `/assets/peer_mock_diagram_${Date.now().toString().slice(-4)}.png`,
-			is_dir: false,
-			size: 2450000,
-			modified_at: new Date().toISOString(),
-			category: "image",
-			syncStatus: "remote_placeholder",
-		};
-		setAssets((prev) => [placeholder, ...prev]);
-	};
-
 	// Drop handler for page-level drop
 	const handlePageDrop = async (e: React.DragEvent) => {
 		e.preventDefault();
@@ -386,15 +372,6 @@ export default function WorkspaceAssets() {
 				</div>
 
 				<div className="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						onPress={handleAddPlaceholderDemo}
-						className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-					>
-						<Sparkles className="size-3.5 text-amber-500" />
-						Simulate Peer Asset
-					</Button>
 					{!isViewer && (
 						<Button
 							onPress={() => setIsUploadOpen(true)}
@@ -487,10 +464,7 @@ export default function WorkspaceAssets() {
 
 			{/* Asset Content List / Grid */}
 			{loading ?
-				<div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
-					<Loader2 className="size-8 animate-spin text-primary" />
-					<p className="text-xs font-mono">Loading workspace assets…</p>
-				</div>
+				<Loading className="py-24" />
 			: filteredAssets.length === 0 ?
 				<div className="flex flex-col items-center justify-center py-20 border border-dashed border-border rounded-none text-center p-8 bg-card/20">
 					<div className="p-4 rounded-none bg-muted/60 text-muted-foreground mb-3">
@@ -539,7 +513,7 @@ export default function WorkspaceAssets() {
 										<div className="flex flex-col items-center gap-2 text-amber-500/80 p-4 text-center">
 											<Sparkles className="size-7" />
 											<span className="text-[11px] font-medium uppercase tracking-wider">
-												Peer Placeholder
+												Not downloaded
 											</span>
 										</div>
 									: isImage && thumbnail ?
@@ -703,7 +677,7 @@ export default function WorkspaceAssets() {
 										<td className="py-3 px-4">
 											{isRemote ?
 												<span className="text-amber-500 font-medium flex items-center gap-1">
-													○ Peer Placeholder
+													○ Not downloaded
 												</span>
 											:	<span className="text-emerald-500 font-medium flex items-center gap-1">
 													● Local

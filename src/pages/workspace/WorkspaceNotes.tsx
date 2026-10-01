@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	ExternalLink,
 	FileText,
-	Loader2,
 	Plus,
 	Search,
 	StickyNote,
@@ -35,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type { WorkspaceFile } from "@/types/workspace";
+import Loading from "@/components/Loading";
 
 // Notes: Markdown notes (.md) edited as Markdown, text notes (.txt) in a rich-text editor, plus office documents
 // (.docx, .pdf, ...) that open in their own app.
@@ -276,9 +276,7 @@ export default function WorkspaceNotes() {
 				{/* Note List */}
 				<div className="flex-1 space-y-px overflow-y-auto">
 					{loading ? (
-						<div className="flex h-32 items-center justify-center">
-							<Loader2 className="size-5 animate-spin text-muted-foreground" />
-						</div>
+						<Loading />
 					) : filteredNotes.length === 0 ? (
 						<div className="flex flex-col items-center justify-center rounded-none border border-dashed border-border/60 p-6 text-center text-xs text-muted-foreground">
 							{searchQuery
@@ -374,9 +372,7 @@ export default function WorkspaceNotes() {
 						</Button>
 					</div>
 				) : contentLoading ? (
-					<div className="flex flex-1 items-center justify-center">
-						<Loader2 className="size-6 animate-spin text-muted-foreground" />
-					</div>
+					<Loading fill className="flex-1" />
 				) : (
 					<NoteEditor
 						key={selectedNote.path}
@@ -387,6 +383,11 @@ export default function WorkspaceNotes() {
 						readOnly={isViewer}
 						workspacePath={workspace?.path}
 						docId={selectedNote.path.replace(/^\/+/, "")}
+						notes={notes.filter((n) => isNoteFile(n.name))}
+						onOpenNote={(path) => {
+							const target = notes.find((n) => n.path === path);
+							if (target) setSelectedNote(target);
+						}}
 					/>
 				)}
 			</div>

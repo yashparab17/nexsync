@@ -56,6 +56,8 @@ export interface ActivityEvent {
 	target?: string;
 	// Optional entity type for target (e.g. file, task, note)
 	target_type?: string;
+	// Who did it; older events have none
+	author?: string;
 }
 
 // Workspace activity history
@@ -175,8 +177,18 @@ export interface Task {
 	priority: TaskPriority;
 	due_date?: string;
 	assignee_id?: string;
+	tags: string[];
+	comments?: Comment[];
 	created_at: string;
 	updated_at: string;
+}
+
+// A comment on a task or card; "@Name" in the text mentions a collaborator
+export interface Comment {
+	id: string;
+	author: string;
+	text: string;
+	at: string;
 }
 
 // Kanban column containing ordered cards
@@ -194,8 +206,20 @@ export interface KanbanCard {
 	description: string;
 	column_id: string;
 	position: number;
+	tags: string[];
+	due_date?: string; // A calendar day, YYYY-MM-DD
+	assignee_id?: string;
+	checklist: ChecklistItem[];
+	comments?: Comment[];
 	created_at: string;
 	updated_at: string;
+}
+
+// One line of a card's checklist
+export interface ChecklistItem {
+	id: string;
+	text: string;
+	done: boolean;
 }
 
 // ────────────────────────────

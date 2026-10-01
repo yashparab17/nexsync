@@ -48,8 +48,8 @@ describe("FileHistoryDialog", () => {
 		expect(screen.getByText("+1")).toBeTruthy();
 		const list = screen.getByRole("list", { name: "Versions" });
 		expect(list.textContent).toContain("Saved");
-		expect(list.textContent).toContain("Snapshot");
-		expect(list.textContent!.indexOf("Saved")).toBeLessThan(list.textContent!.indexOf("Snapshot"));
+		expect(list.textContent).toContain("Auto-saved");
+		expect(list.textContent!.indexOf("Saved")).toBeLessThan(list.textContent!.indexOf("Auto-saved"));
 	});
 
 	it("compares a version with the one before it", async () => {

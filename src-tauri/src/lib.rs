@@ -42,6 +42,7 @@ pub fn run() {
 
             // Workspace filesystem operations
             commands::workspace::list_workspace_files,
+            commands::workspace::search_workspace_files,
             commands::workspace::create_workspace_item,
             commands::workspace::read_workspace_file,
             commands::workspace::write_workspace_file,
@@ -112,6 +113,8 @@ pub fn run() {
             commands::p2p::p2p_disconnect,
             commands::p2p::p2p_disconnect_all,
             commands::p2p::p2p_retry_connection,
+            commands::p2p::p2p_network_status,
+            commands::p2p::p2p_network_change,
             commands::p2p::p2p_fetch_file,
             commands::p2p::p2p_list_shareable_files,
         ])

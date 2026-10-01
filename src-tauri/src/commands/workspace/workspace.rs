@@ -426,9 +426,13 @@ fn persist_metadata(db: &WorkspaceDb, canonical_path_str: &str, metadata: &Works
             }
         }
 
+        if e.author.as_ref().is_some_and(|a| a.len() > 64) {
+            return Err("Activity event author exceeds maximum allowed length.".to_string());
+        }
+
         tx.execute(
-            "INSERT OR REPLACE INTO activity_events (id, workspace_id, timestamp, action, detail, target, target_type)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT OR REPLACE INTO activity_events (id, workspace_id, timestamp, action, detail, target, target_type, author)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             rusqlite::params![
                 &e.id,
                 &metadata.workspace.id,
@@ -437,6 +441,7 @@ fn persist_metadata(db: &WorkspaceDb, canonical_path_str: &str, metadata: &Works
                 &e.detail,
                 &e.target,
                 &e.target_type,
+                &e.author,
             ],
         )
         .map_err(|e| e.to_string())?;

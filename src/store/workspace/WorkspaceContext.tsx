@@ -35,6 +35,7 @@ import {
 
 // Hooks
 import { useErrorLog } from "@/hooks/useErrorLog";
+import { myName } from "@/lib/p2p/selfName";
 
 interface WorkspaceContextType {
 	// Core state
@@ -162,6 +163,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
 	const workspaceRef = useRef<WorkspaceInfo | null>(null);
 	workspaceRef.current = workspace;
+	const metadataRef = useRef(metadata);
+	metadataRef.current = metadata;
 
 	// Refresh workspace metrics and metadata from disk
 	const refreshMetadata = useCallback(
@@ -258,6 +261,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 				timestamp: new Date().toISOString(),
 				action,
 				detail,
+				author: myName(currentWs.id, metadataRef.current?.members.members.find((m) => m.role === "Owner")?.name),
 				...(target !== undefined && { target }),
 				...(targetType !== undefined && {
 					target_type: targetType,

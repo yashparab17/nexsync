@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { lintGutter } from "@codemirror/lint";
-import { EditorState } from "@codemirror/state";
+import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { vscodeDark, vscodeLight } from "@uiw/codemirror-theme-vscode";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
@@ -28,6 +28,8 @@ interface CodeEditorProps {
 	onReady?: (view: EditorView) => void;
 	// Called when the language for the file is known
 	onLanguage?: (language: LoadedLanguage) => void;
+	// Extra CodeMirror extensions, for example clickable note links
+	extraExtensions?: Extension[];
 }
 
 const PLAIN: LoadedLanguage = { name: "Plain Text", support: null };
@@ -43,6 +45,7 @@ export default function CodeEditor({
 	userName = "You",
 	onReady,
 	onLanguage,
+	extraExtensions,
 }: CodeEditorProps) {
 	const { isDark } = useThemeContext();
 
@@ -102,17 +105,18 @@ export default function CodeEditor({
 	}, [awareness, userName]);
 
 	const extensions = useMemo(() => {
-		if (!collab) return [...languageExtensions, ...lookExtensions];
+		if (!collab) return [...languageExtensions, ...lookExtensions, ...(extraExtensions ?? [])];
 		return [
 			...languageExtensions,
 			...lookExtensions,
+			...(extraExtensions ?? []),
 			yCollab(collab.doc.getText("content"), collab.awareness),
 			// Route Ctrl+Z/Ctrl+Y through yCollab's Y.UndoManager instead of CodeMirror's own
 			// history (disabled below via basicSetup), so undo only reverts local edits rather
 			// than fighting the shared CRDT state.
 			keymap.of(yUndoManagerKeymap),
 		];
-	}, [languageExtensions, lookExtensions, collab]);
+	}, [languageExtensions, lookExtensions, extraExtensions, collab]);
 
 	return (
 		<div className="h-full w-full overflow-hidden border-t bg-background font-mono text-xs">

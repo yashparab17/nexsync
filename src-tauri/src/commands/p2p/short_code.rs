@@ -147,7 +147,7 @@ impl Node {
             .alpns(vec![ALPN_INVITE.to_vec()])
             .bind()
             .await
-            .map_err(|e| format!("Failed to start the short code: {e}"))?;
+            .map_err(|e| format!("Couldn't create the code: {e}"))?;
         // The address must be published before a guest can look the code up.
         let relay_connected = tokio::time::timeout(ONLINE_TIMEOUT, endpoint.online()).await.is_ok();
 

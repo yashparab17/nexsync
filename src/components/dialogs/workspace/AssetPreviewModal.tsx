@@ -28,6 +28,7 @@ import { readWorkspaceBinaryFile } from "@/lib/tauri";
 import { getMimeType, formatBytes } from "@/lib/utils";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import type { AssetItem } from "@/types/workspace";
+import Loading from "@/components/Loading";
 
 interface AssetPreviewModalProps {
 	asset: AssetItem | null;
@@ -195,10 +196,7 @@ export default function AssetPreviewModal({
 					{/* Main Viewer */}
 					<div className="relative flex min-h-0 min-w-0 flex-1 overflow-auto bg-muted/40 p-4">
 						{loading && (
-							<div className="m-auto flex flex-col items-center gap-3 text-muted-foreground">
-								<Loader2 className="size-8 animate-spin text-primary" />
-								<p className="text-xs font-mono">Loading binary data…</p>
-							</div>
+							<Loading className="m-auto" />
 						)}
 
 						{error && (
@@ -219,11 +217,10 @@ export default function AssetPreviewModal({
 								</div>
 								<div>
 									<h4 className="font-semibold text-foreground">
-										Peer Asset Placeholder
+										Not downloaded yet
 									</h4>
 									<p className="text-xs text-muted-foreground mt-1">
-										This file is indexed in the workspace metadata but has not
-										been downloaded to your local device yet.
+										This file is part of the workspace, but it hasn't been downloaded to this device yet.
 									</p>
 								</div>
 								<Button
@@ -234,7 +231,7 @@ export default function AssetPreviewModal({
 									{isSyncing ?
 										<Loader2 className="size-4 animate-spin" />
 									:	<RefreshCw className="size-4" />}
-									{isSyncing ? "Syncing from Peer…" : "Download on Demand"}
+									{isSyncing ? "Downloading…" : "Download"}
 								</Button>
 							</div>
 						)}
@@ -369,7 +366,7 @@ export default function AssetPreviewModal({
 												● Local Storage
 											</span>
 										:	<span className="text-amber-500 font-medium flex items-center gap-1">
-												○ Peer Placeholder
+												○ Not downloaded
 											</span>
 										}
 									</dd>

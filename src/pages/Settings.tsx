@@ -43,6 +43,7 @@ import {
 import { loadConfig, saveConfig } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useThemeContext, type ThemePreference } from "@/store/ThemeContext";
+import Loading from "@/components/Loading";
 
 const NAME_LIMIT = 40;
 
@@ -423,7 +424,7 @@ export default function Settings() {
 						icon={<ShieldCheck className="size-4 text-emerald-400" />}
 					>
 						{saved === null && !loadError ? (
-							<p className="animate-pulse text-xs text-muted-foreground">Loading folders…</p>
+							<Loading />
 						) : (
 							<ul className="space-y-2" aria-label="Allowed folders">
 								{roots.map((root, index) => (
@@ -489,10 +490,10 @@ export default function Settings() {
 					<SectionCard
 						id="updates"
 						title="Updates & About"
-						description="Nexsync is local-first: no account, no cloud, no central server holding your data."
+						description="Nexsync keeps your work on your own computer: no account, no cloud, and no server holding your data."
 						icon={<DownloadCloud className="size-4 text-primary" />}
 					>
-						<Row title="Version" hint="Built with Rust, Tauri, React, SQLite, Iroh and Yjs.">
+						<Row title="Version" hint="Notes, tasks and code, shared directly between your devices.">
 							<span className="text-sm font-semibold tabular-nums">{version ? `v${version}` : "…"}</span>
 						</Row>
 						<Row

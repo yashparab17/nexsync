@@ -113,7 +113,7 @@ export default function CreateWorkspaceDialog({
 					<DialogTitle>Create Workspace</DialogTitle>
 
 					<DialogDescription>
-						Create a new local-first workspace for your projects.
+						Create a new workspace for your projects. Everything is saved on your computer.
 					</DialogDescription>
 				</DialogHeader>
 

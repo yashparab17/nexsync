@@ -94,7 +94,7 @@ export default function JoinWorkspaceDialog({
 		try {
 			setIsProcessing(true);
 			setError(null);
-			setStatusMessage("Connecting to host…");
+			setStatusMessage("Connecting…");
 
 			// 1. Dial the host and prove we hold its invite (or wait for it to allow our 6-digit code)
 			const usingCode = p2p.isShortCode(cleanTicket);
@@ -104,7 +104,7 @@ export default function JoinWorkspaceDialog({
 				userName.trim() || "Collaborator",
 			);
 
-			setStatusMessage(`Connected to ${workspaceName}! Initializing local workspace…`);
+			setStatusMessage(`Connected to ${workspaceName}! Setting up your copy…`);
 
 			// 2. Determine target workspace path
 			const sanitizedName = (workspaceName || "synced-workspace").replace(/[^\w\s-]/gi, "");
@@ -116,7 +116,7 @@ export default function JoinWorkspaceDialog({
 			try {
 				wsInfo = await createWorkspace({
 					name: sanitizedName,
-					description: `Collaborative P2P workspace synced with host`,
+					description: `Shared workspace from a collaborator`,
 					path: parentPath,
 				});
 			} catch {
@@ -138,7 +138,7 @@ export default function JoinWorkspaceDialog({
 			}, 600);
 		} catch (err: unknown) {
 			console.error("Join workspace failed:", err);
-			setError(errorText(err, "Failed to join workspace. Ensure host is online."));
+			setError(errorText(err, "Couldn't join the workspace. Check that the host is online."));
 			setStatusMessage(null);
 		} finally {
 			setIsProcessing(false);
@@ -156,9 +156,9 @@ export default function JoinWorkspaceDialog({
 							<Radio className="h-5 w-5 animate-pulse" />
 						</div>
 						<div>
-							<DialogTitle className="text-lg">Join P2P Workspace</DialogTitle>
+							<DialogTitle className="text-lg">Join a Workspace</DialogTitle>
 							<DialogDescription className="text-xs">
-								Paste the invite your collaborator shared to get a synced copy of their workspace.
+								Paste the invite or code your collaborator shared to get a copy of their workspace that stays up to date.
 							</DialogDescription>
 						</div>
 					</div>
@@ -168,11 +168,11 @@ export default function JoinWorkspaceDialog({
 				<div className="flex items-center justify-between rounded-none border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-400">
 					<div className="flex items-center gap-2">
 						<ShieldCheck className="h-4 w-4" />
-						<span>End-to-end encrypted (QUIC + TLS 1.3 via Iroh)</span>
+						<span>Private: only you and your collaborators can read your files</span>
 					</div>
 					<div className="flex items-center gap-1 font-mono text-[11px]">
 						<Lock className="h-3 w-3" />
-						<span>Peer-to-peer</span>
+						<span>No cloud</span>
 					</div>
 				</div>
 
@@ -185,9 +185,9 @@ export default function JoinWorkspaceDialog({
 				<div className="space-y-4 pt-1">
 					{/* Invite ticket input */}
 					<div className="space-y-1.5">
-						<Label className="text-xs">Host's Invite or 6-digit Code *</Label>
+						<Label className="text-xs">Invite or 6-digit code *</Label>
 						<Textarea
-							placeholder="nexsync… or 123 456"
+							placeholder="Paste the invite, or type the 6-digit code"
 							value={ticket}
 							onChange={(e) => setTicket(e.target.value)}
 							rows={3}
@@ -198,12 +198,12 @@ export default function JoinWorkspaceDialog({
 
 					{/* Local Destination folder */}
 					<div className="space-y-1.5">
-						<Label className="text-xs">Local Storage Folder</Label>
+						<Label className="text-xs">Save to folder</Label>
 						<div className="flex items-center gap-2">
 							<Input
 								value={workspaceParentPath}
 								onChange={(e) => setWorkspaceParentPath(e.target.value)}
-								placeholder="Select or enter folder path to save workspace clone"
+								placeholder="Choose a folder to save the workspace in"
 								className="text-xs h-9"
 							/>
 							<Button
@@ -249,7 +249,7 @@ export default function JoinWorkspaceDialog({
 							{isProcessing ? (
 								<>
 									<RefreshCw className="h-3.5 w-3.5 animate-spin" />
-									Connecting & Syncing…
+									Connecting…
 								</>
 							) : isSuccess ? (
 								<>

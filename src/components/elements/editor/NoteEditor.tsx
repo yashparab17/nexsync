@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
-import { Check, Download, FileText, History, Loader2, Save, Type, Users, X } from "lucide-react";
+import { Check, Download, FileText, History, Loader2, PanelRight, Save, Type, Users, X } from "lucide-react";
 
 import CodeEditor from "./CodeEditor";
 import RichTextEditor from "./RichTextEditor";
+import NoteSidePanel from "./NoteSidePanel";
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
 import { useAutoSnapshot } from "@/hooks/useAutoSnapshot";
@@ -13,8 +14,11 @@ import { minimalChange } from "@/lib/editor/format";
 import { isMarkdownFile } from "@/lib/editor/languages";
 import { exportNote, type NoteFormat } from "@/lib/export";
 import { markdownStats, textStats } from "@/lib/notes/text";
+import { resolveLink, type NoteRef } from "@/lib/notes/links";
+import { wikiLinks } from "@/lib/editor/wikiLinks";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import Loading from "@/components/Loading";
 
 interface NoteEditorProps {
 	fileName: string;
@@ -26,6 +30,9 @@ interface NoteEditorProps {
 	// Workspace-relative path, which is also the id of the shared document
 	workspacePath?: string;
 	docId?: string;
+	// The other notes, so [[links]] can open them and the side panel can list backlinks
+	notes?: NoteRef[];
+	onOpenNote?: (path: string) => void;
 }
 
 // The end of a note is not part of what a person wrote, so it does not decide whether there are unsaved changes
@@ -33,7 +40,7 @@ const sameNote = (a: string, b: string) => a.replace(/\s+$/, "") === b.replace(/
 
 // Editor for one note. Markdown files (.md) are edited as Markdown source; text files (.txt) get a rich-text
 // editor and are saved as plain text.
-export default function NoteEditor({ fileName, initialContent, onSave, onClose, readOnly = false, workspacePath, docId }: NoteEditorProps) {
+export default function NoteEditor({ fileName, initialContent, onSave, onClose, readOnly = false, workspacePath, docId, notes, onOpenNote }: NoteEditorProps) {
 	const isMarkdown = isMarkdownFile(fileName);
 	const { peers, selfName, shareNamedVersion } = useP2P();
 	const { metadata } = useWorkspace();
@@ -53,6 +60,23 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 	const onRichReady = useCallback((replace: (text: string) => void) => {
 		replaceRef.current = replace;
 	}, []);
+
+	const [panelOpen, setPanelOpen] = useState(false);
+	const current = useMemo<NoteRef>(() => ({ path: `/${docId ?? fileName}`, name: fileName }), [docId, fileName]);
+	// Ctrl or Cmd+click on a [[link]] opens that note; read through a ref so the editor is not rebuilt
+	const openLinkRef = useRef<(target: string) => void>(() => {});
+	openLinkRef.current = (target) => {
+		const note = resolveLink(target, notes ?? []);
+		if (note) onOpenNote?.(note.path);
+	};
+	const linkExtensions = useMemo(() => wikiLinks((target) => openLinkRef.current(target)), []);
+	const goToLine = (line: number) => {
+		const view = viewRef.current;
+		if (!view) return;
+		const at = view.state.doc.line(Math.min(Math.max(line, 1), view.state.doc.lines));
+		view.dispatch({ selection: { anchor: at.from }, scrollIntoView: true });
+		view.focus();
+	};
 
 	// Markdown: wait for the stored text, fill an empty document from the file, then build the editor with it
 	const seeded = useSeededText(isMarkdown ? collab : null, saved);
@@ -172,6 +196,12 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 					</div>
 					{workspacePath && docId && (
 						<>
+							{notes && onOpenNote && (
+								<Button variant="ghost" size="sm" onPress={() => setPanelOpen((open) => !open)} className="gap-1.5" aria-pressed={panelOpen}>
+									<PanelRight className="size-3.5" />
+									Outline
+								</Button>
+							)}
 							<Button variant="ghost" size="sm" onPress={() => setHistoryOpen(true)} className="gap-1.5">
 								<History className="size-3.5" />
 								History
@@ -206,12 +236,11 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 				</div>
 			</div>
 
-			<div className="min-h-0 flex-1">
+			<div className="flex min-h-0 flex-1">
+				<div className="min-h-0 min-w-0 flex-1">
 				{isMarkdown ? (
 					!collab || !seeded ? (
-						<div className="flex h-full items-center justify-center">
-							<Loader2 className="size-5 animate-spin text-muted-foreground" />
-						</div>
+						<Loading fill />
 					) : (
 						<CodeEditor
 							key={collab.doc.guid}
@@ -223,12 +252,11 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 							userName={userName}
 							minHeight="0px"
 							onReady={(view) => (viewRef.current = view)}
+							extraExtensions={linkExtensions}
 						/>
 					)
 				) : !collab ? (
-					<div className="flex h-full items-center justify-center">
-						<Loader2 className="size-5 animate-spin text-muted-foreground" />
-					</div>
+					<Loading fill />
 				) : (
 					<RichTextEditor
 						key={collab.doc.guid}
@@ -238,6 +266,17 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 						collab={collab}
 						userName={userName}
 						onReady={onRichReady}
+					/>
+				)}
+				</div>
+				{panelOpen && notes && onOpenNote && workspacePath && (
+					<NoteSidePanel
+						workspacePath={workspacePath}
+						current={current}
+						notes={notes}
+						text={content}
+						onOpenNote={onOpenNote}
+						onGoToLine={goToLine}
 					/>
 				)}
 			</div>

@@ -252,7 +252,7 @@ export default function WorkspaceMembers() {
 						className="gap-1.5"
 					>
 						<KeyRound className="size-4 text-sky-400" />
-						P2P Sync & Invite
+						Sharing & Invites
 						{peers.length > 0 && (
 							<span className="flex h-2 w-2 rounded-none bg-emerald-400 animate-ping ml-1" />
 						)}
@@ -280,8 +280,7 @@ export default function WorkspaceMembers() {
 						<CardHeader>
 							<CardTitle className="text-base">Workspace Collaborators</CardTitle>
 							<CardDescription>
-								Users who currently have access to this workspace database and
-								files.
+								People who currently have access to this workspace and files.
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-3">
@@ -417,8 +416,7 @@ export default function WorkspaceMembers() {
 									Owner
 								</div>
 								<p className="mt-1 text-muted-foreground">
-									Full access to file system, SQLite database, member
-									management, P2P sync, and workspace settings.
+									Full access to files, tasks, members, sharing and workspace settings.
 								</p>
 							</div>
 
@@ -439,8 +437,7 @@ export default function WorkspaceMembers() {
 									Editor
 								</div>
 								<p className="mt-1 text-muted-foreground">
-									Can read/write files, edit Kanban cards, manage Tasks, and
-									sync real-time edits over CRDT.
+									Can edit files, notes, Kanban cards and tasks, and work on notes together in real time.
 								</p>
 							</div>
 
@@ -475,7 +472,7 @@ export default function WorkspaceMembers() {
 						<DialogHeader>
 							<DialogTitle>Add Member</DialogTitle>
 							<DialogDescription>
-								Register a collaborator in the workspace SQLite database.
+								Add a collaborator to this workspace.
 							</DialogDescription>
 						</DialogHeader>
 

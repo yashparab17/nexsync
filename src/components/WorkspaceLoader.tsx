@@ -12,6 +12,7 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
 // Hooks
 import { useErrorLog } from "@/hooks/useErrorLog";
+import Loading from "@/components/Loading";
 
 // Startup component that checks and restores the last opened workspace session
 export default function WorkspaceLoader({ children }: { children: ReactNode }) {
@@ -47,9 +48,7 @@ export default function WorkspaceLoader({ children }: { children: ReactNode }) {
 	// Show loading placeholder while checking startup workspace
 	if (!ready) {
 		return (
-			<div className="flex h-full items-center justify-center">
-				<p className="text-muted-foreground">Starting up…</p>
-			</div>
+			<Loading fill />
 		);
 	}
 

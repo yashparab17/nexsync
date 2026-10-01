@@ -3,7 +3,7 @@
 use chrono::Utc;
 use crate::commands::config::validate_allowed_root;
 use super::helpers::get_workspace_id;
-use super::models::{KanbanCard, KanbanColumn, KanbanCardRequest, KanbanColumnRequest, MoveCardRequest, TaskIdRequest};
+use super::models::{json_list, to_json, valid_checklist, valid_comments, valid_tags, KanbanCard, KanbanColumn, KanbanCardRequest, KanbanColumnRequest, MoveCardRequest, TaskIdRequest};
 
 // ────────────────────────────
 // Tauri commands — Kanban CRUD
@@ -40,7 +40,8 @@ pub fn get_kanban(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Kanb
         let cards: Vec<KanbanCard> = db
             .conn
             .prepare(
-                "SELECT id, title, description, column_id, position, created_at, updated_at
+                "SELECT id, title, description, column_id, position, created_at, updated_at,
+                 tags, due_date, assignee_id, checklist, comments
                  FROM kanban_cards WHERE column_id = ?1 ORDER BY position ASC",
             )
             .map_err(|e| e.to_string())?
@@ -53,6 +54,11 @@ pub fn get_kanban(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Kanb
                     position: r.get(4)?,
                     created_at: r.get(5)?,
                     updated_at: r.get(6)?,
+                    tags: json_list(&r.get::<_, String>(7)?),
+                    due_date: r.get(8)?,
+                    assignee_id: r.get(9)?,
+                    checklist: json_list(&r.get::<_, String>(10)?),
+                    comments: json_list(&r.get::<_, String>(11)?),
                 })
             })
             .map_err(|e| e.to_string())?
@@ -104,6 +110,15 @@ pub fn create_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
     if request.card.id.len() > 64 || request.card.column_id.len() > 64 {
         return Err("Card ID or column ID exceeds maximum allowed length.".to_string());
     }
+    if !valid_tags(&request.card.tags) {
+        return Err("A card can have up to 10 tags of 32 characters each.".to_string());
+    }
+    if !valid_comments(&request.card.comments) {
+        return Err("A card can have up to 200 comments of 2000 characters each.".to_string());
+    }
+    if !valid_checklist(&request.card.checklist) {
+        return Err("A checklist can have up to 50 items of 256 characters each.".to_string());
+    }
 
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
@@ -111,12 +126,14 @@ pub fn create_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
     let ws_id = get_workspace_id(&db)?;
     db.conn.execute(
         "INSERT INTO kanban_cards (id, workspace_id, column_id, title, description,
-         position, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+         position, created_at, updated_at, tags, due_date, assignee_id, checklist, comments)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         rusqlite::params![
             &card.id, &ws_id, &card.column_id, &card.title,
             &card.description, &card.position,
             &card.created_at, &card.updated_at,
+            to_json(&card.tags), &card.due_date, &card.assignee_id, to_json(&card.checklist),
+            to_json(&card.comments),
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -138,6 +155,15 @@ pub fn update_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
     if request.card.id.len() > 64 || request.card.column_id.len() > 64 {
         return Err("Card ID or column ID exceeds maximum allowed length.".to_string());
     }
+    if !valid_tags(&request.card.tags) {
+        return Err("A card can have up to 10 tags of 32 characters each.".to_string());
+    }
+    if !valid_comments(&request.card.comments) {
+        return Err("A card can have up to 200 comments of 2000 characters each.".to_string());
+    }
+    if !valid_checklist(&request.card.checklist) {
+        return Err("A checklist can have up to 50 items of 256 characters each.".to_string());
+    }
 
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
@@ -146,12 +172,14 @@ pub fn update_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
     db.conn
         .execute(
             "UPDATE kanban_cards SET title = ?1, description = ?2, column_id = ?3,
-             position = ?4, updated_at = ?5
+             position = ?4, updated_at = ?5, tags = ?8, due_date = ?9, assignee_id = ?10, checklist = ?11, comments = ?12
              WHERE id = ?6 AND workspace_id = ?7",
             rusqlite::params![
                 &card.title, &card.description, &card.column_id,
                 &card.position, &card.updated_at,
                 &card.id, &ws_id,
+                to_json(&card.tags), &card.due_date, &card.assignee_id, to_json(&card.checklist),
+                to_json(&card.comments),
             ],
         )
         .map_err(|e| e.to_string())?;

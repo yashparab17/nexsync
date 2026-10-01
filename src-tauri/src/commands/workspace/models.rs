@@ -72,6 +72,9 @@ pub struct ActivityEvent {
     /// Optional entity type for target
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_type: Option<String>,
+    /// Who did it, when known
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
 }
 
 /// Role-based permission lists
@@ -105,6 +108,10 @@ pub struct Task {
     pub due_date: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub assignee_id: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub comments: Vec<Comment>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -126,8 +133,67 @@ pub struct KanbanCard {
     pub description: String,
     pub column_id: String,
     pub position: i64,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignee_id: Option<String>,
+    #[serde(default)]
+    pub checklist: Vec<ChecklistItem>,
+    #[serde(default)]
+    pub comments: Vec<Comment>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// One line of a card's checklist
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct ChecklistItem {
+    pub id: String,
+    pub text: String,
+    pub done: bool,
+}
+
+/// A comment on a task or card. `@Name` in the text mentions a collaborator.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct Comment {
+    pub id: String,
+    pub author: String,
+    pub text: String,
+    pub at: String,
+}
+
+const MAX_COMMENTS: usize = 200;
+const MAX_TAGS: usize = 10;
+const MAX_TAG_LEN: usize = 32;
+const MAX_CHECKLIST_ITEMS: usize = 50;
+
+/// Tags and checklists live in one JSON text column each; unreadable text reads as empty
+pub fn json_list<T: serde::de::DeserializeOwned>(text: &str) -> Vec<T> {
+    serde_json::from_str(text).unwrap_or_default()
+}
+
+pub fn to_json<T: Serialize>(items: &[T]) -> String {
+    serde_json::to_string(items).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// At most 10 tags of 1 to 32 characters
+pub fn valid_tags(tags: &[String]) -> bool {
+    tags.len() <= MAX_TAGS && tags.iter().all(|t| !t.trim().is_empty() && t.chars().count() <= MAX_TAG_LEN)
+}
+
+/// At most 50 items of up to 256 characters
+pub fn valid_checklist(items: &[ChecklistItem]) -> bool {
+    items.len() <= MAX_CHECKLIST_ITEMS && items.iter().all(|i| i.id.len() <= 64 && i.text.len() <= 256)
+}
+
+/// At most 200 comments, each of 1 to 2000 characters
+pub fn valid_comments(items: &[Comment]) -> bool {
+    items.len() <= MAX_COMMENTS
+        && items.iter().all(|c| {
+            !c.text.trim().is_empty() && c.text.len() <= 2000 && c.id.len() <= 64 && c.author.len() <= 64 && c.at.len() <= 64
+        })
 }
 
 // ────────────────────────────

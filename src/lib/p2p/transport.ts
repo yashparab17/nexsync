@@ -126,6 +126,22 @@ export function disconnectAll(): Promise<void> {
 	return invoke("p2p_disconnect_all");
 }
 
+// Whether this device can reach the relay that links it to peers on other networks
+export interface NetworkStatus {
+	online: boolean;
+	detail: string | null; // Why the relay is unreachable; a firewall or proxy is the usual cause
+}
+
+// Current relay reachability; also starts the network so changes are reported from here on
+export function networkStatus(): Promise<NetworkStatus> {
+	return invoke("p2p_network_status");
+}
+
+// The OS said the network changed, so re-probe now instead of waiting for the next timer
+export function networkChange(): Promise<void> {
+	return invoke("p2p_network_change");
+}
+
 // Invoke backend command to re-dial the host after the automatic attempts gave up
 export function retryConnection(): Promise<void> {
 	return invoke("p2p_retry_connection");
@@ -190,6 +206,10 @@ export const onReconnecting = (handler: (event: { attempt: number; max: number }
 // The backend gave up re-dialing the host
 export const onReconnectFailed = (handler: () => void) =>
 	subscribe<null>("p2p://reconnect-failed", () => handler());
+
+// The relay became reachable or unreachable
+export const onNetwork = (handler: (status: NetworkStatus) => void) =>
+	subscribe<NetworkStatus>("p2p://network", handler);
 
 export const onMessage = (handler: (event: IncomingMessage) => void) =>
 	subscribe<IncomingMessage>("p2p://message", handler);

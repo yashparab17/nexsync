@@ -28,6 +28,7 @@ import { readWorkspaceFile, writeWorkspaceFile } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import Loading from "@/components/Loading";
 
 interface CodeTabProps {
 	// Workspace-relative path of the file, which is also the id of its shared document
@@ -268,9 +269,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 			<div className="flex min-h-0 flex-1">
 				<div className="min-w-0 flex-1">
 					{saved === null || !collab || !seeded ? (
-						<div className="flex h-full items-center justify-center">
-							<Loader2 className="size-5 animate-spin text-muted-foreground" />
-						</div>
+						<Loading fill />
 					) : (
 						<CodeEditor
 							key={collab.doc.guid}

@@ -5,6 +5,7 @@ import App from "@/App";
 import Welcome from "@/pages/Welcome";
 import Workspace from "@/pages/workspace/WorkspaceWrapper";
 import WorkspaceDashboard from "@/pages/workspace/WorkspaceDashboard";
+import Loading from "@/components/Loading";
 
 // Lazy-load sub-routes for optimized bundle splitting
 const WorkspaceFiles = lazy(() => import("@/pages/workspace/WorkspaceFiles"));
@@ -13,6 +14,7 @@ const WorkspaceNotes = lazy(() => import("@/pages/workspace/WorkspaceNotes"));
 const WorkspaceAssets = lazy(() => import("@/pages/workspace/WorkspaceAssets"));
 const WorkspaceTasks = lazy(() => import("@/pages/workspace/WorkspaceTasks"));
 const WorkspaceKanban = lazy(() => import("@/pages/workspace/WorkspaceKanban"));
+const WorkspaceInsights = lazy(() => import("@/pages/workspace/WorkspaceInsights"));
 const WorkspaceMembers = lazy(() => import("@/pages/workspace/WorkspaceMembers"));
 const WorkspaceSettings = lazy(() => import("@/pages/workspace/WorkspaceSettings"));
 const WorkspaceTrash = lazy(() => import("@/pages/workspace/WorkspaceTrash"));
@@ -23,13 +25,7 @@ const Unavailable = lazy(() => import("@/pages/Unavailable"));
 function RouteSuspense({ children }: { children: React.ReactNode }) {
 	return (
 		<Suspense
-			fallback={
-				<div className="flex h-64 items-center justify-center">
-					<p className="text-xs tracking-widest text-muted-foreground uppercase">
-						Loading…
-					</p>
-				</div>
-			}
+			fallback={<Loading fill />}
 		>
 			{children}
 		</Suspense>
@@ -95,6 +91,14 @@ export const router = createBrowserRouter([
 						element: (
 							<RouteSuspense>
 								<WorkspaceTasks />
+							</RouteSuspense>
+						),
+					},
+					{
+						path: "insights",
+						element: (
+							<RouteSuspense>
+								<WorkspaceInsights />
 							</RouteSuspense>
 						),
 					},

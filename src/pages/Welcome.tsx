@@ -39,6 +39,7 @@ import type { WorkspaceInfo } from "@/types/workspace";
 import logo from "@/assets/logos/logo.svg";
 import logo_black from "@/assets/logos/logo-black.svg";
 import logo_white from "@/assets/logos/logo-white.svg";
+import Loading from "@/components/Loading";
 
 // Welcome landing page with recent workspaces and quick actions
 export default function Welcome() {
@@ -119,7 +120,7 @@ export default function Welcome() {
 
 			{/* Tagline */}
 			<p className="mt-2 text-center text-lg text-muted-foreground">
-				Local-first collaborative workspaces.
+				Notes, tasks and code, shared with your team and kept on your own computer.
 			</p>
 
 			{/* Main Content */}
@@ -170,9 +171,7 @@ export default function Welcome() {
 						</h2>
 
 						{loading ?
-							<p className="text-sm text-muted-foreground">
-								Loading recent workspaces…
-							</p>
+							<Loading />
 						: recentWorkspaces.length === 0 ?
 							<p className="text-sm text-muted-foreground">
 								No recent workspaces. Create or import one to

@@ -7,6 +7,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 // Icons
 import {
 	ArrowLeft,
+	BarChart3,
 	Code2,
 	Files,
 	FolderOpen,
@@ -69,6 +70,11 @@ const navigation: NavigationItem[] = [
 		name: "Kanban",
 		path: "/workspace/kanban",
 		icon: KanbanSquare,
+	},
+	{
+		name: "Insights",
+		path: "/workspace/insights",
+		icon: BarChart3,
 	},
 ];
 

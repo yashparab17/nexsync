@@ -209,6 +209,26 @@ CREATE INDEX IF NOT EXISTS idx_file_versions_path ON file_versions(workspace_id,
 ALTER TABLE file_versions ADD COLUMN author TEXT;
 "##,
 	},
+	Migration {
+		version: 7,
+		description: "task and card tags, card due date, assignee and checklist",
+		up: r##"
+ALTER TABLE tasks ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE kanban_cards ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE kanban_cards ADD COLUMN due_date TEXT;
+ALTER TABLE kanban_cards ADD COLUMN assignee_id TEXT;
+ALTER TABLE kanban_cards ADD COLUMN checklist TEXT NOT NULL DEFAULT '[]';
+"##,
+	},
+	Migration {
+		version: 8,
+		description: "comments on tasks and cards, author on activity events",
+		up: r##"
+ALTER TABLE tasks ADD COLUMN comments TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE kanban_cards ADD COLUMN comments TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE activity_events ADD COLUMN author TEXT;
+"##,
+	},
 ];
 
 /// Initialises the schema on a fresh database, running pending migrations

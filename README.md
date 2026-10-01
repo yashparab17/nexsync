@@ -8,11 +8,15 @@ Built with [Tauri 2](https://tauri.app) (Rust) + React 19 + TypeScript, with pee
 
 - **Workspaces on your own disk.** Each workspace is a regular folder (`notes/`, `files/`, `assets/`, `editor/`) plus a hidden `.nexsync/` database.
 - **Files, Notes and Editor.** Files is the file manager. Notes holds Markdown notes (`.md`, edited as Markdown with syntax highlighting) and text notes (`.txt`, edited in a rich-text editor and saved as plain text), and lists office documents that open in their own app. Line and word counts follow what is in the editor, without Markdown markup. Editor is the code tab: an explorer, several files open as tabs, syntax highlighting for about 100 languages, formatting, problem markers, blame and contributions per file, and a Run panel that streams a command's output.
-- **Tasks and Kanban** stored in SQLite, with a dashboard and activity feed.
+- **Tasks and Kanban** stored in SQLite, with a dashboard and activity feed. Tag tasks and cards and filter by tag; give them due dates (overdue and due-soon badges) and assignees; see tasks on a month calendar; drag Kanban cards between columns and into position; add a checklist to a card.
+- **Search and command palette.** Ctrl or Cmd+K opens the header search: files, notes, tasks and cards by name and text, filters by type, a list of what you opened last, and shortcuts to every page.
+- **Note links.** Write `[[Note name]]` in a Markdown note and Ctrl or Cmd+click it to open that note. An Outline panel shows the headings, the links in the note and the notes that link to it.
+- **Notifications.** A bell in the header lists when a collaborator joins or assigns you a task or card.
 - **Assets** with previews, uploads and lazy on-demand download of large files from collaborators.
 - **P2P collaboration:**
     - Invite a collaborator with a single copy-pasteable ticket.
-    - Connects across NATs and firewalls, with end-to-end encryption.
+    - Connects across most NATs and firewalls, with end-to-end encryption. A network that blocks both direct UDP and the HTTPS relay (some colleges and offices) cannot connect; a phone hotspot or a VPN gets around it.
+    - The header shows at once when the network goes away, reconnects by itself when it returns, and has a Retry button. If the relay cannot be reached it shows the error and what to try.
     - The guest gets a full copy of the workspace; after that, notes, files, tasks and kanban boards sync live in both directions.
     - Guests appear in the host's **Members** list automatically, with their invite role and an **Online** badge while connected.
 - **Live co-editing.** Open the same note or file as a collaborator and edit it together in real time — a Yjs CRDT keeps the rich-text and code editors in sync character-by-character, persisted locally so a reload never loses in-flight edits.
@@ -27,6 +31,7 @@ All networking runs in the Rust backend (`src-tauri/src/commands/p2p/`). The Rea
 
 - **Identity:** each app instance runs one Iroh endpoint, identified by a public key.
 - **Connectivity:** Iroh first tries to punch a direct UDP path between the two devices. If that's impossible (strict NAT, carrier-grade NAT, mobile hotspot, campus network), traffic goes through an **encrypted relay**. The relay only forwards encrypted bytes. The UI shows whether each peer is **Direct** or **Relayed**.
+- **Network status:** the backend watches the connection to the relay and emits `p2p://network` whenever it changes; the app also reacts to the OS's online and offline events. When the relay returns, a lost host is re-dialed automatically, and **Retry** in the P2P dialog covers the rest. `HTTPS_PROXY` is used for the relay if set.
 - **Encryption:** every connection is QUIC with TLS 1.3, authenticated by the peers' keys.
 - **Invites:** a ticket (`nexsync…`) contains the host's key, home relay, a few IP hints and a random 128-bit secret. The guest proves it has the ticket by sending the secret _inside_ the encrypted connection. Creating a new invite or pressing **Stop** invalidates the previous ticket.
 - **Live task and kanban sync:** every task or card you create, edit, move or delete is sent to collaborators as a small change message and applied to their SQLite database. The host also shares its member list, so everyone sees who is in the workspace.

@@ -12,6 +12,7 @@ import type { CollabDoc } from "@/hooks/useCollabDoc";
 import { colorForName } from "@/lib/collabColor";
 import { blocksToPlainText, plainTextToBlocks } from "@/lib/notes/text";
 import { useThemeContext } from "@/store/ThemeContext";
+import Loading from "@/components/Loading";
 
 interface RichTextEditorProps {
 	// The note as it is on disk; used to fill the document the first time it is opened
@@ -102,9 +103,7 @@ export default function RichTextEditor({
 	return (
 		<div className="h-full w-full overflow-y-auto bg-background px-2 py-4 [&_.bn-container]:max-w-3xl [&_.bn-editor]:bg-transparent">
 			{!isReady ? (
-				<div className="flex h-48 items-center justify-center">
-					<p className="animate-pulse text-xs uppercase tracking-widest text-muted-foreground">Loading note…</p>
-				</div>
+				<Loading className="h-48" />
 			) : (
 				<BlockNoteView
 					editor={editor}

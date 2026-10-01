@@ -12,8 +12,8 @@ use std::{
 };
 
 use iroh::{
-    endpoint::{presets, Connection, RecvStream, SendStream},
-    Endpoint, EndpointAddr, EndpointId, SecretKey,
+    endpoint::{presets, Connection, RecvStream, RelayStatus, SendStream},
+    Endpoint, EndpointAddr, EndpointId, SecretKey, Watcher,
 };
 use serde::Serialize;
 use subtle::ConstantTimeEq;
@@ -38,6 +38,7 @@ pub const EVENT_PEER_LEFT: &str = "p2p://peer-left";
 pub const EVENT_MESSAGE: &str = "p2p://message";
 pub const EVENT_RECONNECTING: &str = "p2p://reconnecting";
 pub const EVENT_RECONNECT_FAILED: &str = "p2p://reconnect-failed";
+pub const EVENT_NETWORK: &str = "p2p://network";
 
 pub(super) const ONLINE_TIMEOUT: Duration = Duration::from_secs(15);
 pub(super) const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -273,6 +274,20 @@ struct NodeState {
     mesh_tokens: mesh::MeshTokens,
 }
 
+/// Whether this device can reach the relay that connects it to peers outside its own network
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct NetworkStatus {
+    pub online: bool,
+    /// Why the relay is unreachable; a firewall or proxy blocking it is the usual cause
+    pub detail: Option<String>,
+}
+
+fn summarize(relays: &[RelayStatus]) -> NetworkStatus {
+    let online = relays.iter().any(|r| r.is_connected());
+    let detail = if online { None } else { relays.iter().find_map(|r| r.last_error().map(|e| e.to_string())) };
+    NetworkStatus { online, detail }
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct Reconnecting {
     attempt: u32,
@@ -291,14 +306,15 @@ pub struct Node {
 impl Node {
     /// Binds the Iroh endpoint and spawns the accept, stats and live-sync loops
     async fn start(events: EventSink, workspace: SharedWorkspace, secret: Option<SecretKey>) -> Result<Arc<Self>, String> {
-        let mut builder = Endpoint::builder(presets::N0).alpns(vec![wire::ALPN.to_vec()]);
+        // proxy_from_env: behind a proxy-only network (HTTPS_PROXY set) the relay is reached through it
+        let mut builder = Endpoint::builder(presets::N0).alpns(vec![wire::ALPN.to_vec()]).proxy_from_env();
         if let Some(secret) = secret {
             builder = builder.secret_key(secret);
         }
         let endpoint = builder
             .bind()
             .await
-            .map_err(|e| format!("Failed to start the P2P network: {e}"))?;
+            .map_err(|e| format!("Couldn't start collaboration: {e}"))?;
 
         let (live_sync, local_changes) = LiveSync::new();
         let node = Arc::new(Self {
@@ -312,6 +328,7 @@ impl Node {
 
         tokio::spawn(node.clone().accept_loop());
         tokio::spawn(node.clone().stats_loop());
+        tokio::spawn(node.clone().network_loop());
         tokio::spawn(sync::run_local_changes(node.clone(), local_changes));
         node.sync.watch(node.workspace_path().as_deref());
         Ok(node)
@@ -571,7 +588,10 @@ impl Node {
         let conn = tokio::time::timeout(CONNECT_TIMEOUT, self.endpoint.connect(ticket.addr, wire::ALPN))
             .await
             .map_err(|_| ("Timed out reaching the host. Make sure they're online and still have NexSync open.".to_string(), false))?
-            .map_err(|e| (format!("Couldn't reach the host: {e}"), false))?;
+            .map_err(|e| {
+                eprintln!("[P2P] Could not reach the host: {e}");
+                ("Couldn't reach the host. Check that you are both online.".to_string(), false)
+            })?;
 
         let (mut send, mut recv) = conn.open_bi().await.map_err(|e| (e.to_string(), false))?;
         send.write_all(&[wire::STREAM_CONTROL]).await.map_err(|e| (e.to_string(), false))?;
@@ -749,6 +769,36 @@ impl Node {
             drop(st);
             node.emit(EVENT_RECONNECT_FAILED, ());
         });
+    }
+
+    /// Current relay reachability, for a frontend that starts listening after the first change
+    pub fn network_status(&self) -> NetworkStatus {
+        summarize(&self.endpoint.home_relay_status().get())
+    }
+
+    /// Tells Iroh the OS network changed (WiFi toggled, VPN, new network) so it re-probes at once
+    pub async fn network_change(&self) {
+        self.endpoint.network_change().await;
+    }
+
+    /// Reports every change in relay reachability, and re-dials a lost host as soon as the network is back
+    async fn network_loop(self: Arc<Self>) {
+        let mut watcher = self.endpoint.home_relay_status();
+        let mut last: Option<NetworkStatus> = None;
+        loop {
+            let status = summarize(&watcher.get());
+            if last.as_ref() != Some(&status) {
+                let came_back = status.online && last.as_ref().is_some_and(|l| !l.online);
+                self.emit(EVENT_NETWORK, status.clone());
+                last = Some(status);
+                if came_back {
+                    let _ = self.retry_connection();
+                }
+            }
+            if watcher.updated().await.is_err() {
+                break;
+            }
+        }
     }
 
     /// Manual retry after the automatic attempts gave up (or while they are backing off)
@@ -1630,6 +1680,7 @@ mod tests {
             assignee_id: None,
             created_at: "2026-01-01T00:00:00Z".into(),
             updated_at: updated_at.into(),
+            ..Default::default()
         }
     }
 

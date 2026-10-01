@@ -18,7 +18,7 @@ use tauri::{AppHandle, State};
 
 use crate::commands::config::validate_allowed_root;
 pub use node::P2pState;
-use node::{InviteInfo, JoinResult, PeerInfo};
+use node::{InviteInfo, JoinResult, NetworkStatus, PeerInfo};
 use short_code::ShortCodeInfo;
 use files::ShareableFile;
 
@@ -155,6 +155,21 @@ pub async fn p2p_disconnect(state: State<'_, P2pState>, peer_id: String) -> Resu
         Some(node) => node.disconnect(&peer_id),
         None => Ok(()),
     }
+}
+
+/// Whether the relay is reachable right now; also starts the network so changes are reported from here on
+#[tauri::command]
+pub async fn p2p_network_status(app: AppHandle, state: State<'_, P2pState>) -> Result<NetworkStatus, String> {
+    Ok(state.node(&app).await?.network_status())
+}
+
+/// The OS reported a network change, so re-probe the connection immediately
+#[tauri::command]
+pub async fn p2p_network_change(state: State<'_, P2pState>) -> Result<(), String> {
+    if let Some(node) = state.existing().await {
+        node.network_change().await;
+    }
+    Ok(())
 }
 
 /// Re-dials the host after the automatic attempts gave up

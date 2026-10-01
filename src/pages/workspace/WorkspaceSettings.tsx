@@ -145,8 +145,7 @@ export default function WorkspaceSettings() {
 					Workspace Settings
 				</h1>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Configure preferences, identity, and synchronization for this
-					workspace.
+					Configure preferences, identity and sharing for this workspace.
 				</p>
 			</div>
 
@@ -156,8 +155,7 @@ export default function WorkspaceSettings() {
 					<CardHeader>
 						<CardTitle className="text-base">Workspace Identity</CardTitle>
 						<CardDescription>
-							Basic identity details stored in your local workspace SQLite
-							database.
+							Basic details about this workspace, saved on your computer.
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
@@ -194,7 +192,7 @@ export default function WorkspaceSettings() {
 								/>
 							</div>
 							<p className="mt-1 text-xs text-muted-foreground">
-								Physical files live directly in this OS folder.
+								Your files are saved in this folder on your computer.
 							</p>
 						</div>
 					</CardContent>
@@ -204,10 +202,10 @@ export default function WorkspaceSettings() {
 				<Card>
 					<CardHeader>
 						<CardTitle className="text-base">
-							Synchronization & Preferences
+							Sharing & Preferences
 						</CardTitle>
 						<CardDescription>
-							Control local-first caching, autosave, and P2P behavior.
+							Control autosave and how this workspace is shared.
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-5">
@@ -217,7 +215,7 @@ export default function WorkspaceSettings() {
 									Autosave Files
 								</Label>
 								<p className="text-xs text-muted-foreground">
-									Automatically persist file modifications to the OS filesystem.
+									Save your changes to files automatically.
 								</p>
 							</div>
 							<input
@@ -231,10 +229,10 @@ export default function WorkspaceSettings() {
 						<div className="flex items-center justify-between">
 							<div className="space-y-0.5">
 								<Label className="text-sm font-semibold">
-									Real-time P2P Synchronization
+									Share changes live
 								</Label>
 								<p className="text-xs text-muted-foreground">
-									Allow WebRTC DataChannels and Yjs CRDT peer exchange.
+									Let collaborators connect and see each other's changes as they happen.
 								</p>
 							</div>
 							<input
@@ -296,7 +294,7 @@ export default function WorkspaceSettings() {
 					<CardTitle className="text-base">Export</CardTitle>
 					<CardDescription>
 						Save a copy of the workspace files as one zip: notes, files, assets and code, in their folders. Tasks and the
-						Kanban board are stored in the workspace database and are not part of the zip.
+						Kanban board are not part of the zip.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="flex flex-wrap items-center gap-3">
@@ -401,8 +399,7 @@ export default function WorkspaceSettings() {
 								<span className="font-semibold text-foreground">
 									{workspace?.name}
 								</span>{" "}
-								from your recent workspaces? Your physical files and database on
-								disk will remain intact.
+								from your recent workspaces? Your files and data on your disk will remain intact.
 							</DialogDescription>
 						</DialogHeader>
 

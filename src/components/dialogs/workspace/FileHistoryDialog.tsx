@@ -9,12 +9,13 @@ import { isBinaryFile, isDocumentFile } from "@/lib/editor/languages";
 import { listFileVersions, readFileVersion, readWorkspaceFile, recordFileVersion, restoreFileVersion } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { FileVersion } from "@/types/workspace";
+import Loading from "@/components/Loading";
 
 const SOURCES: Record<string, string> = {
 	save: "Saved",
 	sync: "From a collaborator",
 	import: "Imported",
-	auto: "Snapshot",
+	auto: "Auto-saved",
 	named: "Named",
 	restore: "Restored",
 	"before-restore": "Before a restore",
@@ -206,7 +207,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 						History of {fileName}
 					</DialogTitle>
 					<DialogDescription>
-						Versions are kept on this device each time the file is saved, synced or imported{isText ? ", and as snapshots while you edit" : ""}.
+						Versions are kept on this device each time the file is saved, synced or imported{isText ? ", and automatically while you edit" : ""}.
 					</DialogDescription>
 				</DialogHeader>
 
@@ -217,9 +218,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 				)}
 
 				{versions === null && !error ? (
-					<div className="flex flex-1 items-center justify-center">
-						<Loader2 className="size-5 animate-spin text-muted-foreground" />
-					</div>
+					<Loading fill />
 				) : versions?.length === 0 ? (
 					<p className="flex-1 text-sm text-muted-foreground">
 						No versions yet. The first one is kept the next time this file is saved.

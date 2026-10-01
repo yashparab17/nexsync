@@ -12,7 +12,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use super::helpers::get_workspace_id;
-use super::models::{KanbanCard, Task};
+use super::models::{json_list, to_json, valid_checklist, valid_comments, valid_tags, KanbanCard, Task};
 use crate::commands::validation::{validate_task_priority, validate_task_status};
 
 pub const ENTITY_TASK: &str = "task";
@@ -89,6 +89,8 @@ fn valid_task(t: &Task) -> bool {
         && !t.title.is_empty()
         && t.title.len() <= 256
         && t.description.len() <= 32768
+        && valid_tags(&t.tags)
+        && valid_comments(&t.comments)
         && validate_task_status(&t.status).is_ok()
         && validate_task_priority(&t.priority).is_ok()
 }
@@ -100,11 +102,15 @@ fn valid_card(c: &KanbanCard) -> bool {
         && !c.title.is_empty()
         && c.title.len() <= 256
         && c.description.len() <= 32768
+        && valid_tags(&c.tags)
+        && valid_comments(&c.comments)
+        && valid_checklist(&c.checklist)
 }
 
 const TASK_COLUMNS: &str =
-    "id, title, description, status, priority, due_date, assignee_id, created_at, updated_at";
-const CARD_COLUMNS: &str = "id, title, description, column_id, position, created_at, updated_at";
+    "id, title, description, status, priority, due_date, assignee_id, created_at, updated_at, tags, comments";
+const CARD_COLUMNS: &str =
+    "id, title, description, column_id, position, created_at, updated_at, tags, due_date, assignee_id, checklist, comments";
 
 fn task_from_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
     Ok(Task {
@@ -117,6 +123,8 @@ fn task_from_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         assignee_id: r.get(6)?,
         created_at: r.get(7)?,
         updated_at: r.get(8)?,
+        tags: json_list(&r.get::<_, String>(9)?),
+        comments: json_list(&r.get::<_, String>(10)?),
     })
 }
 
@@ -129,6 +137,11 @@ fn card_from_row(r: &rusqlite::Row) -> rusqlite::Result<KanbanCard> {
         position: r.get(4)?,
         created_at: r.get(5)?,
         updated_at: r.get(6)?,
+        tags: json_list(&r.get::<_, String>(7)?),
+        due_date: r.get(8)?,
+        assignee_id: r.get(9)?,
+        checklist: json_list(&r.get::<_, String>(10)?),
+        comments: json_list(&r.get::<_, String>(11)?),
     })
 }
 
@@ -252,10 +265,11 @@ pub fn merge_state(conn: &Connection, ws_id: &str, remote: DataState) -> Result<
         }
         tx.execute(
             "INSERT OR REPLACE INTO tasks (id, workspace_id, title, description, status, priority,
-             due_date, assignee_id, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+             due_date, assignee_id, created_at, updated_at, tags, comments)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 t.id, ws_id, t.title, t.description, t.status, t.priority, t.due_date, t.assignee_id,
-                t.created_at, t.updated_at
+                t.created_at, t.updated_at, to_json(&t.tags), to_json(&t.comments)
             ],
         )
         .map_err(e)?;
@@ -285,8 +299,12 @@ pub fn merge_state(conn: &Connection, ws_id: &str, remote: DataState) -> Result<
         }
         tx.execute(
             "INSERT OR REPLACE INTO kanban_cards (id, workspace_id, column_id, title, description,
-             position, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![c.id, ws_id, c.column_id, c.title, c.description, c.position, c.created_at, c.updated_at],
+             position, created_at, updated_at, tags, due_date, assignee_id, checklist, comments)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            params![
+                c.id, ws_id, c.column_id, c.title, c.description, c.position, c.created_at, c.updated_at,
+                to_json(&c.tags), c.due_date, c.assignee_id, to_json(&c.checklist), to_json(&c.comments)
+            ],
         )
         .map_err(e)?;
         tx.execute("DELETE FROM tombstones WHERE entity = ?1 AND id = ?2", params![ENTITY_CARD, c.id]).map_err(e)?;
@@ -338,6 +356,7 @@ mod tests {
             assignee_id: None,
             created_at: "2026-01-01T00:00:00Z".into(),
             updated_at: at.into(),
+            ..Default::default()
         }
     }
 
@@ -431,6 +450,54 @@ mod tests {
     }
 
     #[test]
+    fn test_tags_due_dates_and_checklists_travel_with_the_record() {
+        use super::super::models::ChecklistItem;
+        let (a, b) = (db("a"), db("b"));
+        let col = ColumnRecord { id: "c1".into(), title: "Todo".into(), position: 0 };
+        let tagged_task = Task { tags: vec!["urgent".into(), "api".into()], ..task("t1", "ship", "2026-02-01T00:00:00Z") };
+        let card = KanbanCard {
+            id: "k1".into(),
+            title: "card".into(),
+            column_id: "c1".into(),
+            tags: vec!["ui".into()],
+            due_date: Some("2026-03-01".into()),
+            assignee_id: Some("m1".into()),
+            checklist: vec![ChecklistItem { id: "i1".into(), text: "write".into(), done: true }],
+            created_at: "2026-01-01T00:00:00Z".into(),
+            updated_at: "2026-01-01T00:00:00Z".into(),
+            ..Default::default()
+        };
+        let state = DataState { tasks: vec![tagged_task.clone()], columns: vec![col], cards: vec![card.clone()], ..Default::default() };
+        merge_state(&a, "a", state).unwrap();
+        // What one device exports, another merges and reads back unchanged
+        merge_state(&b, "b", export_state(&a, "a").unwrap()).unwrap();
+        let got = export_state(&b, "b").unwrap();
+        assert_eq!(got.tasks, vec![tagged_task]);
+        assert_eq!(got.cards, vec![card]);
+
+        // Oversized tag lists are refused rather than stored
+        let many = Task { tags: (0..11).map(|i| i.to_string()).collect(), ..task("t2", "x", "2026-02-01T00:00:00Z") };
+        merge_state(&b, "b", only_tasks(vec![many])).unwrap();
+        assert_eq!(export_state(&b, "b").unwrap().tasks.len(), 1);
+    }
+
+    #[test]
+    fn test_comments_travel_with_the_record_and_oversized_ones_are_refused() {
+        use super::super::models::Comment;
+        let (a, b) = (db("a"), db("b"));
+        let comment = |id: &str, text: &str| Comment { id: id.into(), author: "Ana".into(), text: text.into(), at: "2026-02-01T00:00:00Z".into() };
+        let talked = Task { comments: vec![comment("c1", "@Bo can you check?")], ..task("t1", "ship", "2026-02-01T00:00:00Z") };
+        merge_state(&a, "a", only_tasks(vec![talked.clone()])).unwrap();
+        merge_state(&b, "b", export_state(&a, "a").unwrap()).unwrap();
+        assert_eq!(export_state(&b, "b").unwrap().tasks, vec![talked]);
+
+        let long = Task { comments: vec![comment("c2", &"x".repeat(2001))], ..task("t2", "x", "2026-02-01T00:00:00Z") };
+        let empty = Task { comments: vec![comment("c3", "  ")], ..task("t3", "x", "2026-02-01T00:00:00Z") };
+        merge_state(&b, "b", only_tasks(vec![long, empty])).unwrap();
+        assert_eq!(export_state(&b, "b").unwrap().tasks.len(), 1);
+    }
+
+    #[test]
     fn test_cards_follow_columns_and_deleted_columns_stay_deleted() {
         let a = db("a");
         let col = ColumnRecord { id: "c1".into(), title: "Todo".into(), position: 0 };
@@ -442,6 +509,7 @@ mod tests {
             position: 0,
             created_at: "2026-01-01T00:00:00Z".into(),
             updated_at: "2026-01-01T00:00:00Z".into(),
+            ..Default::default()
         };
         // A card for a column we don't have is skipped rather than failing the whole merge.
         merge_state(&a, "a", DataState { cards: vec![card.clone()], ..Default::default() }).unwrap();

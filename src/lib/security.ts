@@ -1,6 +1,25 @@
 // Security hardening policies: disables right-click, developer tools shortcuts, and OS webview history tracking
 
+// Stops the webview offering to remember or suggest what the user types into forms
+function disableAutofill(): void {
+	const apply = (root: ParentNode) =>
+		root.querySelectorAll("form, input, textarea").forEach((el) => {
+			if (el.getAttribute("autocomplete") !== "off") el.setAttribute("autocomplete", "off");
+		});
+	apply(document);
+	new MutationObserver((records) => {
+		for (const r of records) r.addedNodes.forEach((n) => {
+			if (n instanceof Element) {
+				apply(n);
+				if (n.matches("form, input, textarea")) n.setAttribute("autocomplete", "off");
+			}
+		});
+	}).observe(document.documentElement, { childList: true, subtree: true });
+}
+
 export function initSecurityPolicies(): void {
+	disableAutofill();
+
 	// 1. Disable right-click context menu across the application
 	document.addEventListener(
 		"contextmenu",

@@ -8,6 +8,7 @@ import { router } from "./routes/router";
 import { WorkspaceProvider } from "./store/workspace/WorkspaceContext";
 import { P2PProvider } from "./store/p2p/P2PContext";
 import { ThemeProvider } from "./store/ThemeContext";
+import { NotificationProvider } from "./store/notifications/NotificationContext";
 import WorkspaceLoader from "./components/WorkspaceLoader";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { initSecurityPolicies } from "./lib/security";
@@ -19,6 +20,7 @@ initSecurityPolicies();
 ReactDOM.createRoot(document.getElementById("root")!).render(
 	<React.StrictMode>
 		<ThemeProvider>
+			<NotificationProvider>
 			<WorkspaceProvider>
 				<P2PProvider>
 					<WorkspaceLoader>
@@ -28,6 +30,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 					</WorkspaceLoader>
 				</P2PProvider>
 			</WorkspaceProvider>
+		</NotificationProvider>
 		</ThemeProvider>
 	</React.StrictMode>,
 );

@@ -52,6 +52,7 @@ import {
 
 // Types
 import type { WorkspaceFile } from "@/types/workspace";
+import Loading from "@/components/Loading";
 
 // ────────────────────────────
 // Helpers
@@ -427,9 +428,7 @@ export default function WorkspaceFiles() {
 
 			{/* File Listing Table */}
 			{isLoading ?
-				<div className="flex items-center justify-center py-16">
-					<Loader2 className="size-6 animate-spin text-muted-foreground" />
-				</div>
+				<Loading className="py-16" />
 			: entries.length === 0 ?
 				<div className="border border-dashed py-16 text-center text-sm text-muted-foreground">
 					{currentDir ?

@@ -230,6 +230,11 @@ export function listWorkspaceFiles(
 	return invoke("list_workspace_files", { path, subdir });
 }
 
+// Every file in the workspace with the lower-cased text of small text files, in one call
+export function searchWorkspaceFiles(path: string): Promise<{ name: string; path: string; size: number; body: string }[]> {
+	return invoke("search_workspace_files", { path });
+}
+
 // Create a new empty file in workspace
 export function createWorkspaceFile(
 	path: string,

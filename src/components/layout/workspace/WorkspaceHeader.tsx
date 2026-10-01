@@ -8,6 +8,7 @@ import { Lock, Radio, Settings } from "lucide-react";
 // Components
 import { Button } from "@/components/ui/button";
 import WorkspaceSearch from "@/components/layout/workspace/WorkspaceSearch";
+import NotificationBell from "@/components/layout/workspace/NotificationBell";
 import { useP2P } from "@/store/p2p/P2PContext";
 import P2PConnectDialog from "@/components/dialogs/workspace/P2PConnectDialog";
 import { cn } from "@/lib/utils";
@@ -15,7 +16,7 @@ import { cn } from "@/lib/utils";
 // Header component for the workspace layout
 export default function WorkspaceHeader() {
 	const navigate = useNavigate();
-	const { peers, connectionStatus } = useP2P();
+	const { peers, connectionStatus, network } = useP2P();
 	const [isP2POpen, setIsP2POpen] = useState(false);
 
 	const connectedCount = peers.filter((p) => p.status === "connected").length;
@@ -29,6 +30,7 @@ export default function WorkspaceHeader() {
 
 			{/* Right Actions: P2P Badge & Settings */}
 			<div className="flex shrink-0 items-center gap-2">
+				<NotificationBell />
 				<Button
 					variant="outline"
 					size="sm"
@@ -40,20 +42,22 @@ export default function WorkspaceHeader() {
 							"h-2 w-2 rounded-none",
 							connectedCount > 0
 								? "bg-emerald-400 animate-ping"
+								: !network.online
+									? "bg-red-400"
 								: connectionStatus === "connecting" || connectionStatus === "reconnecting"
 									? "bg-amber-400 animate-pulse"
-									: "bg-muted-foreground",
+									: "bg-emerald-400",
 						)}
 					/>
 					<Radio className="h-3.5 w-3.5 text-sky-400" />
 					<span className="hidden md:inline">
 						{connectedCount > 0
-							? `${connectedCount} Peer${connectedCount > 1 ? "s" : ""}`
-							: "P2P Sync"}
+							? `${connectedCount} collaborator${connectedCount > 1 ? "s" : ""}`
+							: network.online ? "Online" : "Offline"}
 					</span>
 					<div className="hidden items-center gap-0.5 text-[10px] lg:flex text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded-none border border-emerald-500/20 ml-0.5">
 						<Lock className="h-2.5 w-2.5" />
-						<span>E2EE</span>
+						<span>Private</span>
 					</div>
 				</Button>
 

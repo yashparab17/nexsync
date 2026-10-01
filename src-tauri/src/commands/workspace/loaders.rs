@@ -45,7 +45,7 @@ pub(crate) fn load_history(tx: &Transaction, workspace_id: &str) -> Result<Histo
 pub(crate) fn load_activity(tx: &Transaction, workspace_id: &str) -> Result<Activity, String> {
     let mut stmt = tx
         .prepare(
-            "SELECT id, timestamp, action, detail, target, target_type
+            "SELECT id, timestamp, action, detail, target, target_type, author
              FROM activity_events WHERE workspace_id = ?1
              ORDER BY timestamp DESC
              LIMIT 500",
@@ -60,6 +60,7 @@ pub(crate) fn load_activity(tx: &Transaction, workspace_id: &str) -> Result<Acti
                 detail: r.get(3)?,
                 target: r.get(4).ok(),
                 target_type: r.get(5).ok(),
+                author: r.get(6).ok(),
             })
         })
         .map_err(|e| e.to_string())?
