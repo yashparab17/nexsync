@@ -46,6 +46,7 @@ pub fn get_tasks(app_handle: tauri::AppHandle, path: String, with_state: Option<
         .filter_map(|r| r.ok())
         .collect();
     crdt::attach_conflicts(&db.conn, &mut tasks)?;
+    super::invariants::attach(&db.conn, &mut tasks)?;
     if with_state.unwrap_or(false) {
         for t in &mut tasks {
             crdt::attach(&db.conn, t)?;

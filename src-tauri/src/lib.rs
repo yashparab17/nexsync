@@ -10,6 +10,10 @@ pub fn run() {
         .setup(|app| {
             // Initialize the session auth registry
             commands::auth::init();
+            // Writes to tasks and cards are signed with the key this device is known by to collaborators
+            if let Some(key) = commands::p2p::identity(app.handle()) {
+                commands::workspace::signing::init(key);
+            }
             // The updater checks GitHub Releases for a signed newer build; desktop-only, like
             // upstream's own scaffold, since there's nothing to update on mobile app stores.
             #[cfg(desktop)]
@@ -86,6 +90,18 @@ pub fn run() {
             commands::workspace::data_sync::merge_card_record,
             commands::workspace::data_sync::resolve_task_conflict,
             commands::workspace::data_sync::resolve_card_conflict,
+            commands::workspace::catchup::get_catchup,
+            commands::workspace::catchup::mark_catchup,
+            commands::workspace::catchup::add_text_catchup,
+            commands::workspace::invariants::get_rules,
+            commands::workspace::invariants::set_rule,
+            commands::workspace::drafts::list_drafts,
+            commands::workspace::drafts::start_draft,
+            commands::workspace::drafts::get_draft,
+            commands::workspace::drafts::save_draft,
+            commands::workspace::drafts::preview_draft,
+            commands::workspace::drafts::merge_draft,
+            commands::workspace::drafts::discard_draft,
             commands::workspace::create_kanban_column,
             commands::workspace::create_kanban_card,
             commands::workspace::update_kanban_card,

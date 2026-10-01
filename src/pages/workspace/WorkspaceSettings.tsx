@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import RulesCard from "@/components/elements/RulesCard";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useLeaveWorkspace } from "@/hooks/useLeaveWorkspace";
@@ -287,6 +288,8 @@ export default function WorkspaceSettings() {
 					)}
 				</div>
 			</form>
+
+			{workspace && <RulesCard workspacePath={workspace.path} />}
 
 			{/* Export */}
 			<Card>

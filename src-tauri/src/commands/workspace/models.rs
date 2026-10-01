@@ -118,6 +118,9 @@ pub struct Task {
     /// Fields where two people wrote different values at the same time and nobody has chosen yet
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub conflicts: Vec<super::crdt::Conflict>,
+    /// Rules about the whole record that it breaks right now, when the workspace has turned them on
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub violations: Vec<super::invariants::Violation>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -155,6 +158,9 @@ pub struct KanbanCard {
     /// Fields where two people wrote different values at the same time and nobody has chosen yet
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub conflicts: Vec<super::crdt::Conflict>,
+    /// Rules about the whole record that it breaks right now, when the workspace has turned them on
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub violations: Vec<super::invariants::Violation>,
     pub created_at: String,
     pub updated_at: String,
 }

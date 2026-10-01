@@ -242,6 +242,57 @@ CREATE TABLE IF NOT EXISTS crdt_meta (
 );
 "##,
 	},
+	Migration {
+		version: 10,
+		description: "journal of other people's changes, for the catch-up review",
+		up: r##"
+CREATE TABLE IF NOT EXISTS catchup_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    target TEXT NOT NULL,
+    label TEXT NOT NULL,
+    path TEXT NOT NULL DEFAULT '',
+    before TEXT,
+    after TEXT,
+    who TEXT,
+    state TEXT NOT NULL DEFAULT 'new'
+);
+"##,
+	},
+	Migration {
+		version: 11,
+		description: "rules about whole records, turned on per workspace",
+		up: r##"
+CREATE TABLE IF NOT EXISTS enabled_rules (id TEXT PRIMARY KEY);
+"##,
+	},
+	Migration {
+		version: 12,
+		description: "device key that signed each journaled change",
+		up: r##"
+ALTER TABLE catchup_log ADD COLUMN signer TEXT;
+"##,
+	},
+	Migration {
+		version: 13,
+		description: "drafts of tasks and cards",
+		up: r##"
+CREATE TABLE IF NOT EXISTS drafts (
+    id TEXT PRIMARY KEY,
+    entity TEXT NOT NULL,
+    target TEXT NOT NULL,
+    name TEXT NOT NULL,
+    author TEXT,
+    created_at INTEGER NOT NULL,
+    replica TEXT NOT NULL,
+    state TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open'
+);
+CREATE INDEX IF NOT EXISTS idx_drafts_target ON drafts(entity, target);
+"##,
+	},
 ];
 
 /// Initialises the schema on a fresh database, running pending migrations

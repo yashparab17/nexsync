@@ -17,7 +17,8 @@ use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 use serde_json::{json, Value};
 
 use super::crdt::{rfc3339_of, Crdt, RecordState};
-use super::models::{ChecklistItem, Comment, KanbanCard};
+use super::invariants::{check, RULES};
+use super::models::{ChecklistItem, Comment, KanbanCard, Task};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum Effect {
@@ -292,4 +293,140 @@ fn field_merging_loses_fewer_edits_and_every_scheme_converges() {
     assert!(lww.lost > fields.lost, "per-field merging should lose less than whole-record merging");
     assert!(fields.lost > full.lost, "sets and kept conflicts should lose less than per-field registers alone");
     assert_eq!(full.lost, 0, "nothing is silently lost when lists are sets and collisions are kept");
+}
+
+// ────────────────────────────
+// Rules about a whole record
+// ────────────────────────────
+
+/// Two or three devices edit one task while apart. Each device only makes an edit that leaves both rules true on its
+/// own copy (a finished task keeps its assignee, a dated task keeps its assignee), so every device is correct at every
+/// moment. Whatever rule is broken after they merge was broken by the merge, not by anyone.
+#[derive(Default, Debug)]
+struct RuleTally {
+    trials: u64,
+    edits_made: u64,
+    edits_refused: u64,
+    broken_trials: u64,
+    broken_by_rule: BTreeMap<String, u64>,
+    diverged: u64,
+}
+
+fn base_task() -> Task {
+    Task {
+        id: "t".into(),
+        title: "Base".into(),
+        status: "todo".into(),
+        priority: "medium".into(),
+        assignee_id: Some("p0".into()),
+        created_at: "2026-01-01T00:00:00Z".into(),
+        updated_at: "2026-01-01T00:00:00Z".into(),
+        ..Default::default()
+    }
+}
+
+fn rule_trial(whole_record: bool, seed: u64, tally: &mut RuleTally) {
+    let on: Vec<String> = RULES.iter().map(|r| r.id.to_string()).collect();
+    let mut rng = StdRng::seed_from_u64(seed);
+    let devices_n = rng.gen_range(2..=3);
+    let base = base_task();
+    let base_state = RecordState::from_legacy(base.paths(false), 1_000);
+    let mut devices: Vec<(Task, RecordState, u64)> = (0..devices_n).map(|_| (base.clone(), base_state.clone(), 2_000)).collect();
+
+    for (who, (task, state, at)) in devices.iter_mut().enumerate() {
+        for _ in 0..rng.gen_range(1..=4) {
+            *at += rng.gen_range(1..400);
+            let mut next = task.clone();
+            match rng.gen_range(0..6) {
+                0 => next.assignee_id = Some(format!("person-{who}")),
+                1 => next.assignee_id = None,
+                2 => next.status = "done".into(),
+                3 => next.status = "todo".into(),
+                4 => next.due_date = Some(format!("2026-03-{:02}", rng.gen_range(1..28))),
+                _ => next.due_date = None,
+            }
+            // This device's own copy must satisfy the rules after every edit
+            if !check(&next, &on).is_empty() {
+                tally.edits_refused += 1;
+                continue;
+            }
+            tally.edits_made += 1;
+            *task = next;
+            if whole_record {
+                task.updated_at = rfc3339_of(*at);
+            } else {
+                state.diff_write(&format!("d{who}"), &task.paths(false), *at, None);
+            }
+        }
+    }
+
+    for _ in 0..2 {
+        let mut pairs: Vec<(usize, usize)> = (0..devices_n).flat_map(|i| (0..devices_n).filter(move |&j| j != i).map(move |j| (i, j))).collect();
+        pairs.shuffle(&mut rng);
+        for (from, to) in pairs {
+            if whole_record {
+                let theirs = (devices[from].0.updated_at.clone(), from, devices[from].0.clone());
+                let ours = (devices[to].0.updated_at.clone(), to, devices[to].0.clone());
+                if (theirs.0.as_str(), theirs.1) > (ours.0.as_str(), ours.1) && theirs.2 != ours.2 {
+                    devices[to].0 = theirs.2;
+                }
+            } else {
+                let theirs = devices[from].1.clone();
+                devices[to].1 = devices[to].1.merge(&theirs);
+            }
+        }
+    }
+
+    let finals: Vec<Task> = devices.iter().map(|(t, s, _)| if whole_record { t.clone() } else { Task::materialize(&base, &s.resolved()) }).collect();
+    tally.trials += 1;
+    if finals.windows(2).any(|w| w[0].paths(false) != w[1].paths(false)) {
+        tally.diverged += 1;
+    }
+    let broken = check(&finals[0], &on);
+    if !broken.is_empty() {
+        tally.broken_trials += 1;
+        for v in broken {
+            *tally.broken_by_rule.entry(v.rule).or_default() += 1;
+        }
+    }
+}
+
+fn rule_run(whole_record: bool, trials: u64) -> RuleTally {
+    let mut tally = RuleTally::default();
+    for seed in 0..trials {
+        rule_trial(whole_record, seed, &mut tally);
+    }
+    tally
+}
+
+#[test]
+fn merging_field_by_field_can_break_rules_that_no_device_broke() {
+    let trials = 5000;
+    let lww = rule_run(true, trials);
+    let fields = rule_run(false, trials);
+
+    let line = |name: &str, t: &RuleTally| {
+        let pct = |n: u64| 100.0 * n as f64 / t.trials as f64;
+        let by = |rule: &str| t.broken_by_rule.get(rule).copied().unwrap_or(0);
+        println!(
+            "| {name:<12} | {:>6} | {:>5} ({:>4.1}%) | {:>5} ({:>4.1}%) | {:>5} ({:>4.1}%) | {:>8} |",
+            t.trials,
+            t.broken_trials,
+            pct(t.broken_trials),
+            by(super::invariants::FINISHED_HAS_OWNER),
+            pct(by(super::invariants::FINISHED_HAS_OWNER)),
+            by(super::invariants::SCHEDULED_HAS_OWNER),
+            pct(by(super::invariants::SCHEDULED_HAS_OWNER)),
+            t.diverged
+        );
+    };
+    println!("\nOne task edited offline by 2-3 devices, each keeping both rules true on its own copy, {trials} trials each");
+    println!("| strategy     | trials | ends broken     | finished, no owner | dated, no owner | diverged |");
+    line("record-LWW", &lww);
+    line("fields+sets", &fields);
+    println!("edits made {} / refused by the device's own rules {} (fields)", fields.edits_made, fields.edits_refused);
+
+    assert_eq!(lww.diverged + fields.diverged, 0, "devices must end up identical");
+    assert_eq!(lww.broken_trials, 0, "taking one device's whole record keeps the rules, since that device kept them");
+    assert!(fields.broken_trials > 0, "merging field by field can combine two correct records into a broken one");
 }

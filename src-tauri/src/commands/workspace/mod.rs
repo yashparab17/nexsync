@@ -6,6 +6,10 @@ pub mod helpers;
 pub mod workspace;
 pub mod loaders;
 pub mod crdt;
+pub mod catchup;
+pub mod invariants;
+pub mod signing;
+pub mod drafts;
 #[cfg(test)]
 mod crdt_sim;
 pub mod filesystem;

@@ -76,7 +76,7 @@ pub fn clear_tombstone(conn: &Connection, entity: &str, id: &str) -> Result<(), 
         .map_err(|e| e.to_string())
 }
 
-fn valid_task(t: &Task) -> bool {
+pub(super) fn valid_task(t: &Task) -> bool {
     !t.id.is_empty()
         && t.id.len() <= 64
         && !t.title.is_empty()
@@ -88,7 +88,7 @@ fn valid_task(t: &Task) -> bool {
         && validate_task_priority(&t.priority).is_ok()
 }
 
-fn valid_card(c: &KanbanCard) -> bool {
+pub(super) fn valid_card(c: &KanbanCard) -> bool {
     !c.id.is_empty()
         && c.id.len() <= 64
         && c.column_id.len() <= 64
@@ -232,6 +232,7 @@ fn merge_task(conn: &Connection, ws_id: &str, tombs: &HashMap<(String, String), 
     let Some(row) = crdt::merge_remote(conn, t, local.as_ref(), valid_task)? else { return Ok(false) };
     put_task_row(conn, ws_id, &row)?;
     clear_tombstone(conn, ENTITY_TASK, &t.id)?;
+    journal(conn, ENTITY_TASK, &row.id, &row.title, local.as_ref().map(|l| crdt::Crdt::paths(l, false)), crdt::Crdt::paths(&row, false))?;
     Ok(true)
 }
 
@@ -264,7 +265,14 @@ fn merge_card(conn: &Connection, ws_id: &str, tombs: &HashMap<(String, String), 
     }
     put_card(conn, ws_id, &row)?;
     clear_tombstone(conn, ENTITY_CARD, &c.id)?;
+    journal(conn, ENTITY_CARD, &row.id, &row.title, local.as_ref().map(|l| crdt::Crdt::paths(l, false)), crdt::Crdt::paths(&row, false))?;
     Ok(true)
+}
+
+/// Writes down what a merge changed in a record, for the catch-up review
+fn journal(conn: &Connection, entity: &str, id: &str, label: &str, before: Option<std::collections::BTreeMap<String, serde_json::Value>>, after: std::collections::BTreeMap<String, serde_json::Value>) -> Result<(), String> {
+    let Some(state) = crdt::load(conn, entity, id)? else { return Ok(()) };
+    super::catchup::record_merge(conn, entity, id, label, before.as_ref(), &after, &state)
 }
 
 /// A card parked in the Recovered column goes back to its own column once that column exists here again
@@ -283,6 +291,24 @@ fn reclaim(conn: &Connection, parked: Option<&KanbanCard>) -> Result<bool, Strin
 /// Merge state comes from a peer, so it is bounded like everything else they send
 fn crdt_too_big(state: Option<&crdt::RecordState>) -> bool {
     state.is_some_and(|s| s.fields.len() > 1000 || s.vv.len() > 64 || s.fields.values().any(|v| v.len() > 64))
+}
+
+/// Runs one record's merge on its own, so a record the database refuses (say, one assigned to a member this device has
+/// no record of yet) does not stop the rest of a peer's state from merging. What it had written is undone, which also
+/// keeps its merge state from being saved without its row; the record merges on a later sync once it can be stored.
+fn isolated(conn: &Connection, id: &str, merge: impl FnOnce() -> Result<bool, String>) -> Result<bool, String> {
+    conn.execute_batch("SAVEPOINT merge_one").map_err(|e| e.to_string())?;
+    match merge() {
+        Ok(changed) => {
+            conn.execute_batch("RELEASE merge_one").map_err(|e| e.to_string())?;
+            Ok(changed)
+        }
+        Err(e) => {
+            eprintln!("[sync] Could not merge record {id} yet: {e}");
+            conn.execute_batch("ROLLBACK TO merge_one; RELEASE merge_one").map_err(|e| e.to_string())?;
+            Ok(false)
+        }
+    }
 }
 
 /// Merges a peer's state into this device's database; returns true if anything changed.
@@ -323,6 +349,10 @@ pub fn merge_state(conn: &Connection, ws_id: &str, remote: DataState) -> Result<
             }
         }
         if local_updated.is_some() {
+            if t.entity != ENTITY_COLUMN {
+                let title: Option<String> = tx.query_row(&format!("SELECT title FROM {table} WHERE id = ?1"), [&t.id], |r| r.get(0)).optional().map_err(e)?;
+                super::catchup::record_deleted(&tx, &t.entity, &t.id, &title.unwrap_or_default())?;
+            }
             tx.execute(&format!("DELETE FROM {table} WHERE id = ?1"), [&t.id]).map_err(e)?;
             changed = true;
         }
@@ -359,10 +389,10 @@ pub fn merge_state(conn: &Connection, ws_id: &str, remote: DataState) -> Result<
 
     // 3. Tasks and 4. cards: merged field by field, see crdt.rs
     for t in &remote.tasks {
-        changed |= merge_task(&tx, ws_id, &tombs, t)?;
+        changed |= isolated(&tx, &t.id, || merge_task(&tx, ws_id, &tombs, t))?;
     }
     for c in &remote.cards {
-        changed |= merge_card(&tx, ws_id, &tombs, c)?;
+        changed |= isolated(&tx, &c.id, || merge_card(&tx, ws_id, &tombs, c))?;
     }
 
     tx.commit().map_err(e)?;
@@ -452,7 +482,7 @@ pub fn merge_into(path: &str, remote: DataState) -> Result<bool, String> {
 // Tauri commands — live sync and conflicts
 // ────────────────────────────
 
-fn checked(app_handle: &tauri::AppHandle, path: &str) -> Result<(), String> {
+pub(super) fn checked(app_handle: &tauri::AppHandle, path: &str) -> Result<(), String> {
     crate::commands::config::validate_allowed_root(app_handle, path)?;
     crate::commands::path_utils::resolve_workspace_path(path, ".").map(|_| ())
 }
@@ -723,6 +753,25 @@ mod tests {
     fn exchange(a: &Connection, b: &Connection) {
         merge_state(a, "a", export_state(b, "b").unwrap()).unwrap();
         merge_state(b, "b", export_state(a, "a").unwrap()).unwrap();
+    }
+
+    #[test]
+    fn a_record_that_cannot_be_stored_yet_does_not_stop_the_others() {
+        let a = db("a");
+        // Assigned to somebody this device has no member record for yet, which the database refuses
+        let mut unknown = task("1", "assigned to a stranger", "2026-01-02T00:00:00Z");
+        unknown.assignee_id = Some("ghost".into());
+        let fine = task("2", "ordinary", "2026-01-02T00:00:00Z");
+        assert!(merge_state(&a, "a", only_tasks(vec![unknown.clone(), fine])).unwrap());
+        assert!(read_task(&a, "2").unwrap().is_some(), "the other task is merged");
+        assert!(read_task(&a, "1").unwrap().is_none());
+        // And nothing half-done is left behind: no merge state without its row, which would make it look up to date
+        assert!(crdt::load(&a, "task", "1").unwrap().is_none());
+
+        // Once the member is known, the same record merges on the next sync
+        a.execute("INSERT INTO members (id, workspace_id, name, role) VALUES ('ghost', 'a', 'Ghost', 'Editor')", []).unwrap();
+        assert!(merge_state(&a, "a", only_tasks(vec![unknown])).unwrap());
+        assert_eq!(read_task(&a, "1").unwrap().unwrap().assignee_id.as_deref(), Some("ghost"));
     }
 
     fn conflicts_of(conn: &Connection, id: &str) -> Vec<crdt::Conflict> {

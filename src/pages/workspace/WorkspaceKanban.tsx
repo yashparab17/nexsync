@@ -38,6 +38,8 @@ import {
 	updateKanbanCard,
 } from "@/lib/tauri";
 import ConflictPanel from "@/components/elements/ConflictPanel";
+import RuleFlag from "@/components/elements/RuleFlag";
+import DraftsButton from "@/components/dialogs/workspace/DraftsDialog";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type { ChecklistItem, KanbanCard, KanbanColumn } from "@/types/workspace";
@@ -678,9 +680,11 @@ export default function WorkspaceKanban() {
 												{((card.tags ?? []).length > 0 ||
 													card.due_date ||
 													card.assignee_id ||
-													(card.checklist ?? []).length > 0) && (
+													(card.checklist ?? []).length > 0 ||
+													(card.violations ?? []).length > 0) && (
 													<div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-														<DueBadge due={card.due_date} done={colIndex === columns.length - 1} />
+														<RuleFlag violations={card.violations} />
+															<DueBadge due={card.due_date} done={colIndex === columns.length - 1} />
 														{(card.checklist ?? []).length > 0 && (
 															<span className="inline-flex items-center gap-1">
 																<CheckSquare className="size-3" />
@@ -910,7 +914,8 @@ export default function WorkspaceKanban() {
 							{renderCardExtras("edit-card")}
 						</div>
 
-						<ConflictPanel conflicts={editingCard.conflicts ?? []} show={showValue} canChoose={!isViewer} onChoose={resolveConflict} />
+						<ConflictPanel conflicts={editingCard.conflicts ?? []} violations={editingCard.violations} show={showValue} canChoose={!isViewer} onChoose={resolveConflict} />
+						{!isViewer && workspace && <DraftsButton workspacePath={workspace.path} entity="card" record={editingCard} members={members} onMerged={() => setEditingCard(null)} />}
 
 						<Comments
 							comments={editingCard.comments ?? []}

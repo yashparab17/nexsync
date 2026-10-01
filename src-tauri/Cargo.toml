@@ -46,6 +46,15 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
+# Signatures on every synced write are checked by these; unoptimised they take milliseconds each, which makes
+# `tauri dev` and the tests slow when many records sync at once
+[profile.dev.package.curve25519-dalek]
+opt-level = 3
+[profile.dev.package.ed25519-dalek]
+opt-level = 3
+[profile.dev.package.sha2]
+opt-level = 3
+
 # The device key goes in the OS credential store on these systems
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 keyring = { version = "3", default-features = false, features = ["windows-native", "apple-native"] }

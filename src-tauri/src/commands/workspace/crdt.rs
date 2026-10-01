@@ -40,9 +40,14 @@ pub struct Sibling {
     /// Milliseconds since 1970, forced above every time the record has seen so later writes sort later
     pub ts: u64,
     pub value: Value,
-    /// Who made the write, when known
+    /// Who made the write, when known; a name the writing device chose, not proof of anything
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Option<String>,
+    /// The device key that signed the write, and its signature (see `signing`); absent on writes from before signing
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sig: Option<String>,
 }
 
 /// Everything a replica knows about one record
@@ -59,6 +64,9 @@ pub struct ConflictOption {
     pub ts: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Option<String>,
+    /// The device key that signed this value, when it was signed
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<String>,
 }
 
 /// A field with more than one value; the first option is the one being shown
@@ -143,7 +151,7 @@ impl RecordState {
         let mut state = RecordState::default();
         state.vv.insert(LEGACY.to_string(), 0);
         for (path, value) in values {
-            state.fields.insert(path, vec![Sibling { dot: Dot { r: LEGACY.to_string(), c: 0 }, ts, value, who: None }]);
+            state.fields.insert(path, vec![Sibling { dot: Dot { r: LEGACY.to_string(), c: 0 }, ts, value, who: None, by: None, sig: None }]);
         }
         state
     }
@@ -153,7 +161,7 @@ impl RecordState {
         let c = self.vv.get(replica).copied().unwrap_or(0) + 1;
         self.vv.insert(replica.to_string(), c);
         let ts = now.max(self.max_ts() + 1);
-        self.fields.insert(path.to_string(), vec![Sibling { dot: Dot { r: replica.to_string(), c }, ts, value, who: who.map(str::to_string) }]);
+        self.fields.insert(path.to_string(), vec![Sibling { dot: Dot { r: replica.to_string(), c }, ts, value, who: who.map(str::to_string), by: None, sig: None }]);
     }
 
     /// Makes the record read as `desired`, writing only the paths that differ; returns whether anything was written.
@@ -213,6 +221,44 @@ impl RecordState {
         RecordState { vv, fields }
     }
 
+    /// Who wrote the value a path shows, when that is known
+    pub fn writer_of(&self, path: &str) -> Option<String> {
+        self.fields.get(path).and_then(|s| winner(path, s)).and_then(|w| w.who.clone())
+    }
+
+    /// The device key that signed the value a path shows, when it was signed
+    pub fn signer_of(&self, path: &str) -> Option<String> {
+        self.fields.get(path).and_then(|s| winner(path, s)).and_then(|w| w.by.clone())
+    }
+
+    fn write_of<'a>(entity: &'a str, id: &'a str, path: &'a str, s: &'a Sibling) -> super::signing::Write<'a> {
+        super::signing::Write { entity, record: id, path, replica: &s.dot.r, counter: s.dot.c, ts: s.ts, who: s.who.as_deref(), value: &s.value }
+    }
+
+    /// Signs the writes this replica has made that are not signed yet, with this device's key
+    pub fn sign_own(&mut self, entity: &str, id: &str, replica: &str) {
+        for (path, siblings) in self.fields.iter_mut() {
+            for s in siblings.iter_mut().filter(|s| s.dot.r == replica && s.sig.is_none()) {
+                if let Some((by, sig)) = super::signing::sign(&Self::write_of(entity, id, path, s)) {
+                    s.by = Some(by);
+                    s.sig = Some(sig);
+                }
+            }
+        }
+    }
+
+    /// False if any write carries a signature that does not check out for this record. A write with none is not
+    /// refused: it is from before signing, or from a device that does not sign, and simply cannot be vouched for.
+    pub fn signatures_ok(&self, entity: &str, id: &str) -> bool {
+        self.fields.iter().all(|(path, siblings)| {
+            siblings.iter().all(|s| match (&s.by, &s.sig) {
+                (None, None) => true,
+                (Some(by), Some(sig)) => super::signing::verify(by, sig, &Self::write_of(entity, id, path, s)),
+                _ => false,
+            })
+        })
+    }
+
     /// The value each path shows
     pub fn resolved(&self) -> BTreeMap<String, Value> {
         self.fields.iter().filter_map(|(p, s)| winner(p, s).map(|w| (p.clone(), w.value.clone()))).collect()
@@ -230,7 +276,7 @@ impl RecordState {
             let mut options: Vec<ConflictOption> = Vec::new();
             for s in ordered {
                 if options.iter().all(|o| o.value != s.value) {
-                    options.push(ConflictOption { value: s.value.clone(), ts: s.ts, who: s.who.clone() });
+                    options.push(ConflictOption { value: s.value.clone(), ts: s.ts, who: s.who.clone(), by: s.by.clone() });
                 }
             }
             if options.len() > 1 {
@@ -366,6 +412,7 @@ impl Crdt for Task {
             updated_at: base.updated_at.clone(),
             crdt: None,
             conflicts: Vec::new(),
+            violations: Vec::new(),
         }
     }
 }
@@ -448,6 +495,7 @@ impl Crdt for KanbanCard {
             updated_at: base.updated_at.clone(),
             crdt: None,
             conflicts: Vec::new(),
+            violations: Vec::new(),
         }
     }
 }
@@ -525,6 +573,7 @@ pub fn apply_local<T: Crdt>(conn: &Connection, row: &T, existing: Option<&T>, ba
         None => existing.map(|e| RecordState::from_legacy(e.paths(false), ts_of(e.updated_at()))).unwrap_or_default(),
     };
     state.diff_write_from(&replica, &row.paths(false), base.map(|b| b.paths(false)).as_ref(), now_ms(), who);
+    state.sign_own(T::ENTITY, row.id(), &replica);
     save(conn, T::ENTITY, row.id(), &state)?;
     let mut out = T::materialize(existing.unwrap_or(row), &state.resolved());
     out.set_updated_at(rfc3339_of(state.max_ts()));
@@ -537,6 +586,7 @@ pub fn resolve_field<T: Crdt>(conn: &Connection, base: &T, field: &str, value: V
     let Some(mut state) = load(conn, T::ENTITY, base.id())? else { return Ok(None) };
     let replica = replica_id(conn)?;
     state.write(&replica, field, value, now_ms(), who);
+    state.sign_own(T::ENTITY, base.id(), &replica);
     save(conn, T::ENTITY, base.id(), &state)?;
     let mut row = T::materialize(base, &state.resolved());
     row.set_updated_at(rfc3339_of(state.max_ts()));
@@ -547,6 +597,11 @@ pub fn resolve_field<T: Crdt>(conn: &Connection, base: &T, field: &str, value: V
 /// The state is saved; the caller writes the returned record into the row.
 pub fn merge_remote<T: Crdt>(conn: &Connection, remote: &T, local: Option<&T>, valid: impl Fn(&T) -> bool) -> Result<Option<T>, String> {
     let theirs = remote.crdt().cloned().unwrap_or_else(|| RecordState::from_legacy(remote.paths(false), ts_of(remote.updated_at())));
+    // A write whose signature does not check out was altered, or never made by the key it names: the record is refused
+    if !theirs.signatures_ok(T::ENTITY, remote.id()) {
+        eprintln!("[sync] Refused {} {}: a write in it is not signed by the device it names", T::ENTITY, remote.id());
+        return Ok(None);
+    }
     let ours = match load(conn, T::ENTITY, remote.id())? {
         Some(s) => Some(s),
         None => local.map(|l| RecordState::from_legacy(l.paths(false), ts_of(l.updated_at()))),

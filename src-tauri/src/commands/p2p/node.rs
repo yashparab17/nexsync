@@ -123,11 +123,7 @@ impl P2pState {
             return Ok(node.clone());
         }
         // A missing or unwritable key file only costs a stable address, so fall back to a random key.
-        let secret = app
-            .path()
-            .app_data_dir()
-            .ok()
-            .and_then(|dir| load_or_create_identity(&dir.join("nexsync").join("p2p_identity.key")).ok());
+        let secret = identity(app);
         let proxy = crate::commands::config::load_config(app)
             .ok()
             .and_then(|c| crate::commands::config::parse_proxy_url(&c.proxy_url).ok().flatten());
@@ -161,6 +157,11 @@ impl P2pState {
             node.sync.watch(path.as_deref());
         }
     }
+}
+
+/// This device's identity key, or `None` if it can be neither read nor created. The app also signs writes with it.
+pub(crate) fn identity(app: &AppHandle) -> Option<SecretKey> {
+    app.path().app_data_dir().ok().and_then(|dir| load_or_create_identity(&dir.join("nexsync").join("p2p_identity.key")).ok())
 }
 
 /// Loads this device's P2P identity key, creating and saving one on first run.

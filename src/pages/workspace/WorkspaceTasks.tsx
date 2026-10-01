@@ -35,6 +35,8 @@ import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
 import { createTask, deleteTask, getTasks, resolveTaskConflict, updateTask } from "@/lib/tauri";
 import ConflictPanel from "@/components/elements/ConflictPanel";
+import RuleFlag from "@/components/elements/RuleFlag";
+import DraftsButton from "@/components/dialogs/workspace/DraftsDialog";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
@@ -707,8 +709,9 @@ export default function WorkspaceTasks() {
 											</p>
 										)}
 
-										{(task.due_date || task.assignee_id || (task.tags ?? []).length > 0) && (
+										{(task.due_date || task.assignee_id || (task.tags ?? []).length > 0 || (task.violations ?? []).length > 0) && (
 											<div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+												<RuleFlag violations={task.violations} />
 												<DueBadge due={task.due_date} done={task.status === "done"} />
 												{task.assignee_id && <span>Assigned to {memberName(task.assignee_id)}</span>}
 												{(task.tags ?? []).map((tag) => (
@@ -946,7 +949,8 @@ export default function WorkspaceTasks() {
 							{renderExtras("edit")}
 						</div>
 
-						<ConflictPanel conflicts={editingTask.conflicts ?? []} show={showValue} canChoose={!isViewer} onChoose={resolveConflict} />
+						<ConflictPanel conflicts={editingTask.conflicts ?? []} violations={editingTask.violations} show={showValue} canChoose={!isViewer} onChoose={resolveConflict} />
+						{!isViewer && workspace && <DraftsButton workspacePath={workspace.path} entity="task" record={editingTask} members={members} onMerged={() => setEditingTask(null)} />}
 
 						<Comments
 							comments={editingTask.comments ?? []}

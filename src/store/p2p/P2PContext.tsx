@@ -34,6 +34,7 @@ import {
 import { useNotifications } from "@/store/notifications/NotificationContext";
 import {
 	base64ToUint8Array,
+	uint8ArrayToBase64,
 	readWorkspaceMetadata,
 	writeWorkspaceMetadata,
 	getTasks,
@@ -46,7 +47,8 @@ import {
 } from "@/lib/tauri";
 import type { Member } from "@/types/workspace";
 import { bindGuestMember, canChangeRole, roleTable } from "@/lib/roles";
-import { applyCatchUp, buildInventory, updatesFor, type Inventory } from "@/lib/p2p/yjsCatchUp";
+import { applyCatchUp, buildInventory, editDoc, updatesFor, type Inventory } from "@/lib/p2p/yjsCatchUp";
+import { replaceText, revertHunk, type TextHunk } from "@/lib/catchup";
 import { readSelfName, setSelfName } from "@/lib/p2p/selfName";
 import { newMentions } from "@/lib/comments";
 
@@ -133,6 +135,8 @@ interface P2PContextType {
 	declineHandoff: () => void;
 	transferHost: (peerId: string) => Promise<void>; // Owner only: hand ownership and hosting to a connected member
 	publishDataChange: (change: DataChange) => void;
+	refreshData: () => void; // Makes pages reload their tasks and cards after a change made outside them
+	revertTextHunk: (docId: string, hunk: TextHunk) => Promise<boolean>; // Undoes one change a collaborator made to a note's text; false when it can no longer be found
 	shareNamedVersion: (path: string, label: string, content: string) => boolean; // False when the text is too large to send
 	createInvite: (role?: string, options?: p2p.InviteOptions) => Promise<InviteInfo>;
 	blockDevice: (deviceId: string) => Promise<void>;
@@ -526,6 +530,42 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		});
 	};
 
+	const refreshData = useCallback(() => setDataVersion((v) => v + 1), []);
+
+	// Undo one hunk of a collaborator's change to a note. It is an ordinary edit, so it merges like any other; a note
+	// that is not open is saved here, and the edit is sent on so collaborators receive it too.
+	const revertTextHunk = useCallback(
+		async (docId: string, hunk: TextHunk) => {
+			const path = workspaceRef.current?.path;
+			if (!path) return false;
+			const sent: { delta?: Uint8Array } = {};
+			let changed = false;
+			await new Promise<void>((resolve) =>
+				runCatchUp(async () => {
+					try {
+						changed = await editDoc(path, docId, liveDocs(), (doc) => {
+							const text = doc.getText("content");
+							const next = revertHunk(text.toString(), hunk);
+							if (next === null) return false;
+							const before = Y.encodeStateVector(doc);
+							replaceText(text, next);
+							sent.delta = Y.encodeStateAsUpdate(doc, before);
+							return true;
+						});
+					} finally {
+						resolve();
+					}
+				}),
+			);
+			if (changed && sent.delta) {
+				const payload = uint8ArrayToBase64(sent.delta);
+				for (const peer of peersRef.current) send({ kind: "YDOC_UPDATE", timestamp: Date.now(), docId, payload }, peer.id);
+			}
+			return changed;
+		},
+		[runCatchUp, liveDocs, send],
+	);
+
 	// Tell collaborators about a local task/kanban edit
 	const publishDataChange = useCallback(
 		(change: DataChange) => {
@@ -668,9 +708,10 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 					const { docId, payload } = message;
 					if (!path || !docId || !payload) break;
 					runCatchUp(async () => {
-						const changed = await applyCatchUp(path, docId, base64ToUint8Array(payload), liveDocs());
+						const changed = await applyCatchUp(path, docId, base64ToUint8Array(payload), liveDocs(), message.author ?? null);
 						// Everyone else may now be missing what this device just learned.
 						if (changed) {
+							setDataVersion((v) => v + 1);
 							for (const peer of peersRef.current) if (peer.id !== peerId) sendInventoryRef.current(peer.id);
 						}
 					});
@@ -1155,6 +1196,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				declineHandoff,
 				transferHost,
 				publishDataChange,
+				refreshData,
+				revertTextHunk,
 				shareNamedVersion,
 				createInvite,
 				createShortCode,

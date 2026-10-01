@@ -180,6 +180,7 @@ export interface Task {
 	tags: string[];
 	comments?: Comment[];
 	conflicts?: Conflict[];
+	violations?: Violation[];
 	crdt?: unknown; // Merge state exchanged between devices; the app never reads it
 	created_at: string;
 	updated_at: string;
@@ -190,10 +191,69 @@ export interface ConflictOption {
 	value: unknown;
 	ts: number;
 	who?: string;
+	by?: string; // The device key that signed this value, when it was signed
 }
 export interface Conflict {
 	field: string;
 	options: ConflictOption[];
+}
+
+// A private copy of one task or card to change without touching the real one, then review and merge
+export interface Draft {
+	id: string;
+	entity: "task" | "card";
+	target: string;
+	name: string;
+	author: string | null;
+	created_at: number;
+	status: "open" | "merged";
+}
+
+// One field that merging a draft would change in the real record
+export interface DraftChange {
+	path: string;
+	live: unknown;
+	draft: unknown;
+}
+
+// What merging a draft would do, worked out before anything is changed
+export interface DraftPreview {
+	changes: DraftChange[];
+	// Fields the draft and somebody else both changed since it was started; the person chooses one after merging
+	collisions: Conflict[];
+	// The real record was deleted, so there is nothing to merge into
+	deleted: boolean;
+}
+
+// A rule about the whole record that it breaks right now; unlike a conflict, there is no value to choose between
+export interface Violation {
+	rule: string;
+	message: string;
+}
+
+// A rule a workspace can turn on
+export interface RuleInfo {
+	id: string;
+	text: string;
+	applies_to: string;
+	enabled: boolean;
+}
+
+// One change somebody else made, as kept for the catch-up review. `before` and `after` are JSON for a field and plain
+// text for a file; either is null when there was no value, or the text was too large to keep.
+export interface CatchupEntry {
+	id: number;
+	at: number;
+	kind: "field" | "created" | "deleted" | "text";
+	entity: "task" | "card" | "file";
+	target: string;
+	label: string;
+	path: string;
+	before: string | null;
+	after: string | null;
+	who: string | null; // A name the writing device chose
+	signer: string | null; // The device key that signed the change, when it was signed
+	state: "new" | "reverted";
 }
 
 // A comment on a task or card; "@Name" in the text mentions a collaborator
@@ -225,6 +285,7 @@ export interface KanbanCard {
 	checklist: ChecklistItem[];
 	comments?: Comment[];
 	conflicts?: Conflict[];
+	violations?: Violation[];
 	crdt?: unknown;
 	created_at: string;
 	updated_at: string;

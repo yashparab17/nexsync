@@ -68,6 +68,7 @@ pub fn get_kanban(app_handle: tauri::AppHandle, path: String, with_state: Option
             .collect();
         col.cards = cards;
         crdt::attach_conflicts(&db.conn, &mut col.cards)?;
+        super::invariants::attach(&db.conn, &mut col.cards)?;
         if with_state.unwrap_or(false) {
             for card in &mut col.cards {
                 crdt::attach(&db.conn, card)?;

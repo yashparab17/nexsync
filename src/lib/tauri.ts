@@ -25,6 +25,10 @@ import type {
 	KanbanCardRequest,
 	MoveCardRequest,
 	NexsyncConfig,
+	CatchupEntry,
+	RuleInfo,
+	Draft,
+	DraftPreview,
 } from "@/types/workspace";
 
 // ────────────────────────────
@@ -237,6 +241,49 @@ export function resolveTaskConflict(path: string, id: string, field: string, val
 }
 export function resolveCardConflict(path: string, id: string, field: string, value: unknown): Promise<KanbanCard | null> {
 	return invoke("resolve_card_conflict", { path, id, field, value, author: writeAuthor() });
+}
+
+// What other people changed since the person last looked, for the catch-up review
+export function getCatchup(path: string): Promise<CatchupEntry[]> {
+	return invoke("get_catchup", { path });
+}
+export function markCatchup(path: string, ids: number[], state: "seen" | "reverted"): Promise<void> {
+	return invoke("mark_catchup", { path, ids, state });
+}
+export function addTextCatchup(path: string, docId: string, label: string, who: string | null, before: string, after: string): Promise<void> {
+	return invoke("add_text_catchup", { path, docId, label, who, before, after });
+}
+
+// Rules about whole records (a finished task has an assignee), which a workspace can turn on
+export function getRules(path: string): Promise<RuleInfo[]> {
+	return invoke("get_rules", { path });
+}
+export function setRule(path: string, id: string, enabled: boolean): Promise<void> {
+	return invoke("set_rule", { path, id, enabled });
+}
+
+// Drafts: change a copy of one task or card, review what merging it would do, then merge. A draft stays on this device.
+export function listDrafts(path: string, entity: "task" | "card", target: string): Promise<Draft[]> {
+	return invoke("list_drafts", { path, entity, target });
+}
+export function startDraft(path: string, entity: "task" | "card", target: string, name: string): Promise<Draft> {
+	return invoke("start_draft", { path, entity, target, name, author: writeAuthor() });
+}
+export function getDraft<T extends Task | KanbanCard>(path: string, draftId: string): Promise<T> {
+	return invoke("get_draft", { path, draftId });
+}
+export function saveDraft<T extends Task | KanbanCard>(path: string, draftId: string, record: T): Promise<T> {
+	return invoke("save_draft", { path, draftId, record, author: writeAuthor() });
+}
+export function previewDraft(path: string, draftId: string): Promise<DraftPreview> {
+	return invoke("preview_draft", { path, draftId });
+}
+// Resolves to the record with the state other devices need to merge it, to send on like any other edit
+export function mergeDraft<T extends Task | KanbanCard>(path: string, draftId: string): Promise<T> {
+	return invoke("merge_draft", { path, draftId });
+}
+export function discardDraft(path: string, draftId: string): Promise<void> {
+	return invoke("discard_draft", { path, draftId });
 }
 
 // Delete a kanban column and its cards

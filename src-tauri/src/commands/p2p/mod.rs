@@ -19,6 +19,7 @@ use tauri::{AppHandle, State};
 
 use crate::commands::config::validate_allowed_root;
 pub use node::P2pState;
+pub(crate) use node::identity;
 use node::{InviteInfo, InviteOptions, JoinResult, NetworkStatus, PeerInfo};
 use short_code::ShortCodeInfo;
 use files::ShareableFile;

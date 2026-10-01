@@ -3,7 +3,7 @@
 
 import * as Y from "yjs";
 
-import { base64ToUint8Array, getYjsDoc, listYjsDocs, saveYjsDoc, uint8ArrayToBase64 } from "@/lib/tauri";
+import { addTextCatchup, base64ToUint8Array, getYjsDoc, listYjsDocs, saveYjsDoc, uint8ArrayToBase64 } from "@/lib/tauri";
 
 // A document open in the editor; its in-memory state is newer than what is stored
 export interface LiveDoc {
@@ -76,13 +76,32 @@ export async function updatesFor(
 	return updates;
 }
 
-// Merges a peer's update into a document; returns true if that changed it
-export async function applyCatchUp(path: string, docId: string, update: Uint8Array, live: LiveDoc[]): Promise<boolean> {
+// Merges a peer's update into a document; returns true if that changed it. A change to the text is written down for the
+// catch-up review, with who made it when known (a branch is somebody's draft and is not reported).
+export async function applyCatchUp(path: string, docId: string, update: Uint8Array, live: LiveDoc[], who: string | null = null): Promise<boolean> {
 	const { doc, isLive } = await load(path, docId, live);
 	const before = await digestOf(doc);
+	const textBefore = doc.getText("content").toString();
 	Y.applyUpdate(doc, update, "catch-up");
 	const changed = before !== (await digestOf(doc));
 	// An open document is saved by its own persistence provider; a closed one is saved here.
+	if (changed && !isLive) await saveYjsDoc(path, docId, Y.encodeStateAsUpdate(doc));
+	const textAfter = doc.getText("content").toString();
+	if (changed && textBefore !== textAfter && !docId.startsWith("branch:")) {
+		// Reviewing is optional, so failing to note a change must never stop it from being applied
+		void Promise.resolve()
+			.then(() => addTextCatchup(path, docId, docId.split("/").pop() || docId, who, textBefore, textAfter))
+			.catch(() => {});
+	}
+	if (!isLive) doc.destroy();
+	return changed;
+}
+
+// Changes a document that may be open in the editor or only stored; `edit` says whether it changed anything.
+// An open document is saved by its own provider and reaches collaborators live; a stored one is saved here.
+export async function editDoc(path: string, docId: string, live: LiveDoc[], edit: (doc: Y.Doc) => boolean): Promise<boolean> {
+	const { doc, isLive } = await load(path, docId, live);
+	const changed = edit(doc);
 	if (changed && !isLive) await saveYjsDoc(path, docId, Y.encodeStateAsUpdate(doc));
 	if (!isLive) doc.destroy();
 	return changed;
