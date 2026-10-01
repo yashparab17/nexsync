@@ -132,7 +132,8 @@ interface P2PContextType {
 	transferHost: (peerId: string) => Promise<void>; // Owner only: hand ownership and hosting to a connected member
 	publishDataChange: (change: DataChange) => void;
 	shareNamedVersion: (path: string, label: string, content: string) => boolean; // False when the text is too large to send
-	createInvite: (role?: string) => Promise<InviteInfo>;
+	createInvite: (role?: string, options?: p2p.InviteOptions) => Promise<InviteInfo>;
+	blockDevice: (deviceId: string) => Promise<void>;
 	createShortCode: (role?: string) => Promise<ShortCodeInfo>;
 	joinRequests: JoinRequest[]; // Guests waiting for this host to allow or deny them
 	resolveJoinRequest: (requestId: string, approve: boolean) => Promise<void>;
@@ -840,7 +841,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	}, []);
 
 	// Create an invite ticket; generating a new one invalidates the previous ticket
-	const createInvite = useCallback(async (role: string = "Editor") => {
+	const createInvite = useCallback(async (role: string = "Editor", options?: p2p.InviteOptions) => {
 		const ws = workspaceRef.current;
 		if (!ws) {
 			throw new Error("Open a workspace before inviting collaborators.");
@@ -853,6 +854,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			workspaceId: ws.id,
 			workspaceName: ws.name,
 			hostName: owner?.name || "Host",
+			options,
 		});
 	}, []);
 
@@ -976,6 +978,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	);
 
 	const disconnectPeer = useCallback((peerId: string) => p2p.disconnectPeer(peerId), []);
+	const blockDevice = useCallback((deviceId: string) => p2p.blockDevice(deviceId), []);
 	const disconnectAll = useCallback(() => p2p.disconnectAll(), []);
 	const retryConnection = useCallback(() => p2p.retryConnection(), []);
 
@@ -1149,6 +1152,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				requestWorkspaceSnapshot,
 				downloadFileOnDemand,
 				disconnectPeer,
+				blockDevice,
 				disconnectAll,
 				retryConnection,
 				network,

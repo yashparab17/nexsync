@@ -45,26 +45,26 @@ const ROLE_CONFIG: Record<
 	Owner: {
 		label: "Owner",
 		icon: Crown,
-		color: "text-amber-400",
-		bg: "bg-amber-500/10 border-amber-500/20",
+		color: "text-ctp-yellow",
+		bg: "bg-ctp-yellow/10 border-ctp-yellow/20",
 	},
 	Admin: {
 		label: "Admin",
 		icon: ShieldCheck,
-		color: "text-violet-400",
-		bg: "bg-violet-500/10 border-violet-500/20",
+		color: "text-ctp-mauve",
+		bg: "bg-ctp-mauve/10 border-ctp-mauve/20",
 	},
 	Editor: {
 		label: "Editor",
 		icon: Shield,
-		color: "text-sky-400",
-		bg: "bg-sky-500/10 border-sky-500/20",
+		color: "text-ctp-sky",
+		bg: "bg-ctp-sky/10 border-ctp-sky/20",
 	},
 	Viewer: {
 		label: "Viewer",
 		icon: UserCheck,
-		color: "text-emerald-400",
-		bg: "bg-emerald-500/10 border-emerald-500/20",
+		color: "text-ctp-green",
+		bg: "bg-ctp-green/10 border-ctp-green/20",
 	},
 };
 
@@ -85,7 +85,7 @@ export default function WorkspaceMembers() {
 	const [deletingMember, setDeletingMember] = useState<Member | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 
-	const { peers, selfName, selfId, requestRoleChange, disconnectPeer, transferHost } = useP2P();
+	const { peers, selfName, selfId, requestRoleChange, disconnectPeer, blockDevice, transferHost } = useP2P();
 	const [hostTarget, setHostTarget] = useState<Member | null>(null);
 	const [handoffBusy, setHandoffBusy] = useState(false);
 	const [handoffError, setHandoffError] = useState<string | null>(null);
@@ -224,7 +224,7 @@ export default function WorkspaceMembers() {
 				"member",
 			);
 			// Removing someone also drops their connection, so they can't keep editing
-			if (deletingMember.deviceId) await disconnectPeer(deletingMember.deviceId).catch(() => {});
+			if (deletingMember.deviceId) await blockDevice(deletingMember.deviceId).catch(() => disconnectPeer(deletingMember.deviceId!).catch(() => {}));
 			setDeletingMember(null);
 			await refreshMetadata();
 		} catch (err) {
@@ -251,10 +251,10 @@ export default function WorkspaceMembers() {
 						onPress={() => setIsInviteOpen(true)}
 						className="gap-1.5"
 					>
-						<KeyRound className="size-4 text-sky-400" />
+						<KeyRound className="size-4 text-ctp-sky" />
 						Sharing & Invites
 						{peers.length > 0 && (
-							<span className="flex h-2 w-2 rounded-none bg-emerald-400 animate-ping ml-1" />
+							<span className="flex h-2 w-2 rounded-none bg-ctp-green animate-ping ml-1" />
 						)}
 					</Button>
 					<Button
@@ -329,8 +329,8 @@ export default function WorkspaceMembers() {
 															</span>
 														)}
 														{isOnline && (
-															<span className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
-																<span className="size-1.5 rounded-none bg-emerald-400" />
+															<span className="inline-flex items-center gap-1 text-[10px] text-ctp-green">
+																<span className="size-1.5 rounded-none bg-ctp-green" />
 																Online
 															</span>
 														)}
@@ -374,7 +374,7 @@ export default function WorkspaceMembers() {
 		}}
 		aria-label="Make Host"
 	>
-		<Crown className="size-3.5 text-muted-foreground hover:text-amber-400" />
+		<Crown className="size-3.5 text-muted-foreground hover:text-ctp-yellow" />
 	</Button>
 )}
 {!isOwner && !isJoinedCopy && (
@@ -411,7 +411,7 @@ export default function WorkspaceMembers() {
 						</CardHeader>
 						<CardContent className="space-y-4 text-xs">
 							<div className="rounded-none border p-3 bg-muted/10">
-								<div className="flex items-center gap-1.5 font-semibold text-amber-400">
+								<div className="flex items-center gap-1.5 font-semibold text-ctp-yellow">
 									<Crown className="size-3.5" />
 									Owner
 								</div>
@@ -421,7 +421,7 @@ export default function WorkspaceMembers() {
 							</div>
 
 							<div className="rounded-none border p-3 bg-muted/10">
-								<div className="flex items-center gap-1.5 font-semibold text-violet-400">
+								<div className="flex items-center gap-1.5 font-semibold text-ctp-mauve">
 									<ShieldCheck className="size-3.5" />
 									Admin
 								</div>
@@ -432,7 +432,7 @@ export default function WorkspaceMembers() {
 							</div>
 
 							<div className="rounded-none border p-3 bg-muted/10">
-								<div className="flex items-center gap-1.5 font-semibold text-sky-400">
+								<div className="flex items-center gap-1.5 font-semibold text-ctp-sky">
 									<Shield className="size-3.5" />
 									Editor
 								</div>
@@ -442,7 +442,7 @@ export default function WorkspaceMembers() {
 							</div>
 
 							<div className="rounded-none border p-3 bg-muted/10">
-								<div className="flex items-center gap-1.5 font-semibold text-emerald-400">
+								<div className="flex items-center gap-1.5 font-semibold text-ctp-green">
 									<UserCheck className="size-3.5" />
 									Viewer
 								</div>
@@ -633,7 +633,7 @@ export default function WorkspaceMembers() {
 								<span className="font-semibold text-foreground">
 									{deletingMember.name}
 								</span>{" "}
-								from this workspace?
+								from this workspace? They will be disconnected and cannot rejoin with an earlier invite or code.
 							</DialogDescription>
 						</DialogHeader>
 

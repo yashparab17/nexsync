@@ -22,12 +22,15 @@ import {
 
 // Components
 import { Button } from "@/components/ui/button";
+import { t, type MessageKey } from "@/i18n";
+import { cn } from "@/lib/utils";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
 interface NavigationItem {
 	name: string;
+	label: MessageKey; // The text shown, looked up in the language catalog
 	path: string;
 	icon: ElementType;
 	end?: boolean;
@@ -37,42 +40,50 @@ interface NavigationItem {
 const navigation: NavigationItem[] = [
 	{
 		name: "Dashboard",
+		label: "nav.dashboard",
 		path: "/workspace",
 		icon: LayoutDashboard,
 		end: true,
 	},
 	{
 		name: "Notes",
+		label: "nav.notes",
 		path: "/workspace/notes",
 		icon: StickyNote,
 	},
 	{
 		name: "Editor",
+		label: "nav.editor",
 		path: "/workspace/editor",
 		icon: Code2,
 	},
 	{
 		name: "Files",
+		label: "nav.files",
 		path: "/workspace/files",
 		icon: Files,
 	},
 	{
 		name: "Assets",
+		label: "nav.assets",
 		path: "/workspace/assets",
 		icon: FolderOpen,
 	},
 	{
 		name: "Tasks",
+		label: "nav.tasks",
 		path: "/workspace/tasks",
 		icon: ListTodo,
 	},
 	{
 		name: "Kanban",
+		label: "nav.kanban",
 		path: "/workspace/kanban",
 		icon: KanbanSquare,
 	},
 	{
 		name: "Insights",
+		label: "nav.insights",
 		path: "/workspace/insights",
 		icon: BarChart3,
 	},
@@ -82,46 +93,52 @@ const navigation: NavigationItem[] = [
 const bottomNavigation: NavigationItem[] = [
 	{
 		name: "Members",
+		label: "nav.members",
 		path: "/workspace/members",
 		icon: UsersRound,
 	},
 	{
 		name: "Trash",
+		label: "nav.trash",
 		path: "/workspace/trash",
 		icon: Trash2,
 	},
 	{
 		name: "Settings",
+		label: "nav.settings",
 		path: "/workspace/settings",
 		icon: Settings,
 	},
 ];
 
 // Sidebar navigation link component
-function NavigationItem({ item }: { item: NavigationItem }) {
+function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; expanded: boolean; onNavigate?: () => void }) {
 	const Icon = item.icon;
 
 	return (
 		<NavLink
 			to={item.path}
 			end={item.end}
+			onClick={onNavigate}
 			className={({ isActive }) =>
-				`flex w-full items-center justify-center gap-3 rounded-none px-3 py-2 text-sm lg:justify-start font-medium transition-colors ${
-					isActive ?
-						"bg-primary/10 text-primary"
-					:	"text-foreground hover:bg-muted"
-				}`
+				cn(
+					"flex w-full items-center gap-3 rounded-none px-3 py-2 text-sm font-medium transition-colors",
+					expanded ? "justify-start" : "justify-center lg:justify-start",
+					isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted",
+				)
 			}
-			title={item.name}
+			title={t(item.label)}
+			aria-label={t(item.label)}
 		>
-			<Icon className="size-4 shrink-0" />
-			<span className="hidden lg:inline">{item.name}</span>
+			<Icon className="size-4 shrink-0" aria-hidden />
+			<span className={expanded ? "inline" : "hidden lg:inline"}>{t(item.label)}</span>
 		</NavLink>
 	);
 }
 
 // Left sidebar navigation bar for workspace views
-export default function WorkspaceSidebar() {
+// `expanded` is the drawer on small windows: full width with labels, and `onNavigate` closes it after a choice
+export default function WorkspaceSidebar({ expanded = false, onNavigate }: { expanded?: boolean; onNavigate?: () => void }) {
 	const { workspace, clearWorkspace } = useWorkspace();
 	const navigate = useNavigate();
 
@@ -132,9 +149,9 @@ export default function WorkspaceSidebar() {
 	};
 
 	return (
-		<aside className="flex h-full w-14 shrink-0 flex-col border-r bg-muted/20 lg:w-64">
+		<aside className={cn("flex h-full shrink-0 flex-col border-r bg-muted/20", expanded ? "w-64 bg-background" : "w-14 lg:w-64")}>
 			{/* Workspace identity */}
-			<div className="flex h-16 shrink-0 items-center justify-center gap-2 border-b lg:justify-start lg:px-3">
+			<div className={cn("flex h-16 shrink-0 items-center gap-2 border-b", expanded ? "justify-start px-3" : "justify-center lg:justify-start lg:px-3")}>
 				<Button
 					variant="ghost"
 					size="icon"
@@ -144,20 +161,20 @@ export default function WorkspaceSidebar() {
 					<ArrowLeft className="size-5" />
 				</Button>
 
-				<h2 className="hidden truncate font-semibold lg:block">{workspace?.name}</h2>
+				<h2 className={cn("truncate font-semibold", expanded ? "block" : "hidden lg:block")}>{workspace?.name}</h2>
 			</div>
 
 			{/* Main Navigation */}
-			<nav className="flex-1 space-y-1 overflow-y-auto p-1.5 lg:p-3">
+			<nav aria-label={t("nav.main")} className={cn("flex-1 space-y-1 overflow-y-auto", expanded ? "p-3" : "p-1.5 lg:p-3")}>
 				{navigation.map((item) => (
-					<NavigationItem key={item.path} item={item} />
+					<NavigationItem key={item.path} item={item} expanded={expanded} onNavigate={onNavigate} />
 				))}
 			</nav>
 
 			{/* Bottom Navigation */}
-			<nav className="space-y-1 border-t p-1.5 lg:p-3">
+			<nav className={cn("space-y-1 border-t", expanded ? "p-3" : "p-1.5 lg:p-3")}>
 				{bottomNavigation.map((item) => (
-					<NavigationItem key={item.path} item={item} />
+					<NavigationItem key={item.path} item={item} expanded={expanded} onNavigate={onNavigate} />
 				))}
 			</nav>
 		</aside>

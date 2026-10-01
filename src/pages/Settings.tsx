@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getVersion } from "@tauri-apps/api/app";
+import { relaunch } from "@tauri-apps/plugin-process";
 import {
 	ArrowLeft,
 	Bug,
@@ -9,6 +10,7 @@ import {
 	Code2,
 	DownloadCloud,
 	FolderPlus,
+	Globe,
 	HardDrive,
 	Loader2,
 	Minus,
@@ -143,7 +145,10 @@ export default function Settings() {
 	const editorPrefs = useEditorPrefs();
 
 	// What is on disk, and the edits not saved yet
-	const [saved, setSaved] = useState<{ name: string; roots: string[] } | null>(null);
+	const [saved, setSaved] = useState<{ name: string; roots: string[]; proxy: string } | null>(null);
+	const [proxy, setProxy] = useState("");
+	// The proxy is read when the app starts, so a change needs a restart
+	const [restartNeeded, setRestartNeeded] = useState(false);
 	const [name, setName] = useState("");
 	const [roots, setRoots] = useState<string[]>([]);
 	const [newRoot, setNewRoot] = useState("");
@@ -160,8 +165,9 @@ export default function Settings() {
 		loadConfig()
 			.then((config) => {
 				if (!current) return;
-				setSaved({ name: config.display_name, roots: config.allowed_workspace_roots });
+				setSaved({ name: config.display_name, roots: config.allowed_workspace_roots, proxy: config.proxy_url ?? "" });
 				setName(config.display_name);
+				setProxy(config.proxy_url ?? "");
 				setRoots(config.allowed_workspace_roots);
 			})
 			.catch((err) => {
@@ -177,18 +183,20 @@ export default function Settings() {
 		};
 	}, [logError]);
 
-	const dirty = saved !== null && (name.trim() !== saved.name.trim() || !sameList(roots, saved.roots));
+	const dirty = saved !== null && (name.trim() !== saved.name.trim() || proxy.trim() !== saved.proxy.trim() || !sameList(roots, saved.roots));
 	const noRoots = saved !== null && roots.length === 0;
 
 	const save = useCallback(async () => {
 		if (!saved || !dirty || saving || roots.length === 0) return;
-		const next = { name: name.trim(), roots };
+		const next = { name: name.trim(), roots, proxy: proxy.trim() };
 		setSaving(true);
 		setSaveError(null);
 		try {
-			await saveConfig({ display_name: next.name, allowed_workspace_roots: next.roots });
+			await saveConfig({ display_name: next.name, allowed_workspace_roots: next.roots, proxy_url: next.proxy });
+			if (next.proxy !== saved.proxy) setRestartNeeded(true);
 			setSaved(next);
 			setName(next.name);
+			setProxy(next.proxy);
 			setJustSaved(true);
 		} catch (err) {
 			// The backend refuses folders such as system directories, and says why
@@ -202,6 +210,7 @@ export default function Settings() {
 	const discard = () => {
 		if (!saved) return;
 		setName(saved.name);
+		setProxy(saved.proxy);
 		setRoots(saved.roots);
 		setNewRoot("");
 		setRootNote(null);
@@ -326,6 +335,35 @@ export default function Settings() {
 									</span>
 								</div>
 							</div>
+						</div>
+					</SectionCard>
+
+					<SectionCard
+						id="network"
+						title="Network"
+						description="Only needed if your network allows web traffic through a proxy and nothing else."
+						icon={<Globe className="size-4 text-primary" />}
+					>
+						<div className="space-y-1">
+							<Input
+								value={proxy}
+								maxLength={256}
+								onChange={(e) => setProxy(e.target.value)}
+								placeholder="http://proxy.example.edu:8080"
+								aria-label="Proxy address"
+								disabled={saved === null}
+							/>
+							<p className="text-xs text-muted-foreground">
+								Leave it empty to connect directly. Addresses with a username or password are not accepted, since they would be stored as plain text.
+							</p>
+							{restartNeeded && (
+								<div className="flex items-center justify-between gap-2 border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-400">
+									<span>Restart Nexsync to use the new proxy.</span>
+									<Button size="sm" variant="outline" onPress={() => void relaunch()}>
+										Restart now
+									</Button>
+								</div>
+							)}
 						</div>
 					</SectionCard>
 

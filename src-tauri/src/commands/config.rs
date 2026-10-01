@@ -16,6 +16,9 @@ pub struct NexsyncConfig {
     /// Name shown to collaborators; empty means use the default
     #[serde(default)]
     pub display_name: String,
+    /// HTTP proxy for reaching the relay on networks that only allow web traffic through one; empty means none
+    #[serde(default)]
+    pub proxy_url: String,
 }
 
 impl Default for NexsyncConfig {
@@ -38,6 +41,7 @@ impl Default for NexsyncConfig {
         Self {
             allowed_workspace_roots: defaults,
             display_name: String::new(),
+            proxy_url: String::new(),
         }
     }
 }
@@ -187,7 +191,24 @@ pub fn validate_root_candidate(root: &str) -> Result<PathBuf, String> {
 }
 
 /// Saves the configuration to disk after validating root candidates
+/// Checks a proxy setting and returns it parsed; empty means no proxy.
+/// Only http(s) addresses without a login are accepted, so no password is ever stored in the plain config file.
+pub fn parse_proxy_url(text: &str) -> Result<Option<url::Url>, String> {
+    let text = text.trim();
+    if text.is_empty() {
+        return Ok(None);
+    }
+    let bad = || "Enter the proxy as http://host:port, without a username or password.".to_string();
+    let url = url::Url::parse(text).map_err(|_| bad())?;
+    let plain = matches!(url.scheme(), "http" | "https") && url.host_str().is_some() && url.username().is_empty() && url.password().is_none();
+    if text.len() > 256 || !plain {
+        return Err(bad());
+    }
+    Ok(Some(url))
+}
+
 pub fn save_config(app_handle: &tauri::AppHandle, config: &NexsyncConfig) -> Result<(), String> {
+    parse_proxy_url(&config.proxy_url)?;
     for root in &config.allowed_workspace_roots {
         validate_root_candidate(root)?;
     }
@@ -382,6 +403,16 @@ mod tests {
             assert!(path.is_absolute());
             assert!(path.to_string_lossy().contains("test"));
         }
+    }
+
+    #[test]
+    fn test_proxy_urls_are_checked() {
+        assert!(parse_proxy_url("  ").unwrap().is_none());
+        assert!(parse_proxy_url("http://proxy.college.edu:8080").unwrap().is_some());
+        assert!(parse_proxy_url("https://proxy.example").unwrap().is_some());
+        assert!(parse_proxy_url("http://user:secret@proxy:8080").is_err());
+        assert!(parse_proxy_url("socks5://proxy:1080").is_err());
+        assert!(parse_proxy_url("not a url").is_err());
     }
 
     #[test]

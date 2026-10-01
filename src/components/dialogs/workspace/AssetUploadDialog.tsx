@@ -197,7 +197,7 @@ export default function AssetUploadDialog({
 					)}
 
 					{successCount !== null && (
-						<div className="p-3 rounded-none bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
+						<div className="p-3 rounded-none bg-ctp-green/10 border border-ctp-green/20 text-ctp-green text-xs flex items-center gap-2">
 							<Check className="size-4" />
 							Successfully uploaded {successCount} asset
 							{successCount > 1 ? "s" : ""}!

@@ -39,6 +39,33 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+    --color-ctp-rosewater: var(--ctp-rosewater);
+    --color-ctp-flamingo: var(--ctp-flamingo);
+    --color-ctp-pink: var(--ctp-pink);
+    --color-ctp-mauve: var(--ctp-mauve);
+    --color-ctp-red: var(--ctp-red);
+    --color-ctp-maroon: var(--ctp-maroon);
+    --color-ctp-peach: var(--ctp-peach);
+    --color-ctp-yellow: var(--ctp-yellow);
+    --color-ctp-green: var(--ctp-green);
+    --color-ctp-teal: var(--ctp-teal);
+    --color-ctp-sky: var(--ctp-sky);
+    --color-ctp-sapphire: var(--ctp-sapphire);
+    --color-ctp-blue: var(--ctp-blue);
+    --color-ctp-lavender: var(--ctp-lavender);
+    --color-ctp-text: var(--ctp-text);
+    --color-ctp-subtext1: var(--ctp-subtext1);
+    --color-ctp-subtext0: var(--ctp-subtext0);
+    --color-ctp-overlay2: var(--ctp-overlay2);
+    --color-ctp-overlay1: var(--ctp-overlay1);
+    --color-ctp-overlay0: var(--ctp-overlay0);
+    --color-ctp-surface2: var(--ctp-surface2);
+    --color-ctp-surface1: var(--ctp-surface1);
+    --color-ctp-surface0: var(--ctp-surface0);
+    --color-ctp-base: var(--ctp-base);
+    --color-ctp-mantle: var(--ctp-mantle);
+    --color-ctp-crust: var(--ctp-crust);
+    --color-on-accent: var(--on-accent);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -48,73 +75,130 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Catppuccin: Latte for the light theme and Mocha for the dark one. Everything else is built from these --ctp-* colours. */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.141 0.005 285.823);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.141 0.005 285.823);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.141 0.005 285.823);
-    --primary: oklch(0.511 0.096 186.391);
-    --primary-foreground: oklch(0.984 0.014 180.72);
-    --secondary: oklch(0.967 0.001 286.375);
-    --secondary-foreground: oklch(0.21 0.006 285.885);
-    --muted: oklch(0.967 0.001 286.375);
-    --muted-foreground: oklch(0.552 0.016 285.938);
-    --accent: oklch(0.967 0.001 286.375);
-    --accent-foreground: oklch(0.21 0.006 285.885);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.92 0.004 286.32);
-    --input: oklch(0.92 0.004 286.32);
-    --ring: oklch(0.705 0.015 286.067);
-    --chart-1: oklch(0.855 0.138 181.071);
-    --chart-2: oklch(0.704 0.14 182.503);
-    --chart-3: oklch(0.6 0.118 184.704);
-    --chart-4: oklch(0.511 0.096 186.391);
-    --chart-5: oklch(0.437 0.078 188.216);
+    --ctp-rosewater: #dc8a78;
+    --ctp-flamingo: #dd7878;
+    --ctp-pink: #ea76cb;
+    --ctp-mauve: #8839ef;
+    --ctp-red: #d20f39;
+    --ctp-maroon: #e64553;
+    --ctp-peach: #fe640b;
+    --ctp-yellow: #df8e1d;
+    --ctp-green: #40a02b;
+    --ctp-teal: #179299;
+    --ctp-sky: #04a5e5;
+    --ctp-sapphire: #209fb5;
+    --ctp-blue: #1e66f5;
+    --ctp-lavender: #7287fd;
+    --ctp-text: #4c4f69;
+    --ctp-subtext1: #5c5f77;
+    --ctp-subtext0: #6c6f85;
+    --ctp-overlay2: #7c7f93;
+    --ctp-overlay1: #8c8fa1;
+    --ctp-overlay0: #9ca0b0;
+    --ctp-surface2: #acb0be;
+    --ctp-surface1: #bcc0cc;
+    --ctp-surface0: #ccd0da;
+    --ctp-base: #eff1f5;
+    --ctp-mantle: #e6e9ef;
+    --ctp-crust: #dce0e8;
     --radius: 0;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.141 0.005 285.823);
-    --sidebar-primary: oklch(0.6 0.118 184.704);
-    --sidebar-primary-foreground: oklch(0.984 0.014 180.72);
-    --sidebar-accent: oklch(0.967 0.001 286.375);
-    --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-    --sidebar-border: oklch(0.92 0.004 286.32);
-    --sidebar-ring: oklch(0.705 0.015 286.067);
+    --background: var(--ctp-base);
+    --foreground: var(--ctp-text);
+    --card: var(--ctp-mantle);
+    --card-foreground: var(--ctp-text);
+    --popover: var(--ctp-mantle);
+    --popover-foreground: var(--ctp-text);
+    --primary: var(--ctp-teal);
+    --primary-foreground: var(--ctp-base);
+    --secondary: var(--ctp-surface0);
+    --secondary-foreground: var(--ctp-text);
+    --muted: var(--ctp-surface0);
+    --muted-foreground: var(--ctp-subtext1);
+    --accent: var(--ctp-surface0);
+    --accent-foreground: var(--ctp-text);
+    --destructive: var(--ctp-red);
+    --border: var(--ctp-surface1);
+    --input: var(--ctp-surface2);
+    --ring: var(--ctp-teal);
+    --on-accent: var(--ctp-base);
+    --chart-1: var(--ctp-teal);
+    --chart-2: var(--ctp-blue);
+    --chart-3: var(--ctp-mauve);
+    --chart-4: var(--ctp-peach);
+    --chart-5: var(--ctp-yellow);
+    --sidebar: var(--ctp-mantle);
+    --sidebar-foreground: var(--ctp-text);
+    --sidebar-primary: var(--ctp-teal);
+    --sidebar-primary-foreground: var(--ctp-base);
+    --sidebar-accent: var(--ctp-surface0);
+    --sidebar-accent-foreground: var(--ctp-text);
+    --sidebar-border: var(--ctp-surface1);
+    --sidebar-ring: var(--ctp-teal);
+    --focus: var(--ctp-teal);
 }
 
 .dark {
-    --background: oklch(0.141 0.005 285.823);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.21 0.006 285.885);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.21 0.006 285.885);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.437 0.078 188.216);
-    --primary-foreground: oklch(0.984 0.014 180.72);
-    --secondary: oklch(0.274 0.006 286.033);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.274 0.006 286.033);
-    --muted-foreground: oklch(0.705 0.015 286.067);
-    --accent: oklch(0.274 0.006 286.033);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.552 0.016 285.938);
-    --chart-1: oklch(0.855 0.138 181.071);
-    --chart-2: oklch(0.704 0.14 182.503);
-    --chart-3: oklch(0.6 0.118 184.704);
-    --chart-4: oklch(0.511 0.096 186.391);
-    --chart-5: oklch(0.437 0.078 188.216);
-    --sidebar: oklch(0.21 0.006 285.885);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.704 0.14 182.503);
-    --sidebar-primary-foreground: oklch(0.277 0.046 192.524);
-    --sidebar-accent: oklch(0.274 0.006 286.033);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.552 0.016 285.938);
+    --ctp-rosewater: #f5e0dc;
+    --ctp-flamingo: #f2cdcd;
+    --ctp-pink: #f5c2e7;
+    --ctp-mauve: #cba6f7;
+    --ctp-red: #f38ba8;
+    --ctp-maroon: #eba0ac;
+    --ctp-peach: #fab387;
+    --ctp-yellow: #f9e2af;
+    --ctp-green: #a6e3a1;
+    --ctp-teal: #94e2d5;
+    --ctp-sky: #89dceb;
+    --ctp-sapphire: #74c7ec;
+    --ctp-blue: #89b4fa;
+    --ctp-lavender: #b4befe;
+    --ctp-text: #cdd6f4;
+    --ctp-subtext1: #bac2de;
+    --ctp-subtext0: #a6adc8;
+    --ctp-overlay2: #9399b2;
+    --ctp-overlay1: #7f849c;
+    --ctp-overlay0: #6c7086;
+    --ctp-surface2: #585b70;
+    --ctp-surface1: #45475a;
+    --ctp-surface0: #313244;
+    --ctp-base: #1e1e2e;
+    --ctp-mantle: #181825;
+    --ctp-crust: #11111b;
+    --background: var(--ctp-base);
+    --foreground: var(--ctp-text);
+    --card: var(--ctp-mantle);
+    --card-foreground: var(--ctp-text);
+    --popover: var(--ctp-mantle);
+    --popover-foreground: var(--ctp-text);
+    --primary: var(--ctp-teal);
+    --primary-foreground: var(--ctp-crust);
+    --secondary: var(--ctp-surface0);
+    --secondary-foreground: var(--ctp-text);
+    --muted: var(--ctp-surface0);
+    --muted-foreground: var(--ctp-subtext0);
+    --accent: var(--ctp-surface0);
+    --accent-foreground: var(--ctp-text);
+    --destructive: var(--ctp-red);
+    --border: var(--ctp-surface0);
+    --input: var(--ctp-surface1);
+    --ring: var(--ctp-teal);
+    --on-accent: var(--ctp-crust);
+    --chart-1: var(--ctp-teal);
+    --chart-2: var(--ctp-blue);
+    --chart-3: var(--ctp-mauve);
+    --chart-4: var(--ctp-peach);
+    --chart-5: var(--ctp-yellow);
+    --sidebar: var(--ctp-mantle);
+    --sidebar-foreground: var(--ctp-text);
+    --sidebar-primary: var(--ctp-teal);
+    --sidebar-primary-foreground: var(--ctp-crust);
+    --sidebar-accent: var(--ctp-surface0);
+    --sidebar-accent-foreground: var(--ctp-text);
+    --sidebar-border: var(--ctp-surface0);
+    --sidebar-ring: var(--ctp-teal);
+    --focus: var(--ctp-teal);
 }
 
 @layer base {
@@ -147,4 +231,43 @@
 * {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklch, var(--muted-foreground) 40%, transparent) transparent;
+}
+
+/* Keyboard focus: a teal ring that stands out in both themes, on top of what individual components add */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* People who ask their system for less motion get none, except the loading logo, which turns to a slow pulse */
+@media (prefers-reduced-motion: reduce) {
+  *:not([role="status"] *), *:not([role="status"] *)::before, *:not([role="status"] *)::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+::selection {
+  background: color-mix(in srgb, var(--ctp-overlay2) 30%, transparent);
+}
+
+/* The rich-text editor (BlockNote) draws its own colours; point them at the palette. The doubled attribute outranks its stylesheet. */
+.bn-container[data-color-scheme][data-color-scheme] {
+  --bn-colors-editor-text: var(--ctp-text);
+  --bn-colors-editor-background: var(--ctp-base);
+  --bn-colors-menu-text: var(--ctp-text);
+  --bn-colors-menu-background: var(--ctp-mantle);
+  --bn-colors-tooltip-text: var(--ctp-text);
+  --bn-colors-tooltip-background: var(--ctp-surface0);
+  --bn-colors-hovered-text: var(--ctp-text);
+  --bn-colors-hovered-background: var(--ctp-surface0);
+  --bn-colors-selected-text: var(--on-accent);
+  --bn-colors-selected-background: var(--ctp-teal);
+  --bn-colors-disabled-text: var(--ctp-overlay1);
+  --bn-colors-disabled-background: var(--ctp-surface0);
+  --bn-colors-shadow: var(--ctp-crust);
+  --bn-colors-border: var(--ctp-surface1);
+  --bn-colors-side-menu: var(--ctp-overlay1);
 }

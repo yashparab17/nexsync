@@ -128,11 +128,14 @@ impl P2pState {
             .app_data_dir()
             .ok()
             .and_then(|dir| load_or_create_identity(&dir.join("nexsync").join("p2p_identity.key")).ok());
+        let proxy = crate::commands::config::load_config(app)
+            .ok()
+            .and_then(|c| crate::commands::config::parse_proxy_url(&c.proxy_url).ok().flatten());
         let app = app.clone();
         let events: EventSink = Arc::new(move |event, payload| {
             let _ = app.emit(event, payload);
         });
-        let node = Node::start(events, self.workspace.clone(), secret).await?;
+        let node = Node::start(events, self.workspace.clone(), secret, proxy).await?;
         node.set_roles(self.roles.lock().unwrap_or_else(|p| p.into_inner()).clone());
         *guard = Some(node.clone());
         Ok(node)
@@ -161,17 +164,23 @@ impl P2pState {
 }
 
 /// Loads this device's P2P identity key, creating and saving one on first run.
+///
+/// The key lives in the operating system's credential store when there is one; a key file from an earlier
+/// version is moved there and deleted. Without a store the file is used as before.
 fn load_or_create_identity(path: &std::path::Path) -> std::io::Result<SecretKey> {
-    if let Ok(bytes) = std::fs::read(path) {
-        if let Ok(bytes) = <[u8; 32]>::try_from(bytes.as_slice()) {
-            return Ok(SecretKey::from_bytes(&bytes));
+    if let Some(bytes) = super::vault::load() {
+        return Ok(SecretKey::from_bytes(&bytes));
+    }
+    let from_file = std::fs::read(path).ok().and_then(|b| <[u8; 32]>::try_from(b.as_slice()).ok());
+    let key = from_file.map(|b| SecretKey::from_bytes(&b)).unwrap_or_else(SecretKey::generate);
+    if super::vault::store(&key.to_bytes()) {
+        let _ = std::fs::remove_file(path);
+    } else if from_file.is_none() {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
         }
+        std::fs::write(path, key.to_bytes())?;
     }
-    let key = SecretKey::generate();
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(path, key.to_bytes())?;
     Ok(key)
 }
 
@@ -199,7 +208,21 @@ pub struct InviteInfo {
     pub ticket: String,
     /// False if no relay was reachable, so only same-network guests can join
     pub relay_connected: bool,
+    /// When the invite stops working, if it expires
+    pub expires_at: Option<u64>,
+    pub single_use: bool,
 }
+
+/// Limits on who can use an invite and for how long
+#[derive(Debug, Clone, Copy, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct InviteOptions {
+    pub expires_in_secs: Option<u64>,
+    pub single_use: bool,
+}
+
+/// The longest an invite may stay valid
+const MAX_INVITE_SECS: u64 = 30 * 24 * 60 * 60;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -226,6 +249,10 @@ struct IncomingMessage {
 
 struct Invite {
     secret: [u8; SECRET_LEN],
+    /// Milliseconds since the Unix epoch after which the invite no longer admits anyone
+    expires_at: Option<u64>,
+    /// The invite stops working after one guest has joined with it
+    single_use: bool,
     role: String,
     workspace_id: String,
     workspace_name: String,
@@ -260,6 +287,8 @@ struct Peer {
 #[derive(Default)]
 struct NodeState {
     invite: Option<Invite>,
+    /// Devices the host removed; they cannot join until the host creates a new invite
+    blocked: std::collections::HashSet<String>,
     peers: HashMap<EndpointId, Peer>,
     /// Ticket and display name of the host we last joined, kept so a dropped link can be re-dialed
     last_join: Option<(String, String)>,
@@ -305,9 +334,13 @@ pub struct Node {
 
 impl Node {
     /// Binds the Iroh endpoint and spawns the accept, stats and live-sync loops
-    async fn start(events: EventSink, workspace: SharedWorkspace, secret: Option<SecretKey>) -> Result<Arc<Self>, String> {
-        // proxy_from_env: behind a proxy-only network (HTTPS_PROXY set) the relay is reached through it
-        let mut builder = Endpoint::builder(presets::N0).alpns(vec![wire::ALPN.to_vec()]).proxy_from_env();
+    async fn start(events: EventSink, workspace: SharedWorkspace, secret: Option<SecretKey>, proxy: Option<url::Url>) -> Result<Arc<Self>, String> {
+        // Behind a proxy-only network the relay is reached through the proxy from Settings, else the one in HTTPS_PROXY
+        let mut builder = Endpoint::builder(presets::N0).alpns(vec![wire::ALPN.to_vec()]);
+        builder = match proxy {
+            Some(url) => builder.proxy_url(url),
+            None => builder.proxy_from_env(),
+        };
         if let Some(secret) = secret {
             builder = builder.secret_key(secret);
         }
@@ -414,9 +447,25 @@ impl Node {
         workspace_name: String,
         host_name: String,
     ) -> Result<InviteInfo, String> {
+        self.create_invite_with(role, workspace_id, workspace_name, host_name, InviteOptions::default()).await
+    }
+
+    /// Like `create_invite`, with an optional expiry and single use
+    pub async fn create_invite_with(
+        &self,
+        role: String,
+        workspace_id: String,
+        workspace_name: String,
+        host_name: String,
+        options: InviteOptions,
+    ) -> Result<InviteInfo, String> {
         if !INVITE_ROLES.contains(&role.as_str()) {
             return Err(format!("Invalid invite role: {role}"));
         }
+        if options.expires_in_secs.is_some_and(|s| s == 0 || s > MAX_INVITE_SECS) {
+            return Err("An invite can last from one second to 30 days.".to_string());
+        }
+        let expires_at = options.expires_in_secs.map(|s| now_ms() + s * 1000);
 
         // Wait for a home relay so guests outside this network can reach us
         let relay_connected = tokio::time::timeout(ONLINE_TIMEOUT, self.endpoint.online())
@@ -430,17 +479,25 @@ impl Node {
         }
         .encode();
 
-        self.lock().invite = Some(Invite {
+        let mut st = self.lock();
+        // A new invite is a fresh decision by the host, so earlier removals no longer stand
+        st.blocked.clear();
+        st.invite = Some(Invite {
             secret,
+            expires_at,
+            single_use: options.single_use,
             role,
             workspace_id,
             workspace_name,
             host_name,
         });
+        drop(st);
 
         Ok(InviteInfo {
             ticket,
             relay_connected,
+            expires_at,
+            single_use: options.single_use,
         })
     }
 
@@ -548,7 +605,10 @@ impl Node {
     }
 
     fn check_invite(&self, presented: &str, guest: &EndpointId) -> Result<HandshakeReply, String> {
-        let st = self.lock();
+        let mut st = self.lock();
+        if st.blocked.contains(&guest.to_string()) {
+            return Err("The host has removed you from this workspace.".into());
+        }
         let invite = st
             .invite
             .as_ref()
@@ -557,15 +617,29 @@ impl Node {
         if !bool::from(presented.ct_eq(&invite.secret)) {
             return Err("This invite has expired or been replaced. Ask the host for a new one.".into());
         }
+        if invite.expires_at.is_some_and(|t| now_ms() >= t) {
+            return Err("This invite has expired. Ask the host for a new one.".into());
+        }
         // A device the host already assigned a role keeps it, whatever the invite says
         let role = st.roles.get(&guest.to_string()).unwrap_or(&invite.role).clone();
-        Ok(HandshakeReply::Welcome {
+        let reply = HandshakeReply::Welcome {
             v: wire::PROTOCOL_VERSION,
             host_name: invite.host_name.clone(),
             role,
             workspace_id: invite.workspace_id.clone(),
             workspace_name: invite.workspace_name.clone(),
-        })
+        };
+        if invite.single_use {
+            st.invite = None;
+        }
+        Ok(reply)
+    }
+
+    /// Disconnects a guest and refuses it until the host creates a new invite
+    pub fn block_device(self: &Arc<Self>, device_id: &str) -> Result<(), String> {
+        parse_peer_id(device_id)?;
+        self.lock().blocked.insert(device_id.to_string());
+        self.disconnect(device_id)
     }
 
     // ────────────────────────────
@@ -1276,7 +1350,7 @@ mod tests {
             let _ = tx.send((event, payload));
         });
         let workspace: SharedWorkspace = Arc::new(Mutex::new(Some(dir.to_string_lossy().into_owned())));
-        let node = Node::start(sink, workspace, None).await.unwrap();
+        let node = Node::start(sink, workspace, None, None).await.unwrap();
         TestNode { node, events, dir }
     }
 
@@ -1294,6 +1368,41 @@ mod tests {
         })
         .await
         .unwrap_or_else(|_| panic!("timed out waiting for {name}"))
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_invite_limits_single_use_expiry_and_removed_guests() {
+        let mut host = start_test_node("lim-host").await;
+        let first = start_test_node("lim-first").await;
+        let second = start_test_node("lim-second").await;
+        let make = |opts: InviteOptions| host.node.create_invite_with("Editor".into(), "ws".into(), "Demo".into(), "Host".into(), opts);
+
+        // One use: the first guest gets in, the next is turned away
+        let once = make(InviteOptions { expires_in_secs: None, single_use: true }).await.unwrap();
+        let joined = first.node.join(&once.ticket, "First").await.unwrap();
+        let err = second.node.join(&once.ticket, "Second").await.unwrap_err();
+        assert!(err.contains("isn't accepting"), "unexpected error: {err}");
+
+        // Expiry: a short-lived invite stops working on time
+        let brief = make(InviteOptions { expires_in_secs: Some(1), single_use: false }).await.unwrap();
+        assert!(brief.expires_at.is_some());
+        tokio::time::sleep(Duration::from_millis(1300)).await;
+        let err = second.node.join(&brief.ticket, "Second").await.unwrap_err();
+        assert!(err.contains("expired"), "unexpected error: {err}");
+        assert!(host.node.create_invite_with("Editor".into(), "ws".into(), "Demo".into(), "Host".into(), InviteOptions { expires_in_secs: Some(0), single_use: false }).await.is_err());
+
+        // A removed guest cannot come back with the invite it used, but can with a new one
+        let open = make(InviteOptions::default()).await.unwrap();
+        let rejoined = first.node.join(&open.ticket, "First").await.unwrap();
+        let guest_id = next_event(&mut host.events, EVENT_PEER_JOINED).await["id"].as_str().unwrap().to_string();
+        host.node.block_device(&guest_id).unwrap();
+        let _ = joined;
+        let err = first.node.join(&open.ticket, "First").await.unwrap_err();
+        assert!(err.contains("removed you"), "unexpected error: {err}");
+        let fresh = make(InviteOptions::default()).await.unwrap();
+        first.node.join(&fresh.ticket, "First").await.unwrap();
+        let _ = rejoined;
     }
 
     #[tokio::test(flavor = "multi_thread")]

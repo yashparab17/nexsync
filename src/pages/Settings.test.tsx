@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-const config = { display_name: "Sam", allowed_workspace_roots: ["C:\\Users\\Sam\\Documents"] };
+const config = { display_name: "Sam", allowed_workspace_roots: ["C:\\Users\\Sam\\Documents"], proxy_url: "" };
 const saveConfig = vi.fn(async (_config: unknown) => {});
 
 vi.mock("@/lib/tauri", () => ({
@@ -49,8 +49,18 @@ describe("Settings page", () => {
 		fireEvent.click(await screen.findByRole("button", { name: /save changes/i }));
 
 		await waitFor(() => expect(saveConfig).toHaveBeenCalledTimes(1));
-		expect(saveConfig).toHaveBeenCalledWith({ display_name: "Alex", allowed_workspace_roots: config.allowed_workspace_roots });
+		expect(saveConfig).toHaveBeenCalledWith({ display_name: "Alex", allowed_workspace_roots: config.allowed_workspace_roots, proxy_url: "" });
 		await screen.findByText("Settings saved.");
+		expect(screen.queryByText(/restart nexsync/i)).toBeNull();
+	});
+
+	it("saves a proxy and says a restart is needed to use it", async () => {
+		renderPage();
+		const input = await screen.findByLabelText("Proxy address");
+		fireEvent.change(input, { target: { value: " http://proxy.edu:8080 " } });
+		fireEvent.click(await screen.findByRole("button", { name: /save changes/i }));
+		await waitFor(() => expect(saveConfig).toHaveBeenCalledWith({ display_name: "Sam", allowed_workspace_roots: config.allowed_workspace_roots, proxy_url: "http://proxy.edu:8080" }));
+		await screen.findByText(/restart nexsync to use the new proxy/i);
 	});
 
 	it("discards edits back to what was saved", async () => {

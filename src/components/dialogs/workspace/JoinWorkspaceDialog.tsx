@@ -152,7 +152,7 @@ export default function JoinWorkspaceDialog({
 			<Dialog className="sm:max-w-xl">
 				<DialogHeader>
 					<div className="flex items-center gap-2">
-						<div className="flex h-9 w-9 items-center justify-center rounded-none bg-sky-500/10 text-sky-400 border border-sky-500/20">
+						<div className="flex h-9 w-9 items-center justify-center rounded-none bg-ctp-sky/10 text-ctp-sky border border-ctp-sky/20">
 							<Radio className="h-5 w-5 animate-pulse" />
 						</div>
 						<div>
@@ -165,7 +165,7 @@ export default function JoinWorkspaceDialog({
 				</DialogHeader>
 
 				{/* Security banner */}
-				<div className="flex items-center justify-between rounded-none border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-400">
+				<div className="flex items-center justify-between rounded-none border border-ctp-green/20 bg-ctp-green/5 px-3 py-2 text-xs text-ctp-green">
 					<div className="flex items-center gap-2">
 						<ShieldCheck className="h-4 w-4" />
 						<span>Private: only you and your collaborators can read your files</span>
@@ -230,11 +230,11 @@ export default function JoinWorkspaceDialog({
 					</div>
 
 					{statusMessage && (
-						<div className="flex items-center gap-2 rounded-none border border-sky-500/20 bg-sky-500/10 p-2.5 text-xs text-sky-400">
+						<div className="flex items-center gap-2 rounded-none border border-ctp-sky/20 bg-ctp-sky/10 p-2.5 text-xs text-ctp-sky">
 							{isSuccess ? (
-								<Sparkles className="h-4 w-4 text-emerald-400" />
+								<Sparkles className="h-4 w-4 text-ctp-green" />
 							) : (
-								<RefreshCw className="h-4 w-4 animate-spin text-sky-400" />
+								<RefreshCw className="h-4 w-4 animate-spin text-ctp-sky" />
 							)}
 							<span>{statusMessage}</span>
 						</div>
@@ -253,7 +253,7 @@ export default function JoinWorkspaceDialog({
 								</>
 							) : isSuccess ? (
 								<>
-									<Check className="h-3.5 w-3.5 text-emerald-400" />
+									<Check className="h-3.5 w-3.5 text-ctp-green" />
 									Connected!
 								</>
 							) : (

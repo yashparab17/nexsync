@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/card";
 
 // Tauri IPC
-import { getRecentWorkspaces } from "@/lib/tauri";
+import { getRecentWorkspaces, loadConfig } from "@/lib/tauri";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -40,6 +40,8 @@ import logo from "@/assets/logos/logo.svg";
 import logo_black from "@/assets/logos/logo-black.svg";
 import logo_white from "@/assets/logos/logo-white.svg";
 import Loading from "@/components/Loading";
+import OnboardingTour, { tourSeen } from "@/components/dialogs/OnboardingTour";
+import { t } from "@/i18n";
 
 // Welcome landing page with recent workspaces and quick actions
 export default function Welcome() {
@@ -56,6 +58,16 @@ export default function Welcome() {
 		[],
 	);
 	const [loading, setLoading] = useState(true);
+	// The name from Settings, for the greeting; empty until loaded or when none is set
+	const [userName, setUserName] = useState("");
+
+	// "Good morning, Yash." from the time of day and the name in Settings; without a name, just the greeting
+	const hour = new Date().getHours();
+	const part = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
+	const greeting = userName ? t(`welcome.${part}` as const, { name: userName }) : t(`welcome.${part}NoName` as const);
+
+	// The introduction opens by itself the first time, and from the link below after that
+	const [tourOpen, setTourOpen] = useState(() => !tourSeen());
 
 	// Shared button styling
 	const actionButtonClass =
@@ -64,6 +76,9 @@ export default function Welcome() {
 	// Load recent workspaces on mount
 	useEffect(() => {
 		loadRecentWorkspaces();
+		loadConfig()
+			.then((config) => setUserName(config.display_name.trim()))
+			.catch(() => {});
 	}, []);
 
 	// Fetch recent workspaces from backend registry
@@ -91,7 +106,7 @@ export default function Welcome() {
 	};
 
 	return (
-		<main className="flex min-h-full flex-col p-8">
+		<div className="flex min-h-full flex-col p-8">
 			{/* Header */}
 			<header className="relative flex items-center justify-center">
 				<div className="flex items-center gap-3">
@@ -131,9 +146,7 @@ export default function Welcome() {
 				</div>
 
 				<div className="relative z-2 flex flex-col items-center gap-6">
-					<h1 className="text-center text-2xl font-semibold">
-						Good evening, User.
-					</h1>
+					<h2 className="text-center text-2xl font-semibold">{greeting}</h2>
 
 					<p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
 						Quick Actions
@@ -192,7 +205,7 @@ export default function Welcome() {
 													"Local Workspace"}
 											</CardDescription>
 
-											<p className="pt-2 text-green-500">
+											<p className="pt-2 text-ctp-green">
 												● Synced
 											</p>
 										</CardHeader>
@@ -210,7 +223,12 @@ export default function Welcome() {
 				<p className="text-xs">
 					Local First • Open Source • Built with Tauri
 				</p>
+				<Button variant="link" size="sm" onPress={() => setTourOpen(true)}>
+					{t("welcome.tour")}
+				</Button>
 			</footer>
-		</main>
+
+			<OnboardingTour open={tourOpen} onClose={() => setTourOpen(false)} />
+		</div>
 	);
 }

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { Lock, Radio, Settings } from "lucide-react";
+import { Lock, Menu, Radio, Settings } from "lucide-react";
 
 // Components
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,10 @@ import NotificationBell from "@/components/layout/workspace/NotificationBell";
 import { useP2P } from "@/store/p2p/P2PContext";
 import P2PConnectDialog from "@/components/dialogs/workspace/P2PConnectDialog";
 import { cn } from "@/lib/utils";
+import { t } from "@/i18n";
 
 // Header component for the workspace layout
-export default function WorkspaceHeader() {
+export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOpenMenu?: () => void; menuOpen?: boolean }) {
 	const navigate = useNavigate();
 	const { peers, connectionStatus, network } = useP2P();
 	const [isP2POpen, setIsP2POpen] = useState(false);
@@ -23,6 +24,13 @@ export default function WorkspaceHeader() {
 
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 lg:px-6">
+			{/* Opens the navigation drawer when the sidebar is hidden */}
+			{onOpenMenu && (
+				<Button variant="ghost" size="icon" onPress={onOpenMenu} aria-label={t("nav.open")} aria-expanded={menuOpen} className="md:hidden">
+					<Menu className="size-5" />
+				</Button>
+			)}
+
 			{/* Search */}
 			<div className="flex min-w-0 flex-1 justify-center">
 				<WorkspaceSearch />
@@ -35,6 +43,7 @@ export default function WorkspaceHeader() {
 					variant="outline"
 					size="sm"
 					onClick={() => setIsP2POpen(true)}
+					aria-label={connectedCount > 0 ? `Collaborate, ${connectedCount} connected` : network.online ? "Collaborate, online" : "Collaborate, offline"}
 					className="h-8 gap-1.5 px-2.5 text-xs"
 				>
 					<span

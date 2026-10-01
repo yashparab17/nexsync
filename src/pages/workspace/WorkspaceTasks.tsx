@@ -54,21 +54,21 @@ const PRIORITY_CONFIG: Record<
 > = {
 	low: {
 		label: "Low",
-		color: "text-blue-400",
-		bg: "bg-blue-500/10",
-		border: "border-blue-500/20",
+		color: "text-ctp-blue",
+		bg: "bg-ctp-blue/10",
+		border: "border-ctp-blue/20",
 	},
 	medium: {
 		label: "Medium",
-		color: "text-amber-400",
-		bg: "bg-amber-500/10",
-		border: "border-amber-500/20",
+		color: "text-ctp-yellow",
+		bg: "bg-ctp-yellow/10",
+		border: "border-ctp-yellow/20",
 	},
 	high: {
 		label: "High",
-		color: "text-rose-400",
-		bg: "bg-rose-500/10",
-		border: "border-rose-500/20",
+		color: "text-ctp-maroon",
+		bg: "bg-ctp-maroon/10",
+		border: "border-ctp-maroon/20",
 	},
 };
 
@@ -85,14 +85,14 @@ const STATUS_CONFIG: Record<
 	in_progress: {
 		label: "In Progress",
 		icon: AlertCircle,
-		color: "text-amber-400",
-		border: "border-amber-500/30",
+		color: "text-ctp-yellow",
+		border: "border-ctp-yellow/30",
 	},
 	done: {
 		label: "Done",
 		icon: CheckCircle2,
-		color: "text-emerald-400",
-		border: "border-emerald-500/30",
+		color: "text-ctp-green",
+		border: "border-ctp-green/30",
 	},
 };
 
@@ -423,11 +423,11 @@ export default function WorkspaceTasks() {
 							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
 								To Do
 							</p>
-							<p className="mt-1 text-2xl font-bold text-sky-400">
+							<p className="mt-1 text-2xl font-bold text-ctp-sky">
 								{stats.todo}
 							</p>
 						</div>
-						<Clock className="size-6 text-sky-400/60" />
+						<Clock className="size-6 text-ctp-sky/60" />
 					</CardContent>
 				</Card>
 
@@ -437,11 +437,11 @@ export default function WorkspaceTasks() {
 							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
 								In Progress
 							</p>
-							<p className="mt-1 text-2xl font-bold text-amber-400">
+							<p className="mt-1 text-2xl font-bold text-ctp-yellow">
 								{stats.inProgress}
 							</p>
 						</div>
-						<AlertCircle className="size-6 text-amber-400/60" />
+						<AlertCircle className="size-6 text-ctp-yellow/60" />
 					</CardContent>
 				</Card>
 
@@ -451,11 +451,11 @@ export default function WorkspaceTasks() {
 							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
 								Completed
 							</p>
-							<p className="mt-1 text-2xl font-bold text-emerald-400">
+							<p className="mt-1 text-2xl font-bold text-ctp-green">
 								{stats.done}
 							</p>
 						</div>
-						<CheckCircle2 className="size-6 text-emerald-400/60" />
+						<CheckCircle2 className="size-6 text-ctp-green/60" />
 					</CardContent>
 				</Card>
 			</div>
@@ -621,9 +621,9 @@ export default function WorkspaceTasks() {
 											"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-none border transition-colors",
 											isViewer ? "cursor-default" : "cursor-pointer",
 											task.status === "done"
-												? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
+												? "border-ctp-green bg-ctp-green/20 text-ctp-green"
 												: task.status === "in_progress"
-													? "border-amber-500 bg-amber-500/20 text-amber-400"
+													? "border-ctp-yellow bg-ctp-yellow/20 text-ctp-yellow"
 													: "border-muted-foreground/40 hover:border-primary",
 										)}
 									>

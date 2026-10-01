@@ -266,6 +266,8 @@ export interface NexsyncConfig {
 	allowed_workspace_roots: string[];
 	// Name shown to collaborators; empty means "Collaborator"
 	display_name: string;
+	// HTTP proxy for reaching other networks, such as http://host:port; empty means none
+	proxy_url: string;
 }
 
 

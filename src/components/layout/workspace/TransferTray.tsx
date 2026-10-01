@@ -34,7 +34,7 @@ export default function TransferTray() {
 							</span>
 						</div>
 						<div className="h-1 w-full bg-muted">
-							<div className="h-full bg-sky-400" style={{ width: `${percent}%` }} />
+							<div className="h-full bg-ctp-sky" style={{ width: `${percent}%` }} />
 						</div>
 					</div>
 				);

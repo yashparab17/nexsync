@@ -25,7 +25,7 @@ export default function TitleBar() {
 					aria-label={label}
 					className={cn(
 						"flex h-full w-11 items-center justify-center text-muted-foreground transition-colors",
-						danger ? "hover:bg-red-600 hover:text-white" : "hover:bg-muted hover:text-foreground",
+						danger ? "hover:bg-ctp-red hover:text-on-accent" : "hover:bg-muted hover:text-foreground",
 					)}
 				>
 					<Icon className={label === "Maximize" ? "size-3" : "size-3.5"} />

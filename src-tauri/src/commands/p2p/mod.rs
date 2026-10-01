@@ -12,13 +12,14 @@ mod node;
 pub(crate) mod short_code;
 mod sync;
 mod ticket;
+mod vault;
 mod wire;
 
 use tauri::{AppHandle, State};
 
 use crate::commands::config::validate_allowed_root;
 pub use node::P2pState;
-use node::{InviteInfo, JoinResult, NetworkStatus, PeerInfo};
+use node::{InviteInfo, InviteOptions, JoinResult, NetworkStatus, PeerInfo};
 use short_code::ShortCodeInfo;
 use files::ShareableFile;
 
@@ -45,9 +46,19 @@ pub async fn p2p_create_invite(
     workspace_id: String,
     workspace_name: String,
     host_name: String,
+    options: Option<InviteOptions>,
 ) -> Result<InviteInfo, String> {
     let node = state.node(&app).await?;
-    node.create_invite(role, workspace_id, workspace_name, host_name).await
+    node.create_invite_with(role, workspace_id, workspace_name, host_name, options.unwrap_or_default()).await
+}
+
+/// Disconnects a guest and stops them rejoining with an earlier invite or code
+#[tauri::command]
+pub async fn p2p_block_device(state: State<'_, P2pState>, device_id: String) -> Result<(), String> {
+    match state.existing().await {
+        Some(node) => node.block_device(&device_id),
+        None => Ok(()),
+    }
 }
 
 /// Creates an invite plus a 6-digit code that works for 2 minutes and needs the host to approve

@@ -60,16 +60,16 @@ function getActivityIcon(targetType?: string, action?: string) {
 	const type = (targetType || "").toLowerCase();
 
 	if (type === "note" || act.includes("note")) {
-		return <StickyNote className="size-4 text-sky-400 shrink-0" />;
+		return <StickyNote className="size-4 text-ctp-sky shrink-0" />;
 	}
 	if (type === "asset" || act.includes("asset")) {
-		return <Upload className="size-4 text-emerald-400 shrink-0" />;
+		return <Upload className="size-4 text-ctp-green shrink-0" />;
 	}
 	if (type === "task" || act.includes("task")) {
-		return <ListTodo className="size-4 text-purple-400 shrink-0" />;
+		return <ListTodo className="size-4 text-ctp-mauve shrink-0" />;
 	}
 	if (type === "kanban" || act.includes("card") || act.includes("list") || act.includes("column")) {
-		return <ListTodo className="size-4 text-indigo-400 shrink-0" />;
+		return <ListTodo className="size-4 text-ctp-lavender shrink-0" />;
 	}
 	if (type === "folder") {
 		return <FolderOpen className="size-4 text-primary shrink-0" />;
@@ -77,7 +77,7 @@ function getActivityIcon(targetType?: string, action?: string) {
 	if (type === "member" || act.includes("member")) {
 		return <UsersRound className="size-4 text-primary shrink-0" />;
 	}
-	return <FilePlus className="size-4 text-amber-400 shrink-0" />;
+	return <FilePlus className="size-4 text-ctp-yellow shrink-0" />;
 }
 
 interface StatCardProps {

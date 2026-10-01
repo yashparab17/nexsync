@@ -97,6 +97,7 @@ pub fn run() {
             commands::p2p::p2p_set_workspace,
             commands::p2p::p2p_create_invite,
             commands::p2p::p2p_revoke_invite,
+            commands::p2p::p2p_block_device,
             commands::p2p::p2p_create_short_code,
             commands::p2p::p2p_resolve_join_request,
             commands::p2p::p2p_join_with_code,

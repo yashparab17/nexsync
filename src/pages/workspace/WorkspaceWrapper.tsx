@@ -1,10 +1,12 @@
 // React Router
+import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
 // Components
+import { t } from "@/i18n";
 import WorkspaceSidebar from "@/components/layout/workspace/WorkspaceSidebar";
 import WorkspaceHeader from "@/components/layout/workspace/WorkspaceHeader";
 import JoinRequestDialog from "@/components/dialogs/workspace/JoinRequestDialog";
@@ -18,6 +20,15 @@ export default function Workspace() {
 	const { workspace, isLoading } = useWorkspace();
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
+	// Below the medium breakpoint the sidebar is a drawer
+	const [navOpen, setNavOpen] = useState(false);
+
+	useEffect(() => {
+		if (!navOpen) return;
+		const onKey = (e: KeyboardEvent) => e.key === "Escape" && setNavOpen(false);
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [navOpen]);
 
 	// Show loader while workspace data is being fetched
 	if (isLoading) {
@@ -39,19 +50,31 @@ export default function Workspace() {
 	return (
 		<div className="flex h-full">
 			{/* Sidebar */}
-			<WorkspaceSidebar />
+			<div className="hidden h-full md:block">
+				<WorkspaceSidebar />
+			</div>
+
+			{/* Drawer version of the sidebar for narrow windows */}
+			{navOpen && (
+				<div className="fixed inset-0 z-40 flex md:hidden">
+					<div className="relative h-full animate-in slide-in-from-left duration-200 motion-reduce:animate-none">
+						<WorkspaceSidebar expanded onNavigate={() => setNavOpen(false)} />
+					</div>
+					<button type="button" aria-label={t("nav.close")} className="flex-1 cursor-default bg-black/50" onClick={() => setNavOpen(false)} />
+				</div>
+			)}
 
 			{/* Main content area */}
 			<div className="flex min-w-0 flex-1 flex-col">
 				{/* Header */}
-				<WorkspaceHeader />
+				<WorkspaceHeader onOpenMenu={() => setNavOpen(true)} menuOpen={navOpen} />
 
 				{/* Page content */}
-				<main className="flex-1 overflow-auto p-6">
-					<div key={pathname} className="animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
+				<div className="flex-1 overflow-auto p-4 md:p-6">
+					<div key={pathname} className="relative flex min-h-full flex-col animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
 						<Outlet />
 					</div>
-				</main>
+				</div>
 			</div>
 
 			{/* Warns about work due today or late, whichever page is open */}

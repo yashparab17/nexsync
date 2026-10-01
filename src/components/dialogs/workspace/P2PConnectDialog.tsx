@@ -57,6 +57,9 @@ export default function P2PConnectDialog({
 
 	// Host flow state
 	const [hostRole, setHostRole] = useState("Editor");
+	// Limits for a full invite: how long it lasts (seconds, empty for until stopped) and whether one guest uses it up
+	const [expiry, setExpiry] = useState("3600");
+	const [singleUse, setSingleUse] = useState(false);
 	const [invite, setInvite] = useState<InviteInfo | null>(null);
 	const [isGenerating, setIsGenerating] = useState(false);
 	const [shortCode, setShortCode] = useState<ShortCodeInfo | null>(null);
@@ -91,7 +94,7 @@ export default function P2PConnectDialog({
 		try {
 			setIsGenerating(true);
 			setErrorMessage(null);
-			setInvite(await createInvite(hostRole));
+			setInvite(await createInvite(hostRole, { expiresInSecs: expiry ? Number(expiry) : undefined, singleUse }));
 		} catch (err) {
 			setErrorMessage(errorText(err, "Failed to create an invite."));
 		} finally {
@@ -300,6 +303,23 @@ export default function P2PConnectDialog({
 								</div>
 							</div>
 						) : !invite ? (
+							<div className="space-y-3">
+							<div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+								<label className="flex items-center gap-1.5">
+									Full invite lasts
+									<select value={expiry} onChange={(e) => setExpiry(e.target.value)} className="h-7 border border-input bg-background px-1.5">
+										<option value="600">10 minutes</option>
+										<option value="3600">1 hour</option>
+										<option value="86400">1 day</option>
+										<option value="604800">7 days</option>
+										<option value="">Until I stop it</option>
+									</select>
+								</label>
+								<label className="flex items-center gap-1.5">
+									<input type="checkbox" checked={singleUse} onChange={(e) => setSingleUse(e.target.checked)} />
+									Only one person can use it
+								</label>
+							</div>
 							<div className="flex gap-2">
 								<Button
 									onPress={handleGenerateShortCode}
@@ -327,6 +347,7 @@ export default function P2PConnectDialog({
 									<Copy className="h-3.5 w-3.5" />
 									Full invite
 								</Button>
+							</div>
 							</div>
 						) : (
 							<div className="space-y-3 rounded-none border bg-muted/30 p-4">
@@ -356,6 +377,10 @@ export default function P2PConnectDialog({
 								<div className="max-h-28 overflow-y-auto rounded-none border border-primary/30 bg-background px-3 py-2 font-mono text-[11px] leading-relaxed break-all select-all text-primary">
 									{invite.ticket}
 								</div>
+								<p className="text-[11px] text-muted-foreground">
+									{invite.expiresAt ? `Works until ${new Date(invite.expiresAt).toLocaleString()}` : "Works until you stop it"}
+									{invite.singleUse ? ", for one person." : "."}
+								</p>
 
 								{!invite.relayConnected && (
 									<div className="flex items-start gap-2 rounded-none border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-400">

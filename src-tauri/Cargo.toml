@@ -33,6 +33,7 @@ strum = { version = "0.26", features = ["derive"] }
 rand = "0.8"
 base64 = "0.22"
 iroh = "1.2"
+url = "2"
 tokio = { version = "1", features = ["rt", "sync", "time", "macros", "fs", "io-util", "process"] }
 data-encoding = "2"
 subtle = "2"
@@ -45,3 +46,6 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
+# The device key goes in the OS credential store on these systems
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+keyring = { version = "3", default-features = false, features = ["windows-native", "apple-native"] }

@@ -7,6 +7,14 @@ import type { ConnectedPeerInfo, P2PMessage } from "./types";
 export interface InviteInfo {
 	ticket: string;
 	relayConnected: boolean; // False means only same-network guests can join
+	expiresAt?: number | null; // When the invite stops working, in milliseconds since 1970
+	singleUse?: boolean;
+}
+
+// Limits on an invite: how long it lasts and whether one guest uses it up
+export interface InviteOptions {
+	expiresInSecs?: number;
+	singleUse?: boolean;
 }
 
 export interface JoinResult {
@@ -67,8 +75,14 @@ export function createInvite(args: {
 	workspaceId: string;
 	workspaceName: string;
 	hostName: string;
+	options?: InviteOptions;
 }): Promise<InviteInfo> {
 	return invoke("p2p_create_invite", args);
+}
+
+// Disconnect a guest and refuse it until a new invite is made
+export function blockDevice(deviceId: string): Promise<void> {
+	return invoke("p2p_block_device", { deviceId });
 }
 
 // Invoke backend command to stop admitting guests with the current ticket
