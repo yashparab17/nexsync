@@ -38,6 +38,8 @@ import {
 	writeWorkspaceMetadata,
 	getTasks,
 	getKanban,
+	exportCardRecord,
+	exportTaskRecord,
 	createKanbanColumn,
 	loadConfig,
 	receiveNamedVersion,
@@ -383,8 +385,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		try {
 			const [metadata, tasks, kanban, files] = await Promise.all([
 				readWorkspaceMetadata(ws.path),
-				getTasks(ws.path).catch(() => []),
-				getKanban(ws.path).catch(() => []),
+				getTasks(ws.path, true).catch(() => []),
+				getKanban(ws.path, true).catch(() => []),
 				p2p.listShareableFiles(ws.path),
 			]);
 			return {
@@ -528,7 +530,23 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const publishDataChange = useCallback(
 		(change: DataChange) => {
 			if (peersRef.current.length === 0) return;
-			send({ kind: "DATA_CHANGE", timestamp: Date.now(), payload: JSON.stringify(change) });
+			// A task or card goes out with the merge state of its record, which is what lets the other side merge field by field
+			void (async () => {
+				let out = change;
+				const path = workspaceRef.current?.path;
+				try {
+					if (path && change.op === "upsert" && change.entity === "task") {
+						const record = await exportTaskRecord(path, change.task.id);
+						if (record) out = { ...change, task: record };
+					} else if (path && change.op === "upsert" && change.entity === "card") {
+						const record = await exportCardRecord(path, change.card.id);
+						if (record) out = { ...change, card: record };
+					}
+				} catch {
+					// Sending the plain record still works: the other side merges it as one write
+				}
+				send({ kind: "DATA_CHANGE", timestamp: Date.now(), payload: JSON.stringify(out) });
+			})();
 		},
 		[send],
 	);

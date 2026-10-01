@@ -5,6 +5,9 @@ pub mod helpers;
 #[allow(clippy::module_inception)]
 pub mod workspace;
 pub mod loaders;
+pub mod crdt;
+#[cfg(test)]
+mod crdt_sim;
 pub mod filesystem;
 pub mod registry;
 pub mod tasks;

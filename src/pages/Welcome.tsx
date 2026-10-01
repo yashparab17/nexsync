@@ -205,7 +205,7 @@ export default function Welcome() {
 													"Local Workspace"}
 											</CardDescription>
 
-											<p className="pt-2 text-ctp-green">
+											<p className="pt-2 text-green-500">
 												● Synced
 											</p>
 										</CardHeader>

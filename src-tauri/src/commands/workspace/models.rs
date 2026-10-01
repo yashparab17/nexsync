@@ -112,6 +112,12 @@ pub struct Task {
     pub tags: Vec<String>,
     #[serde(default)]
     pub comments: Vec<Comment>,
+    /// What other devices need to merge this record field by field; sent between devices, not shown
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crdt: Option<super::crdt::RecordState>,
+    /// Fields where two people wrote different values at the same time and nobody has chosen yet
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub conflicts: Vec<super::crdt::Conflict>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -143,6 +149,12 @@ pub struct KanbanCard {
     pub checklist: Vec<ChecklistItem>,
     #[serde(default)]
     pub comments: Vec<Comment>,
+    /// What other devices need to merge this record field by field; sent between devices, not shown
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crdt: Option<super::crdt::RecordState>,
+    /// Fields where two people wrote different values at the same time and nobody has chosen yet
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub conflicts: Vec<super::crdt::Conflict>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -260,6 +272,12 @@ pub struct UpdateMetadataRequest {
 pub struct TaskRequest {
     pub path: String,
     pub task: Task,
+    /// The copy the person started editing from, so a newer change by someone else to a field they did not touch is kept
+    #[serde(default)]
+    pub base: Option<Task>,
+    /// Who is making the change, shown beside the value if it ever conflicts with another
+    #[serde(default)]
+    pub author: Option<String>,
 }
 
 /// Payload identifying item by ID
@@ -281,6 +299,10 @@ pub struct KanbanColumnRequest {
 pub struct KanbanCardRequest {
     pub path: String,
     pub card: KanbanCard,
+    #[serde(default)]
+    pub base: Option<KanbanCard>,
+    #[serde(default)]
+    pub author: Option<String>,
 }
 
 /// Card position move payload
@@ -290,4 +312,6 @@ pub struct MoveCardRequest {
     pub card_id: String,
     pub column_id: String,
     pub position: i64,
+    #[serde(default)]
+    pub author: Option<String>,
 }

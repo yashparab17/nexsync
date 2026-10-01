@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import { openSearchPanel } from "@codemirror/search";
 import { EditorView } from "@codemirror/view";
-import { AlertTriangle, Check, History, Loader2, Save, Search, Sparkles } from "lucide-react";
+import { AlertTriangle, Check, GitBranch, History, Loader2, Save, Search, Sparkles } from "lucide-react";
 
 import CodeEditor from "./CodeEditor";
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
 import { useAutoSnapshot } from "@/hooks/useAutoSnapshot";
+import BranchesDialog from "@/components/dialogs/workspace/BranchesDialog";
 import { useCollabDoc } from "@/hooks/useCollabDoc";
 import { useSeededText } from "@/hooks/useSeededText";
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -21,8 +22,10 @@ import {
 	type BlameRange,
 	type Contribution,
 } from "@/lib/editor/blame";
+import { branchDocId, listBranches } from "@/lib/branches";
 import { canFormat, formatCode, minimalChange } from "@/lib/editor/format";
 import type { LoadedLanguage } from "@/lib/editor/languages";
+import { hunksFromDelta, suggestRepair, type Hunk, type Suggestion } from "@/lib/editor/mergeRepair";
 import { countSyntaxErrors, errorRanges } from "@/lib/editor/syntax";
 import { readWorkspaceFile, writeWorkspaceFile } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
@@ -49,7 +52,17 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 	const fileName = path.split("/").pop() ?? path;
 	const userName = selfName ?? metadata?.members.members.find((m) => m.role === "Owner")?.name ?? "You";
 
-	const collab = useCollabDoc(workspacePath, path);
+	// The file's own document is always open (it holds the list of branches); a branch being worked on is a second one
+	const mainCollab = useCollabDoc(workspacePath, path);
+	const [branch, setBranch] = useState<{ id: string; name: string } | null>(null);
+	const [branchesOpen, setBranchesOpen] = useState(false);
+	const branchCollab = useCollabDoc(workspacePath, branch ? branchDocId(branch.id) : undefined);
+	const collab = branch ? branchCollab : mainCollab;
+	const openBranch = (id: string | null) => {
+		setBranch(id && mainCollab ? { id, name: listBranches(mainCollab.doc).find((b) => b.id === id)?.name ?? "branch" } : null);
+		setMergeWarning(null);
+		setRepair(null);
+	};
 	const viewRef = useRef<EditorView | null>(null);
 	const [language, setLanguage] = useState<LoadedLanguage | null>(null);
 	const [saved, setSaved] = useState<string | null>(null);
@@ -58,6 +71,9 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 	const [problems, setProblems] = useState(0);
 	const [notice, setNotice] = useState<string | null>(null);
 	const [mergeWarning, setMergeWarning] = useState<number | null>(null);
+	// The last remote change that added errors, and the repair found for it ("none" when no part of it can be kept)
+	const lastMerge = useRef<{ before: string; merged: string; hunks: Hunk[] } | null>(null);
+	const [repair, setRepair] = useState<Suggestion | "none" | null>(null);
 	const [historyOpen, setHistoryOpen] = useState(false);
 	const [blame, setBlame] = useState<{ ranges: BlameRange[]; people: Contribution[] } | null>(null);
 
@@ -86,11 +102,12 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 		if (seeded) setContent(seeded.text);
 	}, [seeded]);
 
-	const dirty = saved !== null && content !== saved;
+	// Work on a branch is not the file, so it is never unsaved changes to it
+	const dirty = saved !== null && content !== saved && !branch;
 	useEffect(() => onDirtyChange(path, dirty), [path, dirty, onDirtyChange]);
 
 	// Work that was never saved with the Save button still ends up in the file history
-	useAutoSnapshot(workspacePath, path, content, !readOnly && saved !== null);
+	useAutoSnapshot(workspacePath, path, content, !readOnly && saved !== null && !branch);
 
 	// An older version goes into the live editor as a small edit, so collaborators see it and it can be undone
 	const restoreText = (text: string) => {
@@ -110,7 +127,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 	}, [language, refreshProblems]);
 
 	const save = useCallback(async () => {
-		if (saving || readOnly || saved === null) return;
+		if (saving || readOnly || saved === null || branch) return;
 		const text = collab ? collab.doc.getText("content").toString() : content;
 		try {
 			setSaving(true);
@@ -123,7 +140,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 		} finally {
 			setSaving(false);
 		}
-	}, [saving, readOnly, saved, collab, content, workspacePath, path, addActivityEvent, logError]);
+	}, [saving, readOnly, saved, branch, collab, content, workspacePath, path, addActivityEvent, logError]);
 
 	// Ctrl+S saves the visible tab
 	useEffect(() => {
@@ -152,6 +169,33 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 		}
 	};
 
+	// Looks for a part of the collaborator's change that can be kept without the errors
+	const findRepair = () => {
+		const merge = lastMerge.current;
+		const support = language?.support;
+		if (!merge || !support) return;
+		setRepair(suggestRepair(merge.before, merge.hunks, { errors: (t) => countSyntaxErrors(t, support) }) ?? "none");
+	};
+
+	// Applying it is an ordinary edit, so it reaches everyone like any other
+	const applyRepair = () => {
+		const merge = lastMerge.current;
+		if (!collab || !merge || !repair || repair === "none") return;
+		const ytext = collab.doc.getText("content");
+		if (ytext.toString() !== merge.merged) {
+			setNotice("The file has changed since the merge. Check it again.");
+			setRepair(null);
+			return;
+		}
+		const change = minimalChange(merge.merged, repair.text);
+		if (!change) return;
+		collab.doc.transact(() => {
+			if (change.to > change.from) ytext.delete(change.from, change.to - change.from);
+			if (change.insert) ytext.insert(change.from, change.insert);
+		});
+		setRepair(null);
+	};
+
 	const jumpToLine = (line: number) => {
 		const view = viewRef.current;
 		if (!view) return;
@@ -169,14 +213,19 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 		const support = language.support;
 		const ytext = collab.doc.getText("content");
 		let previous = ytext.toString();
-		const observer = (_event: Y.YTextEvent, tr: Y.Transaction) => {
+		const observer = (event: Y.YTextEvent, tr: Y.Transaction) => {
 			const text = ytext.toString();
 			if (!tr.local) {
 				const before = countSyntaxErrors(previous, support);
 				const after = countSyntaxErrors(text, support);
-				if (before !== null && after !== null && after > before) setMergeWarning(after - before);
+				if (before !== null && after !== null && after > before) {
+					setMergeWarning(after - before);
+					lastMerge.current = { before: previous, merged: text, hunks: hunksFromDelta(event.changes.delta) };
+					setRepair(null);
+				}
 			} else if (countSyntaxErrors(text, support) === 0) {
 				setMergeWarning(null);
+				setRepair(null);
 			}
 			previous = text;
 			refreshProblems();
@@ -224,6 +273,12 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 						<History className="size-3.5" />
 						History
 					</Button>
+					{mainCollab && (
+						<Button variant="ghost" size="xs" onPress={() => setBranchesOpen(true)}>
+							<GitBranch className="size-3.5" />
+							Branches
+						</Button>
+					)}
 					<Button variant="ghost" size="xs" onPress={() => viewRef.current && (openSearchPanel(viewRef.current), viewRef.current.focus())}>
 						<Search className="size-3.5" />
 						Find
@@ -234,7 +289,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 							Format
 						</Button>
 					)}
-					{!readOnly && (
+					{!readOnly && !branch && (
 						<Button size="xs" onPress={() => void save()} isDisabled={saving || !dirty}>
 							{saving ? <Loader2 className="size-3.5 animate-spin" /> : dirty ? <Save className="size-3.5" /> : <Check className="size-3.5" />}
 							{saving ? "Saving…" : dirty ? "Save" : "Saved"}
@@ -242,6 +297,21 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 					)}
 				</div>
 			</div>
+
+			{branch && (
+				<div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-1.5 text-xs">
+					<GitBranch className="size-3.5 shrink-0 text-primary" />
+					<span className="min-w-0 flex-1">
+						You are working on the branch <span className="font-semibold">{branch.name}</span>. {fileName} does not change until the branch is merged.
+					</span>
+					<Button size="xs" onPress={() => setBranchesOpen(true)}>
+						Review and merge
+					</Button>
+					<Button variant="ghost" size="xs" onPress={() => openBranch(null)}>
+						Back to the file
+					</Button>
+				</div>
+			)}
 
 			{mergeWarning !== null && (
 				<div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400">
@@ -260,8 +330,40 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 					>
 						Show first
 					</Button>
-					<Button variant="ghost" size="xs" onPress={() => setMergeWarning(null)}>
+					{!readOnly && !repair && (
+						<Button variant="ghost" size="xs" onPress={findRepair}>
+							Suggest a fix
+						</Button>
+					)}
+					<Button variant="ghost" size="xs" onPress={() => { setMergeWarning(null); setRepair(null); }}>
 						Dismiss
+					</Button>
+				</div>
+			)}
+			{mergeWarning !== null && repair && (
+				<div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-xs">
+					{repair === "none" ? (
+						<span className="min-w-0 flex-1 text-muted-foreground">No part of their change can be kept without the errors, so it needs a manual fix.</span>
+					) : (
+						<>
+							<span className="min-w-0 flex-1">
+								Keeping {repair.kept} of {repair.kept + repair.dropped} of their changes avoids the errors.
+								{lastMerge.current?.hunks.map((h, i) =>
+									repair.keep[i] ? null : (
+										<code key={i} className="ml-1 bg-muted px-1">
+											{(h.insert || "removal of " + h.remove + " characters").slice(0, 60).replace(/\s+/g, " ")}
+										</code>
+									),
+								)}{" "}
+								would be left out.
+							</span>
+							<Button size="xs" onPress={applyRepair}>
+								Apply
+							</Button>
+						</>
+					)}
+					<Button variant="ghost" size="xs" onPress={() => setRepair(null)}>
+						Close
 					</Button>
 				</div>
 			)}
@@ -333,6 +435,19 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 					</aside>
 				)}
 			</div>
+
+			{branchesOpen && mainCollab && (
+				<BranchesDialog
+					workspacePath={workspacePath}
+					fileName={fileName}
+					doc={mainCollab.doc}
+					userName={userName}
+					canEdit={!readOnly}
+					activeId={branch?.id ?? null}
+					onOpenBranch={openBranch}
+					onClose={() => setBranchesOpen(false)}
+				/>
+			)}
 
 			{historyOpen && (
 				<FileHistoryDialog

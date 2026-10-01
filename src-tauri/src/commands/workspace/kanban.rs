@@ -3,6 +3,7 @@
 use chrono::Utc;
 use crate::commands::config::validate_allowed_root;
 use super::helpers::get_workspace_id;
+use super::crdt;
 use super::models::{json_list, to_json, valid_checklist, valid_comments, valid_tags, KanbanCard, KanbanColumn, KanbanCardRequest, KanbanColumnRequest, MoveCardRequest, TaskIdRequest};
 
 // ────────────────────────────
@@ -11,7 +12,7 @@ use super::models::{json_list, to_json, valid_checklist, valid_comments, valid_t
 
 /// Fetches all Kanban columns and their ordered cards
 #[tauri::command]
-pub fn get_kanban(app_handle: tauri::AppHandle, path: String) -> Result<Vec<KanbanColumn>, String> {
+pub fn get_kanban(app_handle: tauri::AppHandle, path: String, with_state: Option<bool>) -> Result<Vec<KanbanColumn>, String> {
     validate_allowed_root(&app_handle, &path)?;
     
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&path, ".")?;
@@ -59,12 +60,19 @@ pub fn get_kanban(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Kanb
                     assignee_id: r.get(9)?,
                     checklist: json_list(&r.get::<_, String>(10)?),
                     comments: json_list(&r.get::<_, String>(11)?),
+                    ..Default::default()
                 })
             })
             .map_err(|e| e.to_string())?
             .filter_map(|r| r.ok())
             .collect();
         col.cards = cards;
+        crdt::attach_conflicts(&db.conn, &mut col.cards)?;
+        if with_state.unwrap_or(false) {
+            for card in &mut col.cards {
+                crdt::attach(&db.conn, card)?;
+            }
+        }
     }
     Ok(columns)
 }
@@ -123,6 +131,7 @@ pub fn create_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let card = request.card;
+    let author = request.author;
     let ws_id = get_workspace_id(&db)?;
     db.conn.execute(
         "INSERT INTO kanban_cards (id, workspace_id, column_id, title, description,
@@ -138,6 +147,7 @@ pub fn create_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
     )
     .map_err(|e| e.to_string())?;
     super::data_sync::clear_tombstone(&db.conn, super::data_sync::ENTITY_CARD, &card.id)?;
+    crdt::record_write(&db.conn, &card, author.as_deref(), None)?;
     Ok(card)
 }
 
@@ -168,21 +178,13 @@ pub fn update_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let card = request.card;
+    let author = request.author;
+    let base = request.base;
     let ws_id = get_workspace_id(&db)?;
-    db.conn
-        .execute(
-            "UPDATE kanban_cards SET title = ?1, description = ?2, column_id = ?3,
-             position = ?4, updated_at = ?5, tags = ?8, due_date = ?9, assignee_id = ?10, checklist = ?11, comments = ?12
-             WHERE id = ?6 AND workspace_id = ?7",
-            rusqlite::params![
-                &card.title, &card.description, &card.column_id,
-                &card.position, &card.updated_at,
-                &card.id, &ws_id,
-                to_json(&card.tags), &card.due_date, &card.assignee_id, to_json(&card.checklist),
-                to_json(&card.comments),
-            ],
-        )
-        .map_err(|e| e.to_string())?;
+    let Some(existing) = super::data_sync::read_card(&db.conn, &card.id)? else { return Ok(()) };
+    crdt::ensure(&db.conn, &existing)?;
+    let row = crdt::apply_local(&db.conn, &card, Some(&existing), base.as_ref(), author.as_deref())?;
+    super::data_sync::put_card(&db.conn, &ws_id, &row)?;
     Ok(())
 }
 
@@ -194,6 +196,10 @@ pub fn move_kanban_card(app_handle: tauri::AppHandle, request: MoveCardRequest) 
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let ws_id = get_workspace_id(&db)?;
+    let before = super::data_sync::read_card(&db.conn, &request.card_id)?;
+    if let Some(before) = &before {
+        crdt::ensure(&db.conn, before)?;
+    }
     db.conn
         .execute(
             "UPDATE kanban_cards SET column_id = ?1, position = ?2, updated_at = ?5
@@ -201,6 +207,9 @@ pub fn move_kanban_card(app_handle: tauri::AppHandle, request: MoveCardRequest) 
             rusqlite::params![&request.column_id, &request.position, &request.card_id, &ws_id, Utc::now().to_rfc3339()],
         )
         .map_err(|e| e.to_string())?;
+    if let Some(moved) = super::data_sync::read_card(&db.conn, &request.card_id)? {
+        crdt::record_write(&db.conn, &moved, request.author.as_deref(), before.as_ref())?;
+    }
     Ok(())
 }
 
@@ -249,5 +258,6 @@ pub fn delete_kanban_card(app_handle: tauri::AppHandle, request: TaskIdRequest) 
         )
         .map_err(|e| e.to_string())?;
     super::data_sync::record_tombstone(&db.conn, &ws_id, super::data_sync::ENTITY_CARD, &request.id)?;
+    crdt::forget(&db.conn, <KanbanCard as crdt::Crdt>::ENTITY, &request.id)?;
     Ok(())
 }

@@ -508,9 +508,9 @@ export default function WorkspaceAssets() {
 								className="group relative overflow-hidden cursor-pointer border-border hover:border-primary/60 hover:shadow-lg transition-all duration-200 bg-card/60 flex flex-col"
 							>
 								{/* Thumbnail Header Area */}
-								<div className="relative h-36 bg-ctp-crust/40 flex items-center justify-center overflow-hidden border-b border-border/40">
+								<div className="relative h-36 bg-black/40 flex items-center justify-center overflow-hidden border-b border-border/40">
 									{isRemote ?
-										<div className="flex flex-col items-center gap-2 text-ctp-yellow/80 p-4 text-center">
+										<div className="flex flex-col items-center gap-2 text-amber-500/80 p-4 text-center">
 											<Sparkles className="size-7" />
 											<span className="text-[11px] font-medium uppercase tracking-wider">
 												Not downloaded
@@ -539,10 +539,10 @@ export default function WorkspaceAssets() {
 									{/* Status Badge */}
 									<div className="absolute top-2 left-2">
 										{isRemote ?
-											<span className="bg-ctp-yellow/90 text-ctp-crust text-[10px] font-bold px-2 py-0.5 rounded-none shadow-sm">
+											<span className="bg-amber-500/90 text-black text-[10px] font-bold px-2 py-0.5 rounded-none shadow-sm">
 												Remote
 											</span>
-										:	<span className="bg-ctp-crust/60 backdrop-blur text-ctp-text text-[10px] font-mono px-2 py-0.5 rounded-none border border-ctp-text/10">
+										:	<span className="bg-black/60 backdrop-blur text-white text-[10px] font-mono px-2 py-0.5 rounded-none border border-white/10">
 												{asset.name.split(".").pop()?.toUpperCase()}
 											</span>
 										}
@@ -556,7 +556,7 @@ export default function WorkspaceAssets() {
 											className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
 										>
 											{copiedKey === asset.name ?
-												<Check className="size-3.5 text-ctp-green" />
+												<Check className="size-3.5 text-emerald-400" />
 											:	<Copy className="size-3.5" />}
 										</button>
 										<button
@@ -676,10 +676,10 @@ export default function WorkspaceAssets() {
 										</td>
 										<td className="py-3 px-4">
 											{isRemote ?
-												<span className="text-ctp-yellow font-medium flex items-center gap-1">
+												<span className="text-amber-500 font-medium flex items-center gap-1">
 													○ Not downloaded
 												</span>
-											:	<span className="text-ctp-green font-medium flex items-center gap-1">
+											:	<span className="text-emerald-500 font-medium flex items-center gap-1">
 													● Local
 												</span>
 											}
@@ -701,7 +701,7 @@ export default function WorkspaceAssets() {
 													className="h-7 px-2 text-[11px] rounded-none bg-muted/60 hover:bg-muted text-foreground flex items-center gap-1 cursor-pointer transition-all border border-border/40"
 												>
 													{copiedKey === asset.name ?
-														<Check className="size-3 text-ctp-green" />
+														<Check className="size-3 text-emerald-400" />
 													:	<Copy className="size-3" />}
 													{copiedKey === asset.name ? "Copied" : "Copy"}
 												</button>

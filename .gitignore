@@ -52,7 +52,8 @@ $RECYCLE.BIN/
 PROJECT_GUIDE.md
 COMMENT_STYLE_GUIDE.md
 IMPLEMENTATION_PLAN.md
-nexsync-synopsis.md
+nexsync-synopsis.pdf
+RESEARCH.md
 
 # pnpm only
 package-lock.json

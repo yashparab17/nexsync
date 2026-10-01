@@ -229,6 +229,19 @@ ALTER TABLE kanban_cards ADD COLUMN comments TEXT NOT NULL DEFAULT '[]';
 ALTER TABLE activity_events ADD COLUMN author TEXT;
 "##,
 	},
+	Migration {
+		version: 9,
+		description: "per-field merge state for tasks and cards",
+		up: r##"
+CREATE TABLE IF NOT EXISTS replica (id TEXT PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS crdt_meta (
+    entity TEXT NOT NULL,
+    id TEXT NOT NULL,
+    state TEXT NOT NULL,
+    PRIMARY KEY (entity, id)
+);
+"##,
+	},
 ];
 
 /// Initialises the schema on a fresh database, running pending migrations

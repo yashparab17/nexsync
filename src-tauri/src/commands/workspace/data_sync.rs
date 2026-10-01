@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
+use super::crdt;
 use super::helpers::get_workspace_id;
 use super::models::{json_list, to_json, valid_checklist, valid_comments, valid_tags, KanbanCard, Task};
 use crate::commands::validation::{validate_task_priority, validate_task_status};
@@ -56,14 +57,6 @@ fn is_later(a: &str, b: &str) -> bool {
         (Some(_), None) => true,
         _ => false,
     }
-}
-
-/// Decides whether an incoming record replaces the local one: later edit wins, and a stable
-/// tie-break on the serialized form makes both peers choose the same winner.
-fn remote_wins<T: Serialize>(remote: &T, remote_at: &str, local: Option<(&T, &str)>) -> bool {
-    let Some((local, local_at)) = local else { return true };
-    let (r, l) = (serde_json::to_string(remote).ok(), serde_json::to_string(local).ok());
-    r != l && (is_later(remote_at, local_at) || (remote_at == local_at && r > l))
 }
 
 /// Records that a record was deleted now, so peers don't resurrect it.
@@ -125,6 +118,7 @@ fn task_from_row(r: &rusqlite::Row) -> rusqlite::Result<Task> {
         updated_at: r.get(8)?,
         tags: json_list(&r.get::<_, String>(9)?),
         comments: json_list(&r.get::<_, String>(10)?),
+        ..Default::default()
     })
 }
 
@@ -142,6 +136,7 @@ fn card_from_row(r: &rusqlite::Row) -> rusqlite::Result<KanbanCard> {
         assignee_id: r.get(9)?,
         checklist: json_list(&r.get::<_, String>(10)?),
         comments: json_list(&r.get::<_, String>(11)?),
+        ..Default::default()
     })
 }
 
@@ -176,7 +171,118 @@ pub fn export_state(conn: &Connection, ws_id: &str) -> Result<DataState, String>
         .map_err(e)?
         .collect::<Result<Vec<_>, _>>()
         .map_err(e)?;
+    let (mut tasks, mut cards) = (tasks, cards);
+    for t in &mut tasks {
+        crdt::attach(conn, t)?;
+    }
+    for c in &mut cards {
+        crdt::attach(conn, c)?;
+    }
     Ok(DataState { tasks, columns, cards, tombstones })
+}
+
+pub fn read_task(conn: &Connection, id: &str) -> Result<Option<Task>, String> {
+    conn.query_row(&format!("SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?1"), [id], task_from_row).optional().map_err(|e| e.to_string())
+}
+
+pub fn read_card(conn: &Connection, id: &str) -> Result<Option<KanbanCard>, String> {
+    conn.query_row(&format!("SELECT {CARD_COLUMNS} FROM kanban_cards WHERE id = ?1"), [id], card_from_row).optional().map_err(|e| e.to_string())
+}
+
+pub(super) fn put_task_row(conn: &Connection, ws_id: &str, t: &Task) -> Result<(), String> {
+    conn.execute(
+        "INSERT OR REPLACE INTO tasks (id, workspace_id, title, description, status, priority,
+         due_date, assignee_id, created_at, updated_at, tags, comments)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        params![
+            t.id, ws_id, t.title, t.description, t.status, t.priority, t.due_date, t.assignee_id,
+            t.created_at, t.updated_at, to_json(&t.tags), to_json(&t.comments)
+        ],
+    )
+    .map(|_| ())
+    .map_err(|e| e.to_string())
+}
+
+pub(super) fn put_card(conn: &Connection, ws_id: &str, c: &KanbanCard) -> Result<(), String> {
+    conn.execute(
+        "INSERT OR REPLACE INTO kanban_cards (id, workspace_id, column_id, title, description,
+         position, created_at, updated_at, tags, due_date, assignee_id, checklist, comments)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+        params![
+            c.id, ws_id, c.column_id, c.title, c.description, c.position, c.created_at, c.updated_at,
+            to_json(&c.tags), c.due_date, c.assignee_id, to_json(&c.checklist), to_json(&c.comments)
+        ],
+    )
+    .map(|_| ())
+    .map_err(|e| e.to_string())
+}
+
+/// The column that takes in cards whose own column was deleted while someone else was still using it
+pub const RECOVERED_COLUMN: &str = "recovered";
+
+/// Merges one task a peer sent into this device's copy; returns true if the local record changed.
+fn merge_task(conn: &Connection, ws_id: &str, tombs: &HashMap<(String, String), String>, t: &Task) -> Result<bool, String> {
+    if !valid_task(t) || crdt_too_big(t.crdt.as_ref()) {
+        return Ok(false);
+    }
+    if tombs.get(&(ENTITY_TASK.into(), t.id.clone())).is_some_and(|d| !is_later(&t.updated_at, d)) {
+        return Ok(false);
+    }
+    let local = read_task(conn, &t.id)?;
+    let Some(row) = crdt::merge_remote(conn, t, local.as_ref(), valid_task)? else { return Ok(false) };
+    put_task_row(conn, ws_id, &row)?;
+    clear_tombstone(conn, ENTITY_TASK, &t.id)?;
+    Ok(true)
+}
+
+/// Same for a card. A card whose column no longer exists goes to a Recovered column, not into the void.
+fn merge_card(conn: &Connection, ws_id: &str, tombs: &HashMap<(String, String), String>, c: &KanbanCard) -> Result<bool, String> {
+    if !valid_card(c) || crdt_too_big(c.crdt.as_ref()) {
+        return Ok(false);
+    }
+    if tombs.get(&(ENTITY_CARD.into(), c.id.clone())).is_some_and(|d| !is_later(&c.updated_at, d)) {
+        return Ok(false);
+    }
+    let local = read_card(conn, &c.id)?;
+    let Some(mut row) = crdt::merge_remote(conn, c, local.as_ref(), valid_card)? else {
+        return reclaim(conn, local.as_ref());
+    };
+    let column_exists = conn
+        .query_row("SELECT 1 FROM kanban_columns WHERE id = ?1", [&row.column_id], |_| Ok(()))
+        .optional()
+        .map_err(|e| e.to_string())?
+        .is_some();
+    if !column_exists {
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT OR IGNORE INTO kanban_columns (id, workspace_id, title, position, created_at, updated_at)
+             VALUES (?1, ?2, 'Recovered', 9999, ?3, ?3)",
+            params![RECOVERED_COLUMN, ws_id, now],
+        )
+        .map_err(|e| e.to_string())?;
+        row.column_id = RECOVERED_COLUMN.to_string();
+    }
+    put_card(conn, ws_id, &row)?;
+    clear_tombstone(conn, ENTITY_CARD, &c.id)?;
+    Ok(true)
+}
+
+/// A card parked in the Recovered column goes back to its own column once that column exists here again
+fn reclaim(conn: &Connection, parked: Option<&KanbanCard>) -> Result<bool, String> {
+    let Some(card) = parked.filter(|c| c.column_id == RECOVERED_COLUMN) else { return Ok(false) };
+    let Some(state) = crdt::load(conn, <KanbanCard as crdt::Crdt>::ENTITY, &card.id)? else { return Ok(false) };
+    let Some(home) = state.resolved().get("column_id").and_then(|v| v.as_str().map(str::to_string)) else { return Ok(false) };
+    let home_exists = conn.query_row("SELECT 1 FROM kanban_columns WHERE id = ?1", [&home], |_| Ok(())).optional().map_err(|e| e.to_string())?.is_some();
+    if home == RECOVERED_COLUMN || !home_exists {
+        return Ok(false);
+    }
+    conn.execute("UPDATE kanban_cards SET column_id = ?1 WHERE id = ?2", params![home, card.id]).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+/// Merge state comes from a peer, so it is bounded like everything else they send
+fn crdt_too_big(state: Option<&crdt::RecordState>) -> bool {
+    state.is_some_and(|s| s.fields.len() > 1000 || s.vv.len() > 64 || s.fields.values().any(|v| v.len() > 64))
 }
 
 /// Merges a peer's state into this device's database; returns true if anything changed.
@@ -251,68 +357,81 @@ pub fn merge_state(conn: &Connection, ws_id: &str, remote: DataState) -> Result<
         changed |= added > 0;
     }
 
-    // 3. Tasks.
-    for t in remote.tasks.iter().filter(|t| valid_task(t)) {
-        if tombs.get(&(ENTITY_TASK.into(), t.id.clone())).is_some_and(|d| !is_later(&t.updated_at, d)) {
-            continue;
-        }
-        let local: Option<Task> = tx
-            .query_row(&format!("SELECT {TASK_COLUMNS} FROM tasks WHERE id = ?1"), [&t.id], task_from_row)
-            .optional()
-            .map_err(e)?;
-        if !remote_wins(t, &t.updated_at, local.as_ref().map(|l| (l, l.updated_at.as_str()))) {
-            continue;
-        }
-        tx.execute(
-            "INSERT OR REPLACE INTO tasks (id, workspace_id, title, description, status, priority,
-             due_date, assignee_id, created_at, updated_at, tags, comments)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-            params![
-                t.id, ws_id, t.title, t.description, t.status, t.priority, t.due_date, t.assignee_id,
-                t.created_at, t.updated_at, to_json(&t.tags), to_json(&t.comments)
-            ],
-        )
-        .map_err(e)?;
-        tx.execute("DELETE FROM tombstones WHERE entity = ?1 AND id = ?2", params![ENTITY_TASK, t.id]).map_err(e)?;
-        changed = true;
+    // 3. Tasks and 4. cards: merged field by field, see crdt.rs
+    for t in &remote.tasks {
+        changed |= merge_task(&tx, ws_id, &tombs, t)?;
     }
-
-    // 4. Cards: same rule, and only into a column that exists here.
-    for c in remote.cards.iter().filter(|c| valid_card(c)) {
-        if tombs.get(&(ENTITY_CARD.into(), c.id.clone())).is_some_and(|d| !is_later(&c.updated_at, d)) {
-            continue;
-        }
-        let column_exists = tx
-            .query_row("SELECT 1 FROM kanban_columns WHERE id = ?1", [&c.column_id], |_| Ok(()))
-            .optional()
-            .map_err(e)?
-            .is_some();
-        if !column_exists {
-            continue;
-        }
-        let local: Option<KanbanCard> = tx
-            .query_row(&format!("SELECT {CARD_COLUMNS} FROM kanban_cards WHERE id = ?1"), [&c.id], card_from_row)
-            .optional()
-            .map_err(e)?;
-        if !remote_wins(c, &c.updated_at, local.as_ref().map(|l| (l, l.updated_at.as_str()))) {
-            continue;
-        }
-        tx.execute(
-            "INSERT OR REPLACE INTO kanban_cards (id, workspace_id, column_id, title, description,
-             position, created_at, updated_at, tags, due_date, assignee_id, checklist, comments)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
-            params![
-                c.id, ws_id, c.column_id, c.title, c.description, c.position, c.created_at, c.updated_at,
-                to_json(&c.tags), c.due_date, c.assignee_id, to_json(&c.checklist), to_json(&c.comments)
-            ],
-        )
-        .map_err(e)?;
-        tx.execute("DELETE FROM tombstones WHERE entity = ?1 AND id = ?2", params![ENTITY_CARD, c.id]).map_err(e)?;
-        changed = true;
+    for c in &remote.cards {
+        changed |= merge_card(&tx, ws_id, &tombs, c)?;
     }
 
     tx.commit().map_err(e)?;
     Ok(changed)
+}
+
+/// Merges one record that arrived live from a peer
+pub fn merge_task_into(path: &str, task: &Task) -> Result<bool, String> {
+    let db = crate::database::WorkspaceDb::open_existing(path)?;
+    let ws_id = get_workspace_id(&db)?;
+    let tx = db.conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let tombs = tombstone_map(&tx, &ws_id)?;
+    let changed = merge_task(&tx, &ws_id, &tombs, task)?;
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(changed)
+}
+
+pub fn merge_card_into(path: &str, card: &KanbanCard) -> Result<bool, String> {
+    let db = crate::database::WorkspaceDb::open_existing(path)?;
+    let ws_id = get_workspace_id(&db)?;
+    let tx = db.conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let tombs = tombstone_map(&tx, &ws_id)?;
+    let changed = merge_card(&tx, &ws_id, &tombs, card)?;
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(changed)
+}
+
+fn tombstone_map(conn: &Connection, ws_id: &str) -> Result<HashMap<(String, String), String>, String> {
+    let e = |e: rusqlite::Error| e.to_string();
+    conn.prepare("SELECT entity, id, deleted_at FROM tombstones WHERE workspace_id = ?1")
+        .map_err(e)?
+        .query_map([ws_id], |r| Ok(((r.get(0)?, r.get(1)?), r.get(2)?)))
+        .map_err(e)?
+        .collect::<Result<_, _>>()
+        .map_err(e)
+}
+
+/// A record as other devices should merge it: its row plus its merge state
+pub fn export_task(path: &str, id: &str) -> Result<Option<Task>, String> {
+    let db = crate::database::WorkspaceDb::open_existing(path)?;
+    let Some(mut task) = read_task(&db.conn, id)? else { return Ok(None) };
+    crdt::attach(&db.conn, &mut task)?;
+    Ok(Some(task))
+}
+
+pub fn export_card(path: &str, id: &str) -> Result<Option<KanbanCard>, String> {
+    let db = crate::database::WorkspaceDb::open_existing(path)?;
+    let Some(mut card) = read_card(&db.conn, id)? else { return Ok(None) };
+    crdt::attach(&db.conn, &mut card)?;
+    Ok(Some(card))
+}
+
+/// Settles a conflict on one field by choosing a value; returns the record as it now reads
+pub fn resolve_task_field(path: &str, id: &str, field: &str, value: serde_json::Value, author: Option<&str>) -> Result<Option<Task>, String> {
+    let db = crate::database::WorkspaceDb::open_existing(path)?;
+    let ws_id = get_workspace_id(&db)?;
+    let Some(base) = read_task(&db.conn, id)? else { return Ok(None) };
+    let Some(row) = crdt::resolve_field(&db.conn, &base, field, value, author)? else { return Ok(None) };
+    put_task_row(&db.conn, &ws_id, &row)?;
+    export_task(path, id)
+}
+
+pub fn resolve_card_field(path: &str, id: &str, field: &str, value: serde_json::Value, author: Option<&str>) -> Result<Option<KanbanCard>, String> {
+    let db = crate::database::WorkspaceDb::open_existing(path)?;
+    let ws_id = get_workspace_id(&db)?;
+    let Some(base) = read_card(&db.conn, id)? else { return Ok(None) };
+    let Some(row) = crdt::resolve_field(&db.conn, &base, field, value, author)? else { return Ok(None) };
+    put_card(&db.conn, &ws_id, &row)?;
+    export_card(path, id)
 }
 
 /// Opens the workspace database at `path` and exports its state.
@@ -327,6 +446,54 @@ pub fn merge_into(path: &str, remote: DataState) -> Result<bool, String> {
     let db = crate::database::WorkspaceDb::open_existing(path)?;
     let ws_id = get_workspace_id(&db)?;
     merge_state(&db.conn, &ws_id, remote)
+}
+
+// ────────────────────────────
+// Tauri commands — live sync and conflicts
+// ────────────────────────────
+
+fn checked(app_handle: &tauri::AppHandle, path: &str) -> Result<(), String> {
+    crate::commands::config::validate_allowed_root(app_handle, path)?;
+    crate::commands::path_utils::resolve_workspace_path(path, ".").map(|_| ())
+}
+
+/// A task with the state other devices need to merge it, to send to collaborators after a local change
+#[tauri::command]
+pub fn export_task_record(app_handle: tauri::AppHandle, path: String, id: String) -> Result<Option<Task>, String> {
+    checked(&app_handle, &path)?;
+    export_task(&path, &id)
+}
+
+#[tauri::command]
+pub fn export_card_record(app_handle: tauri::AppHandle, path: String, id: String) -> Result<Option<KanbanCard>, String> {
+    checked(&app_handle, &path)?;
+    export_card(&path, &id)
+}
+
+/// Merges a task a collaborator sent; returns whether anything here changed
+#[tauri::command]
+pub fn merge_task_record(app_handle: tauri::AppHandle, path: String, task: Task) -> Result<bool, String> {
+    checked(&app_handle, &path)?;
+    merge_task_into(&path, &task)
+}
+
+#[tauri::command]
+pub fn merge_card_record(app_handle: tauri::AppHandle, path: String, card: KanbanCard) -> Result<bool, String> {
+    checked(&app_handle, &path)?;
+    merge_card_into(&path, &card)
+}
+
+/// Settles a conflict on a task by choosing one of its values
+#[tauri::command]
+pub fn resolve_task_conflict(app_handle: tauri::AppHandle, path: String, id: String, field: String, value: serde_json::Value, author: Option<String>) -> Result<Option<Task>, String> {
+    checked(&app_handle, &path)?;
+    resolve_task_field(&path, &id, &field, value, author.as_deref())
+}
+
+#[tauri::command]
+pub fn resolve_card_conflict(app_handle: tauri::AppHandle, path: String, id: String, field: String, value: serde_json::Value, author: Option<String>) -> Result<Option<KanbanCard>, String> {
+    checked(&app_handle, &path)?;
+    resolve_card_field(&path, &id, &field, value, author.as_deref())
 }
 
 #[cfg(test)]
@@ -358,6 +525,19 @@ mod tests {
             updated_at: at.into(),
             ..Default::default()
         }
+    }
+
+    // What a record says apart from the merge bookkeeping: tags are kept in a fixed order and times are instants
+    fn plain_task(t: &Task) -> Task {
+        let mut t = Task { crdt: None, updated_at: crdt::rfc3339_of(crdt::ts_of(&t.updated_at)), ..t.clone() };
+        t.tags.sort();
+        t
+    }
+
+    fn plain_card(c: &KanbanCard) -> KanbanCard {
+        let mut c = KanbanCard { crdt: None, updated_at: crdt::rfc3339_of(crdt::ts_of(&c.updated_at)), ..c.clone() };
+        c.tags.sort();
+        c
     }
 
     fn only_tasks(tasks: Vec<Task>) -> DataState {
@@ -472,8 +652,8 @@ mod tests {
         // What one device exports, another merges and reads back unchanged
         merge_state(&b, "b", export_state(&a, "a").unwrap()).unwrap();
         let got = export_state(&b, "b").unwrap();
-        assert_eq!(got.tasks, vec![tagged_task]);
-        assert_eq!(got.cards, vec![card]);
+        assert_eq!(plain_task(&got.tasks[0]), plain_task(&tagged_task));
+        assert_eq!(plain_card(&got.cards[0]), plain_card(&card));
 
         // Oversized tag lists are refused rather than stored
         let many = Task { tags: (0..11).map(|i| i.to_string()).collect(), ..task("t2", "x", "2026-02-01T00:00:00Z") };
@@ -489,7 +669,7 @@ mod tests {
         let talked = Task { comments: vec![comment("c1", "@Bo can you check?")], ..task("t1", "ship", "2026-02-01T00:00:00Z") };
         merge_state(&a, "a", only_tasks(vec![talked.clone()])).unwrap();
         merge_state(&b, "b", export_state(&a, "a").unwrap()).unwrap();
-        assert_eq!(export_state(&b, "b").unwrap().tasks, vec![talked]);
+        assert_eq!(plain_task(&export_state(&b, "b").unwrap().tasks[0]), plain_task(&talked));
 
         let long = Task { comments: vec![comment("c2", &"x".repeat(2001))], ..task("t2", "x", "2026-02-01T00:00:00Z") };
         let empty = Task { comments: vec![comment("c3", "  ")], ..task("t3", "x", "2026-02-01T00:00:00Z") };
@@ -511,20 +691,92 @@ mod tests {
             updated_at: "2026-01-01T00:00:00Z".into(),
             ..Default::default()
         };
-        // A card for a column we don't have is skipped rather than failing the whole merge.
+        // A card for a column we don't have is parked in the Recovered column, not dropped.
         merge_state(&a, "a", DataState { cards: vec![card.clone()], ..Default::default() }).unwrap();
-        assert!(export_state(&a, "a").unwrap().cards.is_empty());
+        let parked = export_state(&a, "a").unwrap();
+        assert_eq!(parked.cards.len(), 1);
+        assert_eq!(parked.cards[0].column_id, RECOVERED_COLUMN);
 
+        // When its column turns up the card goes home.
         merge_state(&a, "a", DataState { columns: vec![col.clone()], cards: vec![card.clone()], ..Default::default() }).unwrap();
-        assert_eq!(export_state(&a, "a").unwrap().cards.len(), 1);
+        let home = export_state(&a, "a").unwrap();
+        assert_eq!((home.cards.len(), home.cards[0].column_id.as_str()), (1, "c1"));
 
         // Deleting the column removes its cards, and the old column can't come back.
         let tomb = Tombstone { entity: ENTITY_COLUMN.into(), id: "c1".into(), deleted_at: "2999-01-01T00:00:00Z".into() };
         merge_state(&a, "a", DataState { tombstones: vec![tomb], ..Default::default() }).unwrap();
         let s = export_state(&a, "a").unwrap();
-        assert!(s.columns.is_empty() && s.cards.is_empty());
-        merge_state(&a, "a", DataState { columns: vec![col], cards: vec![card], ..Default::default() }).unwrap();
-        assert!(export_state(&a, "a").unwrap().columns.is_empty());
+        assert!(s.columns.iter().all(|c| c.id == RECOVERED_COLUMN) && s.cards.is_empty());
+        merge_state(&a, "a", DataState { columns: vec![col], ..Default::default() }).unwrap();
+        assert!(export_state(&a, "a").unwrap().columns.iter().all(|c| c.id == RECOVERED_COLUMN));
+    }
+
+    // A local edit the way the task commands make it: the row changes, then the merge state is told
+    fn edit(conn: &Connection, ws: &str, id: &str, change: impl Fn(&mut Task)) {
+        let mut row = read_task(conn, id).unwrap().unwrap();
+        crdt::ensure(conn, &row).unwrap();
+        change(&mut row);
+        put_task_row(conn, ws, &row).unwrap();
+        crdt::record_write(conn, &row, Some("someone"), None).unwrap();
+    }
+
+    fn exchange(a: &Connection, b: &Connection) {
+        merge_state(a, "a", export_state(b, "b").unwrap()).unwrap();
+        merge_state(b, "b", export_state(a, "a").unwrap()).unwrap();
+    }
+
+    fn conflicts_of(conn: &Connection, id: &str) -> Vec<crdt::Conflict> {
+        let mut rows = vec![read_task(conn, id).unwrap().unwrap()];
+        crdt::attach_conflicts(conn, &mut rows).unwrap();
+        rows.remove(0).conflicts
+    }
+
+    #[test]
+    fn test_edits_to_different_fields_while_apart_both_survive_and_the_same_field_is_a_conflict() {
+        let (a, b) = (db("a"), db("b"));
+        let t = task("1", "ship", "2026-01-01T00:00:00Z");
+        put_task(&a, "a", &t);
+        put_task(&b, "b", &t);
+
+        // Apart: one renames, the other changes the status and comments
+        edit(&a, "a", "1", |t| t.title = "Ship it".into());
+        edit(&b, "b", "1", |t| {
+            t.status = "in_progress".into();
+            t.comments.push(super::super::models::Comment { id: "c1".into(), author: "Bo".into(), text: "on it".into(), at: "2026-02-01T00:00:00Z".into() });
+        });
+        exchange(&a, &b);
+        let (ra, rb) = (read_task(&a, "1").unwrap().unwrap(), read_task(&b, "1").unwrap().unwrap());
+        assert_eq!((ra.title.as_str(), ra.status.as_str(), ra.comments.len()), ("Ship it", "in_progress", 1));
+        assert_eq!(plain_task(&ra), plain_task(&rb));
+        assert!(conflicts_of(&a, "1").is_empty());
+
+        // Apart again, both rename: both values are kept, the same on both devices, until someone chooses
+        edit(&a, "a", "1", |t| t.title = "Title A".into());
+        edit(&b, "b", "1", |t| t.title = "Title B".into());
+        exchange(&a, &b);
+        assert_eq!(read_task(&a, "1").unwrap().unwrap().title, read_task(&b, "1").unwrap().unwrap().title);
+        let (ca, cb) = (conflicts_of(&a, "1"), conflicts_of(&b, "1"));
+        assert_eq!(ca, cb);
+        assert_eq!((ca.len(), ca[0].field.as_str(), ca[0].options.len()), (1, "title", 2));
+
+        // Choosing settles it on both
+        let base = read_task(&a, "1").unwrap().unwrap();
+        let chosen = crdt::resolve_field(&a, &base, "title", serde_json::json!("Title A"), Some("Ann")).unwrap().unwrap();
+        put_task_row(&a, "a", &chosen).unwrap();
+        exchange(&a, &b);
+        assert!(conflicts_of(&a, "1").is_empty() && conflicts_of(&b, "1").is_empty());
+        assert_eq!(read_task(&b, "1").unwrap().unwrap().title, "Title A");
+    }
+
+    #[test]
+    fn test_a_remote_record_cannot_smuggle_an_invalid_value_in_through_hidden_state() {
+        let a = db("a");
+        let mut hostile = task("1", "fine", "2026-01-02T00:00:00Z");
+        let mut state = crdt::RecordState::from_legacy(crdt::Crdt::paths(&hostile, false), 1);
+        state.write("evil", "status", serde_json::json!("not-a-status"), 9_999_999_999_999, None);
+        hostile.crdt = Some(state);
+        merge_state(&a, "a", only_tasks(vec![hostile])).unwrap();
+        assert!(titles(&a, "a").is_empty(), "the merged record would hold an invalid status, so it is refused");
     }
 
     #[test]

@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
-import { Check, Download, FileText, History, Loader2, PanelRight, Save, Type, Users, X } from "lucide-react";
+import { Check, Download, FileText, GitBranch, History, Loader2, PanelRight, Save, Type, Users, X } from "lucide-react";
 
 import CodeEditor from "./CodeEditor";
 import RichTextEditor from "./RichTextEditor";
 import NoteSidePanel from "./NoteSidePanel";
+import BranchesDialog from "@/components/dialogs/workspace/BranchesDialog";
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
 import { useAutoSnapshot } from "@/hooks/useAutoSnapshot";
 import { useCollabDoc } from "@/hooks/useCollabDoc";
 import { useSeededText } from "@/hooks/useSeededText";
+import { branchDocId, listBranches } from "@/lib/branches";
 import { minimalChange } from "@/lib/editor/format";
 import { isMarkdownFile } from "@/lib/editor/languages";
 import { exportNote, type NoteFormat } from "@/lib/export";
@@ -45,7 +47,16 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 	const { peers, selfName, shareNamedVersion } = useP2P();
 	const { metadata } = useWorkspace();
 	const userName = selfName ?? metadata?.members.members.find((m) => m.role === "Owner")?.name ?? "You";
-	const collab = useCollabDoc(workspacePath, docId);
+	// The note's own document is always open (it holds the list of branches); a branch being worked on is a second one.
+	// Branches are for Markdown notes, which are shared text.
+	const mainCollab = useCollabDoc(workspacePath, docId);
+	const [branch, setBranch] = useState<{ id: string; name: string } | null>(null);
+	const [branchesOpen, setBranchesOpen] = useState(false);
+	const branchCollab = useCollabDoc(workspacePath, branch ? branchDocId(branch.id) : undefined);
+	const collab = branch ? branchCollab : mainCollab;
+	const openBranch = (id: string | null) => {
+		setBranch(id && mainCollab ? { id, name: listBranches(mainCollab.doc).find((b) => b.id === id)?.name ?? "branch" } : null);
+	};
 
 	// The note on disk; it moves forward each time it is saved
 	const [saved, setSaved] = useState(() => initialContent.replace(/\r\n/g, "\n"));
@@ -84,11 +95,12 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 		if (seeded) setContent(seeded.text);
 	}, [seeded]);
 
-	const dirty = !sameNote(content, saved);
+	// Work on a branch is not the note, so it is never unsaved changes to it
+	const dirty = !sameNote(content, saved) && !branch;
 	const stats = useMemo(() => (isMarkdown ? markdownStats(content) : textStats(content)), [isMarkdown, content]);
 
 	const save = useCallback(async () => {
-		if (saving || readOnly || !dirty) return;
+		if (saving || readOnly || !dirty || branch) return;
 		// A live Markdown document is the truth; the rich editor reports plain text as it changes
 		const text = isMarkdown && collab ? collab.doc.getText("content").toString() : content;
 		try {
@@ -103,10 +115,10 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 		} finally {
 			setSaving(false);
 		}
-	}, [saving, readOnly, dirty, isMarkdown, collab, content, onSave]);
+	}, [saving, readOnly, dirty, branch, isMarkdown, collab, content, onSave]);
 
 	// Work that was never saved with the Save button still ends up in the file history
-	useAutoSnapshot(workspacePath, docId, content, !readOnly);
+	useAutoSnapshot(workspacePath, docId, content, !readOnly && !branch);
 
 	// An older version goes into the live editor, so collaborators see it and it can be undone
 	const restoreText = (text: string) => {
@@ -202,6 +214,12 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 									Outline
 								</Button>
 							)}
+							{isMarkdown && mainCollab && (
+								<Button variant="ghost" size="sm" onPress={() => setBranchesOpen(true)} className="gap-1.5">
+									<GitBranch className="size-3.5" />
+									Branches
+								</Button>
+							)}
 							<Button variant="ghost" size="sm" onPress={() => setHistoryOpen(true)} className="gap-1.5">
 								<History className="size-3.5" />
 								History
@@ -227,7 +245,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 							</div>
 						</>
 					)}
-					{!readOnly && (
+					{!readOnly && !branch && (
 						<Button size="sm" onPress={() => void save()} isDisabled={saving || !dirty} className="gap-1.5">
 							{saving ? <Loader2 className="size-3.5 animate-spin" /> : justSaved ? <Check className="size-3.5 text-emerald-400" /> : <Save className="size-3.5" />}
 							{saving ? "Saving…" : justSaved ? "Saved!" : "Save"}
@@ -235,6 +253,21 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 					)}
 				</div>
 			</div>
+
+			{branch && (
+				<div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-1.5 text-xs">
+					<GitBranch className="size-3.5 shrink-0 text-primary" />
+					<span className="min-w-0 flex-1">
+						You are working on the branch <span className="font-semibold">{branch.name}</span>. {fileName} does not change until the branch is merged.
+					</span>
+					<Button size="sm" onPress={() => setBranchesOpen(true)}>
+						Review and merge
+					</Button>
+					<Button variant="ghost" size="sm" onPress={() => openBranch(null)}>
+						Back to the note
+					</Button>
+				</div>
+			)}
 
 			<div className="flex min-h-0 flex-1">
 				<div className="min-h-0 min-w-0 flex-1">
@@ -285,6 +318,19 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 				<p role={exportNotice.ok ? "status" : "alert"} className={`mt-2 truncate text-xs ${exportNotice.ok ? "text-emerald-400" : "text-destructive"}`}>
 					{exportNotice.text}
 				</p>
+			)}
+
+			{branchesOpen && workspacePath && mainCollab && (
+				<BranchesDialog
+					workspacePath={workspacePath}
+					fileName={fileName}
+					doc={mainCollab.doc}
+					userName={userName}
+					canEdit={!readOnly}
+					activeId={branch?.id ?? null}
+					onOpenBranch={openBranch}
+					onClose={() => setBranchesOpen(false)}
+				/>
 			)}
 
 			{historyOpen && workspacePath && docId && (

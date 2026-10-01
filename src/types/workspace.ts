@@ -179,8 +179,21 @@ export interface Task {
 	assignee_id?: string;
 	tags: string[];
 	comments?: Comment[];
+	conflicts?: Conflict[];
+	crdt?: unknown; // Merge state exchanged between devices; the app never reads it
 	created_at: string;
 	updated_at: string;
+}
+
+// A field where two people wrote different values while apart; the first option is the one being shown
+export interface ConflictOption {
+	value: unknown;
+	ts: number;
+	who?: string;
+}
+export interface Conflict {
+	field: string;
+	options: ConflictOption[];
 }
 
 // A comment on a task or card; "@Name" in the text mentions a collaborator
@@ -211,6 +224,8 @@ export interface KanbanCard {
 	assignee_id?: string;
 	checklist: ChecklistItem[];
 	comments?: Comment[];
+	conflicts?: Conflict[];
+	crdt?: unknown;
 	created_at: string;
 	updated_at: string;
 }
@@ -230,6 +245,8 @@ export interface ChecklistItem {
 export interface TaskRequest {
 	path: string;
 	task: Task;
+	// The copy the person started editing from, so a collaborator's newer change to a field they did not touch is kept
+	base?: Task;
 }
 
 // Request referencing a task or item by ID
@@ -248,6 +265,7 @@ export interface KanbanColumnRequest {
 export interface KanbanCardRequest {
 	path: string;
 	card: KanbanCard;
+	base?: KanbanCard;
 }
 
 // Request to move a card to a different column or index

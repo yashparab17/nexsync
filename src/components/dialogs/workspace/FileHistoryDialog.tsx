@@ -43,7 +43,7 @@ function fold(rows: DiffRow[]): Shown[] {
 	return shown;
 }
 
-function DiffView({ diff }: { diff: DiffResult }) {
+export function DiffView({ diff }: { diff: DiffResult }) {
 	const shown = useMemo(() => fold(diff.rows), [diff]);
 	if (diff.identical) return <p className="p-4 text-xs text-muted-foreground">No differences.</p>;
 	return (

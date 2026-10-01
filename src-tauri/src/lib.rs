@@ -80,6 +80,12 @@ pub fn run() {
 
             // Kanban board
             commands::workspace::get_kanban,
+            commands::workspace::data_sync::export_task_record,
+            commands::workspace::data_sync::export_card_record,
+            commands::workspace::data_sync::merge_task_record,
+            commands::workspace::data_sync::merge_card_record,
+            commands::workspace::data_sync::resolve_task_conflict,
+            commands::workspace::data_sync::resolve_card_conflict,
             commands::workspace::create_kanban_column,
             commands::workspace::create_kanban_card,
             commands::workspace::update_kanban_card,

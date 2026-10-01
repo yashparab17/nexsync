@@ -2,6 +2,7 @@
 
 use crate::commands::config::validate_allowed_root;
 use super::helpers::get_workspace_id;
+use super::crdt;
 use super::models::{json_list, to_json, valid_comments, valid_tags, Task, TaskIdRequest, TaskRequest};
 use crate::commands::validation::{validate_task_priority, validate_task_status};
 
@@ -11,13 +12,13 @@ use crate::commands::validation::{validate_task_priority, validate_task_status};
 
 /// Fetches all tasks for the workspace
 #[tauri::command]
-pub fn get_tasks(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Task>, String> {
+pub fn get_tasks(app_handle: tauri::AppHandle, path: String, with_state: Option<bool>) -> Result<Vec<Task>, String> {
     validate_allowed_root(&app_handle, &path)?;
     
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&path, ".")?;
     let db = crate::database::WorkspaceDb::open_existing(&path)?;
     let ws_id: String = get_workspace_id(&db)?;
-    let tasks: Vec<Task> = db
+    let mut tasks: Vec<Task> = db
         .conn
         .prepare(
             "SELECT id, title, description, status, priority, due_date, assignee_id,
@@ -38,11 +39,18 @@ pub fn get_tasks(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Task>
                 updated_at: r.get(8)?,
                 tags: json_list(&r.get::<_, String>(9)?),
                 comments: json_list(&r.get::<_, String>(10)?),
+                ..Default::default()
             })
         })
         .map_err(|e| e.to_string())?
         .filter_map(|r| r.ok())
         .collect();
+    crdt::attach_conflicts(&db.conn, &mut tasks)?;
+    if with_state.unwrap_or(false) {
+        for t in &mut tasks {
+            crdt::attach(&db.conn, t)?;
+        }
+    }
     Ok(tasks)
 }
 
@@ -74,6 +82,7 @@ pub fn create_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
 
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let task = request.task;
+    let author = request.author;
     let ws_id = get_workspace_id(&db)?;
     db.conn.execute(
         "INSERT INTO tasks (id, workspace_id, title, description, status, priority,
@@ -88,6 +97,7 @@ pub fn create_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
     )
     .map_err(|e| e.to_string())?;
     super::data_sync::clear_tombstone(&db.conn, super::data_sync::ENTITY_TASK, &task.id)?;
+    crdt::record_write(&db.conn, &task, author.as_deref(), None)?;
     Ok(task)
 }
 
@@ -118,19 +128,15 @@ pub fn update_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
 
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let task = request.task;
+    let author = request.author;
+    let base = request.base;
     let ws_id = get_workspace_id(&db)?;
-    db.conn
-        .execute(
-            "UPDATE tasks SET title = ?1, description = ?2, status = ?3, priority = ?4,
-             due_date = ?5, assignee_id = ?6, updated_at = ?7, tags = ?10, comments = ?11
-             WHERE id = ?8 AND workspace_id = ?9",
-            rusqlite::params![
-                &task.title, &task.description, &task.status, &task.priority,
-                &task.due_date, &task.assignee_id, &task.updated_at,
-                &task.id, &ws_id, to_json(&task.tags), to_json(&task.comments),
-            ],
-        )
-        .map_err(|e| e.to_string())?;
+    let Some(existing) = super::data_sync::read_task(&db.conn, &task.id)? else { return Ok(()) };
+    // A task from before per-field merging gets its state from what it held before this change
+    crdt::ensure(&db.conn, &existing)?;
+    // The row becomes whatever merging says the task is now: the edited copy only where the person changed it
+    let row = crdt::apply_local(&db.conn, &task, Some(&existing), base.as_ref(), author.as_deref())?;
+    super::data_sync::put_task_row(&db.conn, &ws_id, &row)?;
     Ok(())
 }
 
@@ -149,5 +155,6 @@ pub fn delete_task(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Resu
         )
         .map_err(|e| e.to_string())?;
     super::data_sync::record_tombstone(&db.conn, &ws_id, super::data_sync::ENTITY_TASK, &request.id)?;
+    crdt::forget(&db.conn, <Task as crdt::Crdt>::ENTITY, &request.id)?;
     Ok(())
 }

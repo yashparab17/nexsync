@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+	AlertTriangle,
 	ArrowLeft,
 	ArrowRight,
 	CheckSquare,
@@ -33,8 +34,10 @@ import {
 	deleteKanbanColumn,
 	getKanban,
 	moveKanbanCard,
+	resolveCardConflict,
 	updateKanbanCard,
 } from "@/lib/tauri";
+import ConflictPanel from "@/components/elements/ConflictPanel";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type { ChecklistItem, KanbanCard, KanbanColumn } from "@/types/workspace";
@@ -240,12 +243,41 @@ export default function WorkspaceKanban() {
 	// Edit Card Submit
 	const me = myName(workspace?.id, members.find((m) => m.role === "Owner")?.name);
 
+	// What a stored value looks like on screen
+	const showValue = (field: string, value: unknown): string => {
+		if (value === null || value === undefined) return "";
+		if (field === "assignee_id") return memberName(String(value));
+		if (field === "column_id") return columns.find((c) => c.id === value)?.title ?? String(value);
+		return String(value);
+	};
+
+	// Two people changed the same field while apart: keep the chosen value, for everyone
+	const resolveConflict = async (field: string, value: unknown) => {
+		if (isViewer || !workspace?.path || !editingCard) return;
+		try {
+			const record = await resolveCardConflict(workspace.path, editingCard.id, field, value);
+			if (!record) return;
+			publishDataChange({ entity: "card", op: "upsert", card: record });
+			const fresh = await getKanban(workspace.path);
+			setColumns(fresh);
+			const now = fresh.flatMap((c) => c.cards).find((k) => k.id === editingCard.id);
+			if (!now) return;
+			setEditingCard(now);
+			if (field === "title") setCardTitle(now.title);
+			if (field === "description") setCardDesc(now.description || "");
+			if (field === "due_date") setCardDue(now.due_date ?? "");
+			if (field === "assignee_id") setCardAssignee(now.assignee_id ?? "");
+		} catch (err) {
+			logError(err, { source: "kanban" });
+		}
+	};
+
 	// Comments are saved and shared as soon as they are added, without waiting for Save Changes
 	const saveComments = async (comments: Comment[]) => {
 		if (isViewer || !workspace?.path || !editingCard) return;
 		const updated: KanbanCard = { ...editingCard, comments, updated_at: new Date().toISOString() };
 		try {
-			await updateKanbanCard({ path: workspace.path, card: updated });
+			await updateKanbanCard({ path: workspace.path, card: updated, base: editingCard });
 			publishDataChange({ entity: "card", op: "upsert", card: updated });
 			setEditingCard(updated);
 			setColumns((cols) => cols.map((c) => ({ ...c, cards: c.cards.map((k) => (k.id === updated.id ? updated : k)) })));
@@ -270,7 +302,7 @@ export default function WorkspaceKanban() {
 				checklist: cardChecklist,
 				updated_at: new Date().toISOString(),
 			};
-			await updateKanbanCard({ path: workspace.path, card: updated });
+			await updateKanbanCard({ path: workspace.path, card: updated, base: editingCard });
 			publishDataChange({ entity: "card", op: "upsert", card: updated });
 			await addActivityEvent(
 				"Updated card",
@@ -611,6 +643,9 @@ export default function WorkspaceKanban() {
 												<div className="flex items-start justify-between gap-2">
 													<h4 className="text-sm font-medium leading-snug text-foreground">
 														{card.title}
+														{(card.conflicts?.length ?? 0) > 0 && (
+															<AlertTriangle className="ml-1 inline size-3.5 text-amber-500" aria-label="Has a change to sort out" />
+														)}
 													</h4>
 													{!isViewer && (
 														<div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
@@ -874,6 +909,8 @@ export default function WorkspaceKanban() {
 							</div>
 							{renderCardExtras("edit-card")}
 						</div>
+
+						<ConflictPanel conflicts={editingCard.conflicts ?? []} show={showValue} canChoose={!isViewer} onChoose={resolveConflict} />
 
 						<Comments
 							comments={editingCard.comments ?? []}

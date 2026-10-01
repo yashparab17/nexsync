@@ -213,7 +213,7 @@ export default function AssetPreviewModal({
 
 						{asset.syncStatus === "remote_placeholder" && (
 							<div className="m-auto flex max-w-md flex-col items-center gap-4 border bg-card p-8 text-center">
-								<div className="p-3 rounded-none bg-ctp-yellow/10 text-ctp-yellow border border-ctp-yellow/20">
+								<div className="p-3 rounded-none bg-amber-500/10 text-amber-500 border border-amber-500/20">
 									<Sparkles className="size-8" />
 								</div>
 								<div>
@@ -363,10 +363,10 @@ export default function AssetPreviewModal({
 									<dt className="text-muted-foreground">Status</dt>
 									<dd>
 										{asset.syncStatus === "synced" ?
-											<span className="text-ctp-green font-medium flex items-center gap-1">
+											<span className="text-emerald-500 font-medium flex items-center gap-1">
 												● Local Storage
 											</span>
-										:	<span className="text-ctp-yellow font-medium flex items-center gap-1">
+										:	<span className="text-amber-500 font-medium flex items-center gap-1">
 												○ Not downloaded
 											</span>
 										}
@@ -399,7 +399,7 @@ export default function AssetPreviewModal({
 									className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary"
 								>
 									{copiedKey === "markdown" ?
-										<Check className="size-3 text-ctp-green" />
+										<Check className="size-3 text-emerald-400" />
 									:	<Copy className="size-3" />}
 									{copiedKey === "markdown" ? "Copied" : "Copy"}
 								</Button>
@@ -426,7 +426,7 @@ export default function AssetPreviewModal({
 									className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary"
 								>
 									{copiedKey === "path" ?
-										<Check className="size-3 text-ctp-green" />
+										<Check className="size-3 text-emerald-400" />
 									:	<Copy className="size-3" />}
 									{copiedKey === "path" ? "Copied" : "Copy"}
 								</Button>

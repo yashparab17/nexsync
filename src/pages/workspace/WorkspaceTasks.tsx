@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	AlertCircle,
+	AlertTriangle,
 	CalendarDays,
 	CheckCircle2,
 	Clock,
@@ -32,7 +33,8 @@ import { collectTags } from "@/lib/planning";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
-import { createTask, deleteTask, getTasks, updateTask } from "@/lib/tauri";
+import { createTask, deleteTask, getTasks, resolveTaskConflict, updateTask } from "@/lib/tauri";
+import ConflictPanel from "@/components/elements/ConflictPanel";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
@@ -54,21 +56,21 @@ const PRIORITY_CONFIG: Record<
 > = {
 	low: {
 		label: "Low",
-		color: "text-ctp-blue",
-		bg: "bg-ctp-blue/10",
-		border: "border-ctp-blue/20",
+		color: "text-blue-400",
+		bg: "bg-blue-500/10",
+		border: "border-blue-500/20",
 	},
 	medium: {
 		label: "Medium",
-		color: "text-ctp-yellow",
-		bg: "bg-ctp-yellow/10",
-		border: "border-ctp-yellow/20",
+		color: "text-amber-400",
+		bg: "bg-amber-500/10",
+		border: "border-amber-500/20",
 	},
 	high: {
 		label: "High",
-		color: "text-ctp-maroon",
-		bg: "bg-ctp-maroon/10",
-		border: "border-ctp-maroon/20",
+		color: "text-rose-400",
+		bg: "bg-rose-500/10",
+		border: "border-rose-500/20",
 	},
 };
 
@@ -85,14 +87,14 @@ const STATUS_CONFIG: Record<
 	in_progress: {
 		label: "In Progress",
 		icon: AlertCircle,
-		color: "text-ctp-yellow",
-		border: "border-ctp-yellow/30",
+		color: "text-amber-400",
+		border: "border-amber-500/30",
 	},
 	done: {
 		label: "Done",
 		icon: CheckCircle2,
-		color: "text-ctp-green",
-		border: "border-ctp-green/30",
+		color: "text-emerald-400",
+		border: "border-emerald-500/30",
 	},
 };
 
@@ -243,7 +245,7 @@ export default function WorkspaceTasks() {
 				updated_at: new Date().toISOString(),
 			};
 
-			await updateTask({ path: workspace.path, task: updated });
+			await updateTask({ path: workspace.path, task: updated, base: editingTask });
 			publishDataChange({ entity: "task", op: "upsert", task: updated });
 			await addActivityEvent(
 				"Updated task",
@@ -294,12 +296,45 @@ export default function WorkspaceTasks() {
 
 	const me = myName(workspace?.id, members.find((m) => m.role === "Owner")?.name);
 
+	// What a stored value looks like on screen
+	const showValue = (field: string, value: unknown): string => {
+		if (value === null || value === undefined) return "";
+		if (field === "assignee_id") return memberName(String(value));
+		if (field === "due_date") return String(value).slice(0, 10);
+		if (field === "status") return STATUS_CONFIG[value as TaskStatus]?.label ?? String(value);
+		if (field === "priority") return PRIORITY_CONFIG[value as TaskPriority]?.label ?? String(value);
+		return String(value);
+	};
+
+	// Two people changed the same field while apart: keep the chosen value, for everyone
+	const resolveConflict = async (field: string, value: unknown) => {
+		if (isViewer || !workspace?.path || !editingTask) return;
+		try {
+			const record = await resolveTaskConflict(workspace.path, editingTask.id, field, value);
+			if (!record) return;
+			publishDataChange({ entity: "task", op: "upsert", task: record });
+			const fresh = await getTasks(workspace.path);
+			setTasks(fresh);
+			const now = fresh.find((x) => x.id === editingTask.id);
+			if (!now) return;
+			setEditingTask(now);
+			if (field === "title") setFormTitle(now.title);
+			if (field === "description") setFormDescription(now.description || "");
+			if (field === "status") setFormStatus(now.status);
+			if (field === "priority") setFormPriority(now.priority);
+			if (field === "due_date") setFormDueDate(now.due_date ? now.due_date.slice(0, 10) : "");
+			if (field === "assignee_id") setFormAssignee(now.assignee_id ?? "");
+		} catch (err) {
+			logError(err, { source: "tasks" });
+		}
+	};
+
 	// Comments are saved and shared as soon as they are added, without waiting for Save Changes
 	const saveComments = async (comments: Comment[]) => {
 		if (isViewer || !workspace?.path || !editingTask) return;
 		const updated: Task = { ...editingTask, comments, updated_at: new Date().toISOString() };
 		try {
-			await updateTask({ path: workspace.path, task: updated });
+			await updateTask({ path: workspace.path, task: updated, base: editingTask });
 			publishDataChange({ entity: "task", op: "upsert", task: updated });
 			setEditingTask(updated);
 			setTasks((all) => all.map((x) => (x.id === updated.id ? updated : x)));
@@ -423,11 +458,11 @@ export default function WorkspaceTasks() {
 							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
 								To Do
 							</p>
-							<p className="mt-1 text-2xl font-bold text-ctp-sky">
+							<p className="mt-1 text-2xl font-bold text-sky-400">
 								{stats.todo}
 							</p>
 						</div>
-						<Clock className="size-6 text-ctp-sky/60" />
+						<Clock className="size-6 text-sky-400/60" />
 					</CardContent>
 				</Card>
 
@@ -437,11 +472,11 @@ export default function WorkspaceTasks() {
 							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
 								In Progress
 							</p>
-							<p className="mt-1 text-2xl font-bold text-ctp-yellow">
+							<p className="mt-1 text-2xl font-bold text-amber-400">
 								{stats.inProgress}
 							</p>
 						</div>
-						<AlertCircle className="size-6 text-ctp-yellow/60" />
+						<AlertCircle className="size-6 text-amber-400/60" />
 					</CardContent>
 				</Card>
 
@@ -451,11 +486,11 @@ export default function WorkspaceTasks() {
 							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
 								Completed
 							</p>
-							<p className="mt-1 text-2xl font-bold text-ctp-green">
+							<p className="mt-1 text-2xl font-bold text-emerald-400">
 								{stats.done}
 							</p>
 						</div>
-						<CheckCircle2 className="size-6 text-ctp-green/60" />
+						<CheckCircle2 className="size-6 text-emerald-400/60" />
 					</CardContent>
 				</Card>
 			</div>
@@ -621,9 +656,9 @@ export default function WorkspaceTasks() {
 											"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-none border transition-colors",
 											isViewer ? "cursor-default" : "cursor-pointer",
 											task.status === "done"
-												? "border-ctp-green bg-ctp-green/20 text-ctp-green"
+												? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
 												: task.status === "in_progress"
-													? "border-ctp-yellow bg-ctp-yellow/20 text-ctp-yellow"
+													? "border-amber-500 bg-amber-500/20 text-amber-400"
 													: "border-muted-foreground/40 hover:border-primary",
 										)}
 									>
@@ -641,6 +676,11 @@ export default function WorkspaceTasks() {
 											>
 												{task.title}
 											</h4>
+											{(task.conflicts?.length ?? 0) > 0 && (
+												<span title="Two people changed this at the same time" className="text-amber-500">
+													<AlertTriangle className="size-3.5" aria-label="Has a change to sort out" />
+												</span>
+											)}
 											<span
 												className={cn(
 													"inline-flex items-center rounded-none border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
@@ -905,6 +945,8 @@ export default function WorkspaceTasks() {
 							</div>
 							{renderExtras("edit")}
 						</div>
+
+						<ConflictPanel conflicts={editingTask.conflicts ?? []} show={showValue} canChoose={!isViewer} onChoose={resolveConflict} />
 
 						<Comments
 							comments={editingTask.comments ?? []}

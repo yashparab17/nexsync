@@ -156,18 +156,25 @@ export function writeWorkspaceMetadata(
 // ────────────────────────────
 
 // Fetch all tasks for a workspace
-export function getTasks(path: string): Promise<Task[]> {
-	return invoke("get_tasks", { path });
+// Who is making changes, so a value that later collides with someone else's can say whose it was
+let writeAuthor: () => string | undefined = () => undefined;
+export function setWriteAuthor(source: () => string | undefined): void {
+	writeAuthor = source;
+}
+
+// With `withState`, each task carries the merge state other devices need (for sending a whole workspace)
+export function getTasks(path: string, withState = false): Promise<Task[]> {
+	return invoke("get_tasks", { path, withState });
 }
 
 // Create a new task in the workspace
 export function createTask(request: TaskRequest): Promise<Task> {
-	return invoke("create_task", { request });
+	return invoke("create_task", { request: { ...request, author: writeAuthor() } });
 }
 
 // Update an existing task
 export function updateTask(request: TaskRequest): Promise<void> {
-	return invoke("update_task", { request });
+	return invoke("update_task", { request: { ...request, author: writeAuthor() } });
 }
 
 // Delete a task by ID
@@ -180,8 +187,8 @@ export function deleteTask(request: TaskIdRequest): Promise<void> {
 // ────────────────────────────
 
 // Fetch kanban board columns and cards
-export function getKanban(path: string): Promise<KanbanColumn[]> {
-	return invoke("get_kanban", { path });
+export function getKanban(path: string, withState = false): Promise<KanbanColumn[]> {
+	return invoke("get_kanban", { path, withState });
 }
 
 // Create a new kanban column
@@ -195,17 +202,41 @@ export function createKanbanColumn(
 export function createKanbanCard(
 	request: KanbanCardRequest,
 ): Promise<KanbanCard> {
-	return invoke("create_kanban_card", { request });
+	return invoke("create_kanban_card", { request: { ...request, author: writeAuthor() } });
 }
 
 // Update card title, description, or column
 export function updateKanbanCard(request: KanbanCardRequest): Promise<void> {
-	return invoke("update_kanban_card", { request });
+	return invoke("update_kanban_card", { request: { ...request, author: writeAuthor() } });
 }
 
 // Move card to a new column and position
 export function moveKanbanCard(request: MoveCardRequest): Promise<void> {
-	return invoke("move_kanban_card", { request });
+	return invoke("move_kanban_card", { request: { ...request, author: writeAuthor() } });
+}
+
+// A task or card with the state other devices need to merge it, to send after a local change
+export function exportTaskRecord(path: string, id: string): Promise<Task | null> {
+	return invoke("export_task_record", { path, id });
+}
+export function exportCardRecord(path: string, id: string): Promise<KanbanCard | null> {
+	return invoke("export_card_record", { path, id });
+}
+
+// Merge a task or card a collaborator sent, field by field; resolves to whether anything here changed
+export function mergeTaskRecord(path: string, task: Task): Promise<boolean> {
+	return invoke("merge_task_record", { path, task });
+}
+export function mergeCardRecord(path: string, card: KanbanCard): Promise<boolean> {
+	return invoke("merge_card_record", { path, card });
+}
+
+// Settle a conflict by choosing a value for the field; resolves to the record as it now reads
+export function resolveTaskConflict(path: string, id: string, field: string, value: unknown): Promise<Task | null> {
+	return invoke("resolve_task_conflict", { path, id, field, value, author: writeAuthor() });
+}
+export function resolveCardConflict(path: string, id: string, field: string, value: unknown): Promise<KanbanCard | null> {
+	return invoke("resolve_card_conflict", { path, id, field, value, author: writeAuthor() });
 }
 
 // Delete a kanban column and its cards
