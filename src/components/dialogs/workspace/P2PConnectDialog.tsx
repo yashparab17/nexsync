@@ -51,6 +51,8 @@ export default function P2PConnectDialog({
 		disconnectPeer,
 		retryConnection,
 		reconnectToHost,
+		hostUnreachable,
+		hostName,
 		network,
 	} = useP2P();
 
@@ -163,17 +165,21 @@ export default function P2PConnectDialog({
 		: peers.length > 0
 		  ? "Connected"
 		  : connectionStatus === "reconnecting"
-			? "Reconnecting"
+			? hostName ? `Reconnecting to ${hostName}…` : "Reconnecting"
 			: connectionStatus === "connecting"
-			  ? "Connecting"
-			  : "Online";
+			  ? hostName ? `Reaching ${hostName}…` : "Connecting"
+			  : hostUnreachable
+				? `${hostName ?? "The host"} is offline`
+				: "Online";
 	const statusDot = !network.online
 		? "bg-red-400"
 		: peers.length > 0
 		  ? "bg-emerald-400 animate-ping"
 		  : connectionStatus === "reconnecting" || connectionStatus === "connecting"
 			? "bg-amber-400 animate-pulse"
-			: "bg-emerald-400";
+			: hostUnreachable
+			  ? "bg-red-400"
+			  : "bg-emerald-400";
 
 	const tabClass = (tab: typeof activeTab) =>
 		cn(
@@ -206,6 +212,22 @@ export default function P2PConnectDialog({
 						<span className={cn("h-2 w-2 rounded-none", statusDot)} />
 						<span>{statusLabel}</span>
 					</div>
+
+				{network.online && hostUnreachable && peers.length === 0 && (
+					<div className="flex items-start gap-2 rounded-none border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+						<AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+						<div className="space-y-1">
+							<p>
+								{hostName ?? "The host"} isn't online right now, or has closed NexSync. This workspace is hosted from their device, so
+								nobody else can connect you to it. Your copy keeps working, and this device looks for them again every 30 seconds.
+							</p>
+							<Button variant="outline" size="sm" className="mt-1 gap-1.5" onPress={handleRetry}>
+								<RefreshCw className="h-3.5 w-3.5" />
+								Try now
+							</Button>
+						</div>
+					</div>
+				)}
 
 				{!network.online && (
 					<div className="flex items-start gap-2 rounded-none border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">

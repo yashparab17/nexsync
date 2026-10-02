@@ -168,6 +168,8 @@ interface P2PContextType {
 	disconnectPeer: (peerId: string) => Promise<void>;
 	disconnectAll: () => Promise<void>;
 	retryConnection: () => Promise<void>;
+	hostUnreachable: boolean; // This copy was joined from a host that could not be reached; it keeps trying by itself
+	hostName: string | null; // The name of the host this copy was joined from, null in our own workspaces
 	reconnectToHost: () => Promise<boolean>; // Goes back to the host this copy joined, as a member and without an invite; false when there is none saved or it could not be reached
 	network: p2p.NetworkStatus; // Whether the relay is reachable, and why not
 }
@@ -197,6 +199,10 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const [lastSyncedFile, setLastSyncedFile] = useState<SyncedFile | null>(null);
 	const [isJoining, setIsJoining] = useState(false);
 	const [reconnecting, setReconnecting] = useState(false);
+	const [hostUnreachable, setHostUnreachable] = useState(false);
+	const hostUnreachableRef = useRef(false);
+	hostUnreachableRef.current = hostUnreachable;
+	const rejoiningRef = useRef(false);
 	const [network, setNetwork] = useState<p2p.NetworkStatus>({ online: navigator.onLine, detail: null });
 	const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
 	const [workspaceDeleted, setWorkspaceDeleted] = useState(false);
@@ -464,9 +470,14 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			setJoinRequests((prev) => prev.filter((r) => r.requestId !== requestId)),
 		);
 		const offReconnecting = p2p.onReconnecting(() => setReconnecting(true));
-		const offReconnectFailed = p2p.onReconnectFailed(() => setReconnecting(false));
+		const offReconnectFailed = p2p.onReconnectFailed(() => {
+			setReconnecting(false);
+			// The host we joined stayed away through every attempt; the retry loop below takes over
+			if (selfNameRef.current !== null) setHostUnreachable(true);
+		});
 		const offJoined = p2p.onPeerJoined((peer) => {
 			setReconnecting(false);
+			if (peer.isHost) setHostUnreachable(false);
 			peerNamesRef.current.set(peer.id, peer.name);
 			if (!peer.isHost && !readQuiet()) {
 				// The host knows the name the newcomer is about to be given
@@ -1324,7 +1335,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const reconnectToHost = useCallback(async (): Promise<boolean> => {
 		const ws = workspaceRef.current;
 		const saved = readRejoin(ws?.id);
-		if (!ws || !saved || peersRef.current.some((p) => p.isHost)) return false;
+		if (!ws || !saved || rejoiningRef.current || peersRef.current.some((p) => p.isHost)) return false;
+		rejoiningRef.current = true;
 		setIsJoining(true);
 		try {
 			const result = await p2p.joinWithTicket(saved.ticket, saved.name);
@@ -1337,16 +1349,34 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			// Bring tasks, cards and files up to date; the notes follow once the connection is announced
 			pendingSnapshotsRef.current.set(result.peerId, null);
 			await p2p.sendMessage({ kind: "WORKSPACE_SYNC_REQUEST", timestamp: Date.now() }, result.peerId);
+			setHostUnreachable(false);
 			notifyRef.current(`Reconnected to ${result.hostName}.`);
 			return true;
 		} catch (err) {
 			const reason = err instanceof Error ? err.message : String(err);
-			notifyRef.current(`Couldn't reconnect to the host. ${reason} Open Collaborate and press Reconnect to try again.`);
+			// A host that is not there is waited for; any other answer (removed, different version) is not something retrying fixes
+			if (/reach|timed out|in time/i.test(reason)) {
+				if (!hostUnreachableRef.current) notifyRef.current("The host is offline. This copy reconnects by itself when they open NexSync.");
+				setHostUnreachable(true);
+			} else {
+				notifyRef.current(`Couldn't reconnect to the host. ${reason}`);
+			}
 			return false;
 		} finally {
+			rejoiningRef.current = false;
 			setIsJoining(false);
 		}
 	}, []);
+
+	// While the host is away, look for them again every so often
+	useEffect(() => {
+		if (!hostUnreachable || selfName === null) return;
+		const timer = setInterval(() => void reconnectToHost(), 30_000);
+		return () => clearInterval(timer);
+	}, [hostUnreachable, selfName, reconnectToHost]);
+
+	// Another workspace has another host
+	useEffect(() => setHostUnreachable(false), [workspaceId]);
 
 	const rejoinTriedRef = useRef<string | null>(null);
 	useEffect(() => {
@@ -1527,6 +1557,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				blockDevice,
 				disconnectAll,
 				retryConnection,
+				hostUnreachable,
+				hostName: selfName === null ? null : (metadata?.members.members.find((m) => m.role === "Owner")?.name ?? "the host"),
 				reconnectToHost,
 				network,
 			}}
