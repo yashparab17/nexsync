@@ -1,5 +1,5 @@
 // React
-import type { ElementType } from "react";
+import { useState, type ElementType } from "react";
 
 // React Router
 import { NavLink, useNavigate } from "react-router-dom";
@@ -14,7 +14,8 @@ import {
 	KanbanSquare,
 	LayoutDashboard,
 	ListTodo,
-	Settings,
+	ChevronLeft,
+	ChevronRight,
 	StickyNote,
 	Trash2,
 	UsersRound,
@@ -106,13 +107,16 @@ const bottomNavigation: NavigationItem[] = [
 		path: "/workspace/trash",
 		icon: Trash2,
 	},
-	{
-		name: "Settings",
-		label: "nav.settings",
-		path: "/workspace/settings",
-		icon: Settings,
-	},
 ];
+
+const COLLAPSED_KEY = "nexsync.sidebar.collapsed";
+const readCollapsed = () => {
+	try {
+		return localStorage.getItem(COLLAPSED_KEY) === "true";
+	} catch {
+		return false;
+	}
+};
 
 // Sidebar navigation link component
 function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; expanded: boolean; onNavigate?: () => void }) {
@@ -127,18 +131,18 @@ function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; 
 			onClick={onNavigate}
 			className={({ isActive }) =>
 				cn(
-					"flex w-full items-center gap-3 rounded-none px-3 py-2 text-sm font-medium transition-colors",
-					expanded ? "justify-start" : "justify-center lg:justify-start",
+					"flex w-full items-center gap-3 overflow-hidden rounded-none px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
+					expanded ? "justify-start" : "justify-center",
 					isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted",
 				)
 			}
 			title={t(item.label)}
 			aria-label={t(item.label)}
 		>
-			<Icon className="size-4 shrink-0" aria-hidden />
-			<span className={expanded ? "inline" : "hidden lg:inline"}>{t(item.label)}</span>
+			<Icon className="size-5 shrink-0" aria-hidden />
+			<span className={cn("whitespace-nowrap", expanded ? "inline" : "hidden")}>{t(item.label)}</span>
 			{page && (
-				<span className={cn("ml-auto", !expanded && "hidden lg:inline")}>
+				<span className={cn("ml-auto", !expanded && "hidden")}>
 					<PresenceDots names={viewersAt(page)} />
 				</span>
 			)}
@@ -151,6 +155,17 @@ function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; 
 export default function WorkspaceSidebar({ expanded = false, onNavigate }: { expanded?: boolean; onNavigate?: () => void }) {
 	const { workspace, clearWorkspace } = useWorkspace();
 	const navigate = useNavigate();
+	const [collapsed, setCollapsed] = useState(readCollapsed);
+	// The drawer on small windows always shows labels
+	const showLabels = expanded || !collapsed;
+	const toggle = () => {
+		setCollapsed(!collapsed);
+		try {
+			localStorage.setItem(COLLAPSED_KEY, String(!collapsed));
+		} catch {
+			// Not remembered this time
+		}
+	};
 
 	// Unload workspace and return to Welcome view
 	const handleBackToWelcome = async () => {
@@ -159,9 +174,10 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 	};
 
 	return (
-		<aside className={cn("flex h-full shrink-0 flex-col border-r bg-muted/20", expanded ? "w-64 bg-background" : "w-14 lg:w-64")}>
+		<div className="relative flex h-full shrink-0">
+		<aside className={cn("flex h-full shrink-0 flex-col overflow-hidden border-r bg-muted/20 transition-[width] duration-200 motion-reduce:transition-none", expanded ? "w-64 bg-background" : collapsed ? "w-[4.5rem]" : "w-64")}>
 			{/* Workspace identity */}
-			<div className={cn("flex h-16 shrink-0 items-center gap-2 border-b", expanded ? "justify-start px-3" : "justify-center lg:justify-start lg:px-3")}>
+			<div className={cn("flex h-16 shrink-0 items-center gap-2 border-b", showLabels ? "justify-start px-3" : "justify-center")}>
 				<Button
 					variant="ghost"
 					size="icon"
@@ -171,22 +187,36 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 					<ArrowLeft className="size-5" />
 				</Button>
 
-				<h2 className={cn("truncate font-semibold", expanded ? "block" : "hidden lg:block")}>{workspace?.name}</h2>
+				<h2 className={cn("truncate font-semibold whitespace-nowrap", showLabels ? "block" : "hidden")}>{workspace?.name}</h2>
 			</div>
 
 			{/* Main Navigation */}
-			<nav aria-label={t("nav.main")} className={cn("flex-1 space-y-1 overflow-y-auto", expanded ? "p-3" : "p-1.5 lg:p-3")}>
+			<nav aria-label={t("nav.main")} className={cn("flex-1 space-y-1 overflow-y-auto overflow-x-hidden", showLabels ? "p-3" : "p-2")}>
 				{navigation.map((item) => (
-					<NavigationItem key={item.path} item={item} expanded={expanded} onNavigate={onNavigate} />
+					<NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />
 				))}
 			</nav>
 
 			{/* Bottom Navigation */}
-			<nav className={cn("space-y-1 border-t", expanded ? "p-3" : "p-1.5 lg:p-3")}>
+			<nav className={cn("space-y-1 border-t", showLabels ? "p-3" : "p-2")}>
 				{bottomNavigation.map((item) => (
-					<NavigationItem key={item.path} item={item} expanded={expanded} onNavigate={onNavigate} />
+					<NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />
 				))}
 			</nav>
 		</aside>
+
+			{/* The tab on the sidebar edge, level with the header */}
+			{!expanded && (
+				<button
+					type="button"
+					onClick={toggle}
+					aria-label={t(collapsed ? "nav.expand" : "nav.collapse")}
+					title={t(collapsed ? "nav.expand" : "nav.collapse")}
+					className="absolute top-5 -right-3 z-10 flex size-6 items-center justify-center border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+				>
+					{collapsed ? <ChevronRight className="size-3.5" aria-hidden /> : <ChevronLeft className="size-3.5" aria-hidden />}
+				</button>
+			)}
+		</div>
 	);
 }

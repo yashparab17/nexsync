@@ -83,18 +83,13 @@ function getActivityIcon(targetType?: string, action?: string) {
 interface StatCardProps {
 	label: string;
 	value: number;
-	to: string;
 	icon: ReactNode;
-	onNavigate?: (to: string) => void;
 }
 
-// Clickable metric card linking to its respective workspace section
-function StatCard({ label, value, icon, to, onNavigate }: StatCardProps) {
+// Read-only metric card
+function StatCard({ label, value, icon }: StatCardProps) {
 	return (
-		<Card
-			className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
-			onClick={() => onNavigate?.(to)}
-		>
+		<Card>
 			<CardContent className="flex items-center justify-between py-5">
 				<div>
 					<p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -190,29 +185,21 @@ export default function WorkspaceDashboard() {
 				<StatCard
 					label="Files"
 					value={stats?.files ?? 0}
-					to="/workspace/files"
-					onNavigate={navigate}
 					icon={<FilePlus className="size-8 text-primary/60" />}
 				/>
 				<StatCard
 					label="Assets"
 					value={stats?.assets ?? 0}
-					to="/workspace/assets"
-					onNavigate={navigate}
 					icon={<Upload className="size-8 text-primary/60" />}
 				/>
 				<StatCard
 					label="Tasks"
 					value={stats?.tasks ?? 0}
-					to="/workspace/tasks"
-					onNavigate={navigate}
 					icon={<ListTodo className="size-8 text-primary/60" />}
 				/>
 				<StatCard
 					label="Members"
 					value={stats?.members ?? 0}
-					to="/workspace/members"
-					onNavigate={navigate}
 					icon={<UsersRound className="size-8 text-primary/60" />}
 				/>
 			</div>

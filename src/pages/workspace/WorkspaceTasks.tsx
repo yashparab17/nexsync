@@ -24,6 +24,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -834,13 +835,7 @@ export default function WorkspaceTasks() {
 
 							<div>
 								<Label htmlFor="create-due">Due Date</Label>
-								<Input
-									id="create-due"
-									type="date"
-									value={formDueDate}
-									onChange={(e) => setFormDueDate(e.target.value)}
-									className="mt-1"
-								/>
+								<DateField id="create-due" value={formDueDate} onChange={setFormDueDate} className="mt-1" />
 							</div>
 							{renderExtras("create")}
 						</div>
@@ -941,13 +936,7 @@ export default function WorkspaceTasks() {
 
 							<div>
 								<Label htmlFor="edit-due">Due Date</Label>
-								<Input
-									id="edit-due"
-									type="date"
-									value={formDueDate}
-									onChange={(e) => setFormDueDate(e.target.value)}
-									className="mt-1"
-								/>
+								<DateField id="edit-due" value={formDueDate} onChange={setFormDueDate} className="mt-1" />
 							</div>
 							{renderExtras("edit")}
 						</div>

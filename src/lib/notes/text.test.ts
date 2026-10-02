@@ -51,11 +51,18 @@ describe("plain text and rich-text blocks", () => {
 			{ type: "numberedListItem", content: [{ type: "text", text: "two" }] },
 			{ type: "paragraph", content: [{ type: "link", content: [{ type: "text", text: "a link" }] }] },
 		];
-		expect(blocksToPlainText(blocks)).toBe("Groceries\n- milk\n1. one\n2. two\na link\n");
+		expect(blocksToPlainText(blocks)).toBe("# Groceries\n- milk\n1. one\n2. two\na link\n");
 	});
 
 	it("ignores the empty block the editor keeps at the end", () => {
 		expect(blocksToPlainText([{ type: "paragraph", content: [] }])).toBe("");
 		expect(blocksToPlainText([{ type: "paragraph", content: [{ type: "text", text: "hi" }] }, { type: "paragraph", content: [] }])).toBe("hi\n");
+	});
+
+	it("keeps headings and their level through a round trip", () => {
+		const text = "# Plan\n## Steps\n### Detail\nplain # not a heading\n";
+		const blocks = plainTextToBlocks(text);
+		expect(blocks.map((b) => b.type)).toEqual(["heading", "heading", "heading", "paragraph"]);
+		expect(blocksToPlainText(blocks)).toBe(text);
 	});
 });

@@ -1,438 +1,327 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-	ExternalLink,
-	FileText,
-	Plus,
-	Search,
-	StickyNote,
-	Trash2,
-} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { LayoutGrid, Network, Plus, Search } from "lucide-react";
 
 import NoteEditor from "@/components/elements/editor/NoteEditor";
+import NoteBoard from "@/components/elements/notes/NoteBoard";
+import NoteGraph from "@/components/elements/notes/NoteGraph";
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
+import { useCollabDoc } from "@/hooks/useCollabDoc";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
 import { useReportItem } from "@/hooks/usePresence";
-import PresenceDots from "@/components/elements/PresenceDots";import { isDocumentFile, isNoteFile } from "@/lib/editor/languages";
-import {
-	createWorkspaceFile,
-	deleteWorkspaceItem,
-	listWorkspaceFiles,
-	openWorkspaceFile,
-	readWorkspaceFile,
-	writeWorkspaceFile,
-} from "@/lib/tauri";
+import { isNoteFile } from "@/lib/editor/languages";
+import { positionsFor } from "@/lib/notes/board";
+import { buildEdges, type Point } from "@/lib/notes/graph";
+import { createWorkspaceFile, deleteWorkspaceItem, listWorkspaceFiles, readWorkspaceFile, writeWorkspaceFile } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type { WorkspaceFile } from "@/types/workspace";
 import Loading from "@/components/Loading";
 
-// Notes: Markdown notes (.md) edited as Markdown, text notes (.txt) in a rich-text editor, plus office documents
-// (.docx, .pdf, ...) that open in their own app.
-// Code belongs in the Editor tab.
+const BOARD_DOC = "board:notes";
+type View = "board" | "graph";
+
+// Notes: rich-text notes (.txt) as cards on a shared board, or as a graph of the [[links]] between them. Markdown
+// files and code belong in the Editor. A note opens in a panel over the board and is edited live by everyone.
 export default function WorkspaceNotes() {
 	const { workspace, refreshMetadata, addActivityEvent } = useWorkspace();
 	const logError = useErrorLog();
+	const navigate = useNavigate();
+	const isViewer = useIsViewer();
+	const { lastSyncedFile, viewersAt, selfName } = useP2P();
 
-	// Notes file list
 	const [notes, setNotes] = useState<WorkspaceFile[]>([]);
+	const [texts, setTexts] = useState<Record<string, string>>({});
 	const [loading, setLoading] = useState(true);
-	const [searchQuery, setSearchQuery] = useState("");
+	const [view, setView] = useState<View>("board");
+	const [query, setQuery] = useState("");
 
-	// Active Note Editor
-	const [selectedNote, setSelectedNote] = useState<WorkspaceFile | null>(null);
-	const [noteContent, setNoteContent] = useState<string>("");
+	// The note open in the panel
+	const [selected, setSelected] = useState<WorkspaceFile | null>(null);
+	const [noteContent, setNoteContent] = useState("");
 	const [contentLoading, setContentLoading] = useState(false);
 
-	// Modals
-	const [isNewNoteOpen, setIsNewNoteOpen] = useState(false);
-	const [newNoteTitle, setNewNoteTitle] = useState("");
-	const [deletingNote, setDeletingNote] = useState<WorkspaceFile | null>(null);
+	const [isNewOpen, setIsNewOpen] = useState(false);
+	const [newTitle, setNewTitle] = useState("");
+	const [deleting, setDeleting] = useState<WorkspaceFile | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 
-	// Load all markdown notes in workspace
+	// Where the cards sit is a shared document, so everyone sees a card move as it is dragged
+	const board = useCollabDoc(workspace?.path, BOARD_DOC);
+	const [stored, setStored] = useState<Record<string, Point>>({});
+	useEffect(() => {
+		if (!board) return;
+		const map = board.doc.getMap<Point>("positions");
+		const read = () => setStored(Object.fromEntries(map.entries()));
+		read();
+		map.observe(read);
+		return () => map.unobserve(read);
+	}, [board]);
+
 	const loadNotes = useCallback(async () => {
 		if (!workspace?.path) return;
 		try {
-			setLoading(true);
-			// Fetch files from notes root and files root
-			const [notesFiles, rootFiles] = await Promise.all([
+			const [inNotes, inFiles] = await Promise.all([
 				listWorkspaceFiles(workspace.path, "notes").catch(() => []),
 				listWorkspaceFiles(workspace.path, "files").catch(() => []),
 			]);
-
-			const all = [...notesFiles, ...rootFiles].filter(
-				(f) =>
-					!f.is_dir &&
-					(isNoteFile(f.name) || isDocumentFile(f.name)),
-			);
-
-			// Deduplicate by path
-			const unique = Array.from(new Map(all.map((item) => [item.path, item])).values());
-			setNotes(unique);
-
-			// If active note is selected, ensure it still exists
-			if (selectedNote) {
-				const stillExists = unique.find((n) => n.path === selectedNote.path);
-				if (!stillExists && unique.length > 0) {
-					setSelectedNote(unique[0]);
-				}
-			} else if (unique.length > 0) {
-				setSelectedNote(unique[0]);
-			}
+			const all = [...inNotes, ...inFiles].filter((f) => !f.is_dir && isNoteFile(f.name));
+			setNotes(Array.from(new Map(all.map((f) => [f.path, f])).values()));
 		} catch (err) {
-			console.error("Failed to load notes:", err);
 			logError(err, { source: "notes" });
 		} finally {
 			setLoading(false);
 		}
-	}, [workspace?.path, logError, selectedNote]);
+	}, [workspace?.path, logError]);
 
 	useEffect(() => {
-		loadNotes();
+		void loadNotes();
 	}, [loadNotes]);
 
-	// Load selected note content from OS disk
+	// A collaborator's changes arrive as files
 	useEffect(() => {
-		async function fetchContent() {
-			if (!workspace?.path || !selectedNote || isDocumentFile(selectedNote.name)) {
-				setNoteContent("");
-				return;
-			}
-			try {
-				setContentLoading(true);
-				const relPath = selectedNote.path.replace(/^\/+/, "");
-				const text = await readWorkspaceFile(workspace.path, relPath);
-				setNoteContent(text);
-			} catch (err) {
-				console.error("Failed to read note content:", err);
-				logError(err, { source: "notes" });
-			} finally {
-				setContentLoading(false);
-			}
-		}
-
-		fetchContent();
-	}, [workspace?.path, selectedNote, logError]);
-
-	// Reload the note list when a collaborator's changes arrive. The open note itself no longer
-	// needs a refetch-and-remount: live edits now flow straight into the editor's Yjs document.
-	const { lastSyncedFile, viewersAt } = useP2P();
-	useReportItem(selectedNote ? selectedNote.path.replace(/^\/+/, "") : null);
-	useEffect(() => {
-		if (!lastSyncedFile || !workspace?.path) return;
-		void loadNotes();
+		if (lastSyncedFile && workspace?.path) void loadNotes();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lastSyncedFile]);
 
-	const isViewer = useIsViewer();
+	// What each card shows, and the links for the graph, come from the saved text of every note
+	useEffect(() => {
+		const root = workspace?.path;
+		if (!root) return;
+		let live = true;
+		Promise.all(notes.map(async (n) => [n.path, await readWorkspaceFile(root, n.path.replace(/^\/+/, "")).catch(() => "")] as const)).then(
+			(entries) => live && setTexts(Object.fromEntries(entries)),
+		);
+		return () => {
+			live = false;
+		};
+	}, [workspace?.path, notes, lastSyncedFile]);
 
-	// Deep link from workspace search
+	// The text of the open note
+	useEffect(() => {
+		const root = workspace?.path;
+		if (!root || !selected) {
+			setNoteContent("");
+			return;
+		}
+		let live = true;
+		setContentLoading(true);
+		readWorkspaceFile(root, selected.path.replace(/^\/+/, ""))
+			.then((text) => live && setNoteContent(text))
+			.catch((err) => logError(err, { source: "notes" }))
+			.finally(() => live && setContentLoading(false));
+		return () => {
+			live = false;
+		};
+	}, [workspace?.path, selected, logError]);
+
+	useReportItem(selected ? selected.path.replace(/^\/+/, "") : null);
+
+	// Deep link from workspace search or a [[link]] chip; Markdown notes open in the Editor
 	useOpenParam((path) => {
 		const note = notes.find((n) => n.path === path);
-		if (note) setSelectedNote(note);
-	}, notes.length > 0);
+		if (note) setSelected(note);
+		else if (!isNoteFile(path)) navigate(`/workspace/editor?open=${encodeURIComponent(path)}`, { replace: true });
+	}, !loading);
 
-	// Save note content to OS disk
-	const handleSaveNote = async (newText: string) => {
-		if (!workspace?.path || !selectedNote) return;
+	const infos = useMemo(() => notes.map((n) => ({ path: n.path, name: n.name, text: texts[n.path] ?? "" })), [notes, texts]);
+	const edges = useMemo(() => buildEdges(infos), [infos]);
+	const positions = useMemo(() => positionsFor(notes.map((n) => n.path), stored), [notes, stored]);
+	const shown = useMemo(() => {
+		const q = query.trim().toLowerCase();
+		return q ? infos.filter((n) => n.name.toLowerCase().includes(q) || n.text.toLowerCase().includes(q)) : infos;
+	}, [infos, query]);
+
+	const moveCard = (path: string, to: Point) => {
+		if (isViewer || !board) return;
+		board.doc.getMap<Point>("positions").set(path, to);
+	};
+
+	const openByPath = (path: string) => {
+		const note = notes.find((n) => n.path === path);
+		if (note) setSelected(note);
+	};
+
+	const handleSave = async (newText: string) => {
+		if (!workspace?.path || !selected) return;
 		try {
-			const relPath = selectedNote.path.replace(/^\/+/, "");
-			await writeWorkspaceFile(workspace.path, relPath, newText);
+			await writeWorkspaceFile(workspace.path, selected.path.replace(/^\/+/, ""), newText);
 			setNoteContent(newText);
-			addActivityEvent(
-				"Saved note",
-				`Edited note ${selectedNote.name}`,
-				selectedNote.path,
-				"note",
-			);
+			setTexts((prev) => ({ ...prev, [selected.path]: newText }));
+			addActivityEvent("Saved note", `Edited note ${selected.name}`, selected.path, "note");
 			await refreshMetadata();
 		} catch (err) {
-			console.error("Failed to save note:", err);
 			logError(err, { source: "notes" });
 			throw err;
 		}
 	};
 
-	// Create new markdown note on OS disk
-	const handleCreateNoteSubmit = async (e: React.FormEvent) => {
+	const handleCreate = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (isViewer || !workspace?.path || !newNoteTitle.trim()) return;
-
+		if (isViewer || !workspace?.path || !newTitle.trim()) return;
 		try {
 			setSubmitting(true);
-			let filename = newNoteTitle.trim();
-			if (!isNoteFile(filename)) {
-				filename += ".md";
-			}
-
-			// Save into "notes" subdirectory
+			// Notes are rich text; a name that ends in .md is made a .txt note, and Markdown files are made in the Editor
+			let filename = newTitle.trim().replace(/\.(md|markdown)$/i, "");
+			if (!isNoteFile(filename)) filename += ".txt";
 			await createWorkspaceFile(workspace.path, "notes", filename);
-			addActivityEvent(
-				"Created note",
-				`Created note ${filename}`,
-				`/notes/${filename}`,
-				"note",
-			);
-			setIsNewNoteOpen(false);
-			setNewNoteTitle("");
+			addActivityEvent("Created note", `Created note ${filename}`, `/notes/${filename}`, "note");
+			setIsNewOpen(false);
+			setNewTitle("");
 			await loadNotes();
 			await refreshMetadata();
-
-			// Auto select newly created note
-			const newNotePath = `/notes/${filename}`;
-			setSelectedNote({
-				name: filename,
-				path: newNotePath,
-				is_dir: false,
-				size: 0,
-				modified_at: new Date().toISOString(),
-			});
+			setSelected({ name: filename, path: `/notes/${filename}`, is_dir: false, size: 0, modified_at: new Date().toISOString() });
 		} catch (err) {
-			console.error("Failed to create note:", err);
 			logError(err, { source: "notes" });
 		} finally {
 			setSubmitting(false);
 		}
 	};
 
-	// Delete Note
-	const handleDeleteNote = async () => {
-		if (isViewer || !workspace?.path || !deletingNote) return;
+	const handleDelete = async () => {
+		if (isViewer || !workspace?.path || !deleting) return;
 		try {
-			const relPath = deletingNote.path.replace(/^\/+/, "");
-			await deleteWorkspaceItem(workspace.path, relPath);
-			addActivityEvent(
-				"Deleted note",
-				`Deleted note ${deletingNote.name}`,
-				undefined,
-				"note",
-			);
-			if (selectedNote?.path === deletingNote.path) {
-				setSelectedNote(null);
-			}
-			setDeletingNote(null);
+			await deleteWorkspaceItem(workspace.path, deleting.path.replace(/^\/+/, ""));
+			addActivityEvent("Deleted note", `Deleted note ${deleting.name}`, undefined, "note");
+			board?.doc.getMap<Point>("positions").delete(deleting.path);
+			if (selected?.path === deleting.path) setSelected(null);
+			setDeleting(null);
 			await loadNotes();
 			await refreshMetadata();
 		} catch (err) {
-			console.error("Failed to delete note:", err);
 			logError(err, { source: "notes" });
 		}
 	};
 
-	// Filtered notes by search query
-	const filteredNotes = useMemo(() => {
-		return notes.filter((n) =>
-			n.name.toLowerCase().includes(searchQuery.toLowerCase()),
-		);
-	}, [notes, searchQuery]);
+	const toggle = (value: View, label: string, icon: React.ReactNode) => (
+		<button
+			key={value}
+			type="button"
+			aria-pressed={view === value}
+			onClick={() => setView(value)}
+			className={cn(
+				"flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors",
+				view === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+			)}
+		>
+			{icon}
+			{label}
+		</button>
+	);
 
 	return (
-		<div className="-m-6 flex h-[calc(100vh-6rem)]">
-			{/* Left Column: Note Navigation List */}
-			<div className="flex w-52 shrink-0 flex-col border-r lg:w-72 bg-muted/20 p-3">
-				{/* Top Header & Search */}
-				<div className="flex items-center justify-between pb-3">
-					<div className="flex items-center gap-2">
-						<StickyNote className="size-5 text-primary" />
-						<h2 className="font-semibold text-base">Notes</h2>
-						<span className="flex h-5 min-w-5 items-center justify-center bg-primary/10 px-1 text-[11px] font-bold text-primary">
-							{notes.length}
-						</span>
-					</div>
-					{!isViewer && (
-						<Button
-							size="sm"
-							onPress={() => {
-								setNewNoteTitle("");
-								setIsNewNoteOpen(true);
-							}}
-							className="gap-1 px-2.5 h-8"
-						>
-							<Plus className="size-3.5" />
-							New
-						</Button>
-					)}
+		<div className="flex h-[calc(100vh-10rem)] flex-col gap-4">
+			{/* Header */}
+			<div className="flex shrink-0 flex-wrap items-end justify-between gap-4">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight">Notes</h1>
+					<p className="mt-1 text-sm text-muted-foreground">
+						Notes float on a shared board and link to each other with [[Note name]]. Markdown files live in the Editor.
+					</p>
 				</div>
-
-				{/* Search Input */}
-				<div className="relative mb-3">
-					<Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-					<Input
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						placeholder="Search notes…"
-						className="h-8 pl-8 text-xs bg-background/70"
-					/>
-				</div>
-
-				{/* Note List */}
-				<div className="flex-1 space-y-px overflow-y-auto">
-					{loading ? (
-						<Loading />
-					) : filteredNotes.length === 0 ? (
-						<div className="flex flex-col items-center justify-center rounded-none border border-dashed border-border/60 p-6 text-center text-xs text-muted-foreground">
-							{searchQuery
-								? "No matching notes found."
-								: "No notes yet. Click New to create your first note. Code goes in the Editor tab."}
-						</div>
-					) : (
-						filteredNotes.map((note) => {
-							const isSelected = selectedNote?.path === note.path;
-							return (
-								<div
-									key={note.path}
-									onClick={() => setSelectedNote(note)}
-									className={cn(
-										"group flex items-center justify-between gap-2 border-l-2 px-3 py-2.5 transition-colors cursor-pointer",
-										isSelected
-											? "border-primary bg-primary/10"
-											: "border-transparent hover:bg-muted/50",
-									)}
-								>
-									<div className="min-w-0 flex-1">
-										<div className="flex items-center gap-1.5">
-											<FileText className="size-3.5 shrink-0 text-sky-400" />
-											<p className="truncate text-xs font-semibold text-foreground">
-												{note.name.replace(/\.(md|markdown)$/i, "")}
-											</p>
-											<PresenceDots names={viewersAt("notes", note.path.replace(/^\/+/, ""))} />
-										</div>
-										<p className="mt-0.5 text-[10px] text-muted-foreground truncate">
-											{note.path}
-										</p>
-									</div>
-
-									{!isViewer && (
-										<Button
-											variant="ghost"
-											size="icon-xs"
-											className="opacity-0 group-hover:opacity-100 transition-opacity"
-											onPress={() => setDeletingNote(note)}
-											aria-label={`Delete ${note.name}`}
-										>
-											<Trash2 className="size-3 text-destructive" />
-										</Button>
-									)}
-								</div>
-							);
-						})
-					)}
-				</div>
-			</div>
-
-			{/* Right Column: Embedded Rich Editor Container */}
-			<div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background p-5">
-				{!selectedNote ? (
-					<div className="flex flex-1 flex-col items-center justify-center text-center p-8">
-						<div className="flex size-12 items-center justify-center rounded-none bg-muted/60">
-							<FileText className="size-6 text-muted-foreground" />
-						</div>
-						<h3 className="mt-4 font-semibold text-base">Select or create a note</h3>
-						<p className="mt-1 max-w-sm text-xs text-muted-foreground">
-							Choose a note from the left sidebar. Markdown notes (.md) are edited as
-							Markdown, and text notes (.txt) in a rich-text editor.
-						</p>
-						{!isViewer && (
-							<Button
-								size="sm"
-								className="mt-4 gap-1.5"
-								onPress={() => setIsNewNoteOpen(true)}
-							>
-								<Plus className="size-4" />
-								Create New Note
-							</Button>
-						)}
-					</div>
-				) : isDocumentFile(selectedNote.name) ? (
-					<div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-						<FileText className="size-8 text-muted-foreground" />
-						<h3 className="mt-3 text-base font-semibold">{selectedNote.name}</h3>
-						<p className="mt-1 max-w-sm text-xs text-muted-foreground">
-							This document is edited in its own app. Changes you save there sync to collaborators like any
-							other file.
-						</p>
-						<Button
-							size="sm"
-							className="mt-4 gap-1.5"
-							onPress={() =>
-								openWorkspaceFile(workspace?.path ?? "", selectedNote.path.replace(/^\/+/, "")).catch((err) =>
-									logError(err, { source: "notes" }),
-								)
-							}
-						>
-							<ExternalLink className="size-4" />
-							Open in App
-						</Button>
-					</div>
-				) : contentLoading ? (
-					<Loading fill className="flex-1" />
-				) : (
-					<NoteEditor
-						key={selectedNote.path}
-						fileName={selectedNote.name}
-						initialContent={noteContent}
-						onSave={handleSaveNote}
-						onClose={() => setSelectedNote(null)}
-						readOnly={isViewer}
-						workspacePath={workspace?.path}
-						docId={selectedNote.path.replace(/^\/+/, "")}
-						notes={notes.filter((n) => isNoteFile(n.name))}
-						onOpenNote={(path) => {
-							const target = notes.find((n) => n.path === path);
-							if (target) setSelectedNote(target);
+				{!isViewer && (
+					<Button
+						onPress={() => {
+							setNewTitle("");
+							setIsNewOpen(true);
 						}}
-					/>
+					>
+						<Plus className="size-4" />
+						New note
+					</Button>
 				)}
 			</div>
 
-			{/* New Note Dialog */}
-			{isNewNoteOpen && (
-				<Dialog
-					isOpen={isNewNoteOpen}
-					onOpenChange={setIsNewNoteOpen}
-					className="max-w-md"
-				>
-					<form onSubmit={handleCreateNoteSubmit} className="space-y-4">
+			<div className="relative flex min-h-0 flex-1 flex-col border">
+				{/* Toolbar */}
+				<div className="flex min-h-11 shrink-0 flex-wrap items-center gap-3 border-b bg-muted/20 px-3 py-1.5">
+					<div className="flex items-center border" role="group" aria-label="View">
+						{toggle("board", "Board", <LayoutGrid className="size-3.5" />)}
+						{toggle("graph", "Graph", <Network className="size-3.5" />)}
+					</div>
+					<div className="relative w-full max-w-xs">
+						<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+						<Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search notes…" aria-label="Search notes" className="h-8 border bg-background pl-8 text-xs" />
+					</div>
+					<span className="ml-auto text-xs text-muted-foreground">
+						{notes.length} {notes.length === 1 ? "note" : "notes"} · {edges.length} {edges.length === 1 ? "link" : "links"}
+					</span>
+				</div>
+
+				{/* Canvas */}
+				<div className="min-h-0 flex-1">
+					{loading ? (
+						<Loading fill />
+					) : notes.length === 0 ? (
+						<div className="flex h-full flex-col items-center justify-center p-8 text-center">
+							<div className="flex size-12 items-center justify-center bg-muted/60">
+								<LayoutGrid className="size-6 text-muted-foreground" />
+							</div>
+							<h3 className="mt-4 text-base font-semibold">No notes yet</h3>
+							<p className="mt-1 max-w-sm text-xs text-muted-foreground">
+								Create a note and it appears here as a card you can move around. Everyone in the workspace sees the same board.
+							</p>
+						</div>
+					) : view === "board" ? (
+						<NoteBoard
+							notes={shown}
+							positions={positions}
+							edges={edges}
+							activePath={selected?.path ?? null}
+							onMove={moveCard}
+							onOpen={openByPath}
+							onDelete={(path) => setDeleting(notes.find((n) => n.path === path) ?? null)}
+							viewers={(path) => viewersAt("notes", path.replace(/^\/+/, ""))}
+							awareness={board?.awareness}
+							userName={selfName ?? "You"}
+							readOnly={isViewer}
+						/>
+					) : (
+						<NoteGraph notes={shown} edges={edges} activePath={selected?.path ?? null} onOpen={openByPath} />
+					)}
+				</div>
+
+				{/* The open note floats over the board */}
+				{selected && (
+					<aside className="absolute inset-y-0 right-0 z-20 flex w-[min(46rem,92%)] flex-col border-l bg-background shadow-xl" aria-label="Open note">
+						{contentLoading ? (
+							<Loading fill className="flex-1" />
+						) : (
+							<NoteEditor
+								key={selected.path}
+								fileName={selected.name}
+								initialContent={noteContent}
+								onSave={handleSave}
+								onClose={() => setSelected(null)}
+								readOnly={isViewer}
+								workspacePath={workspace?.path}
+								docId={selected.path.replace(/^\/+/, "")}
+								notes={notes}
+								onOpenNote={openByPath}
+							/>
+						)}
+					</aside>
+				)}
+			</div>
+
+			{isNewOpen && (
+				<Dialog isOpen={isNewOpen} onOpenChange={setIsNewOpen} className="max-w-md">
+					<form onSubmit={handleCreate} className="space-y-4">
 						<DialogHeader>
 							<DialogTitle>New Note</DialogTitle>
-							<DialogDescription>
-								Names ending in .txt make a rich-text note; anything else becomes a Markdown (.md) note.
-							</DialogDescription>
+							<DialogDescription>A rich-text note with headings and lists. For a Markdown file, make it in the Editor.</DialogDescription>
 						</DialogHeader>
-
-						<div>
-							<Input
-								required
-								value={newNoteTitle}
-								onChange={(e) => setNewNoteTitle(e.target.value)}
-								placeholder="e.g. Architecture Overview, Meeting Notes"
-								autoFocus
-							/>
-						</div>
-
+						<Input required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Architecture Overview, Meeting Notes" autoFocus />
 						<DialogFooter>
-							<Button
-								type="button"
-								variant="outline"
-								onPress={() => setIsNewNoteOpen(false)}
-								isDisabled={submitting}
-							>
+							<Button type="button" variant="outline" onPress={() => setIsNewOpen(false)} isDisabled={submitting}>
 								Cancel
 							</Button>
-							<Button
-								type="submit"
-								isDisabled={submitting || !newNoteTitle.trim()}
-							>
+							<Button type="submit" isDisabled={submitting || !newTitle.trim()}>
 								{submitting ? "Creating…" : "Create Note"}
 							</Button>
 						</DialogFooter>
@@ -440,29 +329,20 @@ export default function WorkspaceNotes() {
 				</Dialog>
 			)}
 
-			{/* Delete Note Confirmation Dialog */}
-			{deletingNote && (
-				<Dialog
-					isOpen={!!deletingNote}
-					onOpenChange={(open) => !open && setDeletingNote(null)}
-				>
+			{deleting && (
+				<Dialog isOpen onOpenChange={(open) => !open && setDeleting(null)}>
 					<div className="space-y-4">
 						<DialogHeader>
 							<DialogTitle>Delete Note</DialogTitle>
 							<DialogDescription>
-								Move{" "}
-								<span className="font-semibold text-foreground">
-									{deletingNote.name}
-								</span>{" "}
-								to the Trash? You can restore it from there.
+								Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can restore it from there.
 							</DialogDescription>
 						</DialogHeader>
-
 						<DialogFooter>
-							<Button variant="outline" onPress={() => setDeletingNote(null)}>
+							<Button variant="outline" onPress={() => setDeleting(null)}>
 								Cancel
 							</Button>
-							<Button variant="destructive" onPress={handleDeleteNote}>
+							<Button variant="destructive" onPress={handleDelete}>
 								Delete
 							</Button>
 						</DialogFooter>

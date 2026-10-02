@@ -39,6 +39,7 @@ export function markdownStats(markdown: string): TextStats {
 // The parts of a rich-text block this file reads, so it does not depend on the editor library's types
 interface RichBlock {
 	type: string;
+	props?: { level?: number };
 	content?: unknown;
 	children?: RichBlock[];
 }
@@ -65,6 +66,7 @@ export function blocksToPlainText(blocks: RichBlock[]): string {
 			const text = inlineText(block.content);
 			number = block.type === "numberedListItem" ? number + 1 : 0;
 			const marker =
+				block.type === "heading" ? "#".repeat(Math.min(Math.max(block.props?.level ?? 1, 1), 3)) + " " :
 				block.type === "bulletListItem" ? "- "
 				: block.type === "numberedListItem" ? `${number}. `
 				: block.type === "checkListItem" ? "[ ] "
@@ -79,11 +81,15 @@ export function blocksToPlainText(blocks: RichBlock[]): string {
 	return lines.length === 0 ? "" : lines.join("\n") + "\n";
 }
 
-// Rich-text blocks for plain text: one paragraph per line
+// Rich-text blocks for plain text: one paragraph per line, and a line starting with "# ", "## " or "### " is a heading
 export function plainTextToBlocks(text: string) {
 	const lines = text.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n");
-	return lines.map((line) => ({
-		type: "paragraph" as const,
-		content: line === "" ? [] : [{ type: "text" as const, text: line, styles: {} }],
-	}));
+	return lines.map((line) => {
+		const heading = /^(#{1,3}) +(.+)$/.exec(line);
+		const shown = heading ? heading[2] : line;
+		const content = shown === "" ? [] : [{ type: "text" as const, text: shown, styles: {} }];
+		return heading
+			? { type: "heading" as const, props: { level: heading[1].length as 1 | 2 | 3 }, content }
+			: { type: "paragraph" as const, content };
+	});
 }

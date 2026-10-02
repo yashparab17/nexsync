@@ -165,7 +165,7 @@ export default function JoinWorkspaceDialog({
 				</DialogHeader>
 
 				{/* Security banner */}
-				<div className="flex items-center justify-between rounded-none border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-400">
+				<div className="flex items-center justify-between px-3 py-2 text-xs text-emerald-400">
 					<div className="flex items-center gap-2">
 						<ShieldCheck className="h-4 w-4" />
 						<span>Private: only you and your collaborators can read your files</span>

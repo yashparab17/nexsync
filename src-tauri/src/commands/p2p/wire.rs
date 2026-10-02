@@ -1,4 +1,4 @@
-//! Wire format shared by both sides of a NexSync P2P connection.
+//! Wire format shared by both sides of a Nexsync P2P connection.
 //!
 //! Every QUIC bi-directional stream starts with a single stream-kind byte.
 //! After that, structured data is sent as length-prefixed frames

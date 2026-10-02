@@ -16,9 +16,7 @@ const WorkspaceTasks = lazy(() => import("@/pages/workspace/WorkspaceTasks"));
 const WorkspaceKanban = lazy(() => import("@/pages/workspace/WorkspaceKanban"));
 const WorkspaceInsights = lazy(() => import("@/pages/workspace/WorkspaceInsights"));
 const WorkspaceMembers = lazy(() => import("@/pages/workspace/WorkspaceMembers"));
-const WorkspaceSettings = lazy(() => import("@/pages/workspace/WorkspaceSettings"));
 const WorkspaceTrash = lazy(() => import("@/pages/workspace/WorkspaceTrash"));
-const Settings = lazy(() => import("@/pages/Settings"));
 const Unavailable = lazy(() => import("@/pages/Unavailable"));
 
 // Suspense fallback wrapper for lazy-loaded route components
@@ -126,23 +124,7 @@ export const router = createBrowserRouter([
 							</RouteSuspense>
 						),
 					},
-					{
-						path: "settings",
-						element: (
-							<RouteSuspense>
-								<WorkspaceSettings />
-							</RouteSuspense>
-						),
-					},
 				],
-			},
-			{
-				path: "settings",
-				element: (
-					<RouteSuspense>
-						<Settings />
-					</RouteSuspense>
-				),
 			},
 		],
 	},

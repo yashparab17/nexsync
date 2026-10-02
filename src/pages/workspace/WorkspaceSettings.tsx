@@ -1,15 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Check, Download, Loader2, Save, Trash2 } from "lucide-react";
+import { AlertTriangle, Download, FolderOpen, Loader2, Moon, Save, SlidersHorizontal, Radio, ShieldCheck, Sun, Trash2, Undo2, User, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 import {
 	Dialog,
 	DialogDescription,
@@ -20,6 +13,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import Avatar from "@/components/elements/Avatar";
+import { Row, SectionCard, SectionNav, Segmented } from "@/components/elements/SettingsParts";
 import RulesCard from "@/components/elements/RulesCard";
 import HostRequiredCard from "@/components/elements/HostRequiredCard";
 
@@ -31,7 +26,17 @@ import { removeRecentWorkspace, writeWorkspaceMetadata } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
 
-export default function WorkspaceSettings() {
+const SECTIONS = [
+	{ id: "you", label: "You", icon: <User className="size-4 shrink-0" /> },
+	{ id: "workspace", label: "Workspace", icon: <FolderOpen className="size-4 shrink-0" /> },
+	{ id: "preferences", label: "Preferences", icon: <SlidersHorizontal className="size-4 shrink-0" /> },
+	{ id: "rules", label: "Rules", icon: <ShieldCheck className="size-4 shrink-0" /> },
+	{ id: "collaboration", label: "Collaboration", icon: <Radio className="size-4 shrink-0" /> },
+	{ id: "export", label: "Export", icon: <Download className="size-4 shrink-0" /> },
+	{ id: "danger", label: "Danger zone", icon: <AlertTriangle className="size-4 shrink-0" /> },
+];
+
+export default function WorkspaceSettings({ onClose }: { onClose?: () => void } = {}) {
 	const {
 		workspace,
 		metadata,
@@ -65,9 +70,29 @@ export default function WorkspaceSettings() {
 	const [isLeaveOpen, setIsLeaveOpen] = useState(false);
 	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 	const [confirmName, setConfirmName] = useState("");
+	const [leaving, setLeaving] = useState(false);
 	const [busy, setBusy] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const guestCount = peers.filter((p) => !p.isHost).length;
+
+	// Who this is: the name the host knows this device by, or the owner when this is the host's own copy
+	const myName = selfName ?? metadata?.members.members.find((m) => m.role === "Owner")?.name ?? "You";
+	const myRole = metadata?.members.members.find((m) => m.name === myName)?.role;
+
+	const dirty =
+		!isJoinedCopy &&
+		(name !== (workspace?.name || "") ||
+			description !== (workspace?.description || "") ||
+			autosave !== (metadata?.settings.autosave ?? true) ||
+			sync !== (metadata?.settings.sync ?? true) ||
+			theme !== (metadata?.settings.theme ?? "dark"));
+	const discard = () => {
+		setName(workspace?.name || "");
+		setDescription(workspace?.description || "");
+		setAutosave(metadata?.settings.autosave ?? true);
+		setSync(metadata?.settings.sync ?? true);
+		setTheme(metadata?.settings.theme ?? "dark");
+	};
 
 	// Leaves (guest) or deletes (owner) the workspace; the page unmounts once it succeeds
 	const runAction = async (deleteFiles: boolean, announce = false) => {
@@ -82,8 +107,7 @@ export default function WorkspaceSettings() {
 		}
 	};
 
-	const handleSaveSettings = async (e: React.FormEvent) => {
-		e.preventDefault();
+	const handleSaveSettings = async () => {
 		if (isJoinedCopy || !workspace?.path || !metadata) return;
 
 		try {
@@ -140,256 +164,188 @@ export default function WorkspaceSettings() {
 	};
 
 	return (
-		<div className="max-w-4xl space-y-6">
-			{/* Header */}
-			<div>
-				<h1 className="text-2xl font-bold tracking-tight">
-					Workspace Settings
-				</h1>
-				<p className="mt-1 text-sm text-muted-foreground">
-					Configure preferences, identity and sharing for this workspace.
-				</p>
-			</div>
+		<div className={onClose ? "flex h-[85vh] gap-8 overflow-y-auto p-6" : "mx-auto flex max-w-5xl gap-8"}>
+			{/* Section list */}
+			<aside className="hidden w-44 shrink-0 md:block">
+				<SectionNav label="Workspace settings sections" sections={SECTIONS} />
+			</aside>
 
-			<form onSubmit={handleSaveSettings} className="space-y-6">
-				{/* General Settings */}
-				<Card>
-					<CardHeader>
-						<CardTitle className="text-base">Workspace Identity</CardTitle>
-						<CardDescription>
-							Basic details about this workspace, saved on your computer.
-						</CardDescription>
-					</CardHeader>
-					<CardContent className="space-y-4">
-						<div>
-							<Label htmlFor="ws-name">Workspace Name *</Label>
-							<Input
-								id="ws-name"
-								required
-								value={name}
-								onChange={(e) => setName(e.target.value)}
-								className="mt-1"
-							/>
-						</div>
-
-						<div>
-							<Label htmlFor="ws-desc">Description</Label>
-							<Textarea
-								id="ws-desc"
-								value={description}
-								onChange={(e) => setDescription(e.target.value)}
-								placeholder="Optional description..."
-								rows={3}
-								className="mt-1"
-							/>
-						</div>
-
-						<div>
-							<Label>Local Path (OS File System)</Label>
-							<div className="mt-1 flex items-center gap-2">
-								<Input
-									readOnly
-									value={workspace?.path || ""}
-									className="font-mono text-xs bg-muted/40 text-muted-foreground"
-								/>
-							</div>
-							<p className="mt-1 text-xs text-muted-foreground">
-								Your files are saved in this folder on your computer.
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				{/* Synchronization & Behavior */}
-				<Card>
-					<CardHeader>
-						<CardTitle className="text-base">
-							Sharing & Preferences
-						</CardTitle>
-						<CardDescription>
-							Control autosave and how this workspace is shared.
-						</CardDescription>
-					</CardHeader>
-					<CardContent className="space-y-5">
-						<div className="flex items-center justify-between">
-							<div className="space-y-0.5">
-								<Label className="text-sm font-semibold">
-									Autosave Files
-								</Label>
-								<p className="text-xs text-muted-foreground">
-									Save your changes to files automatically.
-								</p>
-							</div>
-							<input
-								type="checkbox"
-								checked={autosave}
-								onChange={(e) => setAutosave(e.target.checked)}
-								className="size-4 rounded-none accent-primary cursor-pointer"
-							/>
-						</div>
-
-						<div className="flex items-center justify-between">
-							<div className="space-y-0.5">
-								<Label className="text-sm font-semibold">
-									Share changes live
-								</Label>
-								<p className="text-xs text-muted-foreground">
-									Let collaborators connect and see each other's changes as they happen.
-								</p>
-							</div>
-							<input
-								type="checkbox"
-								checked={sync}
-								onChange={(e) => setSync(e.target.checked)}
-								className="size-4 rounded-none accent-primary cursor-pointer"
-							/>
-						</div>
-
-						<div className="flex items-center justify-between">
-							<div className="space-y-0.5">
-								<Label className="text-sm font-semibold">
-									Workspace Theme
-								</Label>
-								<p className="text-xs text-muted-foreground">
-									Color scheme preference for this workspace.
-								</p>
-							</div>
-							<select
-								value={theme}
-								onChange={(e) => setTheme(e.target.value)}
-								className="flex h-9 rounded-none border border-input bg-background px-3 py-1 text-xs text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-							>
-								<option value="dark">Dark</option>
-								<option value="light">Light</option>
-							</select>
-						</div>
-					</CardContent>
-				</Card>
-
-				{/* Save Button */}
-				<div className="flex items-center gap-3">
-					<Button
-						type="submit"
-						isDisabled={saving || isJoinedCopy}
-						className="gap-2"
-					>
-						<Save className="size-4" />
-						{saving ? "Saving…" : "Save Settings"}
-					</Button>
-					{savedSuccess && (
-						<span className="flex items-center gap-1.5 text-xs text-emerald-400">
-							<Check className="size-4" />
-							Settings saved successfully
-						</span>
-					)}
-					{isJoinedCopy && (
-						<span className="text-xs text-muted-foreground">
-							You joined this workspace, so its host manages these settings.
-						</span>
+			<div className="min-w-0 flex-1 space-y-6">
+				{/* Header */}
+				<div className="flex items-start justify-between gap-3">
+					<div>
+					<h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+					<p className="text-sm text-muted-foreground">Preferences, identity and sharing for {workspace?.name ?? "this workspace"}.</p>
+					</div>
+					{onClose && (
+						<Button variant="ghost" size="icon" aria-label="Close" onPress={() => (dirty ? setLeaving(true) : onClose())}>
+							<X className="size-5" />
+						</Button>
 					)}
 				</div>
-			</form>
 
-			{workspace && <RulesCard workspacePath={workspace.path} />}
-
-			<HostRequiredCard />
-
-			{/* Export */}
-			<Card>
-				<CardHeader>
-					<CardTitle className="text-base">Export</CardTitle>
-					<CardDescription>
-						Save a copy of the workspace files as one zip: notes, files, assets and code, in their folders. Tasks and the
-						Kanban board are not part of the zip.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="flex flex-wrap items-center gap-3">
-					<Button
-						variant="outline"
-						isDisabled={exporting || !workspace}
-						onPress={async () => {
-							if (!workspace) return;
-							setExporting(true);
-							setExportResult(null);
-							try {
-								const result = await exportFolders(workspace.path, ["notes", "files", "assets", "editor"], workspace.name);
-								if (result) setExportResult({ ok: true, text: `Saved ${result.count} ${result.count === 1 ? "file" : "files"} to ${result.dest}` });
-							} catch (err) {
-								setExportResult({ ok: false, text: errorText(err, "Could not export the workspace.") });
-							} finally {
-								setExporting(false);
-							}
-						}}
-					>
-						{exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-						Export workspace as zip
-					</Button>
-					{exportResult && (
-						<span role={exportResult.ok ? "status" : "alert"} className={`text-xs ${exportResult.ok ? "text-emerald-400" : "text-destructive"}`}>
-							{exportResult.text}
-						</span>
-					)}
-				</CardContent>
-			</Card>
-
-			{/* Danger Zone */}
-			<Card className="border-destructive/30 bg-destructive/5">
-				<CardHeader>
-					<CardTitle className="text-base text-destructive flex items-center gap-2">
-						<AlertTriangle className="size-4" />
-						Danger Zone
-					</CardTitle>
-					<CardDescription>
-						Leave, remove or delete this workspace.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="flex items-center justify-between">
-					<div>
-						<p className="text-sm font-medium">Remove from Recent Workspaces</p>
-						<p className="text-xs text-muted-foreground">
-							This will remove the workspace from your quick access list. Your
-							files on disk will not be deleted.
-						</p>
-					</div>
-					<Button
-						variant="destructive"
-						size="sm"
-						onPress={() => setIsRemoveConfirmOpen(true)}
-						className="gap-1.5"
-					>
-						<Trash2 className="size-3.5" />
-						Remove Workspace
-					</Button>
-				</CardContent>
-				{isJoinedCopy ? (
-					<CardContent className="flex items-center justify-between border-t pt-4">
-						<div>
-							<p className="text-sm font-medium">Leave Workspace</p>
-							<p className="text-xs text-muted-foreground">
-								Disconnect from the host and remove this workspace from the app. You can keep your
-								copy of the files or move it to the recycle bin.
-							</p>
-						</div>
-						<Button variant="destructive" size="sm" onPress={() => setIsLeaveOpen(true)} className="gap-1.5">
-							<Trash2 className="size-3.5" />
-							Leave
-						</Button>
-					</CardContent>
-				) : (
-					<CardContent className="flex items-center justify-between border-t pt-4">
-						<div>
-							<p className="text-sm font-medium">Delete Workspace</p>
-							<p className="text-xs text-muted-foreground">
-								Move this workspace to the recycle bin. Collaborators keep their own copies.
-							</p>
-						</div>
-						<Button variant="destructive" size="sm" onPress={() => setIsDeleteOpen(true)} className="gap-1.5">
-							<Trash2 className="size-3.5" />
-							Delete Workspace
-						</Button>
-					</CardContent>
+				{isJoinedCopy && (
+					<p className="border p-3 text-xs text-muted-foreground">You joined this workspace, so its host manages these settings.</p>
 				)}
-			</Card>
+
+				<SectionCard id="you" title="You" description="How collaborators see you in this workspace." icon={<User className="size-4 text-primary" />}>
+					<div className="flex items-center gap-4">
+						<Avatar name={myName} className="size-12 text-lg" />
+						<div className="min-w-0 flex-1">
+							<p className="truncate text-base font-semibold">{myName}</p>
+							<p className="text-xs text-muted-foreground">
+								{myRole ? `${myRole}. ` : ""}Your name and picture are the same everywhere in the app. Change your name in Members.
+							</p>
+						</div>
+					</div>
+				</SectionCard>
+
+				<SectionCard id="workspace" title="Workspace" description="Basic details about this workspace, saved on your computer." icon={<FolderOpen className="size-4 text-primary" />}>
+					<div>
+						<Label htmlFor="ws-name">Workspace name</Label>
+						<Input id="ws-name" required value={name} disabled={isJoinedCopy} onChange={(e) => setName(e.target.value)} className="mt-1" />
+					</div>
+					<div>
+						<Label htmlFor="ws-desc">Description</Label>
+						<Textarea id="ws-desc" value={description} disabled={isJoinedCopy} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description..." rows={3} className="mt-1" />
+					</div>
+					<div>
+						<Label>Local path</Label>
+						<Input readOnly value={workspace?.path || ""} className="mt-1 bg-muted/40 font-mono text-xs text-muted-foreground" />
+						<p className="mt-1 text-xs text-muted-foreground">Your files are saved in this folder on your computer.</p>
+					</div>
+				</SectionCard>
+
+				<SectionCard id="preferences" title="Preferences" description="Autosave, live sharing and the color scheme of this workspace." icon={<SlidersHorizontal className="size-4 text-primary" />}>
+					<Row title="Autosave files" hint="Save your changes to files automatically.">
+						<input type="checkbox" aria-label="Autosave files" checked={autosave} disabled={isJoinedCopy} onChange={(e) => setAutosave(e.target.checked)} className="size-4 cursor-pointer rounded-none accent-primary" />
+					</Row>
+					<Row title="Share changes live" hint="Let collaborators connect and see each other's changes as they happen.">
+						<input type="checkbox" aria-label="Share changes live" checked={sync} disabled={isJoinedCopy} onChange={(e) => setSync(e.target.checked)} className="size-4 cursor-pointer rounded-none accent-primary" />
+					</Row>
+					<Row title="Workspace theme" hint="Color scheme preference for this workspace.">
+						<Segmented
+							label="Workspace theme"
+							value={theme}
+							onChange={(value) => !isJoinedCopy && setTheme(value)}
+							options={[
+								{ value: "dark", label: "Dark", icon: <Moon className="size-3.5" /> },
+								{ value: "light", label: "Light", icon: <Sun className="size-3.5" /> },
+							]}
+						/>
+					</Row>
+				</SectionCard>
+
+				{workspace && (
+					<div id="rules" className="scroll-mt-8">
+						<RulesCard workspacePath={workspace.path} />
+					</div>
+				)}
+
+				<div id="collaboration" className="scroll-mt-8">
+					<HostRequiredCard />
+				</div>
+
+				<SectionCard
+					id="export"
+					title="Export"
+					description="Save a copy of the workspace files as one zip: notes, files, assets and code, in their folders. Tasks and the Kanban board are not part of the zip."
+					icon={<Download className="size-4 text-primary" />}
+				>
+					<div className="flex flex-wrap items-center gap-3">
+						<Button
+							variant="outline"
+							isDisabled={exporting || !workspace}
+							onPress={async () => {
+								if (!workspace) return;
+								setExporting(true);
+								setExportResult(null);
+								try {
+									const result = await exportFolders(workspace.path, ["notes", "files", "assets", "editor"], workspace.name);
+									if (result) setExportResult({ ok: true, text: `Saved ${result.count} ${result.count === 1 ? "file" : "files"} to ${result.dest}` });
+								} catch (err) {
+									setExportResult({ ok: false, text: errorText(err, "Could not export the workspace.") });
+								} finally {
+									setExporting(false);
+								}
+							}}
+						>
+							{exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+							Export workspace as zip
+						</Button>
+						{exportResult && (
+							<span role={exportResult.ok ? "status" : "alert"} className={`text-xs ${exportResult.ok ? "text-emerald-400" : "text-destructive"}`}>
+								{exportResult.text}
+							</span>
+						)}
+					</div>
+				</SectionCard>
+
+				<SectionCard
+					id="danger"
+					title="Danger zone"
+					description="Leave, remove or delete this workspace."
+					icon={<AlertTriangle className="size-4" />}
+					className="border-destructive/30"
+					titleClassName="text-destructive"
+				>
+					<Row title="Remove from recent workspaces" hint="Takes the workspace off your quick access list. Your files on disk are not deleted.">
+						<Button variant="destructive" size="sm" onPress={() => setIsRemoveConfirmOpen(true)}>
+							<Trash2 className="size-3.5" />
+							Remove
+						</Button>
+					</Row>
+					<div className="border-t pt-4">
+						{isJoinedCopy ? (
+							<Row title="Leave workspace" hint="Disconnect from the host and remove this workspace from the app. You can keep your copy of the files or move it to the recycle bin.">
+								<Button variant="destructive" size="sm" onPress={() => setIsLeaveOpen(true)}>
+									<Trash2 className="size-3.5" />
+									Leave
+								</Button>
+							</Row>
+						) : (
+							<Row title="Delete workspace" hint="Move this workspace to the recycle bin. Collaborators keep their own copies.">
+								<Button variant="destructive" size="sm" onPress={() => setIsDeleteOpen(true)}>
+									<Trash2 className="size-3.5" />
+									Delete
+								</Button>
+							</Row>
+						)}
+					</div>
+				</SectionCard>
+
+				{/* Appears while there is something to save */}
+				{(dirty || saving || savedSuccess) && !isJoinedCopy && (
+					<div role="region" aria-label="Unsaved changes" className="sticky bottom-0 -mx-1 border-t bg-background/95 backdrop-blur">
+						<div className="flex flex-wrap items-center gap-3 px-1 py-3">
+							<p role="status" className={`min-w-0 flex-1 text-xs ${savedSuccess && !dirty ? "text-emerald-400" : "text-muted-foreground"}`}>
+								{saving ? "Saving…" : savedSuccess && !dirty ? "Settings saved" : "You have unsaved changes."}
+							</p>
+							<Button variant="outline" size="sm" isDisabled={saving || !dirty} onPress={discard}>
+								<Undo2 className="size-4" />
+								Discard
+							</Button>
+							<Button size="sm" isDisabled={saving || !dirty || !name.trim()} onPress={() => void handleSaveSettings()}>
+								{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+								{saving ? "Saving…" : "Save changes"}
+							</Button>
+						</div>
+					</div>
+				)}
+			{leaving && (
+				<Dialog isOpen onOpenChange={(open) => !open && setLeaving(false)}>
+					<div className="space-y-4">
+						<DialogHeader>
+							<DialogTitle>Leave without saving?</DialogTitle>
+							<DialogDescription>Your changes to these settings will be lost.</DialogDescription>
+						</DialogHeader>
+						<DialogFooter>
+							<Button variant="outline" onPress={() => setLeaving(false)}>Keep editing</Button>
+							<Button variant="destructive" onPress={() => onClose?.()}>Discard and leave</Button>
+						</DialogFooter>
+					</div>
+				</Dialog>
+			)}
 
 			{/* Remove Workspace Modal */}
 			{isRemoveConfirmOpen && (
@@ -493,6 +449,7 @@ export default function WorkspaceSettings() {
 					</div>
 				</Dialog>
 			)}
+			</div>
 		</div>
 	);
 }

@@ -361,7 +361,7 @@ export default function WorkspaceAssets() {
 			{/* Page Header */}
 			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 				<div>
-					<h1 className="text-2xl font-bold tracking-tight">Workspace Assets</h1>
+					<h1 className="text-2xl font-bold tracking-tight">Assets</h1>
 					<p className="mt-1 text-sm text-muted-foreground">
 						Store and manage images, media, and binary files in your local{" "}
 						<code className="bg-muted px-1.5 py-0.5 rounded-none text-xs font-mono text-foreground">

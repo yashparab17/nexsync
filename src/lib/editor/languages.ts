@@ -4,8 +4,8 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { LanguageDescription, type LanguageSupport } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 
-// Text the Notes page can edit
-const NOTE_EXTENSIONS = ["md", "markdown", "txt", "text"];
+// Rich-text notes; Markdown files are code-editor files and open in the Editor
+const NOTE_EXTENSIONS = ["txt", "text"];
 // Documents other apps edit; Notes lists them and opens them in the system app
 const DOCUMENT_EXTENSIONS = ["doc", "docx", "odt", "rtf", "pdf", "ppt", "pptx", "xls", "xlsx", "csv"];
 // Files that are not text at all, so no editor can show them

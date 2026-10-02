@@ -54,7 +54,7 @@ export default function HostGate() {
 				<p className="text-sm text-muted-foreground">
 					{hostGate === "connecting"
 						? "This workspace can only be used while its host is online. Hold on while we reach them."
-						: `This workspace can only be used while its host is online. Ask ${host} to open NexSync, then open the workspace again.`}
+						: `This workspace can only be used while its host is online. Ask ${host} to open Nexsync, then open the workspace again.`}
 				</p>
 				{hostGate === "offline" && <p className="text-xs text-muted-foreground">Taking you back to the Welcome page in {Math.max(left, 0)}…</p>}
 				<Button variant="outline" onPress={() => void leave()}>

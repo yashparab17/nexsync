@@ -221,7 +221,7 @@ export default function P2PConnectDialog({
 						<AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
 						<div className="space-y-1">
 							<p>
-								{hostName ?? "The host"} isn't online right now, or has closed NexSync. This workspace is hosted from their device, so
+								{hostName ?? "The host"} isn't online right now, or has closed Nexsync. This workspace is hosted from their device, so
 								nobody else can connect you to it. Your copy keeps working, and this device looks for them again every 30 seconds.
 							</p>
 							<Button variant="outline" size="sm" className="mt-1 gap-1.5" onPress={handleRetry}>
@@ -247,7 +247,7 @@ export default function P2PConnectDialog({
 						<AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
 						<div className="space-y-1">
 							<p>
-								NexSync can't reach the service that connects you to people on other networks.
+								Nexsync can't reach the service that connects you to people on other networks.
 								Check your internet, then press Retry.
 							</p>
 							{network.detail && <p className="font-mono text-[11px] opacity-80">Details: {network.detail}</p>}
@@ -489,7 +489,7 @@ export default function P2PConnectDialog({
 						</div>
 
 						{joinSuccess ? (
-							<div className="flex items-center justify-center gap-2 rounded-none border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-400 font-medium">
+							<div className="flex items-center justify-center gap-2 p-3 text-xs text-emerald-400 font-medium">
 								<Sparkles className="h-4 w-4" />
 								<span>Connected! Getting the workspace…</span>
 							</div>
@@ -568,12 +568,12 @@ export default function P2PConnectDialog({
 															className={cn(
 																"rounded-none px-1.5 py-0.5 text-[10px] uppercase tracking-wider",
 																peer.connectionType === "direct"
-																	? "bg-emerald-500/10 text-emerald-400"
-																	: "bg-amber-500/10 text-amber-400",
+																	? "text-emerald-400"
+																	: "text-amber-400",
 															)}
 															title={
 																peer.connectionType === "relay"
-																	? "Connected through a helper server because a direct link is not possible here. Still private. NexSync keeps trying for a direct one."
+																	? "Connected through a helper server because a direct link is not possible here. Still private. Nexsync keeps trying for a direct one."
 																	: undefined
 															}
 														>
@@ -596,7 +596,7 @@ export default function P2PConnectDialog({
 											</div>
 
 											<div className="flex items-center gap-1.5">
-												<div className="flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-none">
+												<div className="flex items-center gap-1 text-[11px] text-emerald-400 py-0.5">
 													<Lock className="h-3 w-3" />
 													<span>Private</span>
 												</div>

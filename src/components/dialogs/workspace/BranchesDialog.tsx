@@ -121,7 +121,7 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 						{error}
 					</p>
 				)}
-				{done && <p className="border border-emerald-500/40 bg-emerald-500/10 p-2 text-xs text-emerald-400">{done}</p>}
+				{done && <p className="p-2 text-xs text-emerald-400">{done}</p>}
 
 				{review ? (
 					<div className="flex min-h-0 flex-1 flex-col gap-3">

@@ -40,7 +40,7 @@ const PAGES: [string, string][] = [
 	["Insights", "/workspace/insights"],
 	["Members", "/workspace/members"],
 	["Trash", "/workspace/trash"],
-	["Workspace settings", "/workspace/settings"],
+	["Workspace settings", "/workspace/dashboard?settings=1"],
 ];
 const COMMANDS: Hit[] = PAGES.map(([title, to]) => ({ key: `go:${to}`, kind: "Go to", title, sub: "Open page", to }));
 
@@ -93,9 +93,9 @@ export default function WorkspaceSearch() {
 		]);
 		setIndex([
 			...files.map((f): Hit => {
-				const isNote = (isNoteFile(f.name) || isDocumentFile(f.name)) && /^\/(notes|files)\/[^/]+$/.test(f.path);
+				const isNote = isNoteFile(f.name) && /^\/(notes|files)\/[^/]+$/.test(f.path);
 				const isAsset = /^\/assets\/[^/]+$/.test(f.path);
-				const isCode = !isNote && !isAsset && /^\/(editor|files)\//.test(f.path) && !isBinaryFile(f.name) && !isDocumentFile(f.name);
+				const isCode = !isNote && !isAsset && /^\/(editor|files|notes)\//.test(f.path) && !isBinaryFile(f.name) && !isDocumentFile(f.name);
 				const open = encodeURIComponent(f.path);
 				return {
 					key: `f:${f.path}`,

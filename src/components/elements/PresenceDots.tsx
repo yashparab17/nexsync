@@ -1,8 +1,6 @@
-// Small initials for the people who are somewhere, in a colour that stays the same for each person
+import Avatar from "@/components/elements/Avatar";
 
-const COLORS = ["bg-emerald-500", "bg-sky-500", "bg-violet-500", "bg-amber-500", "bg-rose-500", "bg-teal-500"];
-
-export const colorOf = (name: string) => COLORS[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % COLORS.length];
+// Small initials for the people who are somewhere, in the colour that goes with their name everywhere else
 
 // `doing` finishes the hover text: "Raven is here", "Raven is editing"
 export default function PresenceDots({ names, doing = "here" }: { names: string[]; doing?: string }) {
@@ -11,9 +9,7 @@ export default function PresenceDots({ names, doing = "here" }: { names: string[
 	return (
 		<span className="inline-flex shrink-0 items-center -space-x-1" title={`${names.join(", ")} ${names.length === 1 ? "is" : "are"} ${doing}`}>
 			{shown.map((n) => (
-				<span key={n} className={`flex size-4 items-center justify-center text-[9px] font-bold text-white ring-1 ring-background ${colorOf(n)}`}>
-					{n.slice(0, 1).toUpperCase()}
-				</span>
+				<Avatar key={n} name={n} className="size-4 text-[9px] ring-1 ring-background" />
 			))}
 			{names.length > shown.length && <span className="pl-1.5 text-[9px] text-muted-foreground">+{names.length - shown.length}</span>}
 		</span>

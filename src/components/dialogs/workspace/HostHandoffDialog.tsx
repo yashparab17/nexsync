@@ -41,7 +41,7 @@ export default function HostHandoffDialog() {
 					</div>
 					<DialogDescription>
 						{handoffOffer.hostName} wants to make you the Owner and host of this workspace. Collaborators will
-						reconnect to this device, so keep NexSync open while they work. {handoffOffer.hostName} stays on as an
+						reconnect to this device, so keep Nexsync open while they work. {handoffOffer.hostName} stays on as an
 						Admin.
 					</DialogDescription>
 				</DialogHeader>

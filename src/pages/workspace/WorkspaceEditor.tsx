@@ -32,7 +32,7 @@ import { useReportItem } from "@/hooks/usePresence";import { useWorkspace } from
 import type { WorkspaceFile } from "@/types/workspace";
 
 // Folders shown in the explorer: code lives in editor, and files holds anything else worth opening here
-const ROOTS = ["editor", "files"];
+const ROOTS = ["editor", "files", "notes"];
 
 const toRel = (path: string) => path.replace(/^\/+/, "");
 
@@ -221,7 +221,14 @@ export default function WorkspaceEditor() {
 	};
 
 	return (
-		<div className="-m-6 flex h-[calc(100vh-6rem)]">
+		<div className="flex h-[calc(100vh-10rem)] flex-col gap-4">
+			{/* Header */}
+			<div className="shrink-0">
+				<h1 className="text-2xl font-bold tracking-tight">Editor</h1>
+				<p className="mt-1 text-sm text-muted-foreground">Edit code and text files. Several can stay open as tabs, and everyone in the workspace edits the same file live.</p>
+			</div>
+
+			<div className="flex min-h-0 flex-1 border">
 			<FileExplorer
 				roots={ROOTS}
 				entries={entries}
@@ -264,13 +271,13 @@ export default function WorkspaceEditor() {
 
 			{/* Tabs, editor and run output */}
 			<div className="flex min-w-0 flex-1 flex-col bg-background">
-				<div className="flex items-stretch border-b">
+				<div className="flex min-h-11 items-stretch border-b">
 					<div className="flex min-w-0 flex-1 overflow-x-auto">
 						{tabs.map((path) => (
 							<div
 								key={path}
 								className={cn(
-									"group flex shrink-0 items-center gap-1.5 border-r px-3 py-2 text-xs",
+									"group flex shrink-0 items-center gap-1.5 border-r px-3 text-xs",
 									active === path ? "bg-background font-medium" : "bg-muted/30 text-muted-foreground hover:text-foreground",
 								)}
 							>
@@ -299,8 +306,10 @@ export default function WorkspaceEditor() {
 				<div className="relative min-h-0 flex-1">
 					{tabs.length === 0 && (
 						<div className="flex h-full flex-col items-center justify-center p-8 text-center">
-							<Code2 className="size-8 text-muted-foreground" />
-							<h3 className="mt-3 text-base font-semibold">Open a file to start editing</h3>
+							<div className="flex size-12 items-center justify-center bg-muted/60">
+								<Code2 className="size-6 text-muted-foreground" />
+							</div>
+							<h3 className="mt-4 text-base font-semibold">Open a file to start editing</h3>
 							<p className="mt-1 max-w-sm text-xs text-muted-foreground">
 								Pick a file in the explorer. Several files can stay open as tabs, and everyone in the workspace
 								edits the same file live.
@@ -319,6 +328,7 @@ export default function WorkspaceEditor() {
 						<RunPanel workspacePath={workspacePath} activePath={active} />
 					</div>
 				)}
+			</div>
 			</div>
 
 			{newItem && (

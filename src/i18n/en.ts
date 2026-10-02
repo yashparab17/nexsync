@@ -17,6 +17,8 @@ const en = {
 	"nav.open": "Open menu",
 	"nav.close": "Close menu",
 	"nav.main": "Workspace",
+	"nav.collapse": "Collapse",
+	"nav.expand": "Expand",
 
 	"welcome.morning": "Good morning, {name}.",
 	"welcome.afternoon": "Good afternoon, {name}.",

@@ -8,6 +8,7 @@ import { FilePen, GitMerge, Trash2 } from "lucide-react";
 import { fieldName } from "@/components/elements/ConflictPanel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -286,7 +287,7 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 						<div className="grid gap-3 sm:grid-cols-2">
 							<div>
 								<Label htmlFor="draft-due">Due date</Label>
-								<Input id="draft-due" type="date" value={form.due_date ?? ""} onChange={(e) => patch({ due_date: e.target.value || undefined })} />
+								<DateField id="draft-due" value={form.due_date ?? ""} onChange={(v) => patch({ due_date: v || undefined })} />
 							</div>
 							<div>
 								<Label htmlFor="draft-assignee">Assignee</Label>

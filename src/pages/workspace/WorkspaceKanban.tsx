@@ -18,6 +18,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -456,13 +457,7 @@ export default function WorkspaceKanban() {
 			<div className="grid grid-cols-2 gap-3">
 				<div>
 					<Label htmlFor={`${prefix}-due`}>Due date</Label>
-					<Input
-						id={`${prefix}-due`}
-						type="date"
-						value={cardDue}
-						onChange={(e) => setCardDue(e.target.value)}
-						className="mt-1"
-					/>
+					<DateField id={`${prefix}-due`} value={cardDue} onChange={setCardDue} className="mt-1" />
 				</div>
 				<div>
 					<Label htmlFor={`${prefix}-assignee`}>Assignee</Label>

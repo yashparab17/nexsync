@@ -1,11 +1,11 @@
 // React
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 // React Router
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { FolderOpen, FolderPlus, Settings, UsersRound } from "lucide-react";
+import { FolderOpen, FolderPlus, Settings as SettingsIcon, UsersRound } from "lucide-react";
 
 // Hooks
 import { useThemeContext } from "@/store/ThemeContext";
@@ -19,6 +19,9 @@ import ThemeToggle from "@/components/elements/ThemeToggle";
 
 
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+
+const Settings = lazy(() => import("@/pages/Settings"));
 import {
 	Card,
 	CardDescription,
@@ -70,6 +73,7 @@ export default function Welcome() {
 
 	// The introduction opens by itself the first time, and from the link below after that
 	const [tourOpen, setTourOpen] = useState(() => !tourSeen());
+	const [settingsOpen, setSettingsOpen] = useState(false);
 
 	// Shared button styling
 	const actionButtonClass =
@@ -129,10 +133,10 @@ export default function Welcome() {
 					<Button
 						variant="ghost"
 						size="icon"
-						onPress={() => navigate("/settings")}
+						onPress={() => setSettingsOpen(true)}
 						aria-label="Application Settings"
 					>
-						<Settings className="size-5" />
+						<SettingsIcon className="size-5" />
 					</Button>
 				</div>
 			</header>
@@ -233,6 +237,15 @@ export default function Welcome() {
 					{t("welcome.tour")}
 				</Button>
 			</footer>
+
+			{/* Settings opens over the page; the page asks before closing with unsaved edits, so Escape and a click outside are off */}
+			<Dialog isOpen={settingsOpen} onOpenChange={setSettingsOpen} showCloseButton={false} isDismissable={false} isKeyboardDismissDisabled className="overflow-hidden p-0 sm:max-w-5xl">
+				{settingsOpen && (
+					<Suspense fallback={<div className="h-[85vh]" />}>
+						<Settings onClose={() => setSettingsOpen(false)} />
+					</Suspense>
+				)}
+			</Dialog>
 
 			<OnboardingTour open={tourOpen} onClose={() => setTourOpen(false)} />
 		</div>

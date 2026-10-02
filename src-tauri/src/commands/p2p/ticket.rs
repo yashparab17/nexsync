@@ -75,7 +75,7 @@ impl Ticket {
             .map_err(|_| INVALID)?;
         let wire: TicketWire = postcard::from_bytes(&bytes).map_err(|_| INVALID)?;
         if wire.v != TICKET_VERSION {
-            return Err("This invite was created by a different version of NexSync. Update both apps and try again.".into());
+            return Err("This invite was created by a different version of Nexsync. Update both apps and try again.".into());
         }
 
         let id = EndpointId::from_bytes(&wire.id).map_err(|_| INVALID)?;

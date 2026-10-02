@@ -1427,7 +1427,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			setRejoinFailed(true);
 			// A host that is not there is waited for; any other answer (removed, different version) is not something retrying fixes
 			if (/reach|timed out|in time/i.test(reason)) {
-				if (!hostUnreachableRef.current) notifyRef.current("The host is offline. This copy reconnects by itself when they open NexSync.");
+				if (!hostUnreachableRef.current) notifyRef.current("The host is offline. This copy reconnects by itself when they open Nexsync.");
 				setHostUnreachable(true);
 			} else {
 				notifyRef.current(`Couldn't reconnect to the host. ${reason}`);

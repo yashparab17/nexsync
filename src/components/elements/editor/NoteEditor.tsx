@@ -168,7 +168,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 
 	return (
 		<div className="flex h-full w-full flex-col bg-background">
-			<div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+			<div className="flex min-h-11 flex-wrap items-center justify-between gap-3 border-b px-3 py-1.5">
 				<div className="flex min-w-0 items-center gap-2">
 					<Button variant="ghost" size="icon-xs" onPress={onClose} aria-label="Close note">
 						<X className="size-4" />
@@ -193,7 +193,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 
 				<div className="flex items-center gap-2">
 					{collab && peers.length > 0 && (
-						<span className="flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
+						<span className="flex items-center gap-1 py-0.5 text-[11px] font-medium text-emerald-400">
 							<Users className="size-3" />
 							Live
 						</span>

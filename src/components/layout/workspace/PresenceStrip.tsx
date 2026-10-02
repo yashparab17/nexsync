@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, BellOff } from "lucide-react";
 
-import { colorOf } from "@/components/elements/PresenceDots";
+import { initialOf } from "@/components/elements/Avatar";
+import { colorForName } from "@/lib/collabColor";
 import { followPath, placeLabel, readQuiet, saveQuiet } from "@/lib/p2p/presence";
 import { cn } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -47,16 +48,16 @@ export default function PresenceStrip() {
 							onClick={() => setFollowing(followed ? null : peer.id)}
 							disabled={!where}
 							aria-pressed={followed}
+							style={{ background: colorForName(who) }}
 							aria-label={where ? `${followed ? "Stop following" : "Follow"} ${who}` : who}
 							title={`${detail}${where ? (followed ? " Click to stop following." : " Click to follow.") : ""}`}
 							className={cn(
 								"relative flex size-7 items-center justify-center text-[11px] font-bold text-white ring-2 ring-background",
-								colorOf(who),
 								away && "opacity-60",
 								followed && "ring-primary",
 							)}
 						>
-							{who.slice(0, 1).toUpperCase()}
+							{initialOf(who)}
 							<span className={cn("absolute -bottom-0.5 -right-0.5 size-2 ring-1 ring-background", away ? "bg-amber-400" : "bg-emerald-400")} />
 						</button>
 					);

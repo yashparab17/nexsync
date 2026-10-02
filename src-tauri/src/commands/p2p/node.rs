@@ -651,7 +651,7 @@ impl Node {
             .flatten();
         let mut member_link = false;
         let verdict = if hello.v != wire::PROTOCOL_VERSION {
-            Err("You're running a different version of NexSync than the host. Update both apps and try again.".to_string())
+            Err("You're running a different version of Nexsync than the host. Update both apps and try again.".to_string())
         } else if let Some(allow) = &mesh_peer {
             Ok(HandshakeReply::Welcome {
                 v: wire::PROTOCOL_VERSION,
@@ -1037,7 +1037,7 @@ impl Node {
 
         let conn = tokio::time::timeout(CONNECT_TIMEOUT, self.endpoint.connect(ticket.addr, wire::ALPN))
             .await
-            .map_err(|_| ("Timed out reaching the host. Make sure they're online and still have NexSync open.".to_string(), false))?
+            .map_err(|_| ("Timed out reaching the host. Make sure they're online and still have Nexsync open.".to_string(), false))?
             .map_err(|e| {
                 eprintln!("[P2P] Could not reach the host: {e}");
                 ("Couldn't reach the host. Check that you are both online.".to_string(), false)
@@ -1074,7 +1074,7 @@ impl Node {
             } => {
                 if v != wire::PROTOCOL_VERSION {
                     conn.close(CLOSE_REJECTED.into(), b"version mismatch");
-                    return Err(("The host is running a different version of NexSync. Update both apps and try again.".into(), true));
+                    return Err(("The host is running a different version of Nexsync. Update both apps and try again.".into(), true));
                 }
                 let host_name = sanitize_name(&host_name);
                 self.lock().last_join = Some((ticket_str.to_string(), display_name.to_string()));

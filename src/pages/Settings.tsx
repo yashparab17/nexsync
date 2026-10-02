@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import {
-	ArrowLeft,
 	Bug,
 	Check,
 	Code2,
@@ -24,16 +23,17 @@ import {
 	Trash2,
 	Undo2,
 	User,
+	X,
 } from "lucide-react";
 
+import { Row, Segmented, SectionCard } from "@/components/elements/SettingsParts";
+import Avatar from "@/components/elements/Avatar";
 import ErrorLogCard from "@/components/elements/ErrorLogCard";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAppUpdater } from "@/hooks/useAppUpdater";
 import { useErrorLog } from "@/hooks/useErrorLog";
-import { colorForName } from "@/lib/collabColor";
 import {
 	DEFAULT_EDITOR_PREFS,
 	FONT_SIZE_RANGE,
@@ -66,78 +66,8 @@ const samePath = (a: string, b: string) => {
 
 const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((item, i) => item === b[i]);
 
-// A row inside a card: what the setting is on the left, its control on the right
-function Row({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
-	return (
-		<div className="flex flex-wrap items-center justify-between gap-3">
-			<div className="min-w-0">
-				<p className="text-sm font-semibold">{title}</p>
-				{hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-			</div>
-			<div className="flex shrink-0 items-center gap-2">{children}</div>
-		</div>
-	);
-}
-
-// A few buttons of which exactly one is chosen
-function Segmented<T extends string | number>({
-	label,
-	value,
-	options,
-	onChange,
-}: {
-	label: string;
-	value: T;
-	options: { value: T; label: string; icon?: ReactNode }[];
-	onChange: (value: T) => void;
-}) {
-	return (
-		<div role="group" aria-label={label} className="inline-flex border">
-			{options.map((option) => (
-				<Button
-					key={option.value}
-					size="xs"
-					variant={option.value === value ? "secondary" : "ghost"}
-					aria-pressed={option.value === value}
-					onPress={() => onChange(option.value)}
-				>
-					{option.icon}
-					{option.label}
-				</Button>
-			))}
-		</div>
-	);
-}
-
-function SectionCard({
-	id,
-	title,
-	description,
-	icon,
-	children,
-}: {
-	id: string;
-	title: string;
-	description: string;
-	icon: ReactNode;
-	children: ReactNode;
-}) {
-	return (
-		<Card id={id} className="scroll-mt-8">
-			<CardHeader>
-				<CardTitle className="flex items-center gap-2 text-base">
-					{icon}
-					{title}
-				</CardTitle>
-				<CardDescription>{description}</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-4">{children}</CardContent>
-		</Card>
-	);
-}
-
 // App-wide preferences: who you are to collaborators, how the app looks, and where workspaces may live
-export default function Settings() {
+export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 	const navigate = useNavigate();
 	const { preference, setPreference } = useThemeContext();
 	const logError = useErrorLog();
@@ -262,12 +192,12 @@ export default function Settings() {
 		}
 	};
 
-	const back = () => (dirty ? setLeaving(true) : navigate(-1));
-
-	const nameColor = colorForName(name.trim() || "Collaborator");
+	// In the popup the parent closes it; as a plain page it goes back
+	const close = () => (onClose ? onClose() : navigate(-1));
+	const back = () => (dirty ? setLeaving(true) : close());
 
 	return (
-		<div className="min-h-full bg-background">
+		<div className={cn("bg-background", onClose ? "h-[85vh] overflow-y-auto" : "min-h-full")}>
 			<div className="mx-auto flex max-w-5xl gap-8 p-8">
 				{/* Section list */}
 				<aside className="hidden w-44 shrink-0 md:block">
@@ -288,8 +218,8 @@ export default function Settings() {
 
 				<div className="min-w-0 flex-1 space-y-6">
 					<div className="flex items-center gap-3">
-						<Button variant="ghost" size="icon" onPress={back} aria-label="Back">
-							<ArrowLeft className="size-5" />
+						<Button variant="ghost" size="icon" onPress={back} aria-label="Close">
+							<X className="size-5" />
 						</Button>
 						<div>
 							<h1 className="text-3xl font-bold tracking-tight">Settings</h1>
@@ -312,13 +242,7 @@ export default function Settings() {
 						icon={<User className="size-4 text-primary" />}
 					>
 						<div className="flex items-center gap-4">
-							<div
-								aria-hidden
-								className="flex size-12 shrink-0 items-center justify-center text-lg font-bold text-white"
-								style={{ background: nameColor }}
-							>
-								{(name.trim() || "C").charAt(0).toUpperCase()}
-							</div>
+							<Avatar name={name} className="size-12 text-lg" />
 							<div className="min-w-0 flex-1 space-y-1">
 								<Input
 									value={name}
@@ -621,7 +545,7 @@ export default function Settings() {
 							<Button variant="outline" onPress={() => setLeaving(false)}>
 								Keep editing
 							</Button>
-							<Button variant="destructive" onPress={() => navigate(-1)}>
+							<Button variant="destructive" onPress={close}>
 								Discard and leave
 							</Button>
 						</DialogFooter>

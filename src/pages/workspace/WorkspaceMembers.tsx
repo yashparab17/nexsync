@@ -26,6 +26,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import Avatar from "@/components/elements/Avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -341,9 +342,7 @@ export default function WorkspaceMembers() {
 											className="flex items-center justify-between rounded-none border bg-muted/20 p-3.5 transition-colors hover:bg-muted/30"
 										>
 											<div className="flex items-center gap-3">
-												<div className="flex size-10 items-center justify-center rounded-none bg-primary/10 font-bold text-primary">
-													{member.name.slice(0, 2).toUpperCase()}
-												</div>
+												<Avatar name={member.name} className="size-10" />
 												<div>
 													<div className="flex items-center gap-2">
 														<span className="font-semibold text-sm">
