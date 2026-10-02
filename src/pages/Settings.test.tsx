@@ -10,7 +10,6 @@ vi.mock("@/lib/tauri", () => ({
 	saveConfig: (c: unknown) => saveConfig(c),
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: async () => null }));
-vi.mock("@tauri-apps/api/app", () => ({ getVersion: async () => "1.2.3" }));
 const updater = { status: "idle", version: null, error: null, checkForUpdate: () => {}, installUpdate: () => {} };
 vi.mock("@/hooks/useAppUpdater", () => ({ useAppUpdater: () => updater }));
 // The real hook returns one stable function; a new one per render would reload the settings each time
@@ -19,6 +18,7 @@ vi.mock("@/hooks/useErrorLog", () => ({ useErrorLog: () => logError }));
 vi.mock("@/components/elements/ErrorLogCard", () => ({ default: () => <div>error log</div> }));
 
 import { resetEditorPrefs } from "@/lib/editorPrefs";
+import { APP_VERSION } from "@/lib/version";
 import { ThemeProvider } from "@/store/ThemeContext";
 import Settings from "./Settings";
 
@@ -111,6 +111,6 @@ describe("Settings page", () => {
 		fireEvent.click(screen.getByRole("button", { name: "8" }));
 		const stored = JSON.parse(localStorage.getItem("nexsync.editorPrefs") ?? "{}");
 		expect(stored).toMatchObject({ fontSize: 13, tabSize: 8 });
-		expect(await screen.findByText("v1.2.3")).toBeTruthy();
+		expect(await screen.findByText(`v${APP_VERSION}`)).toBeTruthy();
 	});
 });

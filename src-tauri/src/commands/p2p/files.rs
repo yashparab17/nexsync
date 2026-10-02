@@ -235,7 +235,7 @@ pub async fn fetch(node: &Arc<Node>, peer_id: &str, workspace_path: &str, rel_pa
 
     // On failure the partial file is kept so the next attempt can resume from it.
     receive_into(&mut recv, &part, start, size, &mut cancel, progress).await?;
-    tokio::fs::rename(&part, &target)
+    rename_with_retry(&part, &target)
         .await
         .map_err(|e| format!("Failed to save {rel}: {e}"))?;
     // Keep what arrived as a version, off the async threads since it reads the file back
@@ -245,6 +245,24 @@ pub async fn fetch(node: &Arc<Node>, peer_id: &str, workspace_path: &str, rel_pa
     })
     .await;
     Ok(size)
+}
+
+/// Moves a finished download into place. A virus scanner or indexer can hold a file for a moment right after it is
+/// written, and the folder is made again in case something removed it, so a failed rename is tried a few more times.
+async fn rename_with_retry(from: &Path, to: &Path) -> std::io::Result<()> {
+    let mut attempt = 0;
+    loop {
+        if let Some(parent) = to.parent() {
+            let _ = tokio::fs::create_dir_all(parent).await;
+        }
+        match tokio::fs::rename(from, to).await {
+            Err(e) if attempt < 4 && matches!(e.kind(), std::io::ErrorKind::NotFound | std::io::ErrorKind::PermissionDenied) => {
+                attempt += 1;
+                tokio::time::sleep(Duration::from_millis(100 * attempt)).await;
+            }
+            other => return other,
+        }
+    }
 }
 
 /// A hidden partial download left by an interrupted transfer

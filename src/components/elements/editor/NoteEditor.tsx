@@ -37,6 +37,8 @@ interface NoteEditorProps {
 	// The other notes, so [[links]] can open them and the side panel can list backlinks
 	notes?: NoteRef[];
 	onOpenNote?: (path: string) => void;
+	// Told the whole text on every change, so a board can show the note as it is being written
+	onTextChange?: (text: string) => void;
 }
 
 // The end of a note is not part of what a person wrote, so it does not decide whether there are unsaved changes
@@ -44,7 +46,7 @@ const sameNote = (a: string, b: string) => a.replace(/\s+$/, "") === b.replace(/
 
 // Editor for one note. Markdown files (.md) are edited as Markdown source; text files (.txt) get a rich-text
 // editor and are saved as plain text.
-export default function NoteEditor({ fileName, initialContent, onSave, onClose, readOnly = false, workspacePath, docId, notes, onOpenNote }: NoteEditorProps) {
+export default function NoteEditor({ fileName, initialContent, onSave, onClose, readOnly = false, workspacePath, docId, notes, onOpenNote, onTextChange }: NoteEditorProps) {
 	const isMarkdown = isMarkdownFile(fileName);
 	const { peers, selfName, shareNamedVersion } = useP2P();
 	const { metadata } = useWorkspace();
@@ -63,6 +65,12 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 	// The note on disk; it moves forward each time it is saved
 	const [saved, setSaved] = useState(() => initialContent.replace(/\r\n/g, "\n"));
 	const [content, setContent] = useState(saved);
+	// Read through a ref so a new callback each render does not restart anything
+	const textChangeRef = useRef(onTextChange);
+	textChangeRef.current = onTextChange;
+	useEffect(() => {
+		textChangeRef.current?.(content);
+	}, [content]);
 	const [saving, setSaving] = useState(false);
 	const [justSaved, setJustSaved] = useState(false);
 	const [historyOpen, setHistoryOpen] = useState(false);

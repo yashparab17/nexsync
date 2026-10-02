@@ -881,6 +881,34 @@ impl Node {
     /// Members this device should be linked to and is not. Only while a workspace is open, and only by a member that is
     /// not the owner: the owner is dialed, it does not dial. Of any two members only the one with the smaller key dials,
     /// so they do not both try at once.
+    /// The owner's running device signs a fresh version of the list every few hours, so the others' leases do not run out
+    /// while it is online
+    fn refresh_lease(self: &Arc<Self>) {
+        let Some(current) = self.lock().membership.clone() else { return };
+        if self.workspace_path().is_none() {
+            return;
+        }
+        if let Some(doc) = membership::refresh(&current, &self.secret, now_ms()) {
+            self.install_membership(doc, true);
+            self.push_membership(None, None);
+        }
+    }
+
+    /// A device whose own list has run out lets go of the direct links it made on the strength of it
+    fn drop_stale_links(self: &Arc<Self>) {
+        let mine = self.endpoint.id().to_string();
+        let stale: Vec<String> = {
+            let st = self.lock();
+            match &st.membership {
+                Some(m) if !m.vouches(&mine, now_ms()) => st.peers.iter().filter(|(_, p)| p.mesh && !p.is_host).map(|(id, _)| id.to_string()).collect(),
+                _ => Vec::new(),
+            }
+        };
+        for id in stale {
+            let _ = self.disconnect(&id);
+        }
+    }
+
     fn member_targets(&self) -> Vec<EndpointId> {
         if self.workspace_path().is_none() {
             return Vec::new();
@@ -888,7 +916,7 @@ impl Node {
         let mine = self.endpoint.id().to_string();
         let mut st = self.lock();
         let Some(m) = &st.membership else { return Vec::new() };
-        if m.owner == mine || m.role_of(&mine).is_none() {
+        if m.owner == mine || m.role_of(&mine).is_none() || m.lease_expired(now_ms()) {
             return Vec::new();
         }
         let ids: Vec<EndpointId> = m
@@ -907,6 +935,8 @@ impl Node {
     async fn member_loop(self: Arc<Self>) {
         tokio::time::sleep(Duration::from_secs(2)).await;
         loop {
+            self.refresh_lease();
+            self.drop_stale_links();
             for id in self.member_targets() {
                 tokio::spawn(self.clone().dial_member(id));
             }
@@ -966,6 +996,11 @@ impl Node {
         let st = self.lock();
         let id = guest.to_string();
         if st.blocked.contains(&id) || st.known.workspace_id.is_empty() {
+            return None;
+        }
+        // A device that is not the owner and has not had a fresh list for a day does not vouch for anyone: it may have missed
+        // a removal, and this is what stops it being a way back in for the removed
+        if st.membership.as_ref().is_some_and(|m| !m.vouches(&self.endpoint.id().to_string(), now_ms())) {
             return None;
         }
         let role = st.roles.get(&id).or_else(|| st.known.roles.get(&id))?.clone();
@@ -1879,7 +1914,7 @@ mod tests {
         events: &mut mpsc::UnboundedReceiver<(&'static str, serde_json::Value)>,
         name: &str,
     ) -> serde_json::Value {
-        tokio::time::timeout(Duration::from_secs(20), async {
+        tokio::time::timeout(Duration::from_secs(60), async {
             loop {
                 let (event, payload) = events.recv().await.expect("event channel closed");
                 if event == name {

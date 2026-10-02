@@ -2,6 +2,7 @@ import { Minus, Square, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version";
 
 const controls = [
 	{ label: "Minimize", icon: Minus, run: () => getCurrentWindow().minimize() },
@@ -15,7 +16,7 @@ export default function TitleBar() {
 		<header className="relative z-[60] flex h-8 shrink-0 select-none items-center border-b bg-background">
 			<div data-tauri-drag-region className="flex h-full flex-1 items-center px-3">
 				<span data-tauri-drag-region className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-					nexsync
+					Nexsync <span className="font-normal normal-case tracking-normal">v{APP_VERSION}</span>
 				</span>
 			</div>
 			{controls.map(({ label, icon: Icon, run, danger }) => (

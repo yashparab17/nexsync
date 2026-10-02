@@ -1,0 +1,25 @@
+name: Point the beta channel
+# The app's Beta channel reads latest.json from a release tagged "beta". This copies that file from a published
+# pre-release (for example v0.7.0-beta.1) onto it, so testers are offered that build. Run it by hand after publishing.
+on:
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: "The published pre-release to offer testers, for example v0.7.0-beta.1"
+                required: true
+
+jobs:
+    point:
+        runs-on: ubuntu-22.04
+        permissions:
+            contents: write
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            GH_REPO: ${{ github.repository }}
+        steps:
+            - name: Fetch latest.json from the pre-release
+              run: gh release download "${{ inputs.tag }}" --pattern latest.json
+            - name: Make sure the beta release exists
+              run: gh release view beta || gh release create beta --prerelease --title "Beta channel" --notes "Holds latest.json for the app's Beta update channel. Not a download page."
+            - name: Replace latest.json on it
+              run: gh release upload beta latest.json --clobber

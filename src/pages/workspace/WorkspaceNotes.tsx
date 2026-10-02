@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LayoutGrid, Network, Plus, Search } from "lucide-react";
 
@@ -24,6 +24,8 @@ import type { WorkspaceFile } from "@/types/workspace";
 import Loading from "@/components/Loading";
 
 const BOARD_DOC = "board:notes";
+// The most of a note that is shared for the cards; longer notes show the start
+const MAX_LIVE_CHARS = 20000;
 type View = "board" | "graph";
 
 // Notes: rich-text notes (.txt) as cards on a shared board, or as a graph of the [[links]] between them. Markdown
@@ -54,13 +56,22 @@ export default function WorkspaceNotes() {
 	// Where the cards sit is a shared document, so everyone sees a card move as it is dragged
 	const board = useCollabDoc(workspace?.path, BOARD_DOC);
 	const [stored, setStored] = useState<Record<string, Point>>({});
+	// The text of each note as it is being written, shared through the same document
+	const [liveTexts, setLiveTexts] = useState<Record<string, string>>({});
 	useEffect(() => {
 		if (!board) return;
 		const map = board.doc.getMap<Point>("positions");
 		const read = () => setStored(Object.fromEntries(map.entries()));
+		const texts = board.doc.getMap<string>("live");
+		const readTexts = () => setLiveTexts(Object.fromEntries(texts.entries()));
 		read();
+		readTexts();
 		map.observe(read);
-		return () => map.unobserve(read);
+		texts.observe(readTexts);
+		return () => {
+			map.unobserve(read);
+			texts.unobserve(readTexts);
+		};
 	}, [board]);
 
 	const loadNotes = useCallback(async () => {
@@ -129,7 +140,7 @@ export default function WorkspaceNotes() {
 		else if (!isNoteFile(path)) navigate(`/workspace/editor?open=${encodeURIComponent(path)}`, { replace: true });
 	}, !loading);
 
-	const infos = useMemo(() => notes.map((n) => ({ path: n.path, name: n.name, text: texts[n.path] ?? "" })), [notes, texts]);
+	const infos = useMemo(() => notes.map((n) => ({ path: n.path, name: n.name, text: liveTexts[n.path] ?? texts[n.path] ?? "" })), [notes, texts, liveTexts]);
 	const edges = useMemo(() => buildEdges(infos), [infos]);
 	const positions = useMemo(() => positionsFor(notes.map((n) => n.path), stored), [notes, stored]);
 	const shown = useMemo(() => {
@@ -141,6 +152,28 @@ export default function WorkspaceNotes() {
 		if (isViewer || !board) return;
 		board.doc.getMap<Point>("positions").set(path, to);
 	};
+
+	// While a note is edited, its text goes into the shared board so every card and the graph follow each keystroke. A short
+	// wait groups fast typing; the last text is sent when the note is closed.
+	const pendingText = useRef<{ path: string; text: string } | null>(null);
+	const textTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const flushText = useCallback(() => {
+		const pending = pendingText.current;
+		pendingText.current = null;
+		if (!pending || !board) return;
+		const map = board.doc.getMap<string>("live");
+		if (map.get(pending.path) !== pending.text) map.set(pending.path, pending.text);
+	}, [board]);
+	const shareText = useCallback(
+		(path: string, text: string) => {
+			if (isViewer || !board) return;
+			pendingText.current = { path, text: text.slice(0, MAX_LIVE_CHARS) };
+			if (textTimer.current) clearTimeout(textTimer.current);
+			textTimer.current = setTimeout(flushText, 250);
+		},
+		[isViewer, board, flushText],
+	);
+	useEffect(() => flushText, [flushText]);
 
 	const openByPath = (path: string) => {
 		const note = notes.find((n) => n.path === path);
@@ -189,6 +222,7 @@ export default function WorkspaceNotes() {
 			await deleteWorkspaceItem(workspace.path, deleting.path.replace(/^\/+/, ""));
 			addActivityEvent("Deleted note", `Deleted note ${deleting.name}`, undefined, "note");
 			board?.doc.getMap<Point>("positions").delete(deleting.path);
+			board?.doc.getMap<string>("live").delete(deleting.path);
 			if (selected?.path === deleting.path) setSelected(null);
 			setDeleting(null);
 			await loadNotes();
@@ -303,6 +337,7 @@ export default function WorkspaceNotes() {
 								docId={selected.path.replace(/^\/+/, "")}
 								notes={notes}
 								onOpenNote={openByPath}
+								onTextChange={(text) => shareText(selected.path, text)}
 							/>
 						)}
 					</aside>

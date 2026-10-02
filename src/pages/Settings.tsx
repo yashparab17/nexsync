@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { open } from "@tauri-apps/plugin-dialog";
-import { getVersion } from "@tauri-apps/api/app";
+import { APP_VERSION } from "@/lib/version";
 import { relaunch } from "@tauri-apps/plugin-process";
 import {
 	Bug,
@@ -88,7 +88,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 	const [justSaved, setJustSaved] = useState(false);
 	const [saveError, setSaveError] = useState<string | null>(null);
 	const [leaving, setLeaving] = useState(false);
-	const [version, setVersion] = useState<string | null>(null);
+	const version = APP_VERSION;
 
 	useEffect(() => {
 		let current = true;
@@ -105,9 +105,6 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 				setLoadError(err instanceof Error ? err.message : String(err));
 				logError(err, { source: "load_config" });
 			});
-		getVersion()
-			.then((v) => current && setVersion(v))
-			.catch(() => {});
 		return () => {
 			current = false;
 		};
@@ -458,6 +455,17 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						<Row title="Version" hint="Notes, tasks and code, shared directly between your devices.">
 							<span className="text-sm font-semibold tabular-nums">{version ? `v${version}` : "…"}</span>
 						</Row>
+						<Row title="Update channel" hint="Stable is the tested release. Beta gets new builds sooner and may have rough edges.">
+							<Segmented
+								label="Update channel"
+								value={updater.channel}
+								onChange={updater.setChannel}
+								options={[
+									{ value: "stable", label: "Stable" },
+									{ value: "beta", label: "Beta" },
+								]}
+							/>
+						</Row>
 						<Row
 							title="Updates"
 							hint="Signed builds come from GitHub Releases. Nothing is checked until you ask."
@@ -487,6 +495,14 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								</Button>
 							)}
 						</Row>
+						{(updater.status === "available" || updater.status === "installing") && (
+							<div className="space-y-1 border-l-2 border-primary/50 pl-3">
+								<p className="text-sm font-semibold">What's new in v{updater.version}</p>
+								<p className="max-h-40 overflow-y-auto whitespace-pre-wrap text-xs text-muted-foreground">
+									{updater.notes?.trim() || "This release has no notes."}
+								</p>
+							</div>
+						)}
 						{updater.status === "up-to-date" && (
 							<p role="status" className="flex items-center gap-1.5 text-xs text-emerald-400">
 								<Check className="size-3.5" />

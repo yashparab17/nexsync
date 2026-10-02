@@ -9,9 +9,14 @@
 //! the versions after it. Nothing else says who the owner is.
 //!
 //! What this does not do: a device that has not heard about a newer version still acts on its old one. Versions travel
-//! to every device a member meets (see `Node::on_membership`), which bounds how long that lasts but cannot remove it.
+//! to every device a member meets (see `Node::on_membership`), which bounds how long that lasts but cannot remove it. A
+//! lease closes the rest: every version carries the time it was signed, the owner's device signs a fresh one every few
+//! hours while it is running, and a device whose newest version is older than the lease stops letting other members in or
+//! dialing them. A device that missed a removal is therefore a way back in for a day at most, and it learns of the
+//! removal the moment it meets any member that has a newer version.
 
 use std::collections::{BTreeSet, HashMap};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::str::FromStr;
 
 use iroh::{PublicKey, SecretKey, Signature};
@@ -23,6 +28,21 @@ use crate::database::WorkspaceDb;
 /// Most members one workspace can have; the merge state of a record has the same ceiling
 pub const MAX_MEMBERS: usize = 64;
 const ROLES: &[&str] = &["Admin", "Editor", "Viewer"];
+
+/// How long a version can be acted on after the owner signed it. A day cut the chance that a removed member got back in
+/// through a device that had not heard about it from 23% to 4% in the simulation in `hostless_sim.rs`, at the price of
+/// members linking less often when the owner is rarely online.
+pub const LEASE_MS: u64 = 24 * 60 * 60 * 1000;
+/// How old a version gets before the owner's running device signs a fresh one
+pub const REFRESH_MS: u64 = 6 * 60 * 60 * 1000;
+
+fn unix_ms() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+fn is_zero(n: &u64) -> bool {
+    *n == 0
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Membership {
@@ -39,6 +59,10 @@ pub struct Membership {
     pub members: Vec<(String, String)>,
     /// Devices that were members and no longer are, sorted
     pub removed: Vec<String>,
+    /// When the owner signed this version, in milliseconds since 1970; 0 on a list from before leases, which counts as
+    /// expired until the owner signs a new one
+    #[serde(default)]
+    pub issued_at: u64,
     pub sig: String,
 }
 
@@ -51,6 +75,8 @@ struct Unsigned<'a> {
     signer: &'a str,
     members: &'a [(String, String)],
     removed: &'a [String],
+    #[serde(skip_serializing_if = "is_zero")]
+    issued_at: u64,
 }
 
 fn is_key(text: &str) -> bool {
@@ -68,10 +94,29 @@ impl Membership {
             signer: &self.signer,
             members: &self.members,
             removed: &self.removed,
+            issued_at: self.issued_at,
         };
         let mut bytes = b"nexsync membership v1\n".to_vec();
         bytes.extend(serde_json::to_vec(&body).unwrap_or_default());
         bytes
+    }
+
+    /// Whether this version is too old to act on at `now`
+    pub fn lease_expired(&self, now: u64) -> bool {
+        self.issued_at == 0 || now > self.issued_at.saturating_add(LEASE_MS)
+    }
+
+    /// Whether the device `me` holding this version may let other members in at `now`: the owner always may, anybody else
+    /// only while the version is fresh
+    pub fn vouches(&self, me: &str, now: u64) -> bool {
+        self.owner == me || !self.lease_expired(now)
+    }
+
+    /// This version signed again with the time `at`
+    fn stamped(mut self, secret: &SecretKey, at: u64) -> Self {
+        self.issued_at = at;
+        self.sig = to_hex(&secret.sign(&self.payload()).to_bytes());
+        self
     }
 
     pub fn role_of(&self, device: &str) -> Option<&str> {
@@ -130,6 +175,7 @@ pub fn issue(secret: &SecretKey, workspace_id: &str, workspace_name: &str, epoch
         signer: secret.public().to_string(),
         members,
         removed,
+        issued_at: 0,
         sig: String::new(),
     };
     m.sig = to_hex(&secret.sign(&m.payload()).to_bytes());
@@ -158,7 +204,7 @@ pub fn next(current: Option<&Membership>, secret: &SecretKey, workspace_id: &str
     members.sort();
     members.dedup_by(|a, b| a.0 == b.0);
     let Some(cur) = current.filter(|c| c.workspace_id == workspace_id) else {
-        return Ok(Some(issue(secret, workspace_id, workspace_name, 1, &me, members, vec![])));
+        return Ok(Some(issue(secret, workspace_id, workspace_name, 1, &me, members, vec![]).stamped(secret, unix_ms())));
     };
     if cur.owner != me {
         return Err("only the owner can change who is in the workspace".into());
@@ -171,7 +217,7 @@ pub fn next(current: Option<&Membership>, secret: &SecretKey, workspace_id: &str
     let mut removed: BTreeSet<String> = cur.removed.iter().cloned().collect();
     removed.extend(cur.members.iter().map(|(id, _)| id.clone()).filter(|id| !now.contains(id)));
     removed.retain(|id| !now.contains(id));
-    Ok(Some(issue(secret, workspace_id, workspace_name, cur.epoch + 1, &me, members, removed.into_iter().collect())))
+    Ok(Some(issue(secret, workspace_id, workspace_name, cur.epoch + 1, &me, members, removed.into_iter().collect()).stamped(secret, unix_ms())))
 }
 
 /// The version that makes `new_owner` the owner: signed by the current owner, who stays a member as an Admin
@@ -186,7 +232,16 @@ pub fn hand_off(current: &Membership, secret: &SecretKey, new_owner: &str) -> Re
     let mut members: Vec<(String, String)> = current.members.iter().filter(|(id, _)| id != new_owner).cloned().collect();
     members.push((me.clone(), "Admin".into()));
     let removed = current.removed.iter().filter(|id| id.as_str() != new_owner).cloned().collect();
-    Ok(issue(secret, &current.workspace_id, &current.workspace_name, current.epoch + 1, new_owner, members, removed))
+    Ok(issue(secret, &current.workspace_id, &current.workspace_name, current.epoch + 1, new_owner, members, removed).stamped(secret, unix_ms()))
+}
+
+/// The owner's next version with the same members, signed at `now`, when the one it holds is old enough to need it.
+/// Only the owner can do this, and it changes nothing about who belongs.
+pub fn refresh(current: &Membership, secret: &SecretKey, now: u64) -> Option<Membership> {
+    if current.owner != secret.public().to_string() || (current.issued_at != 0 && now < current.issued_at.saturating_add(REFRESH_MS)) {
+        return None;
+    }
+    Some(issue(secret, &current.workspace_id, &current.workspace_name, current.epoch + 1, &current.owner, current.members.clone(), current.removed.clone()).stamped(secret, now))
 }
 
 // ────────────────────────────
@@ -324,5 +379,52 @@ mod tests {
         assert!(load(&path).is_none(), "an edited list fails its signature");
         drop(db);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    const HOUR: u64 = 60 * 60 * 1000;
+
+    #[test]
+    fn a_version_carries_the_time_it_was_signed_and_that_time_cannot_be_changed() {
+        let m = first(1, &[(2, "Editor")]);
+        assert!(m.issued_at > 0, "the owner's own versions are stamped");
+        assert!(m.verify().is_ok());
+        let later = Membership { issued_at: m.issued_at + HOUR, ..m.clone() };
+        assert!(later.verify().is_err(), "a later time without the owner's signature is refused");
+        let stripped = Membership { issued_at: 0, ..m.clone() };
+        assert!(stripped.verify().is_err(), "removing the time to look like an old list is refused too");
+    }
+
+    #[test]
+    fn a_version_is_good_for_a_day_and_a_list_with_no_time_is_not_good_at_all() {
+        let m = issue(&key(1), "ws", "Demo", 1, &id(1), vec![], vec![]).stamped(&key(1), 1_000);
+        assert!(!m.lease_expired(1_000 + LEASE_MS));
+        assert!(m.lease_expired(1_000 + LEASE_MS + 1));
+        assert!(!m.lease_expired(500), "a clock a little behind the owner's is not an expiry");
+        let old = issue(&key(1), "ws", "Demo", 1, &id(1), vec![], vec![]);
+        assert_eq!(old.issued_at, 0);
+        assert!(old.lease_expired(1));
+        assert!(old.verify().is_ok(), "a list from before leases still verifies");
+    }
+
+    #[test]
+    fn only_the_owner_refreshes_and_only_when_the_version_is_getting_old() {
+        let m = issue(&key(1), "ws", "Demo", 3, &id(1), roster(&[(2, "Editor")]), vec![id(5)]).stamped(&key(1), 10 * HOUR);
+        assert!(refresh(&m, &key(1), 10 * HOUR + REFRESH_MS - 1).is_none(), "too soon");
+        let fresh = refresh(&m, &key(1), 10 * HOUR + REFRESH_MS).unwrap();
+        assert_eq!((fresh.epoch, fresh.issued_at), (4, 10 * HOUR + REFRESH_MS));
+        assert_eq!((&fresh.members, &fresh.removed), (&m.members, &m.removed), "who belongs does not change");
+        assert!(accept(Some(&m), &fresh).is_ok(), "the others take it as the next version");
+        assert!(refresh(&m, &key(2), 100 * HOUR).is_none(), "a member cannot");
+        let legacy = issue(&key(1), "ws", "Demo", 3, &id(1), vec![], vec![]);
+        assert!(refresh(&legacy, &key(1), 1).is_some(), "a list with no time is stamped at once");
+    }
+
+    #[test]
+    fn a_member_whose_list_has_run_out_does_not_let_anyone_in_but_the_owner_always_may() {
+        let m = issue(&key(1), "ws", "Demo", 1, &id(1), roster(&[(2, "Editor")]), vec![]).stamped(&key(1), 5 * HOUR);
+        let late = 5 * HOUR + LEASE_MS + 1;
+        assert!(m.vouches(&id(2), 5 * HOUR + 1), "a member with a fresh list");
+        assert!(!m.vouches(&id(2), late), "the same member a day on, without hearing from the owner");
+        assert!(m.vouches(&id(1), late), "the owner is the source of the list, so it does not run out");
     }
 }

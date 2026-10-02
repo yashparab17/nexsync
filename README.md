@@ -4,6 +4,8 @@ Nexsync is a **local-first, peer-to-peer collaborative workspace** desktop app. 
 
 Built with [Tauri 2](https://tauri.app) (Rust) + React 19 + TypeScript, with peer-to-peer networking by [Iroh](https://www.iroh.computer).
 
+**Status: alpha.** See [CHANGELOG.md](CHANGELOG.md) for what is in the first build and [ALPHA_CHECKLIST.md](ALPHA_CHECKLIST.md) for what is checked and what is left.
+
 ## Features
 
 - **Workspaces on your own disk.** Each workspace is a regular folder (`notes/`, `files/`, `assets/`, `editor/`) plus a hidden `.nexsync/` database.
@@ -92,7 +94,7 @@ CI is split into two workflows:
 
 ### Auto-updates
 
-The app checks GitHub Releases for a newer signed build from **Settings → Updates & About → Check for updates**, downloads it, and relaunches. Releases are signed with a minisign keypair (the public half lives in `src-tauri/tauri.conf.json`); `release.yml` needs `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` set as repo secrets to produce a release the updater will trust. Windows/macOS code signing is wired the same way (`WINDOWS_CERTIFICATE*`, `APPLE_*` secrets) but no signing identity is configured yet — builds are unsigned until those are added.
+The app checks GitHub Releases for a newer signed build from **Settings → Updates & About → Check for updates**, shows the release notes under "What's new", downloads it, and relaunches. The **update channel** there is Stable (the newest published release) or Beta (a pre-release you point testers at by running the **Point the beta channel** workflow with the pre-release tag; tags with a dash, such as `v0.2.0-beta.1`, are published as pre-releases). The notes come from the release body, so edit the draft release before publishing it. Releases are signed with a minisign keypair (the public half lives in `src-tauri/tauri.conf.json`); `release.yml` needs `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` set as repo secrets to produce a release the updater will trust. Windows signing imports the certificate from `WINDOWS_CERTIFICATE` and `WINDOWS_CERTIFICATE_PASSWORD`, and macOS signing and notarization use the `APPLE_*` secrets. Neither has been run yet, because no certificate is configured, so builds are unsigned for now.
 
 ## Collaborating with someone
 
@@ -133,11 +135,11 @@ If you already have the synced workspace open, use **P2P Sync → Join with Invi
 
 ## Current limitations
 
-- **Host-vouched mesh:** guests join through the host, which relays changes and introduces each pair of guests to each other. Guests then link directly and keep syncing if the host goes offline, but a direct link that drops while the host is away is not re-dialed, and new guests cannot join until a host is back.
-- **Live co-editing has no presence UI yet:** cursor/selection data is relayed and applied, but nothing outside the open editor reads it — no "who's viewing this file" indicator on the Members page yet.
+- **The host still decides who is a member.** Members link to each other without the host and keep syncing while it is away, using a member list the host signs. Only the host can change roles, rules and settings, and a removed member can still get back in through a device that has not yet heard of the removal, for at most 24 hours: the owner's device re-signs the member list every 6 hours, and a device whose list is older than a day stops letting members in (the numbers are in [RESEARCH.md](RESEARCH.md)). New people can only join while the host is online.
+- **Reaching a device across networks is only measured on one machine.** Direct and relayed connections are used as Iroh decides; how often a member can be reached without the host across real networks is not yet known.
+- **Alpha software.** Expect rough edges and keep your own backups of anything important.
 - **CodeMirror's undo is CRDT-aware, but a rename mid-edit only migrates the collaboration state for files, not folders**, and the very first time two people open a never-before-collaborated file at almost the same instant, both may seed it independently (harmless once anyone edits it once).
 - **Last writer wins, outside a live session:** a plain file save (not currently open together) or a re-pull from the host still replaces the other side's copy of files ≤ 10 MB rather than merging.
-- **Offline changes aren't reconciled:** edits made while disconnected sync only when the file or task changes again, or via **Pull from Host**. Pulling adds and updates tasks and cards but doesn't remove ones deleted while you were offline.
 - **Trash isn't emptied automatically:** clear `.nexsync/trash/` yourself if it grows.
 - **Public relays:** n0's public relays are meant for development and light use. A production deployment should run its own [iroh-relay](https://github.com/n0-computer/iroh).
 - **No code-signing identity configured yet:** Windows/macOS release builds are unsigned until certificates are added as repo secrets, so installers will trigger OS-level "unknown publisher" warnings.
@@ -186,3 +188,7 @@ Frontend type-check and production build:
 ```bash
 pnpm build
 ```
+
+## License
+
+Nexsync is open source under the [MIT License](LICENSE). Copyright (c) 2026 Yash Parab and Dhruv Dinda.

@@ -85,3 +85,22 @@ pub fn clear_error_log(app_handle: tauri::AppHandle) -> Result<(), String> {
         _ => Ok(()),
     }
 }
+
+/// Writes a crash to the error log on its way down, so there is something to report. It stays on this device.
+pub fn install_panic_hook(app_handle: tauri::AppHandle) {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let message = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "unknown panic".to_string());
+        let place = info.location().map(|l| format!("{}:{}", l.file(), l.line()));
+        let _ = log_error(
+            app_handle.clone(),
+            ErrorRecord { timestamp: chrono::Utc::now().to_rfc3339(), message: format!("The app crashed: {message}"), source: "panic".into(), workspace: None, detail: place },
+        );
+        previous(info);
+    }));
+}

@@ -51,6 +51,25 @@ jobs:
             - name: Install dependencies
               run: pnpm install
 
+            # Tauri does not read the certificate secrets itself: the certificate goes into the Windows store and the
+            # bundler is told which one to sign with. Skipped when no certificate secret is set.
+            - name: Import Windows code-signing certificate
+              if: matrix.platform == 'windows-latest' && env.WINDOWS_CERTIFICATE != ''
+              shell: pwsh
+              env:
+                  WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+                  WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+              run: |
+                  New-Item -ItemType directory -Path certificate
+                  Set-Content -Path certificate/tempCert.txt -Value $env:WINDOWS_CERTIFICATE
+                  certutil -decode certificate/tempCert.txt certificate/certificate.pfx
+                  $password = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+                  $cert = Import-PfxCertificate -FilePath certificate/certificate.pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password
+                  $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+                  $windows = [pscustomobject]@{ certificateThumbprint = $cert.Thumbprint; digestAlgorithm = 'sha256'; timestampUrl = 'http://timestamp.digicert.com' }
+                  $conf.bundle | Add-Member -NotePropertyName windows -NotePropertyValue $windows -Force
+                  $conf | ConvertTo-Json -Depth 20 | Set-Content src-tauri/tauri.conf.json
+
             - name: Build and publish release
               uses: tauri-apps/tauri-action@v0
               env:
@@ -74,5 +93,8 @@ jobs:
                   tagName: v__VERSION__
                   releaseName: "Nexsync v__VERSION__"
                   releaseDraft: true
-                  prerelease: false
+                  # A tag with a dash, such as v0.7.0-beta.1, is a pre-release: stable users are not offered it
+                  prerelease: ${{ contains(github.ref_name, '-') }}
+                  # Shown in the app as "What's new" when this release is installed as an update; edit before publishing
+                  releaseBody: "Edit these release notes before publishing the draft. They appear in the app under Settings > Updates."
                   includeUpdaterJson: true

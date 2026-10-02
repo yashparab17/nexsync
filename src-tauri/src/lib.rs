@@ -8,6 +8,8 @@ pub fn run() {
         .manage(commands::p2p::P2pState::default())
         .manage(commands::editor_run::RunState::default())
         .setup(|app| {
+            // A crash leaves a record in the local error log
+            commands::workspace::install_panic_hook(app.handle().clone());
             // Initialize the session auth registry
             commands::auth::init();
             // Writes to tasks and cards are signed with the key this device is known by to collaborators
@@ -24,6 +26,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
+            // Updates
+            commands::updates::check_for_update,
+            commands::updates::install_update,
             // Session management
             commands::auth::create_workspace_session,
             commands::auth::close_workspace_session,

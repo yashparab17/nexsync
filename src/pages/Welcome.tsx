@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/card";
 
 // Tauri IPC
+import { APP_VERSION } from "@/lib/version";
 import { getLastWorkspace, getRecentWorkspaces, loadConfig } from "@/lib/tauri";
 
 // Context
@@ -229,7 +230,7 @@ export default function Welcome() {
 
 			{/* Footer */}
 			<footer className="mt-auto space-y-1 pb-4 text-center text-muted-foreground">
-				<p className="text-2xl">Nexsync 0.6.7</p>
+				<p className="text-2xl">Nexsync {APP_VERSION}</p>
 				<p className="text-xs">
 					Local First • Open Source • Built with Tauri
 				</p>

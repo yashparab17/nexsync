@@ -80,4 +80,13 @@ describe("Notes", () => {
 		await waitFor(() => expect(stats()).toContain("2 lines"));
 		expect(stats()).toContain("4 words");
 	});
+
+	it("tells its page the whole text as it is written, so a board can follow each keystroke", async () => {
+		const seen = vi.fn();
+		render(<NoteEditor fileName="live.md" initialContent={"# Title\nbody\n"} onSave={async () => {}} onClose={() => {}} workspacePath="/w" docId="notes/live.md" onTextChange={seen} />);
+		await waitFor(() => expect(seen).toHaveBeenCalledWith("# Title\nbody\n"));
+		const { doc } = docs.get("notes/live.md")!;
+		doc.getText("content").insert(doc.getText("content").length, "more\n");
+		await waitFor(() => expect(seen).toHaveBeenLastCalledWith("# Title\nbody\nmore\n"));
+	});
 });

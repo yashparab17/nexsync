@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, Copy, RefreshCw, Trash2 } from "lucide-react";
+import { APP_VERSION } from "@/lib/version";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +39,15 @@ export default function ErrorLogCard() {
 		await refresh();
 	};
 
+	// What to attach to a bug report: the app and system, then the log. It is copied, never sent.
+	const copyDiagnostics = () => {
+		copy(`Nexsync ${APP_VERSION}
+${navigator.userAgent}
+${new Date().toISOString()}
+
+${asText() || "No errors recorded."}`, "diagnostics");
+	};
+
 	const asText = () =>
 		records
 			.map((r) => `${r.timestamp} [${r.source}] ${r.message}${r.detail ? `\n${r.detail}` : ""}`)
@@ -66,6 +76,10 @@ export default function ErrorLogCard() {
 					>
 						{copiedKey === "log" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
 						{copiedKey === "log" ? "Copied" : "Copy All"}
+					</Button>
+					<Button variant="outline" size="sm" onPress={copyDiagnostics} className="gap-1.5">
+						{copiedKey === "diagnostics" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+						{copiedKey === "diagnostics" ? "Copied" : "Copy diagnostics"}
 					</Button>
 					<Button
 						variant="outline"
