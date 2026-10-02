@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import WorkspaceSearch from "@/components/layout/workspace/WorkspaceSearch";
 import NotificationBell from "@/components/layout/workspace/NotificationBell";
 import CatchUp from "@/components/layout/workspace/CatchUp";
+import PresenceStrip from "@/components/layout/workspace/PresenceStrip";
 import { useP2P } from "@/store/p2p/P2PContext";
 import P2PConnectDialog from "@/components/dialogs/workspace/P2PConnectDialog";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 
 			{/* Right Actions: P2P Badge & Settings */}
 			<div className="flex shrink-0 items-center gap-2">
+				<PresenceStrip />
 				<CatchUp />
 					<NotificationBell />
 				<Button

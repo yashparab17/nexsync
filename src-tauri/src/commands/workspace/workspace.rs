@@ -62,6 +62,7 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
             name: owner_name,
             role: "Owner".to_string(),
             device_id: None,
+            last_seen: None,
         }],
     };
 
@@ -104,8 +105,8 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
     for m in &members.members {
         validate_member_role(&m.role).map_err(|e| e.to_string())?;
         tx.execute(
-            "INSERT INTO members (id, workspace_id, name, role, device_id) VALUES (?1, ?2, ?3, ?4, ?5)",
-            rusqlite::params![&m.id, &workspace.id, &m.name, &m.role, &m.device_id],
+            "INSERT INTO members (id, workspace_id, name, role, device_id, last_seen) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![&m.id, &workspace.id, &m.name, &m.role, &m.device_id, &m.last_seen],
         )
         .map_err(|e| e.to_string())?;
     }
@@ -239,7 +240,7 @@ pub fn read_workspace_metadata(app_handle: tauri::AppHandle, path: String) -> Re
     };
 
     let members: Vec<Member> = tx
-        .prepare("SELECT id, name, role, device_id FROM members WHERE workspace_id = ?1")
+        .prepare("SELECT id, name, role, device_id, last_seen FROM members WHERE workspace_id = ?1")
         .map_err(|e| e.to_string())?
         .query_map([&workspace.id], |r| {
             Ok(Member {
@@ -247,6 +248,7 @@ pub fn read_workspace_metadata(app_handle: tauri::AppHandle, path: String) -> Re
                 name: r.get(1)?,
                 role: r.get(2)?,
                 device_id: r.get(3)?,
+                last_seen: r.get(4)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -333,6 +335,14 @@ fn persist_metadata(db: &WorkspaceDb, canonical_path_str: &str, metadata: &Works
     )
     .map_err(|e| e.to_string())?;
 
+    // Names tell people apart, so two members never share one (the database holds the same rule)
+    let mut names = std::collections::HashSet::new();
+    for m in &metadata.members.members {
+        if !names.insert(m.name.trim().to_lowercase()) {
+            return Err(format!("Another member is already called \"{}\".", m.name));
+        }
+    }
+
     // Keep surviving member rows in place so task assignees aren't cleared on every save
     let member_ids = serde_json::to_string(
         &metadata.members.members.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
@@ -352,9 +362,9 @@ fn persist_metadata(db: &WorkspaceDb, canonical_path_str: &str, metadata: &Works
     for m in &metadata.members.members {
         validate_member_role(&m.role).map_err(|e| e.to_string())?;
         tx.execute(
-            "INSERT INTO members (id, workspace_id, name, role, device_id) VALUES (?1, ?2, ?3, ?4, ?5)
-             ON CONFLICT(id) DO UPDATE SET name = excluded.name, role = excluded.role, device_id = excluded.device_id",
-            rusqlite::params![&m.id, &metadata.workspace.id, &m.name, &m.role, &m.device_id],
+            "INSERT INTO members (id, workspace_id, name, role, device_id, last_seen) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(id) DO UPDATE SET name = excluded.name, role = excluded.role, device_id = excluded.device_id, last_seen = excluded.last_seen",
+            rusqlite::params![&m.id, &metadata.workspace.id, &m.name, &m.role, &m.device_id, &m.last_seen],
         )
         .map_err(|e| e.to_string())?;
     }
@@ -561,6 +571,43 @@ mod tests {
         db.conn
             .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))
             .unwrap()
+    }
+
+    #[test]
+    fn test_two_members_cannot_share_a_name_even_in_different_capitals() {
+        let dir = std::env::temp_dir().join(format!("nexsync-names-{}", Uuid::new_v4()));
+        let db = WorkspaceDb::open(dir.to_str().unwrap()).unwrap();
+        let path = dir.to_string_lossy().to_string();
+        let owner = serde_json::json!({ "id": "owner", "name": "Sam", "role": "Owner" });
+        let other = serde_json::json!({ "id": "m-2", "name": "sam", "role": "Editor" });
+        let err = persist_metadata(&db, &path, &metadata(serde_json::json!([owner, other]))).unwrap_err();
+        assert!(err.contains("already called"), "{err}");
+        // The database refuses it too, should anything write around the check
+        let ok = serde_json::json!({ "id": "m-2", "name": "Sam (2)", "role": "Editor" });
+        persist_metadata(&db, &path, &metadata(serde_json::json!([owner, ok]))).unwrap();
+        let clash = db.conn.execute("UPDATE members SET name = 'SAM' WHERE id = 'm-2'", []);
+        assert!(clash.is_err());
+        drop(db);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_when_a_member_was_last_seen_is_saved_and_survives_later_saves() {
+        let dir = std::env::temp_dir().join(format!("nexsync-seen-{}", Uuid::new_v4()));
+        let db = WorkspaceDb::open(dir.to_str().unwrap()).unwrap();
+        let path = dir.to_string_lossy().to_string();
+        let owner = serde_json::json!({ "id": "owner", "name": "Host", "role": "Owner" });
+        let friend = serde_json::json!({ "id": "m-2", "name": "Raven", "role": "Editor", "deviceId": "key", "lastSeen": 1_700_000_000_000i64 });
+        persist_metadata(&db, &path, &metadata(serde_json::json!([owner, friend]))).unwrap();
+        let seen = |db: &WorkspaceDb| -> Option<i64> {
+            db.conn.query_row("SELECT last_seen FROM members WHERE id = 'm-2'", [], |r| r.get(0)).unwrap()
+        };
+        assert_eq!(seen(&db), Some(1_700_000_000_000));
+        // The field also round-trips as JSON, which is how the host's member list reaches guests
+        let parsed: Member = serde_json::from_value(friend).unwrap();
+        assert_eq!(serde_json::to_value(&parsed).unwrap()["lastSeen"], 1_700_000_000_000i64);
+        drop(db);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

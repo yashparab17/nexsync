@@ -1,7 +1,7 @@
 import { describe as suite, expect, it } from "vitest";
 import * as Y from "yjs";
 
-import { authorOf, canRevertField, describe, groupByAuthor, replaceText, revertHunk, revertValue, textHunks } from "@/lib/catchup";
+import { authorOf, canRevertField, countRows, describe, groupByAuthor, previewText, replaceText, revertHunk, revertValue, rowsOf, textHunks } from "@/lib/catchup";
 import type { CatchupEntry } from "@/types/workspace";
 
 const look = { member: (id: string) => (id === "m1" ? "Sam" : "someone"), column: (id: string) => (id === "done" ? "Done" : id) };
@@ -14,6 +14,27 @@ suite("grouping", () => {
 	it("groups by author, most recent author first, and names the unknown", () => {
 		const groups = groupByAuthor([entry({ id: 3, at: 300, who: "Ana" }), entry({ id: 2, at: 200, who: null }), entry({ id: 1, at: 100, who: "Ana" }), entry({ id: 4, at: 400, who: "Sam" })]);
 		expect(groups.map((g) => [g.who, g.entries.length])).toEqual([["Sam", 1], ["Ana", 2], ["A collaborator", 1]]);
+	});
+});
+
+suite("folding", () => {
+	const text = (id: number, over: Partial<CatchupEntry> = {}) => entry({ id, kind: "text", entity: "file", target: "notes/a.md", label: "a.md", path: "", before: "one\n", after: "one\ntwo\n", ...over });
+
+	it("folds one person's edits to a file into one item and keeps other changes apart", () => {
+		const rows = rowsOf([text(3), text(2), entry({ id: 5 }), text(1, { target: "notes/b.md" })]);
+		expect(rows.map((r) => r.map((e) => e.id))).toEqual([[3, 2], [5], [1]]);
+	});
+
+	it("counts what the review lists, not every burst of typing", () => {
+		const entries = [text(1), text(2), text(3), text(4, { who: "Ana" }), entry({ id: 9 })];
+		expect(countRows(entries)).toBe(3); // Sam's file, Ana's file, Sam's field change
+	});
+
+	it("shows what a text change added on one line", () => {
+		expect(previewText(text(1))).toBe("two");
+		expect(previewText(text(1, { before: "a\nb\n", after: "a\n" }))).toBe("Removed text");
+		expect(previewText(text(1, { before: null, after: null }))).toBe("A large change");
+		expect(previewText(text(1, { before: "", after: "x".repeat(200) })).length).toBe(90);
 	});
 });
 

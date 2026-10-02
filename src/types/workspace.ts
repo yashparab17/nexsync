@@ -39,6 +39,7 @@ export interface Member {
 	name: string;
 	role: string;
 	deviceId?: string; // P2P device key; roles are enforced against this, not the name
+	lastSeen?: number; // When the host last saw this member's connection end, in ms; only the host sets it
 }
 
 // List of workspace collaborators

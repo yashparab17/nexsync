@@ -1,3 +1,4 @@
+import { freeName } from "@/lib/memberNames";
 import type { Member } from "@/types/workspace";
 
 // Roles a member can be set to. Owner belongs to whoever created the workspace and is never handed out.
@@ -30,8 +31,5 @@ export function bindGuestMember(
 	if (legacy) return members.map((m) => (m === legacy ? { ...m, deviceId: peer.id, role: peer.role } : m));
 
 	// A new device never takes over an existing member's name, the Owner's included
-	const taken = new Set(members.map((m) => m.name.toLowerCase()));
-	let name = peer.name;
-	for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${peer.name} (${n})`;
-	return [...members, { id: newId(), name, role: peer.role, deviceId: peer.id }];
+	return [...members, { id: newId(), name: freeName(members, peer.name), role: peer.role, deviceId: peer.id }];
 }

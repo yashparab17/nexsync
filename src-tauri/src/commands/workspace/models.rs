@@ -45,6 +45,9 @@ pub struct Member {
     /// The collaborator's P2P device key, which is what roles are enforced against
     #[serde(default, rename = "deviceId", skip_serializing_if = "Option::is_none")]
     pub device_id: Option<String>,
+    /// When the host last saw this member's connection end, in milliseconds; only the host writes it
+    #[serde(default, rename = "lastSeen", skip_serializing_if = "Option::is_none")]
+    pub last_seen: Option<i64>,
 }
 
 /// List of workspace collaborators

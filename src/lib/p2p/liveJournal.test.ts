@@ -54,7 +54,7 @@ describe("LiveJournal", () => {
 		a.getText("content").insert(0, "hello");
 		const update = sent.find((m) => m.kind === "SYNC_UPDATE")!;
 		provider.handleMessage("a", { ...update, author: "Sam" });
-		expect(heard).toEqual([["notes/x.md", "Sam", "", "hello"]]);
+		expect(heard).toEqual([["notes/x.md", "Sam", "", "hello", true]]);
 	});
 
 	it("ignores a change that changed nothing", () => {

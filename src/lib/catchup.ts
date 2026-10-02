@@ -55,6 +55,33 @@ export function groupByAuthor(entries: CatchupEntry[], members: { name: string; 
 	return [...groups.values()].sort((a, b) => b.latest - a.latest);
 }
 
+// What is reviewed as one item: all of a person's edits to one file are one, and every other change is its own
+export const rowKey = (e: CatchupEntry) => (e.kind === "text" ? `text:${e.target}` : `entry:${e.id}`);
+
+// The items of one person's changes, each holding the changes folded into it (newest first)
+export function rowsOf(entries: CatchupEntry[]): CatchupEntry[][] {
+	const rows = new Map<string, CatchupEntry[]>();
+	for (const e of entries) rows.set(rowKey(e), [...(rows.get(rowKey(e)) ?? []), e]);
+	return [...rows.values()];
+}
+
+// How many items there are to review, which is what a badge should count
+export function countRows(entries: CatchupEntry[], members: { name: string; deviceId?: string }[] = []): number {
+	return groupByAuthor(entries, members).reduce((n, g) => n + rowsOf(g.entries).length, 0);
+}
+
+// One line of what a text change added, for the folded view
+export function previewText(e: CatchupEntry, max = 90): string {
+	if (e.before === null || e.after === null) return "A large change";
+	const added = textHunks(e.before, e.after)
+		.flatMap((h) => h.newLines)
+		.join(" ")
+		.replace(/\s+/g, " ")
+		.trim();
+	if (!added) return "Removed text";
+	return added.length > max ? `${added.slice(0, max - 1)}…` : added;
+}
+
 // A value from the journal, which holds JSON text; anything unreadable is treated as no value
 export function parseValue(json: string | null): unknown {
 	if (json === null) return undefined;

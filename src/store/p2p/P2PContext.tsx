@@ -54,6 +54,8 @@ import { applyCatchUp, buildInventory, editDoc, updatesFor, type Inventory } fro
 import { replaceText, revertHunk, type TextHunk } from "@/lib/catchup";
 import { readSelfName, setSelfName } from "@/lib/p2p/selfName";
 import { readRejoin, saveRejoin, type Rejoin } from "@/lib/p2p/rejoin";
+import { HEARTBEAT_MS, HERE, IDLE_MS, parsePresence, readQuiet, whoIsAt, type PeerPresence, type Presence } from "@/lib/p2p/presence";
+import { cleanName, freeName, nameProblem } from "@/lib/memberNames";
 import { newMentions } from "@/lib/comments";
 import { LiveJournal } from "@/lib/p2p/liveJournal";
 
@@ -125,6 +127,11 @@ function isMemberList(value: unknown): value is Member[] {
 
 interface P2PContextType {
 	peers: ConnectedPeerInfo[];
+	presence: Record<string, PeerPresence>; // Where each collaborator is, by name; empty for someone who has not said
+	setMyPresence: (patch: Partial<Presence>) => void; // Tells everyone where this device is; only the fields given change
+	nameOf: (deviceId: string) => string; // The name a connected device goes by in this workspace
+	viewersAt: (page: string, item?: string) => string[]; // Names of the collaborators on a page, or with one file, card or task open
+	requestName: (name: string) => void; // Guests only: asks the host to change the name this device goes by in this workspace
 	connectionStatus: "offline" | "connecting" | "reconnecting" | "connected";
 	placeholders: PlaceholderItem[];
 	syncProgress: SyncProgress | null;
@@ -200,6 +207,13 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const sendInventoryRef = useRef<(peerId: string) => void>(() => {});
 	// What a peer said it has, kept when it arrives before any workspace is open (joining from the Welcome page), and answered once one is
 	const heldInventoriesRef = useRef<Map<string, string>>(new Map());
+	// Who each connected peer is, kept so that when one leaves we can still say who it was
+	const peerNamesRef = useRef<Map<string, string>>(new Map());
+	// Connections this device ended on purpose, which are not announced as someone leaving
+	const quietPeersRef = useRef<Set<string>>(new Set());
+	const quietUntilRef = useRef(0);
+	const [presence, setPresence] = useState<Record<string, PeerPresence>>({});
+	const myPresenceRef = useRef<Presence>(HERE);
 	const answerInventoryRef = useRef<(path: string, peerId: string, raw: string) => void>(() => {});
 	const [transfers, setTransfers] = useState<FileTransfer[]>([]);
 	// Set when the user cancels everything, so a snapshot download loop stops instead of starting the next file
@@ -296,6 +310,55 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		);
 	}, []);
 
+	// Says where this device is, to one peer or to everyone
+	const sharePresence = useCallback(
+		(peerId?: string) => {
+			if (peerId === undefined && peersRef.current.length === 0) return;
+			send({ kind: "PRESENCE", timestamp: Date.now(), payload: JSON.stringify(myPresenceRef.current) }, peerId);
+		},
+		[send],
+	);
+
+	// The workspace name of a device: its member's name, which is unique, and for the host the owner's, since the host has no device key in the list
+	const memberNameOf = useCallback((id: string) => {
+		const members = metadataRef.current?.members.members ?? [];
+		const byKey = members.find((m) => m.deviceId === id)?.name;
+		if (byKey) return byKey;
+		return selfNameRef.current !== null && peersRef.current.some((p) => p.id === id && p.isHost) ? members.find((m) => m.role === "Owner")?.name : undefined;
+	}, []);
+	const nameOf = useCallback((id: string) => memberNameOf(id) ?? peerNamesRef.current.get(id) ?? "A collaborator", [memberNameOf]);
+	const memberNameOfRef = useRef(memberNameOf);
+	memberNameOfRef.current = memberNameOf;
+
+	const setMyPresence = useCallback(
+		(patch: Partial<Presence>) => {
+			const next = { ...myPresenceRef.current, ...patch };
+			const was = myPresenceRef.current;
+			if (next.page === was.page && next.item === was.item && next.away === was.away) return;
+			myPresenceRef.current = next;
+			sharePresence();
+		},
+		[sharePresence],
+	);
+
+	// Showing up as away after a while without input, and back on the first input; again every so often for newcomers
+	useEffect(() => {
+		let idle = setTimeout(() => setMyPresence({ away: true }), IDLE_MS);
+		const active = () => {
+			clearTimeout(idle);
+			idle = setTimeout(() => setMyPresence({ away: true }), IDLE_MS);
+			if (myPresenceRef.current.away) setMyPresence({ away: false });
+		};
+		const events = ["pointerdown", "keydown", "wheel", "focus"] as const;
+		for (const e of events) window.addEventListener(e, active, { passive: true });
+		const beat = setInterval(() => sharePresence(), HEARTBEAT_MS);
+		return () => {
+			clearTimeout(idle);
+			clearInterval(beat);
+			for (const e of events) window.removeEventListener(e, active);
+		};
+	}, [setMyPresence, sharePresence]);
+
 	// Share the open workspace's files with connected peers (none when no workspace is open)
 	useEffect(() => {
 		p2p.setSharedWorkspace(workspace?.path ?? null).catch((err) =>
@@ -339,6 +402,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		const prevId = prevWorkspaceIdRef.current;
 		const currentId = workspace?.id ?? null;
 		if (prevId && prevId !== currentId) {
+			quietUntilRef.current = Date.now() + 3000;
 			p2p.disconnectAll().catch(console.error);
 			syncProvidersRef.current.forEach((provider) => provider.destroy());
 			syncProvidersRef.current.clear();
@@ -364,10 +428,26 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		}
 	}, []);
 
+	// Host only: notes when a member's connection ended, in the member list so that every guest sees it too
+	const stampLastSeen = useCallback(async (peerId: string, at: number) => {
+		const path = workspaceRef.current?.path;
+		if (!path || selfNameRef.current !== null) return;
+		try {
+			const meta = await readWorkspaceMetadata(path);
+			if (!meta.members.members.some((m) => m.deviceId === peerId)) return;
+			const members = meta.members.members.map((m) => (m.deviceId === peerId ? { ...m, lastSeen: at } : m));
+			await writeWorkspaceMetadata({ path, metadata: { ...meta, members: { members } } });
+			await refreshMetadataRef.current(path);
+		} catch (err) {
+			console.error("[P2P] Failed to note when a member was last seen:", err);
+		}
+	}, []);
+
 	// Track connected peers and attach them to live Yjs providers
 	useEffect(() => {
 		const updatePeers = (list: ConnectedPeerInfo[]) => {
 			peersRef.current = list;
+			for (const peer of list) peerNamesRef.current.set(peer.id, peer.name);
 			setPeers(list);
 		};
 		p2p.listPeers().then(updatePeers).catch(() => {});
@@ -387,7 +467,14 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		const offReconnectFailed = p2p.onReconnectFailed(() => setReconnecting(false));
 		const offJoined = p2p.onPeerJoined((peer) => {
 			setReconnecting(false);
-			if (!peer.isHost) notifyRef.current(`${peer.name} joined the workspace`);
+			peerNamesRef.current.set(peer.id, peer.name);
+			if (!peer.isHost && !readQuiet()) {
+				// The host knows the name the newcomer is about to be given
+				const members = metadataRef.current?.members.members ?? [];
+				const shown = members.find((m) => m.deviceId === peer.id)?.name ?? (selfNameRef.current === null ? freeName(members, peer.name) : peer.name);
+				notifyRef.current(`${shown} joined the workspace`);
+			}
+			sharePresence(peer.id);
 			syncProvidersRef.current.forEach((provider) => provider.addPeer(peer.id));
 			sendInventoryRef.current(peer.id);
 			if (!peer.isHost && selfNameRef.current === null) void addGuestMember(peer);
@@ -396,6 +483,18 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			syncProvidersRef.current.forEach((provider) => provider.removePeer(peerId));
 			pendingSnapshotsRef.current.delete(peerId);
 			heldInventoriesRef.current.delete(peerId);
+			// Closing the app and losing the connection look the same from here. Not announced when it was this device
+			// that ended the connection, or when no workspace is open to be working in.
+			const name = nameOf(peerId);
+			peerNamesRef.current.delete(peerId);
+			const mine = quietPeersRef.current.delete(peerId) || Date.now() < quietUntilRef.current;
+			if (!mine && workspaceRef.current && !readQuiet()) notifyRef.current(`${name} left the workspace`);
+			setPresence((prev) => {
+				if (!(peerId in prev)) return prev;
+				const { [peerId]: _gone, ...rest } = prev;
+				return rest;
+			});
+			void stampLastSeen(peerId, Date.now());
 		});
 		return () => {
 			offPeers();
@@ -407,7 +506,12 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			offReconnectFailed();
 			offDataChanged();
 		};
-	}, [addGuestMember]);
+	}, [addGuestMember, sharePresence, stampLastSeen, nameOf]);
+
+	// Nobody is shown as present once nobody is connected
+	useEffect(() => {
+		if (peers.length === 0) setPresence((prev) => (Object.keys(prev).length ? {} : prev));
+	}, [peers.length]);
 
 	// Broadcast local activity events to connected peers
 	useEffect(() => {
@@ -692,6 +796,14 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 					);
 					break;
 
+				case "PRESENCE": {
+					// The backend wrote who sent it
+					const where = parsePresence(message.payload);
+					const id = message.authorId;
+					if (where && id) setPresence((prev) => ({ ...prev, [id]: { ...where, at: Date.now() } }));
+					break;
+				}
+
 				case "WORKSPACE_SYNC_REQUEST": {
 					const snapshot = await generateWorkspaceSnapshot();
 					if (snapshot) {
@@ -847,6 +959,28 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 					break;
 				}
 
+				case "NAME_REQUEST": {
+					// The backend only delivers this to a host, from a guest; what the guest may be called is checked here
+					const path = workspaceRef.current?.path;
+					if (!path || !message.payload || selfNameRef.current !== null) break;
+					try {
+						const request: { name?: unknown } = JSON.parse(message.payload);
+						if (typeof request.name !== "string") break;
+						const meta = await readWorkspaceMetadata(path);
+						const members = meta.members.members;
+						const me = members.find((m) => m.deviceId === peerId);
+						if (!me || nameProblem(members, request.name, me.id)) break;
+						const name = cleanName(request.name);
+						if (name === me.name) break;
+						const updated = members.map((m) => (m.id === me.id ? { ...m, name } : m));
+						await writeWorkspaceMetadata({ path, metadata: { ...meta, members: { members: updated } } });
+						await refreshMetadataRef.current(path);
+					} catch (err) {
+						console.error("[P2P] Failed to apply a name change:", err);
+					}
+					break;
+				}
+
 				case "MEMBERS_UPDATE": {
 					// The backend only delivers this from the host we joined
 					const path = workspaceRef.current?.path;
@@ -916,10 +1050,14 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	handleMessageRef.current = handleMessage;
 
 	useEffect(() => {
-		return p2p.onMessage(({ peerId, message }) => {
+		return p2p.onMessage(({ peerId, message: received }) => {
+			// Two people can join under the same name, so the sender is named by their member name, which is unique
+			const who = received.authorId ? memberNameOfRef.current(received.authorId) : undefined;
+			const message = who ? { ...received, author: who } : received;
 			if (
 				message.kind === "WORKSPACE_SYNC_REQUEST" ||
 				message.kind.startsWith("SYNC_") ||
+				message.kind === "PRESENCE" ||
 				message.kind === "AWARENESS_UPDATE"
 			) {
 				void handleMessageRef.current(peerId, message);
@@ -1113,8 +1251,9 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	// Create a Yjs provider that stays in sync with every connected peer
 	const createSyncProvider = useCallback(
 		(doc: Y.Doc, docId: string = "root", awareness: Awareness | null = null) => {
-			const provider = new P2PSyncProvider(doc, (message, peerId) => send(message, peerId), docId, awareness, (id, who, before, after) =>
-				liveJournal.record(id, who, before, after),
+			const provider = new P2PSyncProvider(doc, (message, peerId) => send(message, peerId), docId, awareness, (id, who, before, after, exact) =>
+				// With only two people, whatever the other one sends is theirs; with more, a catch-up answer may hold several
+				liveJournal.record(id, exact || (metadataRef.current?.members.members.length ?? 0) <= 2 ? who : null, before, after),
 			);
 			peersRef.current.forEach((peer) => provider.addPeer(peer.id));
 			syncProvidersRef.current.add(provider);
@@ -1130,9 +1269,18 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		[send, liveJournal],
 	);
 
-	const disconnectPeer = useCallback((peerId: string) => p2p.disconnectPeer(peerId), []);
-	const blockDevice = useCallback((deviceId: string) => p2p.blockDevice(deviceId), []);
-	const disconnectAll = useCallback(() => p2p.disconnectAll(), []);
+	const disconnectPeer = useCallback((peerId: string) => {
+		quietPeersRef.current.add(peerId);
+		return p2p.disconnectPeer(peerId);
+	}, []);
+	const blockDevice = useCallback((deviceId: string) => {
+		quietPeersRef.current.add(deviceId);
+		return p2p.blockDevice(deviceId);
+	}, []);
+	const disconnectAll = useCallback(() => {
+		quietUntilRef.current = Date.now() + 3000;
+		return p2p.disconnectAll();
+	}, []);
 	const retryConnection = useCallback(() => p2p.retryConnection(), []);
 
 	// While hosting, push the member list to guests whenever it changes or someone joins
@@ -1210,6 +1358,17 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	// A joined copy identifies itself in the member list by its device key
 	const [selfId, setSelfId] = useState<string | null>(null);
 	selfIdRef.current = selfId;
+
+	// In a workspace someone else hosts, the member list decides what this device is called: the host may have added a
+	// number to the name it joined under, or this device may have changed it
+	useEffect(() => {
+		if (!workspace || selfName === null || !selfId) return;
+		const mine = metadata?.members.members.find((m) => m.deviceId === selfId);
+		if (mine && mine.name !== selfName) {
+			setSelfName(workspace.id, mine.name);
+			setSelfNameVersion((v) => v + 1);
+		}
+	}, [workspace, metadata, selfName, selfId]);
 	useEffect(() => {
 		if (selfName === null) return;
 		p2p.selfId().then(setSelfId).catch(() => {});
@@ -1325,6 +1484,13 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		<P2PContext.Provider
 			value={{
 				peers,
+				presence,
+				setMyPresence,
+				nameOf,
+				viewersAt: (page, item) => whoIsAt(presence, page, item).map(nameOf),
+				requestName: (name) => {
+					for (const host of peersRef.current.filter((p) => p.isHost)) send({ kind: "NAME_REQUEST", timestamp: Date.now(), payload: JSON.stringify({ name }) }, host.id);
+				},
 				connectionStatus,
 				placeholders,
 				syncProgress,

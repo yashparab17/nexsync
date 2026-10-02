@@ -33,6 +33,8 @@ import { useErrorLog } from "@/hooks/useErrorLog";
 import { writeWorkspaceMetadata } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { ASSIGNABLE_ROLES, canChangeRole } from "@/lib/roles";
+import { lastSeenText, placeLabel } from "@/lib/p2p/presence";
+import { cleanName, nameProblem } from "@/lib/memberNames";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useSelfRole } from "@/store/p2p/P2PContext";
 import P2PConnectDialog from "@/components/dialogs/workspace/P2PConnectDialog";
@@ -84,8 +86,12 @@ export default function WorkspaceMembers() {
 
 	const [deletingMember, setDeletingMember] = useState<Member | null>(null);
 	const [submitting, setSubmitting] = useState(false);
+	// A guest changing the name they go by in this workspace; the host applies it
+	const [renameOpen, setRenameOpen] = useState(false);
+	const [renameValue, setRenameValue] = useState("");
+	const [renameError, setRenameError] = useState<string | null>(null);
 
-	const { peers, selfName, selfId, requestRoleChange, disconnectPeer, blockDevice, transferHost } = useP2P();
+	const { peers, presence, requestName, selfName, selfId, requestRoleChange, disconnectPeer, blockDevice, transferHost } = useP2P();
 	const [hostTarget, setHostTarget] = useState<Member | null>(null);
 	const [handoffBusy, setHandoffBusy] = useState(false);
 	const [handoffError, setHandoffError] = useState<string | null>(null);
@@ -112,12 +118,17 @@ export default function WorkspaceMembers() {
 	const onlineNames = new Set(peers.map((p) => p.name.toLowerCase()));
 	// Roles a member may be moved to by this device: anything for the host, Editor or Viewer for an Admin guest
 	const rolesFor = (member: Member) => ASSIGNABLE_ROLES.filter((r) => canChangeRole(selfRole, member.role, r));
+	// Where a member is, by device key; on a joined copy the owner has no key in the list, and is the host we are connected to
+	const hostPeer = peers.find((p) => p.isHost);
+	const presenceOf = (m: Member) => (m.deviceId ? presence[m.deviceId] : isJoinedCopy && m.role === "Owner" && hostPeer ? presence[hostPeer.id] : undefined);
 
 
 	// Add Member directly
 	const handleAddMemberSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!workspace?.path || !metadata || !newMemberName.trim()) return;
+		const problem = nameProblem(members, newMemberName);
+		if (problem) return logError(new Error(problem), { source: "members" });
 
 		try {
 			setSubmitting(true);
@@ -308,6 +319,7 @@ export default function WorkspaceMembers() {
 										!isYou &&
 										(member.deviceId ? onlineIds.has(member.deviceId) : onlineNames.has(member.name.toLowerCase()));
 									const canEdit = !isJoinedCopy || (!!member.deviceId && rolesFor(member).length > 0);
+									const here = presenceOf(member);
 
 									return (
 										<div
@@ -329,10 +341,14 @@ export default function WorkspaceMembers() {
 															</span>
 														)}
 														{isOnline && (
-															<span className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
-																<span className="size-1.5 rounded-none bg-emerald-400" />
-																Online
+															<span className={cn("inline-flex items-center gap-1 text-[10px]", here?.away ? "text-amber-400" : "text-emerald-400")}>
+																<span className={cn("size-1.5 rounded-none", here?.away ? "bg-amber-400" : "bg-emerald-400")} />
+																{here?.away ? "Away" : "Online"}
+																{here && !here.away && ` · ${placeLabel(here)}`}
 															</span>
+														)}
+														{!isOnline && !isYou && member.lastSeen && (
+															<span className="text-[10px] text-muted-foreground">Last seen {lastSeenText(member.lastSeen)}</span>
 														)}
 													</div>
 													<div className="flex items-center gap-2 mt-0.5">
@@ -350,6 +366,20 @@ export default function WorkspaceMembers() {
 												</div>
 											</div>
 
+											{isJoinedCopy && isYou && (
+												<Button
+													variant="ghost"
+													size="icon-xs"
+													onPress={() => {
+														setRenameValue(member.name);
+														setRenameError(null);
+														setRenameOpen(true);
+													}}
+													aria-label="Change my name in this workspace"
+												>
+													<Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
+												</Button>
+											)}
 											{canEdit && (
 												<div className="flex items-center gap-1">
 													<Button
@@ -589,6 +619,51 @@ export default function WorkspaceMembers() {
 							</Button>
 							<Button type="submit" isDisabled={submitting || (!isJoinedCopy && !editName.trim())}>
 								{submitting ? "Saving…" : "Save Changes"}
+							</Button>
+						</DialogFooter>
+					</form>
+				</Dialog>
+			)}
+
+			{/* Change My Name Dialog (guests) */}
+			{renameOpen && (
+				<Dialog isOpen onOpenChange={(open) => !open && setRenameOpen(false)} className="max-w-md">
+					<form
+						onSubmit={(e) => {
+							e.preventDefault();
+							const problem = nameProblem(members, renameValue, members.find((m) => m.deviceId === selfId)?.id);
+							if (problem) return setRenameError(problem);
+							requestName(cleanName(renameValue));
+							setRenameOpen(false);
+						}}
+						className="space-y-4"
+					>
+						<DialogHeader>
+							<DialogTitle>Change my name here</DialogTitle>
+							<DialogDescription>
+								This is the name others see in this workspace. It does not change the name you use elsewhere, and nobody else here can have the same one.
+							</DialogDescription>
+						</DialogHeader>
+						<div>
+							<Label htmlFor="my-workspace-name">Name in this workspace</Label>
+							<Input
+								id="my-workspace-name"
+								value={renameValue}
+								onChange={(e) => {
+									setRenameValue(e.target.value);
+									setRenameError(null);
+								}}
+								className="mt-1"
+								autoFocus
+							/>
+							{renameError && <p className="mt-1 text-xs text-destructive">{renameError}</p>}
+						</div>
+						<DialogFooter>
+							<Button type="button" variant="outline" onPress={() => setRenameOpen(false)}>
+								Cancel
+							</Button>
+							<Button type="submit" isDisabled={!renameValue.trim()}>
+								Save
 							</Button>
 						</DialogFooter>
 					</form>

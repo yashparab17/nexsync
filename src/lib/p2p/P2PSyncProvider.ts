@@ -30,7 +30,7 @@ export class P2PSyncProvider {
 		send: SyncSend,
 		docId = "root",
 		awareness: Awareness | null = null,
-		private readonly onRemoteText?: (docId: string, who: string | null, before: string, after: string) => void,
+		private readonly onRemoteText?: (docId: string, who: string | null, before: string, after: string, exact: boolean) => void,
 	) {
 		this.doc = doc;
 		this.docId = docId;
@@ -112,8 +112,9 @@ export class P2PSyncProvider {
 				const text = this.doc.getText("content");
 				const before = this.onRemoteText ? text.toString() : "";
 				Y.applyUpdate(this.doc, base64ToBytes(message.payload), this);
-				// A catch-up answer holds what several people wrote, so it is not credited to the one who sent it
-				this.onRemoteText?.(this.docId, message.kind === "SYNC_UPDATE" ? (message.author ?? null) : null, before, text.toString());
+				// `exact` says the sender wrote this: a live update is its sender's, while a catch-up answer can hold what
+				// several people wrote, and the listener decides how far to credit it to the one who sent it
+				this.onRemoteText?.(this.docId, message.author ?? null, before, text.toString(), message.kind === "SYNC_UPDATE");
 			} else if (message.kind === "AWARENESS_UPDATE" && this.awareness) {
 				applyAwarenessUpdate(this.awareness, base64ToBytes(message.payload), this);
 			}

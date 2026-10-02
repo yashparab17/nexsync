@@ -137,6 +137,19 @@ pub fn record_text(conn: &Connection, doc_id: &str, label: &str, who: Option<&st
     insert(conn, &e)
 }
 
+/// A change nobody opened for this long is taken as reviewed, so the list stays short for a team that is mostly online
+const AUTO_SEEN_MS: i64 = 24 * 60 * 60 * 1000;
+/// A reviewed change is deleted after this long; by then the file history and the record itself say as much
+const PURGE_MS: i64 = 7 * AUTO_SEEN_MS;
+
+/// Marks old changes reviewed and deletes long-reviewed ones
+pub fn expire(conn: &Connection, now: i64) -> Result<(), String> {
+    let e = |e: rusqlite::Error| e.to_string();
+    conn.execute("UPDATE catchup_log SET state = 'seen' WHERE state != 'seen' AND at < ?1", [now - AUTO_SEEN_MS]).map_err(e)?;
+    conn.execute("DELETE FROM catchup_log WHERE state = 'seen' AND at < ?1", [now - PURGE_MS]).map_err(e)?;
+    Ok(())
+}
+
 /// What there is to review: everything not yet marked seen, newest first
 pub fn list(conn: &Connection) -> Result<Vec<Entry>, String> {
     let e = |e: rusqlite::Error| e.to_string();
@@ -184,7 +197,10 @@ fn open(app_handle: &tauri::AppHandle, path: &str) -> Result<crate::database::Wo
 
 #[tauri::command]
 pub fn get_catchup(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Entry>, String> {
-    list(&open(&app_handle, &path)?.conn)
+    let db = open(&app_handle, &path)?;
+    // Housekeeping must not stop the review from loading
+    let _ = expire(&db.conn, now_ms() as i64);
+    list(&db.conn)
 }
 
 #[tauri::command]
@@ -362,5 +378,32 @@ mod tests {
         assert_eq!(log.len(), 2);
         assert!(log.iter().find(|e| e.target == "notes/b.md").unwrap().before.is_none());
         assert_eq!(log.iter().find(|e| e.target == "notes/a.md").unwrap().after.as_deref(), Some("two"));
+    }
+
+    #[test]
+    fn live_typing_is_marked_so_it_is_not_announced_as_made_while_away() {
+        let a = db("a");
+        record_text(&a, "notes/d.md", "d.md", Some("Sam"), "x", "y", true).unwrap();
+        record_text(&a, "notes/e.md", "e.md", Some("Sam"), "x", "y", false).unwrap();
+        let log = list(&a).unwrap();
+        assert_eq!(log.iter().find(|e| e.target == "notes/d.md").unwrap().path, "live");
+        assert_eq!(log.iter().find(|e| e.target == "notes/e.md").unwrap().path, "");
+    }
+
+    #[test]
+    fn old_changes_count_as_reviewed_after_a_day_and_are_deleted_after_a_week() {
+        let a = db("a");
+        let now = 100 * PURGE_MS;
+        for (target, age) in [("notes/fresh.md", AUTO_SEEN_MS / 2), ("notes/day.md", AUTO_SEEN_MS + 1), ("notes/week.md", PURGE_MS + 1)] {
+            record_text(&a, target, target, Some("Sam"), "a", "b", false).unwrap();
+            a.execute("UPDATE catchup_log SET at = ?1 WHERE target = ?2", params![now - age, target]).unwrap();
+        }
+        expire(&a, now).unwrap();
+        // Only the recent change is still waiting for review
+        let waiting: Vec<String> = list(&a).unwrap().into_iter().map(|e| e.target).collect();
+        assert_eq!(waiting, ["notes/fresh.md"]);
+        // The day-old one was kept as reviewed; the week-old one is gone altogether
+        let rows: Vec<(String, String)> = a.prepare("SELECT target, state FROM catchup_log ORDER BY target").unwrap().query_map([], |r| Ok((r.get(0)?, r.get(1)?))).unwrap().collect::<Result<_, _>>().unwrap();
+        assert_eq!(rows, [("notes/day.md".to_string(), "seen".to_string()), ("notes/fresh.md".to_string(), "new".to_string())]);
     }
 }

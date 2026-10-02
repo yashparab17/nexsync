@@ -4,6 +4,8 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { useP2P } from "@/store/p2p/P2PContext";
+import { pageOf } from "@/lib/p2p/presence";
 
 // Components
 import { t } from "@/i18n";
@@ -22,6 +24,13 @@ export default function Workspace() {
 	const { pathname } = useLocation();
 	// Below the medium breakpoint the sidebar is a drawer
 	const [navOpen, setNavOpen] = useState(false);
+
+	// Collaborators see which page this device is on
+	const { setMyPresence } = useP2P();
+	useEffect(() => {
+		const page = pageOf(pathname);
+		if (page) setMyPresence({ page });
+	}, [pathname, setMyPresence]);
 
 	useEffect(() => {
 		if (!navOpen) return;

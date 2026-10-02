@@ -5,7 +5,7 @@ import { History } from "lucide-react";
 
 import CatchUpDialog from "@/components/dialogs/workspace/CatchUpDialog";
 import { Button } from "@/components/ui/button";
-import type { Lookups } from "@/lib/catchup";
+import { countRows, type Lookups } from "@/lib/catchup";
 import { getCatchup, getKanban } from "@/lib/tauri";
 import { useNotifications } from "@/store/notifications/NotificationContext";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -43,6 +43,12 @@ export default function CatchUp() {
 		void refresh();
 	}, [refresh, dataVersion]);
 
+	// Old changes are marked reviewed by the backend when the list loads, so it loads again now and then
+	useEffect(() => {
+		const timer = setInterval(() => void refresh(), 10 * 60 * 1000);
+		return () => clearInterval(timer);
+	}, [refresh]);
+
 	// Said once when a workspace opens, and only about changes made while the app was closed
 	useEffect(() => {
 		if (announced.current || entries.length === 0) return;
@@ -68,7 +74,11 @@ export default function CatchUp() {
 		[members, columns],
 	);
 
-	const unread = entries.filter((e) => e.state === "new").length;
+	// Counted as the review lists them: a person's edits to one file are one change
+	const unread = countRows(
+		entries.filter((e) => e.state === "new"),
+		members ?? [],
+	);
 	if (!path) return null;
 
 	return (

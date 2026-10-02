@@ -40,7 +40,8 @@ import DraftsButton from "@/components/dialogs/workspace/DraftsDialog";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
-import type { Task, TaskPriority, TaskStatus } from "@/types/workspace";
+import { useReportItem } from "@/hooks/usePresence";
+import PresenceDots from "@/components/elements/PresenceDots";import type { Task, TaskPriority, TaskStatus } from "@/types/workspace";
 import Loading from "@/components/Loading";
 import { itemTarget } from "@/lib/insights";
 import Comments from "@/components/elements/Comments";
@@ -104,7 +105,7 @@ export default function WorkspaceTasks() {
 	const { workspace, metadata, refreshMetadata, addActivityEvent } = useWorkspace();
 	const members = metadata?.members.members ?? [];
 	const memberName = (id: string) => members.find((m) => m.id === id)?.name ?? "a removed member";
-	const { dataVersion, publishDataChange } = useP2P();
+	const { dataVersion, publishDataChange, viewersAt } = useP2P();
 	const isViewer = useIsViewer();
 	const logError = useErrorLog();
 
@@ -119,6 +120,7 @@ export default function WorkspaceTasks() {
 	// Dialog States
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
 	const [editingTask, setEditingTask] = useState<Task | null>(null);
+	useReportItem(editingTask?.id ?? null);
 	const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
 
 	// Form State for Create/Edit
@@ -678,6 +680,7 @@ export default function WorkspaceTasks() {
 											>
 												{task.title}
 											</h4>
+											<PresenceDots names={viewersAt("tasks", task.id)} doing="editing this task" />
 											{(task.conflicts?.length ?? 0) > 0 && (
 												<span title="Two people changed this at the same time" className="text-amber-500">
 													<AlertTriangle className="size-3.5" aria-label="Has a change to sort out" />

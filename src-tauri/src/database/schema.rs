@@ -308,6 +308,25 @@ CREATE TABLE IF NOT EXISTS board_drafts (
 CREATE INDEX IF NOT EXISTS idx_drafts_board ON drafts(board);
 "##,
 	},
+	Migration {
+		version: 15,
+		description: "when each member was last seen online, kept by the host",
+		up: r##"
+ALTER TABLE members ADD COLUMN last_seen INTEGER;
+"##,
+	},
+	Migration {
+		version: 16,
+		description: "no two members of a workspace share a name, whatever the capitals",
+		up: r##"
+UPDATE members SET name = name || ' (' || rowid || ')'
+WHERE rowid IN (
+    SELECT m.rowid FROM members m JOIN members o
+      ON o.workspace_id = m.workspace_id AND lower(o.name) = lower(m.name) AND o.rowid < m.rowid
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_members_name_nocase ON members(workspace_id, lower(name));
+"##,
+	},
 ];
 
 /// Initialises the schema on a fresh database, running pending migrations

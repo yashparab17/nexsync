@@ -45,7 +45,8 @@ import RuleFlag from "@/components/elements/RuleFlag";
 import DraftsButton from "@/components/dialogs/workspace/DraftsDialog";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
-import type { BoardDraft, ChecklistItem, KanbanCard, KanbanColumn } from "@/types/workspace";
+import { useReportItem } from "@/hooks/usePresence";
+import PresenceDots from "@/components/elements/PresenceDots";import type { BoardDraft, ChecklistItem, KanbanCard, KanbanColumn } from "@/types/workspace";
 import Loading from "@/components/Loading";
 import { itemTarget } from "@/lib/insights";
 import Comments from "@/components/elements/Comments";
@@ -57,7 +58,7 @@ export default function WorkspaceKanban() {
 	const { workspace, metadata, refreshMetadata, addActivityEvent } = useWorkspace();
 	const members = metadata?.members.members ?? [];
 	const memberName = (id: string) => members.find((m) => m.id === id)?.name ?? "a removed member";
-	const { dataVersion, publishDataChange } = useP2P();
+	const { dataVersion, publishDataChange, viewersAt } = useP2P();
 	const isViewer = useIsViewer();
 	const logError = useErrorLog();
 
@@ -78,6 +79,7 @@ export default function WorkspaceKanban() {
 	const [cardDesc, setCardDesc] = useState("");
 
 	const [editingCard, setEditingCard] = useState<KanbanCard | null>(null);
+	useReportItem(editingCard?.id ?? null);
 	const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
 	const [deletingColId, setDeletingColId] = useState<string | null>(null);
 
@@ -669,6 +671,7 @@ export default function WorkspaceKanban() {
 															<AlertTriangle className="ml-1 inline size-3.5 text-amber-500" aria-label="Has a change to sort out" />
 														)}
 													</h4>
+													<PresenceDots names={viewersAt("kanban", card.id)} doing="editing this card" />
 													{canChange && (
 														<div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
 															<Button

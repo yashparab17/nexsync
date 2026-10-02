@@ -28,7 +28,7 @@ import {
 } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useIsViewer, useP2P } from "@/store/p2p/P2PContext";
-import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { useReportItem } from "@/hooks/usePresence";import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { WorkspaceFile } from "@/types/workspace";
 
 // Folders shown in the explorer: code lives in editor, and files holds anything else worth opening here
@@ -47,7 +47,7 @@ export default function WorkspaceEditor() {
 	const { workspace, refreshStats, addActivityEvent } = useWorkspace();
 	const isViewer = useIsViewer();
 	const logError = useErrorLog();
-	const { lastSyncedFile } = useP2P();
+	const { lastSyncedFile, viewersAt } = useP2P();
 	const workspacePath = workspace?.path ?? "";
 
 	const [expanded, setExpanded] = useState<Set<string>>(new Set(["editor"]));
@@ -55,6 +55,7 @@ export default function WorkspaceEditor() {
 	const [targetDir, setTargetDir] = useState("editor");
 	const [tabs, setTabs] = useState<string[]>([]);
 	const [active, setActive] = useState<string | null>(null);
+	useReportItem(active);
 	const [dirty, setDirty] = useState<Set<string>>(new Set());
 	const [showBlame, setShowBlame] = useState(false);
 	const [showRun, setShowRun] = useState(true);
@@ -230,6 +231,7 @@ export default function WorkspaceEditor() {
 				openPaths={tabs}
 				dirtyPaths={dirty}
 				readOnly={isViewer}
+				viewers={(rel) => viewersAt("editor", rel)}
 				onToggleDir={toggleDir}
 				onOpenFile={openPath}
 				onNew={(kind, dir) => {

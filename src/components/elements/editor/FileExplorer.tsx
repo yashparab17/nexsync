@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import PresenceDots from "@/components/elements/PresenceDots";
 import { extensionOf } from "@/lib/editor/languages";
 import { cn } from "@/lib/utils";
 import type { WorkspaceFile } from "@/types/workspace";
@@ -47,6 +48,8 @@ interface FileExplorerProps {
 	openPaths: string[];
 	dirtyPaths: Set<string>;
 	readOnly: boolean;
+	// Who has a file open right now, by name
+	viewers?: (rel: string) => string[];
 	onToggleDir: (dir: string) => void;
 	onOpenFile: (rel: string) => void;
 	onNew: (kind: "file" | "folder", dir: string) => void;
@@ -71,6 +74,7 @@ export default function FileExplorer({
 	openPaths,
 	dirtyPaths,
 	readOnly,
+	viewers,
 	onToggleDir,
 	onOpenFile,
 	onNew,
@@ -167,6 +171,7 @@ export default function FileExplorer({
 									</>
 								)}
 								<span className={cn("truncate", isActive && "font-medium")}>{entry.name}</span>
+									{!entry.is_dir && viewers && <PresenceDots names={viewers(rel)} />}
 								{!entry.is_dir && openPaths.includes(rel) && (
 									<span
 										className={cn("ml-auto size-1.5 shrink-0", dirtyPaths.has(rel) ? "bg-amber-400" : "bg-muted-foreground/50")}

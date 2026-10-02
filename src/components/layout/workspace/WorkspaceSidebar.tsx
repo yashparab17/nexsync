@@ -24,6 +24,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { t, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
+import PresenceDots from "@/components/elements/PresenceDots";
+import { pageOf } from "@/lib/p2p/presence";
+import { useP2P } from "@/store/p2p/P2PContext";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -114,6 +117,8 @@ const bottomNavigation: NavigationItem[] = [
 // Sidebar navigation link component
 function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; expanded: boolean; onNavigate?: () => void }) {
 	const Icon = item.icon;
+	const { viewersAt } = useP2P();
+	const page = pageOf(item.path);
 
 	return (
 		<NavLink
@@ -132,6 +137,11 @@ function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; 
 		>
 			<Icon className="size-4 shrink-0" aria-hidden />
 			<span className={expanded ? "inline" : "hidden lg:inline"}>{t(item.label)}</span>
+			{page && (
+				<span className={cn("ml-auto", !expanded && "hidden lg:inline")}>
+					<PresenceDots names={viewersAt(page)} />
+				</span>
+			)}
 		</NavLink>
 	);
 }

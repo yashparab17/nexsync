@@ -61,6 +61,10 @@ const KIND_DATA_CHANGE: &str = "DATA_CHANGE";
 const KIND_MEMBERS_UPDATE: &str = "MEMBERS_UPDATE";
 /// The rules the host has turned on, which become the workspace's rules; accepted only from the host
 const KIND_RULES_UPDATE: &str = "RULES_UPDATE";
+/// Where a person is in the workspace; stamped with who sent it so nobody can show up as someone else
+const KIND_PRESENCE: &str = "PRESENCE";
+/// A guest asking the host to change the name they go by in this workspace; only a host acts on it
+const KIND_NAME_REQUEST: &str = "NAME_REQUEST";
 /// The host telling guests the workspace was deleted; accepted only from the host
 const KIND_WORKSPACE_DELETED: &str = "WORKSPACE_DELETED";
 /// The host offering a guest to take over hosting; accepted only from the host
@@ -75,12 +79,14 @@ const KIND_YDOC_UPDATE: &str = "YDOC_UPDATE";
 const KIND_ROLE_REQUEST: &str = "ROLE_REQUEST";
 /// Puts the sender's name on a message. The one exception is a guest hearing from the host, which already
 /// stamped a relayed message with whoever sent it.
-fn stamp_author(message: &mut serde_json::Value, sender: &str, keep_existing: bool) {
+fn stamp_author(message: &mut serde_json::Value, sender: &str, sender_id: &str, keep_existing: bool) {
     let stamped = message.get("author").and_then(|a| a.as_str()).is_some_and(|a| !a.is_empty());
     if keep_existing && stamped {
         return;
     }
     message["author"] = serde_json::Value::String(sender.to_string());
+    // The device key says who it was even when two people typed the same name; the app shows the member's name for it
+    message["authorId"] = serde_json::Value::String(sender_id.to_string());
 }
 
 /// App messages a host forwards from one guest to the others. Yjs sync messages are included
@@ -95,6 +101,7 @@ const RELAYED_KINDS: &[&str] = &[
     "SYNC_STEP_2",
     "SYNC_UPDATE",
     "AWARENESS_UPDATE",
+    KIND_PRESENCE,
 ];
 
 /// Roles a host may grant through an invite
@@ -1016,6 +1023,7 @@ impl Node {
             // Only the host decides who is in the workspace
             KIND_MEMBERS_UPDATE | KIND_RULES_UPDATE | KIND_WORKSPACE_DELETED | KIND_HOST_HANDOFF | KIND_HOST_MOVED if !from_host => return,
             // Only Admin guests may ask for role changes, and only a host acts on them
+            KIND_NAME_REQUEST if from_host || !hosting => return,
             KIND_ROLE_REQUEST if from_host || !is_admin || !hosting => {
                 eprintln!("[P2P] Ignoring a role request from {}", from.fmt_short());
                 return;
@@ -1026,8 +1034,8 @@ impl Node {
         // Who named a version is decided here, not by the sender, so nobody can sign as someone else
         let mut relayed = bytes.to_vec();
         // The same goes for note text: the catch-up review credits a change to whoever it says sent it
-        if matches!(kind.as_str(), KIND_VERSION_NAMED | KIND_YDOC_UPDATE | "SYNC_UPDATE" | "SYNC_STEP_2") {
-            stamp_author(&mut message, &sender, from_host && !hosting);
+        if matches!(kind.as_str(), KIND_VERSION_NAMED | KIND_YDOC_UPDATE | "SYNC_UPDATE" | "SYNC_STEP_2" | KIND_PRESENCE) {
+            stamp_author(&mut message, &sender, &from.to_string(), from_host && !hosting);
             relayed = serde_json::to_vec(&message).unwrap_or(relayed);
         }
         if !from_host && hosting && RELAYED_KINDS.contains(&kind.as_str()) {
@@ -2157,18 +2165,21 @@ mod tests {
     #[test]
     fn test_author_is_stamped_by_the_receiver_and_a_hosts_stamp_is_kept() {
         // A host or a directly linked guest names the sender itself, whatever the message claims
-        let mut message = serde_json::json!({ "kind": KIND_VERSION_NAMED, "author": "Someone Else" });
-        stamp_author(&mut message, "Ed", false);
+        let mut message = serde_json::json!({ "kind": KIND_VERSION_NAMED, "author": "Someone Else", "authorId": "forged" });
+        stamp_author(&mut message, "Ed", "key-ed", false);
         assert_eq!(message["author"], "Ed");
+        assert_eq!(message["authorId"], "key-ed");
 
         // A guest hearing from the host keeps the name the host stamped, and names the host if there is none
-        stamp_author(&mut message, "Host", true);
+        stamp_author(&mut message, "Host", "key-host", true);
         assert_eq!(message["author"], "Ed");
+        assert_eq!(message["authorId"], "key-ed");
         let mut plain = serde_json::json!({ "kind": KIND_VERSION_NAMED });
-        stamp_author(&mut plain, "Host", true);
+        stamp_author(&mut plain, "Host", "key-host", true);
         assert_eq!(plain["author"], "Host");
+        assert_eq!(plain["authorId"], "key-host");
         let mut empty = serde_json::json!({ "kind": KIND_VERSION_NAMED, "author": "" });
-        stamp_author(&mut empty, "Host", true);
+        stamp_author(&mut empty, "Host", "key-host", true);
         assert_eq!(empty["author"], "Host");
     }
 

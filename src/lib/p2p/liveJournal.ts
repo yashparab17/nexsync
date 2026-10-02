@@ -13,7 +13,8 @@ interface Burst {
 	timer: ReturnType<typeof setTimeout>;
 }
 
-export const QUIET_MS = 4000;
+// A burst of typing ends after this much quiet; long enough that a pause to think does not start a new entry
+export const QUIET_MS = 15000;
 
 export class LiveJournal {
 	private bursts = new Map<string, Burst>();

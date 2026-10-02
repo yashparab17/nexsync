@@ -21,7 +21,8 @@ import { Input } from "@/components/ui/input";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
-import { isDocumentFile, isNoteFile } from "@/lib/editor/languages";
+import { useReportItem } from "@/hooks/usePresence";
+import PresenceDots from "@/components/elements/PresenceDots";import { isDocumentFile, isNoteFile } from "@/lib/editor/languages";
 import {
 	createWorkspaceFile,
 	deleteWorkspaceItem,
@@ -126,7 +127,8 @@ export default function WorkspaceNotes() {
 
 	// Reload the note list when a collaborator's changes arrive. The open note itself no longer
 	// needs a refetch-and-remount: live edits now flow straight into the editor's Yjs document.
-	const { lastSyncedFile } = useP2P();
+	const { lastSyncedFile, viewersAt } = useP2P();
+	useReportItem(selectedNote ? selectedNote.path.replace(/^\/+/, "") : null);
 	useEffect(() => {
 		if (!lastSyncedFile || !workspace?.path) return;
 		void loadNotes();
@@ -303,6 +305,7 @@ export default function WorkspaceNotes() {
 											<p className="truncate text-xs font-semibold text-foreground">
 												{note.name.replace(/\.(md|markdown)$/i, "")}
 											</p>
+											<PresenceDots names={viewersAt("notes", note.path.replace(/^\/+/, ""))} />
 										</div>
 										<p className="mt-0.5 text-[10px] text-muted-foreground truncate">
 											{note.path}

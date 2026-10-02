@@ -20,6 +20,8 @@ export type P2PMessageKind =
 	| "YDOC_INVENTORY" // State summary of every stored note, sent on connect so the peer can send what is missing
 	| "YDOC_UPDATE" // What one note is missing on the peer, answering an inventory
 	| "VERSION_NAMED" // A collaborator naming a version of a file; hosts drop these from Viewers and relay the rest
+	| "NAME_REQUEST" // A guest asking the host for a new workspace name; only delivered to the host
+	| "PRESENCE" // Where a person is: page, open item, away; relayed by the host and stamped with the sender's name
 	| "HOST_MOVED"; // The host telling guests the ticket of the new host; only accepted from the host
 
 // JSON envelope carried over a peer's encrypted control stream
@@ -29,6 +31,7 @@ export interface P2PMessage {
 	docId?: string; // Yjs document scope for SYNC_* messages
 	payload?: string; // JSON string or base64 Yjs update
 	author?: string; // Who sent a VERSION_NAMED message; stamped by the receiving backend, never trusted from the sender
+	authorId?: string; // The sender's device key, stamped with the author; the app swaps `author` for the member's name
 }
 
 // The payload of a VERSION_NAMED message: the text of a file at the moment someone named it
