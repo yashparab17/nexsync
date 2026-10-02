@@ -53,6 +53,7 @@ export default function P2PConnectDialog({
 		reconnectToHost,
 		hostUnreachable,
 		hostName,
+		link,
 		network,
 	} = useP2P();
 
@@ -163,7 +164,9 @@ export default function P2PConnectDialog({
 	const statusLabel = !network.online
 		? "Offline"
 		: peers.length > 0
-		  ? "Connected"
+		  ? hostName !== null && link === "members"
+			? `Connected to ${peers.length === 1 ? "a member" : `${peers.length} members`} (${hostName} is offline)`
+			: "Connected"
 		  : connectionStatus === "reconnecting"
 			? hostName ? `Reconnecting to ${hostName}…` : "Reconnecting"
 			: connectionStatus === "connecting"
@@ -226,6 +229,16 @@ export default function P2PConnectDialog({
 								Try now
 							</Button>
 						</div>
+					</div>
+				)}
+
+				{network.online && hostName !== null && link === "members" && (
+					<div className="flex items-start gap-2 rounded-none border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-300">
+						<Radio className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+						<p>
+							{hostName} is offline. You are working with the other members who are online, and your changes reach {hostName} when
+							they are back. Settings, roles and invites can only be changed while the host is connected.
+						</p>
 					</div>
 				)}
 

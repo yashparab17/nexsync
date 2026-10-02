@@ -34,6 +34,9 @@ pub struct Settings {
     pub theme: String,
     pub autosave: bool,
     pub sync: bool,
+    /// Guests may only work while the host is connected; chosen by the host or an Admin
+    #[serde(default)]
+    pub require_host: bool,
 }
 
 /// Workspace collaborator

@@ -15,6 +15,7 @@ import JoinRequestDialog from "@/components/dialogs/workspace/JoinRequestDialog"
 import WorkspaceDeletedDialog from "@/components/dialogs/workspace/WorkspaceDeletedDialog";
 import HostHandoffDialog from "@/components/dialogs/workspace/HostHandoffDialog";
 import TransferTray from "@/components/layout/workspace/TransferTray";
+import HostGate from "@/components/layout/workspace/HostGate";
 import DueReminders from "@/components/layout/workspace/DueReminders";
 
 // Shell layout for all workspace sub-routes
@@ -100,6 +101,9 @@ export default function Workspace() {
 
 			{/* Progress and cancel for file downloads */}
 			<TransferTray />
+
+			{/* Holds the screen while a workspace that needs its host waits for it */}
+			<HostGate />
 		</div>
 	);
 }

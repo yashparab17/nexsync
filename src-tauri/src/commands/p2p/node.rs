@@ -25,6 +25,7 @@ use tokio::{
 
 use super::{
     files,
+    membership::{self, Membership},
     mesh::{self, MeshAllow},
     short_code::ShortCodes,
     sync::{self, LiveSync, SyncMessage},
@@ -50,6 +51,11 @@ const STATS_INTERVAL: Duration = Duration::from_secs(2);
 const OUTBOX_CAPACITY: usize = 256;
 const MESH_DIAL_ATTEMPTS: u32 = 3;
 const MESH_DIAL_DELAY: Duration = Duration::from_secs(2);
+/// How often a member that is not linked to the others looks for them, which also covers the seconds after a device
+/// starts before its address can be found
+const MEMBER_DIAL_EVERY: Duration = Duration::from_secs(10);
+const MEMBER_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const MEMBER_DIAL_PARALLEL: usize = 6;
 
 const CLOSE_NORMAL: u32 = 0;
 const CLOSE_REJECTED: u32 = 1;
@@ -65,6 +71,12 @@ const KIND_RULES_UPDATE: &str = "RULES_UPDATE";
 const KIND_PRESENCE: &str = "PRESENCE";
 /// A guest asking the host to change the name they go by in this workspace; only a host acts on it
 const KIND_NAME_REQUEST: &str = "NAME_REQUEST";
+/// A version of the signed member list; any device may pass one on, and each takes it only if it is genuine and newer
+const KIND_MEMBERSHIP: &str = "MEMBERSHIP";
+/// The host telling guests whether the workspace needs the host online to be worked in; only accepted from the host
+const KIND_POLICY_UPDATE: &str = "POLICY_UPDATE";
+/// An Admin guest asking the host to change that; only delivered to the host
+const KIND_POLICY_REQUEST: &str = "POLICY_REQUEST";
 /// The host telling guests the workspace was deleted; accepted only from the host
 const KIND_WORKSPACE_DELETED: &str = "WORKSPACE_DELETED";
 /// The host offering a guest to take over hosting; accepted only from the host
@@ -103,6 +115,13 @@ const RELAYED_KINDS: &[&str] = &[
     "AWARENESS_UPDATE",
     KIND_PRESENCE,
 ];
+
+/// Whether a message from a guest is passed on to the others. Only the owner's device does: a message says who wrote it
+/// because the device that received it directly stamped it, and a member relaying it would be credited as its author.
+/// Members that are not the owner reach each other by direct links instead, which `member_loop` makes between all pairs.
+fn should_relay(from_host: bool, hosting: bool, owner_is_elsewhere: bool, kind: &str) -> bool {
+    !from_host && hosting && !owner_is_elsewhere && RELAYED_KINDS.contains(&kind)
+}
 
 /// Roles a host may grant through an invite
 const INVITE_ROLES: &[&str] = &["Editor", "Viewer"];
@@ -147,6 +166,7 @@ impl P2pState {
         });
         let node = Node::start(events, self.workspace.clone(), secret, proxy).await?;
         node.set_roles(self.roles.lock().unwrap_or_else(|p| p.into_inner()).clone());
+        node.reload_membership();
         if let Some((id, name, host, members)) = self.known.lock().unwrap_or_else(|p| p.into_inner()).clone() {
             node.set_known_members(id, name, host, members);
         }
@@ -181,6 +201,7 @@ impl P2pState {
         *self.workspace.lock().unwrap_or_else(|p| p.into_inner()) = path.clone();
         if let Some(node) = self.existing().await {
             node.sync.watch(path.as_deref());
+            node.reload_membership();
         }
     }
 }
@@ -330,8 +351,14 @@ struct NodeState {
     mesh_allow: HashMap<EndpointId, MeshAllow>,
     /// Host side: the token shared by each pair of guests
     mesh_tokens: mesh::MeshTokens,
-    /// Host side: the members of the open workspace, who may reconnect without an invite
+    /// Who may come back without an invite, as the signed member list has it
     known: KnownMembers,
+    /// The newest signed member list this device holds for the open workspace
+    membership: Option<Membership>,
+    /// The first list a host sent, kept until the workspace folder it belongs to exists
+    pending_membership: Option<Membership>,
+    /// Members being dialed right now, so one is not dialed twice
+    dialing: std::collections::HashSet<EndpointId>,
 }
 
 /// The people already in a workspace, as the host's member list has them. A device on this list proves who it is with
@@ -359,6 +386,24 @@ fn summarize(relays: &[RelayStatus]) -> NetworkStatus {
     NetworkStatus { online, detail }
 }
 
+/// The result of dialing a member by key alone
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Probe {
+    pub reachable: bool,
+    /// Time until a connection existed, or until giving up
+    pub connect_ms: u64,
+    /// "direct", "relay", or "none" when nothing connected
+    pub path: &'static str,
+    /// Time until the path became direct; empty if it stayed on the relay
+    pub direct_after_ms: Option<u64>,
+    pub rtt_ms: u64,
+    pub error: Option<String>,
+}
+
+const PROBE_TIMEOUT: Duration = Duration::from_secs(15);
+const PROBE_DIRECT_WAIT_MS: u64 = 3000;
+
 #[derive(Debug, Clone, Serialize)]
 struct Reconnecting {
     attempt: u32,
@@ -367,6 +412,8 @@ struct Reconnecting {
 
 pub struct Node {
     endpoint: Endpoint,
+    /// This device's key, which signs the member list when this device owns the workspace
+    secret: SecretKey,
     events: EventSink,
     workspace: SharedWorkspace,
     sync: LiveSync,
@@ -383,9 +430,9 @@ impl Node {
             Some(url) => builder.proxy_url(url),
             None => builder.proxy_from_env(),
         };
-        if let Some(secret) = secret {
-            builder = builder.secret_key(secret);
-        }
+        // Without a stored identity the device gets a key for this run, which still has to be kept to sign with
+        let secret = secret.unwrap_or_else(SecretKey::generate);
+        builder = builder.secret_key(secret.clone());
         let endpoint = builder
             .bind()
             .await
@@ -394,6 +441,7 @@ impl Node {
         let (live_sync, local_changes) = LiveSync::new();
         let node = Arc::new(Self {
             endpoint,
+            secret,
             events,
             workspace,
             sync: live_sync,
@@ -404,6 +452,7 @@ impl Node {
         tokio::spawn(node.clone().accept_loop());
         tokio::spawn(node.clone().stats_loop());
         tokio::spawn(node.clone().network_loop());
+        tokio::spawn(node.clone().member_loop());
         tokio::spawn(sync::run_local_changes(node.clone(), local_changes));
         node.sync.watch(node.workspace_path().as_deref());
         Ok(node)
@@ -600,6 +649,7 @@ impl Node {
         let mesh_peer = (hello.v == wire::PROTOCOL_VERSION)
             .then(|| self.check_mesh(&hello.secret, &conn.remote_id()))
             .flatten();
+        let mut member_link = false;
         let verdict = if hello.v != wire::PROTOCOL_VERSION {
             Err("You're running a different version of NexSync than the host. Update both apps and try again.".to_string())
         } else if let Some(allow) = &mesh_peer {
@@ -611,6 +661,8 @@ impl Node {
                 workspace_name: String::new(),
             })
         } else if let Some(welcome) = self.check_known_member(&conn.remote_id()) {
+            // A device that is not the owner and is let in as a member is another member's direct link, not a guest of a host
+            member_link = self.is_not_owner();
             Ok(welcome)
         } else {
             self.check_invite(&hello.secret, &conn.remote_id())
@@ -625,7 +677,7 @@ impl Node {
                 wire::write_json(&mut send, &welcome).await?;
                 match mesh_peer {
                     Some(allow) => self.register_peer(conn, send, recv, PeerIdentity::guest(allow.name, role, true)),
-                    None => self.register_peer(conn, send, recv, PeerIdentity::guest(sanitize_name(&hello.name), role, false)),
+                    None => self.register_peer(conn, send, recv, PeerIdentity::guest(sanitize_name(&hello.name), role, member_link)),
                 }
                 Ok(())
             }
@@ -640,6 +692,17 @@ impl Node {
         }
     }
 
+    #[cfg(test)]
+    fn membership_epoch(&self) -> Option<u64> {
+        self.lock().membership.as_ref().map(|m| m.epoch)
+    }
+
+    /// Whether the member list this device holds names another device as the owner
+    fn is_not_owner(&self) -> bool {
+        let mine = self.endpoint.id().to_string();
+        self.lock().membership.as_ref().is_some_and(|m| m.owner != mine)
+    }
+
     /// The guest entry if `id` was vouched for by the host and presented the right token
     fn check_mesh(&self, presented: &str, id: &EndpointId) -> Option<MeshAllow> {
         let st = self.lock();
@@ -648,11 +711,253 @@ impl Node {
         bool::from(presented.ct_eq(&allow.token)).then(|| allow.clone())
     }
 
-    /// Replaces the list of people who may come back without an invite. Call it whenever the member list changes, so a
-    /// removed member stops being let in at once.
-    pub fn set_known_members(&self, workspace_id: String, workspace_name: String, host_name: String, members: Vec<(String, String)>) {
-        let roles = members.into_iter().filter(|(_, role)| GUEST_ROLES.contains(&role.as_str())).collect();
-        self.lock().known = KnownMembers { workspace_id, workspace_name, host_name, roles };
+    /// The owner says who the members are, and signs that as the next version of the list; call it whenever the member
+    /// list changes, so a removed member stops being let in at once. A device that is not the owner has nothing to say
+    /// here: it takes the list from the owner's signed versions instead.
+    pub fn set_known_members(self: &Arc<Self>, workspace_id: String, workspace_name: String, host_name: String, members: Vec<(String, String)>) {
+        let members: Vec<(String, String)> = members.into_iter().filter(|(_, role)| GUEST_ROLES.contains(&role.as_str())).collect();
+        let current = {
+            let mut st = self.lock();
+            st.known.host_name = host_name;
+            st.membership.clone()
+        };
+        match membership::next(current.as_ref(), &self.secret, &workspace_id, &workspace_name, members) {
+            Ok(Some(doc)) => {
+                self.install_membership(doc, true);
+                self.push_membership(None, None);
+            }
+            Ok(None) => {}
+            Err(e) => eprintln!("[P2P] Not publishing the member list: {e}"),
+        }
+    }
+
+    /// Takes the list stored with the open workspace, or none when there is none; called when the workspace changes
+    pub fn reload_membership(self: &Arc<Self>) {
+        let loaded = self.workspace_path().and_then(|path| membership::load(&path));
+        let mut st = self.lock();
+        match loaded {
+            Some(m) => {
+                st.known.workspace_id = m.workspace_id.clone();
+                st.known.workspace_name = m.workspace_name.clone();
+                st.known.roles = m.roles();
+                st.membership = Some(m);
+            }
+            None => {
+                st.known.workspace_id.clear();
+                st.known.roles.clear();
+                st.membership = None;
+            }
+        }
+    }
+
+    /// Makes `m` the list this device acts on: who may come in, with which role, and who has to go
+    fn install_membership(self: &Arc<Self>, m: Membership, persist: bool) {
+        if persist {
+            if let Some(path) = self.workspace_path() {
+                if let Err(e) = membership::store(&path, &m) {
+                    eprintln!("[P2P] Could not keep the member list with the workspace: {e}");
+                }
+            }
+        }
+        let roles = m.roles();
+        let mut removed_now = Vec::new();
+        {
+            let mut st = self.lock();
+            st.known.workspace_id = m.workspace_id.clone();
+            st.known.workspace_name = m.workspace_name.clone();
+            st.known.roles = roles.clone();
+            for (id, peer) in st.peers.iter_mut() {
+                if peer.is_host {
+                    continue;
+                }
+                let key = id.to_string();
+                match roles.get(&key) {
+                    Some(role) => peer.role = role.clone(),
+                    None if m.removed.contains(&key) => removed_now.push(key),
+                    None => {}
+                }
+            }
+            if st.pending_membership.as_ref().is_some_and(|p| p.workspace_id == m.workspace_id) {
+                st.pending_membership = Some(m.clone());
+            }
+            st.membership = Some(m);
+        }
+        // Whoever was removed is sent away at once, whichever device found out first
+        for id in removed_now {
+            let _ = self.disconnect(&id);
+        }
+    }
+
+    /// Sends this device's list to one peer, or to all but `except`; a device that is behind then catches up, and a
+    /// version the owner just signed spreads to every member that is online
+    fn push_membership(&self, to: Option<EndpointId>, except: Option<EndpointId>) {
+        let Some(doc) = self.lock().membership.clone() else { return };
+        let message = serde_json::json!({ "kind": KIND_MEMBERSHIP, "timestamp": now_ms(), "payload": serde_json::to_string(&doc).unwrap_or_default() });
+        let Ok(bytes) = serde_json::to_vec(&message) else { return };
+        let outboxes: Vec<mpsc::Sender<Vec<u8>>> = self
+            .lock()
+            .peers
+            .iter()
+            .filter(|(id, _)| to.is_none_or(|t| **id == t) && except.is_none_or(|e| **id != e))
+            .map(|(_, p)| p.outbox.clone())
+            .collect();
+        if outboxes.is_empty() {
+            return;
+        }
+        tokio::spawn(async move {
+            for outbox in outboxes {
+                let _ = outbox.send(bytes.clone()).await;
+            }
+        });
+    }
+
+    /// A peer sent a version of the member list. It is taken only if it is genuine and newer; a peer that sent an older
+    /// one is sent ours.
+    fn on_membership(self: &Arc<Self>, from: &EndpointId, message: &serde_json::Value) {
+        let Some(doc) = message.get("payload").and_then(|p| p.as_str()).and_then(|p| serde_json::from_str::<Membership>(p).ok()) else {
+            return;
+        };
+        let (current, from_is_host) = {
+            let st = self.lock();
+            (st.membership.clone(), st.peers.get(from).is_some_and(|p| p.is_host))
+        };
+        let verdict = match &current {
+            // With nothing yet, a list is believed only from the host that was dialed, and only if it names that host
+            None => membership::accept(None, &doc).and_then(|_| {
+                if from_is_host && doc.owner == from.to_string() {
+                    Ok(())
+                } else {
+                    Err("a first list from somebody other than the host".to_string())
+                }
+            }),
+            Some(cur) => membership::accept(Some(cur), &doc),
+        };
+        match verdict {
+            Ok(()) => {
+                if current.is_none() {
+                    self.lock().pending_membership = Some(doc.clone());
+                }
+                self.install_membership(doc, true);
+                self.push_membership(None, Some(*from));
+            }
+            Err(reason) => {
+                let behind = current.as_ref().is_some_and(|c| c.workspace_id == doc.workspace_id && doc.epoch < c.epoch) && doc.verify().is_ok();
+                if behind {
+                    self.push_membership(Some(*from), None);
+                } else {
+                    eprintln!("[P2P] Ignoring a member list from {}: {reason}", from.fmt_short());
+                }
+            }
+        }
+    }
+
+    /// A joined copy was just created from the host's workspace: keep the list the host sent with it. The list arrives
+    /// when the connection is made, which can be before there is a workspace folder to keep it in.
+    pub fn adopt_membership(self: &Arc<Self>, workspace: &str, host_workspace_id: &str) -> bool {
+        let doc = {
+            let st = self.lock();
+            st.membership.clone().into_iter().chain(st.pending_membership.clone()).find(|m| m.workspace_id == host_workspace_id)
+        };
+        let Some(doc) = doc else { return false };
+        if let Err(e) = membership::store(workspace, &doc) {
+            eprintln!("[P2P] Could not keep the member list with the workspace: {e}");
+            return false;
+        }
+        if self.workspace_path().as_deref() == Some(workspace) {
+            self.reload_membership();
+        }
+        true
+    }
+
+    /// The owner makes another device the owner; the new owner and everyone else learn it from the signed list
+    pub fn hand_off_membership(self: &Arc<Self>, new_owner: &str) -> Result<(), String> {
+        let current = self.lock().membership.clone().ok_or("There is no member list to hand over.")?;
+        let doc = membership::hand_off(&current, &self.secret, new_owner)?;
+        self.install_membership(doc, true);
+        self.push_membership(None, None);
+        Ok(())
+    }
+
+    /// Members this device should be linked to and is not. Only while a workspace is open, and only by a member that is
+    /// not the owner: the owner is dialed, it does not dial. Of any two members only the one with the smaller key dials,
+    /// so they do not both try at once.
+    fn member_targets(&self) -> Vec<EndpointId> {
+        if self.workspace_path().is_none() {
+            return Vec::new();
+        }
+        let mine = self.endpoint.id().to_string();
+        let mut st = self.lock();
+        let Some(m) = &st.membership else { return Vec::new() };
+        if m.owner == mine || m.role_of(&mine).is_none() {
+            return Vec::new();
+        }
+        let ids: Vec<EndpointId> = m
+            .members
+            .iter()
+            .filter(|(id, _)| mine < *id)
+            .filter_map(|(id, _)| parse_peer_id(id).ok())
+            .filter(|id| !st.peers.contains_key(id) && !st.dialing.contains(id))
+            .take(MEMBER_DIAL_PARALLEL)
+            .collect();
+        st.dialing.extend(ids.iter().copied());
+        ids
+    }
+
+    /// Looks for the other members by key every so often, which is what keeps a workspace working when the host is away
+    async fn member_loop(self: Arc<Self>) {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        loop {
+            for id in self.member_targets() {
+                tokio::spawn(self.clone().dial_member(id));
+            }
+            tokio::time::sleep(MEMBER_DIAL_EVERY).await;
+        }
+    }
+
+    async fn dial_member(self: Arc<Self>, id: EndpointId) {
+        let result = self.try_dial_member(id).await;
+        self.lock().dialing.remove(&id);
+        // A member that is not online has no address to find, which is the usual and quiet case
+        if let Err(e) = result {
+            eprintln!("[P2P] No link to member {}: {e}", id.fmt_short());
+        }
+    }
+
+    async fn try_dial_member(self: &Arc<Self>, id: EndpointId) -> Result<(), String> {
+        let (workspace_id, role) = {
+            let st = self.lock();
+            let m = st.membership.as_ref().ok_or("no member list")?;
+            (m.workspace_id.clone(), m.role_of(&id.to_string()).ok_or("not a member")?.to_string())
+        };
+        let conn = tokio::time::timeout(MEMBER_CONNECT_TIMEOUT, self.endpoint.connect(EndpointAddr::new(id), wire::ALPN))
+            .await
+            .map_err(|_| "no answer".to_string())?
+            .map_err(|e| e.to_string())?;
+        let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+        send.write_all(&[wire::STREAM_CONTROL]).await.map_err(|e| e.to_string())?;
+        // No secret: the other device knows this one's key from the member list
+        wire::write_json(
+            &mut send,
+            &Hello { v: wire::PROTOCOL_VERSION, secret: ticket::encode_secret(&[0u8; SECRET_LEN]), name: "Member".to_string() },
+        )
+        .await?;
+        let reply: HandshakeReply = tokio::time::timeout(HANDSHAKE_TIMEOUT, wire::read_json(&mut recv, wire::MAX_SMALL_FRAME))
+            .await
+            .map_err(|_| "no answer".to_string())??;
+        match reply {
+            HandshakeReply::Welcome { workspace_id: theirs, .. } if theirs == workspace_id => {
+                self.register_peer(conn, send, recv, PeerIdentity::guest("Member".to_string(), role, true));
+                Ok(())
+            }
+            HandshakeReply::Welcome { .. } => {
+                conn.close(CLOSE_REJECTED.into(), b"another workspace");
+                Err("that device is sharing another workspace".into())
+            }
+            HandshakeReply::Reject { error } => {
+                conn.close(CLOSE_REJECTED.into(), b"rejected");
+                Err(error)
+            }
+        }
     }
 
     /// Welcomes a device the host already has as a member. The connection has proved the device's key, so nothing else
@@ -839,6 +1144,8 @@ impl Node {
         tokio::spawn(write_loop(send, rx));
         tokio::spawn(self.clone().run_peer(conn, recv));
         tokio::spawn(sync::send_catch_up(self.clone(), id.to_string()));
+        // Each side tells the other which version of the member list it holds, so whichever is behind catches up
+        self.push_membership(Some(id), None);
     }
 
     /// Reads app messages and serves file requests until the connection ends
@@ -988,6 +1295,12 @@ impl Node {
             return;
         }
 
+        // Who belongs to the workspace is settled by signed lists, which the backend checks itself
+        if kind == KIND_MEMBERSHIP {
+            self.on_membership(from, &message);
+            return;
+        }
+
         // File sync is handled entirely in the backend
         if SyncMessage::is_sync_kind(kind) {
             match serde_json::from_value::<SyncMessage>(message) {
@@ -1021,10 +1334,10 @@ impl Node {
                 return;
             }
             // Only the host decides who is in the workspace
-            KIND_MEMBERS_UPDATE | KIND_RULES_UPDATE | KIND_WORKSPACE_DELETED | KIND_HOST_HANDOFF | KIND_HOST_MOVED if !from_host => return,
+            KIND_MEMBERS_UPDATE | KIND_RULES_UPDATE | KIND_POLICY_UPDATE | KIND_WORKSPACE_DELETED | KIND_HOST_HANDOFF | KIND_HOST_MOVED if !from_host => return,
             // Only Admin guests may ask for role changes, and only a host acts on them
             KIND_NAME_REQUEST if from_host || !hosting => return,
-            KIND_ROLE_REQUEST if from_host || !is_admin || !hosting => {
+            KIND_ROLE_REQUEST | KIND_POLICY_REQUEST if from_host || !is_admin || !hosting => {
                 eprintln!("[P2P] Ignoring a role request from {}", from.fmt_short());
                 return;
             }
@@ -1038,7 +1351,7 @@ impl Node {
             stamp_author(&mut message, &sender, &from.to_string(), from_host && !hosting);
             relayed = serde_json::to_vec(&message).unwrap_or(relayed);
         }
-        if !from_host && hosting && RELAYED_KINDS.contains(&kind.as_str()) {
+        if should_relay(from_host, hosting, self.is_not_owner(), &kind) {
             self.relay(from, relayed);
         }
 
@@ -1175,6 +1488,42 @@ impl Node {
                 Err(error)
             }
         }
+    }
+
+    /// Phase 0 of syncing without the host: can this device reach another member from nothing but its key? Dials it,
+    /// notes how long that took and whether the path is direct or through a relay, then hangs up without a handshake.
+    pub async fn probe_member(self: &Arc<Self>, device_id: &str) -> Result<Probe, String> {
+        let id = parse_peer_id(device_id)?;
+        if id == self.endpoint.id() {
+            return Err("That is this device.".into());
+        }
+        let started = std::time::Instant::now();
+        let ms = |t: std::time::Instant| t.elapsed().as_millis() as u64;
+        let failed = |error: String| Probe { reachable: false, connect_ms: ms(started), path: "none", direct_after_ms: None, rtt_ms: 0, error: Some(error) };
+        let conn = match tokio::time::timeout(PROBE_TIMEOUT, self.endpoint.connect(EndpointAddr::new(id), wire::ALPN)).await {
+            Err(_) => return Ok(failed(format!("No answer in {} s. They are probably offline.", PROBE_TIMEOUT.as_secs()))),
+            Ok(Err(e)) => return Ok(failed(e.to_string())),
+            Ok(Ok(conn)) => conn,
+        };
+        let connect_ms = ms(started);
+        // A first link often goes through the relay and moves to a direct path once hole punching works, so give it a moment
+        let (mut path, mut rtt_ms, mut direct_after_ms) = ("relay", 0, None);
+        loop {
+            if let Some(p) = conn.paths().iter().find(|p| p.is_selected()) {
+                rtt_ms = p.rtt().as_millis() as u64;
+                path = if p.is_relay() { "relay" } else { "direct" };
+                if !p.is_relay() {
+                    direct_after_ms = Some(ms(started));
+                    break;
+                }
+            }
+            if ms(started) > connect_ms + PROBE_DIRECT_WAIT_MS {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+        conn.close(CLOSE_NORMAL.into(), b"probe");
+        Ok(Probe { reachable: true, connect_ms, path, direct_after_ms, rtt_ms, error: None })
     }
 
     /// Forwards a message to every peer except the one it came from
@@ -1405,6 +1754,104 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.dir);
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_a_member_is_found_by_its_key_alone_and_an_absent_one_is_not() {
+        // No host, no ticket, no invite: two devices that know only each other's key
+        let a = start_test_node("probe-a").await;
+        let b = start_test_node("probe-b").await;
+        // A device publishes where it can be found when it starts, so the first dials may come too early; note how long
+        let began = std::time::Instant::now();
+        let mut tries = 0;
+        let found = loop {
+            tries += 1;
+            let probe = a.node.probe_member(&b.node.self_id()).await.unwrap();
+            println!("after {} ms, try {tries}: {probe:?}", began.elapsed().as_millis());
+            if probe.reachable || began.elapsed() > Duration::from_secs(60) {
+                break probe;
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        };
+        assert!(found.reachable, "{found:?}");
+        assert!(found.error.is_none());
+
+        // A key that no device is running: it must fail by itself, and say so, instead of hanging
+        let nobody = SecretKey::generate().public().to_string();
+        let gone = a.node.probe_member(&nobody).await.unwrap();
+        println!("probe of an absent device: {gone:?}");
+        assert!(!gone.reachable);
+        assert_eq!(gone.path, "none");
+        assert!(gone.error.is_some());
+        assert!(a.node.probe_member(&a.node.self_id()).await.is_err());
+    }
+
+    async fn eventually(wait: Duration, mut ok: impl FnMut() -> bool) -> bool {
+        let end = std::time::Instant::now() + wait;
+        while std::time::Instant::now() < end {
+            if ok() {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+        ok()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_members_link_up_without_the_host_and_a_removed_one_is_sent_away() {
+        let host = start_test_node("hl-host").await;
+        let a = start_test_node("hl-a").await;
+        let mut b = start_test_node("hl-b").await;
+        let invite = host.node.create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into()).await.unwrap();
+        let joined_a = a.node.join(&invite.ticket, "A").await.unwrap();
+        b.node.join(&invite.ticket, "B").await.unwrap();
+        let (a_id, b_id) = (a.node.self_id(), b.node.self_id());
+        let linked = |n: &Arc<Node>, other: &str| n.peers().iter().any(|p| p.id == other);
+
+        // The host signs the first list, and both guests take it
+        let both = vec![(a_id.clone(), "Editor".to_string()), (b_id.clone(), "Editor".to_string())];
+        host.node.set_known_members("ws".into(), "Demo".into(), "Host".into(), both);
+        assert!(eventually(Duration::from_secs(20), || a.node.membership_epoch() == Some(1) && b.node.membership_epoch() == Some(1)).await, "the guests did not get the signed list");
+
+        // The host goes away: nobody is connected to it and nobody holds a ticket to it. The members must find each other.
+        a.node.disconnect_all();
+        b.node.disconnect_all();
+        assert!(!linked(&a.node, &b_id));
+        let began = std::time::Instant::now();
+        assert!(
+            eventually(Duration::from_secs(90), || linked(&a.node, &b_id) && linked(&b.node, &a_id)).await,
+            "the members never linked up without the host"
+        );
+        println!("members linked without the host after {} ms", began.elapsed().as_millis());
+
+        // What one says reaches the other, named by its key
+        a.node.send(None, &serde_json::json!({ "kind": "PRESENCE", "timestamp": 1, "payload": "{\"page\":\"notes\"}" })).await.unwrap();
+        let got = next_of_kind(&mut b, "PRESENCE", Duration::from_secs(10)).await.expect("the message did not arrive over the member link");
+        assert_eq!(got["message"]["authorId"].as_str(), Some(a_id.as_str()));
+
+        // While they are apart the owner removes B. A hears about it when it next meets the host, and drops B at once
+        host.node.set_known_members("ws".into(), "Demo".into(), "Host".into(), vec![(a_id.clone(), "Editor".to_string())]);
+        a.node.join(&joined_a.rejoin_ticket, "A").await.unwrap();
+        assert!(eventually(Duration::from_secs(20), || a.node.membership_epoch() == Some(2) && !linked(&a.node, &b_id)).await, "A kept the removed member");
+
+        // B still holds the old list, but A no longer lets it in
+        tokio::time::sleep(Duration::from_secs(25)).await;
+        assert!(!linked(&a.node, &b_id), "the removed member got back in through a stale list");
+    }
+
+    #[test]
+    fn test_only_the_owners_device_passes_guests_messages_on() {
+        // The host relays what a guest sends, but never what the host itself sent
+        assert!(should_relay(false, true, false, KIND_DATA_CHANGE));
+        assert!(!should_relay(true, true, false, KIND_DATA_CHANGE));
+        // A member that is not the owner can look like a host (it has no host of its own to be connected to right now)
+        // but must not relay, or its receivers would credit it with what others wrote
+        assert!(!should_relay(false, true, true, KIND_DATA_CHANGE));
+        assert!(!should_relay(false, false, false, KIND_DATA_CHANGE));
+        // And only the kinds that are meant to be passed on
+        assert!(!should_relay(false, true, false, KIND_MEMBERS_UPDATE));
     }
 
     #[test]

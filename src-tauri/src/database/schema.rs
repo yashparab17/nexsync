@@ -327,6 +327,23 @@ WHERE rowid IN (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_members_name_nocase ON members(workspace_id, lower(name));
 "##,
 	},
+	Migration {
+		version: 17,
+		description: "a workspace can require its host to be online",
+		up: r##"
+ALTER TABLE settings ADD COLUMN require_host INTEGER NOT NULL DEFAULT 0;
+"##,
+	},
+	Migration {
+		version: 18,
+		description: "the signed list of who belongs to the workspace",
+		up: r##"
+CREATE TABLE IF NOT EXISTS membership (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    doc TEXT NOT NULL
+);
+"##,
+	},
 ];
 
 /// Initialises the schema on a fresh database, running pending migrations

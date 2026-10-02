@@ -20,6 +20,8 @@ export type P2PMessageKind =
 	| "YDOC_INVENTORY" // State summary of every stored note, sent on connect so the peer can send what is missing
 	| "YDOC_UPDATE" // What one note is missing on the peer, answering an inventory
 	| "VERSION_NAMED" // A collaborator naming a version of a file; hosts drop these from Viewers and relay the rest
+	| "POLICY_UPDATE" // Whether the workspace needs its host online to be worked in, as {requireHost}; only accepted from the host
+	| "POLICY_REQUEST" // An Admin guest asking the host to change that; only delivered to the host
 	| "NAME_REQUEST" // A guest asking the host for a new workspace name; only delivered to the host
 	| "PRESENCE" // Where a person is: page, open item, away; relayed by the host and stamped with the sender's name
 	| "HOST_MOVED"; // The host telling guests the ticket of the new host; only accepted from the host

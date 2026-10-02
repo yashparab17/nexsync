@@ -31,6 +31,7 @@ export interface Settings {
 	theme: string;
 	autosave: boolean;
 	sync: boolean;
+	require_host?: boolean; // Guests may only work while the host is connected; chosen by the host or an Admin
 }
 
 // Workspace collaborator

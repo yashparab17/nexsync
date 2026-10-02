@@ -56,6 +56,7 @@ import { readSelfName, setSelfName } from "@/lib/p2p/selfName";
 import { readRejoin, saveRejoin, type Rejoin } from "@/lib/p2p/rejoin";
 import { HEARTBEAT_MS, HERE, IDLE_MS, parsePresence, readQuiet, whoIsAt, type PeerPresence, type Presence } from "@/lib/p2p/presence";
 import { cleanName, freeName, nameProblem } from "@/lib/memberNames";
+import { hostGateOf, linkOf, type HostGate, type Link } from "@/lib/p2p/hostGate";
 import { newMentions } from "@/lib/comments";
 import { LiveJournal } from "@/lib/p2p/liveJournal";
 
@@ -168,6 +169,10 @@ interface P2PContextType {
 	disconnectPeer: (peerId: string) => Promise<void>;
 	disconnectAll: () => Promise<void>;
 	retryConnection: () => Promise<void>;
+	link: Link; // Connected through the host, through other members while the host is away, or not at all
+	hostGate: HostGate; // Whether this copy may be worked in: a workspace can require its host to be online
+	requireHost: boolean; // The workspace's setting
+	setRequireHost: (on: boolean) => Promise<void>; // Host or Admin: the host applies it and tells everyone
 	hostUnreachable: boolean; // This copy was joined from a host that could not be reached; it keeps trying by itself
 	hostName: string | null; // The name of the host this copy was joined from, null in our own workspaces
 	reconnectToHost: () => Promise<boolean>; // Goes back to the host this copy joined, as a member and without an invite; false when there is none saved or it could not be reached
@@ -200,6 +205,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const [isJoining, setIsJoining] = useState(false);
 	const [reconnecting, setReconnecting] = useState(false);
 	const [hostUnreachable, setHostUnreachable] = useState(false);
+	// The last try at reaching the host failed, for any reason; the screen that waits for the host gives up on it
+	const [rejoinFailed, setRejoinFailed] = useState(false);
 	const hostUnreachableRef = useRef(false);
 	hostUnreachableRef.current = hostUnreachable;
 	const rejoiningRef = useRef(false);
@@ -473,11 +480,17 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		const offReconnectFailed = p2p.onReconnectFailed(() => {
 			setReconnecting(false);
 			// The host we joined stayed away through every attempt; the retry loop below takes over
-			if (selfNameRef.current !== null) setHostUnreachable(true);
+			if (selfNameRef.current !== null) {
+				setHostUnreachable(true);
+				setRejoinFailed(true);
+			}
 		});
 		const offJoined = p2p.onPeerJoined((peer) => {
 			setReconnecting(false);
-			if (peer.isHost) setHostUnreachable(false);
+			if (peer.isHost) {
+				setHostUnreachable(false);
+				setRejoinFailed(false);
+			}
 			peerNamesRef.current.set(peer.id, peer.name);
 			if (!peer.isHost && !readQuiet()) {
 				// The host knows the name the newcomer is about to be given
@@ -486,6 +499,11 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				notifyRef.current(`${shown} joined the workspace`);
 			}
 			sharePresence(peer.id);
+			// Another member, with the host away: take what they have, since there is nobody else to ask
+			if (!peer.isHost && selfNameRef.current !== null && !peersRef.current.some((p) => p.isHost)) {
+				pendingSnapshotsRef.current.set(peer.id, null);
+				void p2p.sendMessage({ kind: "WORKSPACE_SYNC_REQUEST", timestamp: Date.now() }, peer.id).catch(() => {});
+			}
 			syncProvidersRef.current.forEach((provider) => provider.addPeer(peer.id));
 			sendInventoryRef.current(peer.id);
 			if (!peer.isHost && selfNameRef.current === null) void addGuestMember(peer);
@@ -587,21 +605,26 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 					pendingSelfNameRef.current = null;
 					if (pendingRejoinRef.current) {
 						saveRejoin(local.workspace.id, pendingRejoinRef.current);
+						// The signed member list came with the connection; keep it with this copy, for when the host is away
+						void p2p.adoptMembership(path, pendingRejoinRef.current.hostWorkspaceId).catch(() => {});
 						pendingRejoinRef.current = null;
 					}
 					setSelfNameVersion((v) => v + 1);
 				}
-				await writeWorkspaceMetadata({
-					path,
-					metadata: {
-						...snapshot.metadata,
-						workspace: {
-							...snapshot.metadata.workspace,
-							id: local.workspace.id,
-							path: local.workspace.path,
+				// Only the host's word is taken for the members, rules and settings; another member's copy may be behind
+				if (peersRef.current.find((p) => p.id === fromPeerId)?.isHost ?? true) {
+					await writeWorkspaceMetadata({
+						path,
+						metadata: {
+							...snapshot.metadata,
+							workspace: {
+								...snapshot.metadata.workspace,
+								id: local.workspace.id,
+								path: local.workspace.path,
+							},
 						},
-					},
-				});
+					});
+				}
 
 				// Re-syncing updates existing rows and adds missing ones
 				for (const task of snapshot.tasks ?? []) {
@@ -683,6 +706,26 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		},
 		[send],
 	);
+
+	// Whether guests may only work while the host is connected: the host decides, and tells everyone as it does the rules
+	const sendPolicy = useCallback(
+		(peerId?: string) => {
+			if (selfNameRef.current !== null) return;
+			const requireHost = metadataRef.current?.settings?.require_host === true;
+			send({ kind: "POLICY_UPDATE", timestamp: Date.now(), payload: JSON.stringify({ requireHost }) }, peerId);
+		},
+		[send],
+	);
+
+	// Writes the setting into this copy of the workspace
+	const applyPolicy = useCallback(async (on: boolean) => {
+		const path = workspaceRef.current?.path;
+		if (!path) return;
+		const meta = await readWorkspaceMetadata(path);
+		if ((meta.settings.require_host === true) === on) return;
+		await writeWorkspaceMetadata({ path, metadata: { ...meta, settings: { ...meta.settings, require_host: on } } });
+		await refreshMetadataRef.current(path);
+	}, []);
 
 	// Notes open in an editor, whose live state is newer than what is stored
 	const liveDocs = useCallback(
@@ -970,6 +1013,32 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 					break;
 				}
 
+				case "POLICY_UPDATE": {
+					// The backend only delivers this from the host we joined
+					try {
+						const update: { requireHost?: unknown } = JSON.parse(message.payload ?? "{}");
+						if (typeof update.requireHost === "boolean") await applyPolicy(update.requireHost);
+					} catch (err) {
+						console.error("[P2P] Failed to apply the host policy:", err);
+					}
+					break;
+				}
+
+				case "POLICY_REQUEST": {
+					// The backend only delivers this to a host, from an Admin guest; the member list is checked again here
+					if (selfNameRef.current !== null) break;
+					try {
+						const request: { requireHost?: unknown } = JSON.parse(message.payload ?? "{}");
+						const sender = metadataRef.current?.members.members.find((m) => m.deviceId === peerId);
+						if (typeof request.requireHost !== "boolean" || sender?.role !== "Admin") break;
+						await applyPolicy(request.requireHost);
+						sendPolicy();
+					} catch (err) {
+						console.error("[P2P] Failed to apply a policy request:", err);
+					}
+					break;
+				}
+
 				case "NAME_REQUEST": {
 					// The backend only delivers this to a host, from a guest; what the guest may be called is checked here
 					const path = workspaceRef.current?.path;
@@ -1054,7 +1123,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				}
 			}
 		},
-		[generateWorkspaceSnapshot, applyWorkspaceSnapshot, send, sendMembers, liveDocs, runCatchUp],
+		[generateWorkspaceSnapshot, applyWorkspaceSnapshot, send, sendMembers, sendPolicy, applyPolicy, liveDocs, runCatchUp],
 	);
 
 	const handleMessageRef = useRef(handleMessage);
@@ -1227,9 +1296,9 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	// Ask a peer (default: the host we joined) for its workspace and apply it locally
 	const requestWorkspaceSnapshot = useCallback(
 		async (peerId?: string, targetWorkspacePath?: string) => {
-			const targets = peerId
-				? [peerId]
-				: peersRef.current.filter((p) => p.isHost).map((p) => p.id);
+			// With no peer named, ask the host, and with the host away, whichever member is connected
+			const hosts = peersRef.current.filter((p) => p.isHost);
+			const targets = peerId ? [peerId] : (hosts.length > 0 ? hosts : peersRef.current.slice(0, 1)).map((p) => p.id);
 			for (const target of targets) {
 				pendingSnapshotsRef.current.set(target, targetWorkspacePath ?? null);
 				await p2p.sendMessage({ kind: "WORKSPACE_SYNC_REQUEST", timestamp: Date.now() }, target);
@@ -1301,8 +1370,9 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		if (guestCount > 0 && membersJson !== "null" && selfNameRef.current === null) {
 			sendMembers();
 			void sendRules();
+			sendPolicy();
 		}
-	}, [membersJson, guestCount, sendMembers, sendRules]);
+	}, [membersJson, guestCount, sendMembers, sendRules, sendPolicy]);
 
 	const selfName = useMemo(
 		() => readSelfName(workspace?.id),
@@ -1354,6 +1424,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			return true;
 		} catch (err) {
 			const reason = err instanceof Error ? err.message : String(err);
+			setRejoinFailed(true);
 			// A host that is not there is waited for; any other answer (removed, different version) is not something retrying fixes
 			if (/reach|timed out|in time/i.test(reason)) {
 				if (!hostUnreachableRef.current) notifyRef.current("The host is offline. This copy reconnects by itself when they open NexSync.");
@@ -1376,7 +1447,10 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	}, [hostUnreachable, selfName, reconnectToHost]);
 
 	// Another workspace has another host
-	useEffect(() => setHostUnreachable(false), [workspaceId]);
+	useEffect(() => {
+		setHostUnreachable(false);
+		setRejoinFailed(false);
+	}, [workspaceId]);
 
 	const rejoinTriedRef = useRef<string | null>(null);
 	useEffect(() => {
@@ -1444,6 +1518,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			});
 			if (!ticket) throw new Error(`${target.name} declined to become the host.`);
 
+			// The signed member list is what says the workspace has a new owner; the new host and everyone else take it from here
+			await p2p.handoffMembership(peerId).catch((err) => console.warn("[P2P] Could not hand over the member list:", err));
 			await writeWorkspaceMetadata({ path: ws.path, metadata: { ...meta, members: { members } } });
 			// Everyone else follows the new host, then this device joins it as a guest too
 			for (const peer of peersRef.current) {
@@ -1504,6 +1580,16 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		[send],
 	);
 
+	const requireHost = metadata?.settings?.require_host === true;
+	const hostGate = hostGateOf({
+		joined: selfName !== null,
+		required: requireHost,
+		hasHost: peers.some((p) => p.isHost),
+		trying: isJoining || reconnecting,
+		failed: hostUnreachable || rejoinFailed,
+		canRetry: readRejoin(workspaceId) !== null,
+	});
+
 	const connectionStatus: P2PContextType["connectionStatus"] =
 		peers.length > 0 ? "connected"
 		: reconnecting ? "reconnecting"
@@ -1557,6 +1643,18 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				blockDevice,
 				disconnectAll,
 				retryConnection,
+				link: linkOf(peers),
+				hostGate,
+				requireHost,
+				setRequireHost: async (on) => {
+					// The host applies it itself; an Admin guest asks, and the change comes back like any other
+					if (selfNameRef.current === null) {
+						await applyPolicy(on);
+						sendPolicy();
+						return;
+					}
+					for (const host of peersRef.current.filter((p) => p.isHost)) send({ kind: "POLICY_REQUEST", timestamp: Date.now(), payload: JSON.stringify({ requireHost: on }) }, host.id);
+				},
 				hostUnreachable,
 				hostName: selfName === null ? null : (metadata?.members.members.find((m) => m.role === "Owner")?.name ?? "the host"),
 				reconnectToHost,

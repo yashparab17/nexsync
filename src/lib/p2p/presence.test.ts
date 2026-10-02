@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { followPath, lastSeenText, pageOf, parsePresence, placeLabel, whoIsAt, type PeerPresence } from "@/lib/p2p/presence";
+import { followPath, lastSeenText, pageOf, parsePresence, placeLabel, probeText, whoIsAt, type PeerPresence } from "@/lib/p2p/presence";
 
 describe("presence messages", () => {
 	it("accepts a known page and drops anything else", () => {
@@ -36,6 +36,15 @@ describe("saying where", () => {
 		expect(whoIsAt(all, "kanban")).toEqual(["Raven", "Sam"]);
 		expect(whoIsAt(all, "kanban", "c1")).toEqual(["Raven"]);
 		expect(whoIsAt(all, "tasks")).toEqual([]);
+	});
+
+	it("says in one line whether a member could be reached by key", () => {
+		const base = { reachable: true, connectMs: 1250, path: "direct" as const, directAfterMs: 1800, rttMs: 24, error: null };
+		expect(probeText(base)).toBe("Reachable directly, 24 ms, connected in 1.3 s");
+		expect(probeText({ ...base, path: "relay", directAfterMs: null })).toBe("Reachable through a relay, connected in 1.3 s");
+		expect(probeText({ ...base, reachable: false, path: "none", error: "No addressing information available" })).toBe(
+			"Not reachable from here: No addressing information available",
+		);
 	});
 
 	it("words how long ago someone left", () => {

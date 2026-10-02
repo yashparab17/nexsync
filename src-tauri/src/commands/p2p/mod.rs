@@ -7,6 +7,9 @@
 //! commands below and listens to `p2p://*` events.
 
 mod files;
+#[cfg(test)]
+mod hostless_sim;
+mod membership;
 mod mesh;
 mod node;
 pub(crate) mod short_code;
@@ -34,8 +37,38 @@ pub async fn p2p_set_workspace(
     if let Some(path) = &workspace_path {
         validate_allowed_root(&app, path)?;
     }
+    // A workspace that has a signed member list has other members to be linked to, host or no host, so the network starts
+    let has_members = workspace_path.as_deref().is_some_and(|p| membership::load(p).is_some());
     state.set_workspace_path(workspace_path).await;
+    if has_members {
+        state.node(&app).await?;
+    }
     Ok(())
+}
+
+/// A workspace was just created as a copy of the host's: keep the member list the host sent with it. Returns whether
+/// there was one to keep.
+#[tauri::command]
+pub async fn p2p_adopt_membership(
+    app: AppHandle,
+    state: State<'_, P2pState>,
+    workspace_path: String,
+    host_workspace_id: String,
+) -> Result<bool, String> {
+    validate_allowed_root(&app, &workspace_path)?;
+    Ok(match state.existing().await {
+        Some(node) => node.adopt_membership(&workspace_path, &host_workspace_id),
+        None => false,
+    })
+}
+
+/// The owner hands the workspace to another device: the signed member list is what says so
+#[tauri::command]
+pub async fn p2p_handoff_membership(state: State<'_, P2pState>, new_owner: String) -> Result<(), String> {
+    match state.existing().await {
+        Some(node) => node.hand_off_membership(&new_owner),
+        None => Err("The network is not running.".into()),
+    }
 }
 
 /// Creates an invite ticket for the active workspace, replacing any previous invite
@@ -71,6 +104,13 @@ pub async fn p2p_set_known_members(
         state.node(&app).await?;
     }
     Ok(())
+}
+
+/// Dials a member by device key alone and reports whether and how it got through
+#[tauri::command]
+pub async fn p2p_probe_member(app: AppHandle, state: State<'_, P2pState>, device_id: String) -> Result<node::Probe, String> {
+    let node = state.node(&app).await?;
+    node.probe_member(&device_id).await
 }
 
 /// Disconnects a guest and stops them rejoining with an earlier invite or code

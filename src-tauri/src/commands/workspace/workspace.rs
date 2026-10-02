@@ -48,6 +48,7 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
         theme: "dark".to_string(),
         autosave: true,
         sync: true,
+        require_host: false,
     };
 
     let owner_name = crate::commands::config::load_config(&app_handle)
@@ -92,12 +93,13 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
     .map_err(|e| e.to_string())?;
 
     tx.execute(
-        "INSERT INTO settings (workspace_id, theme, autosave, sync)
-         VALUES (?1, ?2, ?3, ?4)",
+        "INSERT INTO settings (workspace_id, theme, autosave, sync, require_host)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
         rusqlite::params![
             &workspace.id, &settings.theme,
             if settings.autosave { 1 } else { 0 },
             if settings.sync { 1 } else { 0 },
+            if settings.require_host { 1 } else { 0 },
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -233,10 +235,15 @@ pub fn read_workspace_metadata(app_handle: tauri::AppHandle, path: String) -> Re
         .query_row("SELECT sync FROM settings WHERE workspace_id = ?1", [&workspace.id], |r| r.get(0))
         .map_err(|e| e.to_string())?;
 
+    let require_host: i64 = tx
+        .query_row("SELECT require_host FROM settings WHERE workspace_id = ?1", [&workspace.id], |r| r.get(0))
+        .map_err(|e| e.to_string())?;
+
     let settings = Settings {
         theme,
         autosave: autosave != 0,
         sync: sync != 0,
+        require_host: require_host != 0,
     };
 
     let members: Vec<Member> = tx
@@ -324,13 +331,14 @@ fn persist_metadata(db: &WorkspaceDb, canonical_path_str: &str, metadata: &Works
     .map_err(|e| e.to_string())?;
 
     tx.execute(
-        "INSERT OR REPLACE INTO settings (workspace_id, theme, autosave, sync)
-         VALUES (?1, ?2, ?3, ?4)",
+        "INSERT OR REPLACE INTO settings (workspace_id, theme, autosave, sync, require_host)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
         rusqlite::params![
             &metadata.workspace.id,
             &metadata.settings.theme,
             if metadata.settings.autosave { 1 } else { 0 },
             if metadata.settings.sync { 1 } else { 0 },
+            if metadata.settings.require_host { 1 } else { 0 },
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -571,6 +579,24 @@ mod tests {
         db.conn
             .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))
             .unwrap()
+    }
+
+    #[test]
+    fn test_the_host_required_setting_is_saved_and_older_metadata_means_off() {
+        let dir = std::env::temp_dir().join(format!("nexsync-host-req-{}", Uuid::new_v4()));
+        let db = WorkspaceDb::open(dir.to_str().unwrap()).unwrap();
+        let path = dir.to_string_lossy().to_string();
+        let owner = serde_json::json!({ "id": "owner", "name": "Host", "role": "Owner" });
+        let mut meta = metadata(serde_json::json!([owner]));
+        assert!(!meta.settings.require_host, "metadata written before the setting existed must mean off");
+        persist_metadata(&db, &path, &meta).unwrap();
+        let stored = |db: &WorkspaceDb| -> i64 { db.conn.query_row("SELECT require_host FROM settings", [], |r| r.get(0)).unwrap() };
+        assert_eq!(stored(&db), 0);
+        meta.settings.require_host = true;
+        persist_metadata(&db, &path, &meta).unwrap();
+        assert_eq!(stored(&db), 1);
+        drop(db);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

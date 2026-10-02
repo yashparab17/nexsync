@@ -93,6 +93,31 @@ export function createInvite(args: {
 }
 
 // Disconnect a guest and refuse it until a new invite is made
+// What dialing a member by device key alone found; used to check that members can reach each other without the host
+export interface ProbeResult {
+	reachable: boolean;
+	connectMs: number; // Until a connection existed, or until giving up
+	path: "direct" | "relay" | "none";
+	directAfterMs: number | null; // Until the path became direct; null if it stayed on the relay
+	rttMs: number;
+	error: string | null;
+}
+
+export function probeMember(deviceId: string): Promise<ProbeResult> {
+	return invoke("p2p_probe_member", { deviceId });
+}
+
+// A workspace was just created as a copy of the host's: keeps the signed member list the host sent with it, so this
+// device can link to the other members when the host is away. False when no list had arrived.
+export function adoptMembership(workspacePath: string, hostWorkspaceId: string): Promise<boolean> {
+	return invoke("p2p_adopt_membership", { workspacePath, hostWorkspaceId });
+}
+
+// The owner hands the workspace to another device; the signed member list is what records it
+export function handoffMembership(newOwner: string): Promise<void> {
+	return invoke("p2p_handoff_membership", { newOwner });
+}
+
 export function blockDevice(deviceId: string): Promise<void> {
 	return invoke("p2p_block_device", { deviceId });
 }

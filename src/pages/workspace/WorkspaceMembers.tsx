@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+	Activity,
 	Crown,
 	KeyRound,
 	Pencil,
@@ -33,7 +34,8 @@ import { useErrorLog } from "@/hooks/useErrorLog";
 import { writeWorkspaceMetadata } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { ASSIGNABLE_ROLES, canChangeRole } from "@/lib/roles";
-import { lastSeenText, placeLabel } from "@/lib/p2p/presence";
+import { lastSeenText, placeLabel, probeText } from "@/lib/p2p/presence";
+import { probeMember, type ProbeResult } from "@/lib/p2p/transport";
 import { cleanName, nameProblem } from "@/lib/memberNames";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useSelfRole } from "@/store/p2p/P2PContext";
@@ -90,6 +92,18 @@ export default function WorkspaceMembers() {
 	const [renameOpen, setRenameOpen] = useState(false);
 	const [renameValue, setRenameValue] = useState("");
 	const [renameError, setRenameError] = useState<string | null>(null);
+	// What dialing each member by device key found, by member id; "running" while it is being tried
+	const [probes, setProbes] = useState<Record<string, ProbeResult | "running">>({});
+	const runProbe = async (member: Member) => {
+		if (!member.deviceId) return;
+		setProbes((p) => ({ ...p, [member.id]: "running" }));
+		try {
+			const result = await probeMember(member.deviceId);
+			setProbes((p) => ({ ...p, [member.id]: result }));
+		} catch (err) {
+			setProbes((p) => ({ ...p, [member.id]: { reachable: false, connectMs: 0, path: "none", directAfterMs: null, rttMs: 0, error: err instanceof Error ? err.message : String(err) } }));
+		}
+	};
 
 	const { peers, presence, requestName, selfName, selfId, requestRoleChange, disconnectPeer, blockDevice, transferHost } = useP2P();
 	const [hostTarget, setHostTarget] = useState<Member | null>(null);
@@ -351,7 +365,12 @@ export default function WorkspaceMembers() {
 															<span className="text-[10px] text-muted-foreground">Last seen {lastSeenText(member.lastSeen)}</span>
 														)}
 													</div>
-													<div className="flex items-center gap-2 mt-0.5">
+													{probes[member.id] && (
+															<p className="mt-0.5 text-[10px] text-muted-foreground">
+																{probes[member.id] === "running" ? "Looking for them by device key…" : probeText(probes[member.id] as ProbeResult)}
+															</p>
+														)}
+														<div className="flex items-center gap-2 mt-0.5">
 														<span
 															className={cn(
 																"inline-flex items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
@@ -366,6 +385,19 @@ export default function WorkspaceMembers() {
 												</div>
 											</div>
 
+											{member.deviceId && !isYou && (
+												<span title="Check whether this member can be reached from here without the host">
+													<Button
+														variant="ghost"
+														size="icon-xs"
+														onPress={() => void runProbe(member)}
+														isDisabled={probes[member.id] === "running"}
+														aria-label={`Check whether ${member.name} can be reached directly`}
+													>
+														<Activity className="size-3.5 text-muted-foreground hover:text-foreground" />
+													</Button>
+												</span>
+											)}
 											{isJoinedCopy && isYou && (
 												<Button
 													variant="ghost"

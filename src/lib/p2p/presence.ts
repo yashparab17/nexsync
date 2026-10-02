@@ -1,5 +1,7 @@
 // Who is where in a workspace: the message each device sends, and the words and links built from it
 
+import type { ProbeResult } from "@/lib/p2p/transport";
+
 // Pages a person can be on; anything else a peer sends is ignored, since following sends this device there
 const PAGES = ["dashboard", "notes", "editor", "files", "assets", "tasks", "kanban", "insights", "members", "trash", "settings"] as const;
 
@@ -58,6 +60,14 @@ export function whoIsAt(all: Record<string, PeerPresence>, page: string, item?: 
 	return Object.entries(all)
 		.filter(([, p]) => p.page === page && (item === undefined || p.item === item))
 		.map(([who]) => who);
+}
+
+// One line for what dialing a member by key found
+export function probeText(r: ProbeResult): string {
+	const secs = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
+	if (!r.reachable) return `Not reachable from here: ${r.error ?? "no answer"}`;
+	const how = r.path === "direct" ? `directly, ${r.rttMs} ms` : "through a relay";
+	return `Reachable ${how}, connected in ${secs(r.connectMs)}`;
 }
 
 // "2 hours ago", for someone who has left

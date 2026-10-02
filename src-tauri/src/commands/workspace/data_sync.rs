@@ -757,6 +757,31 @@ mod tests {
         merge_state(b, "b", export_state(a, "a").unwrap()).unwrap();
     }
 
+    // With members linked directly and the host relaying too, one change can reach a device by several routes
+    #[test]
+    fn a_change_that_arrives_by_several_routes_is_one_entry_in_the_catch_up_review() {
+        let (a, b, c) = (db("a"), db("b"), db("c"));
+        put_task(&a, "a", &task("1", "one", "2026-01-02T00:00:00Z"));
+        merge_state(&b, "b", export_state(&a, "a").unwrap()).unwrap();
+        merge_state(&c, "c", export_state(&a, "a").unwrap()).unwrap();
+
+        edit(&a, "a", "1", |t| t.title = "changed".into());
+        let direct = export_state(&a, "a").unwrap();
+        merge_state(&c, "c", direct.clone()).unwrap();
+        let relayed = export_state(&c, "c").unwrap();
+
+        // B hears it from A, then from C (which had it from A), then from A again
+        assert!(merge_state(&b, "b", direct.clone()).unwrap());
+        assert!(!merge_state(&b, "b", relayed).unwrap());
+        assert!(!merge_state(&b, "b", direct).unwrap());
+        let title_changes = crate::commands::workspace::catchup::list(&b)
+            .unwrap()
+            .into_iter()
+            .filter(|e| e.kind == "field" && e.path == "title")
+            .count();
+        assert_eq!(title_changes, 1);
+    }
+
     #[test]
     fn a_record_that_cannot_be_stored_yet_does_not_stop_the_others() {
         let a = db("a");

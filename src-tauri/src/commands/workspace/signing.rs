@@ -41,11 +41,11 @@ impl Write<'_> {
     }
 }
 
-fn to_hex(bytes: &[u8]) -> String {
+pub fn to_hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn from_hex(text: &str) -> Option<Vec<u8>> {
+pub fn from_hex(text: &str) -> Option<Vec<u8>> {
     if !text.len().is_multiple_of(2) || !text.is_ascii() {
         return None;
     }

@@ -13,7 +13,7 @@ import type { ConnectedPeerInfo } from "@/lib/p2p/types";
 const route = (p: ConnectedPeerInfo) => (p.connectionType === "direct" ? "Direct" : p.connectionType === "relay" ? "Through a relay" : "Connecting");
 
 export default function PresenceStrip() {
-	const { peers, presence, nameOf } = useP2P();
+	const { peers, presence, nameOf, link, hostName } = useP2P();
 	const navigate = useNavigate();
 	const [following, setFollowing] = useState<string | null>(null);
 	const [quiet, setQuiet] = useState(readQuiet);
@@ -62,6 +62,11 @@ export default function PresenceStrip() {
 					);
 				})}
 			</div>
+			{hostName !== null && link === "members" && (
+				<span className="hidden text-[11px] text-amber-400 md:inline" title={`${hostName} is offline. You are working with the other members.`}>
+					Host offline
+				</span>
+			)}
 			{following && <span className="hidden text-[11px] text-primary md:inline">Following {nameOf(following)}</span>}
 			<button
 				type="button"
