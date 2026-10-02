@@ -55,6 +55,8 @@ const MESH_DIAL_DELAY: Duration = Duration::from_secs(2);
 /// starts before its address can be found
 const MEMBER_DIAL_EVERY: Duration = Duration::from_secs(10);
 const MEMBER_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+/// How long the lists of the members just linked to are given to arrive before this device trusts its own
+const MEMBER_SETTLE: Duration = Duration::from_secs(1);
 const MEMBER_DIAL_PARALLEL: usize = 6;
 
 const CLOSE_NORMAL: u32 = 0;
@@ -359,6 +361,10 @@ struct NodeState {
     pending_membership: Option<Membership>,
     /// Members being dialed right now, so one is not dialed twice
     dialing: std::collections::HashSet<EndpointId>,
+    /// Whether this device has looked for the other members since its list was loaded. Until it has, its list may be out of
+    /// date, so it does not let a member in by key: otherwise a removed member could get in during the moments after a
+    /// device that missed their removal comes back online.
+    caught_up: bool,
 }
 
 /// The people already in a workspace, as the host's member list has them. A device on this list proves who it is with
@@ -735,6 +741,7 @@ impl Node {
     pub fn reload_membership(self: &Arc<Self>) {
         let loaded = self.workspace_path().and_then(|path| membership::load(&path));
         let mut st = self.lock();
+        st.caught_up = false;
         match loaded {
             Some(m) => {
                 st.known.workspace_id = m.workspace_id.clone();
@@ -937,8 +944,15 @@ impl Node {
         loop {
             self.refresh_lease();
             self.drop_stale_links();
-            for id in self.member_targets() {
-                tokio::spawn(self.clone().dial_member(id));
+            let first_look = !self.lock().caught_up;
+            let dials: Vec<_> = self.member_targets().into_iter().map(|id| tokio::spawn(self.clone().dial_member(id))).collect();
+            if first_look {
+                // The lists of the members that answered arrive just after the links come up
+                for dial in dials {
+                    let _ = dial.await;
+                }
+                tokio::time::sleep(MEMBER_SETTLE).await;
+                self.lock().caught_up = true;
             }
             tokio::time::sleep(MEMBER_DIAL_EVERY).await;
         }
@@ -1001,6 +1015,9 @@ impl Node {
         // A device that is not the owner and has not had a fresh list for a day does not vouch for anyone: it may have missed
         // a removal, and this is what stops it being a way back in for the removed
         if st.membership.as_ref().is_some_and(|m| !m.vouches(&self.endpoint.id().to_string(), now_ms())) {
+            return None;
+        }
+        if !st.caught_up && st.membership.as_ref().is_some_and(|m| m.owner != self.endpoint.id().to_string()) {
             return None;
         }
         let role = st.roles.get(&id).or_else(|| st.known.roles.get(&id))?.clone();
@@ -1887,6 +1904,26 @@ mod tests {
         assert!(!should_relay(false, false, false, KIND_DATA_CHANGE));
         // And only the kinds that are meant to be passed on
         assert!(!should_relay(false, true, false, KIND_MEMBERS_UPDATE));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "starts a network endpoint"]
+    async fn test_a_member_is_not_let_in_by_key_until_this_device_has_looked_for_the_others() {
+        let me = start_test_node("gate").await;
+        let owner = iroh::SecretKey::from_bytes(&[7u8; 32]);
+        let member = iroh::SecretKey::from_bytes(&[8u8; 32]);
+        let list = membership::next(None, &owner, "ws", "Demo", vec![(member.public().to_string(), "Editor".to_string())]).unwrap().unwrap();
+        let _db = crate::database::WorkspaceDb::open(me.dir.to_str().unwrap()).unwrap();
+        membership::store(me.dir.to_str().unwrap(), &list).unwrap();
+        me.node.reload_membership();
+
+        // The list is genuine, fresh and names the member, yet this device has not checked it against anyone yet
+        assert!(me.node.check_known_member(&member.public()).is_none(), "let a member in before looking for the others");
+        me.node.lock().caught_up = true;
+        assert!(me.node.check_known_member(&member.public()).is_some(), "turned a member away after looking for the others");
+        // Loading a different list starts the check over
+        me.node.reload_membership();
+        assert!(me.node.check_known_member(&member.public()).is_none());
     }
 
     #[test]

@@ -129,18 +129,17 @@ If you already have the synced workspace open, use **P2P Sync → Join with Invi
 - Closing or switching workspaces disconnects all peers and revokes the invite.
 - A guest applies a workspace snapshot only if it asked for one, so a peer can't push changes into your workspace unprompted.
 - A host ignores file, task, kanban **and live-editing** changes from guests invited as **Viewer** — enforced on the host, not just hidden in the guest's UI, so a modified client can't bypass it by sending raw messages directly. Only the host can change the member list or workspace settings.
-- Files deleted by a collaborator are moved into your workspace's `.nexsync/trash/` folder, so a mistake on their side can be undone on yours.
+- Files deleted by a collaborator are moved into your workspace's `.nexsync/trash/` folder, so a mistake on their side can be undone on yours. Items are deleted from the trash after 30 days.
 - Relays and discovery use n0's public infrastructure. They can see that two endpoint keys are talking, but not what they say.
 - Release builds are signed (minisign) and the app only installs an update whose signature matches the public key baked into the app; an attacker controlling GitHub Releases without the private key can't push a malicious update.
 
 ## Current limitations
 
-- **The host still decides who is a member.** Members link to each other without the host and keep syncing while it is away, using a member list the host signs. Only the host can change roles, rules and settings, and a removed member can still get back in through a device that has not yet heard of the removal, for at most 24 hours: the owner's device re-signs the member list every 6 hours, and a device whose list is older than a day stops letting members in. New people can only join while the host is online.
+- **The host still decides who is a member.** Members link to each other without the host and keep syncing while it is away, using a member list the host signs. Only the host can change roles, rules and settings, and a removed member can still get back in through a device that has not yet heard of the removal, for at most 24 hours: the owner's device re-signs the member list every 6 hours, and a device whose list is older than a day stops letting members in. A device that has just come online also looks for the other members before it lets anyone in by key, so a removed member cannot slip in during those first moments; only when no fresh member can be reached does the 24 hours still apply. New people can only join while the host is online.
 - **Reaching a device across networks is only measured on one machine.** Direct and relayed connections are used as Iroh decides; how often a member can be reached without the host across real networks is not yet known.
 - **Alpha software.** Expect rough edges and keep your own backups of anything important.
 - **CodeMirror's undo is CRDT-aware, but a rename mid-edit only migrates the collaboration state for files, not folders**, and the very first time two people open a never-before-collaborated file at almost the same instant, both may seed it independently (harmless once anyone edits it once).
 - **Last writer wins, outside a live session:** a plain file save (not currently open together) or a re-pull from the host still replaces the other side's copy of files ≤ 10 MB rather than merging.
-- **Trash isn't emptied automatically:** clear `.nexsync/trash/` yourself if it grows.
 - **Public relays:** n0's public relays are meant for development and light use. A production deployment should run its own [iroh-relay](https://github.com/n0-computer/iroh).
 - **No code-signing identity configured yet:** Windows/macOS release builds are unsigned until certificates are added as repo secrets, so installers will trigger OS-level "unknown publisher" warnings.
 

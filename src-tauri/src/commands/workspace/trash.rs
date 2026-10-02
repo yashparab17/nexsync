@@ -37,6 +37,20 @@ fn entry_dir(workspace: &str, id: &str) -> Result<PathBuf, String> {
     if dir.is_dir() { Ok(dir) } else { Err("Trash item not found.".to_string()) }
 }
 
+/// Trash entries older than this are deleted the next time something is trashed or the Trash is opened.
+const RETENTION_MS: u128 = 30 * 24 * 60 * 60 * 1000;
+
+/// Deletes entries older than `RETENTION_MS`. Ids are millisecond timestamps, so age needs no file reads.
+fn purge_expired(workspace: &str, now: u128) {
+    let Ok(rd) = fs::read_dir(trash_root(workspace)) else { return };
+    for e in rd.flatten() {
+        let Some(at) = e.file_name().to_string_lossy().parse::<u128>().ok() else { continue };
+        if now.saturating_sub(at) > RETENTION_MS {
+            let _ = fs::remove_dir_all(e.path());
+        }
+    }
+}
+
 /// Moves `local` (workspace-relative `rel`) into a fresh trash entry.
 pub fn move_to_trash(workspace: &str, local: &Path, rel: &str) -> io::Result<()> {
     stash(workspace, local, rel, false)
@@ -49,6 +63,7 @@ pub fn copy_to_trash(workspace: &str, local: &Path, rel: &str) -> io::Result<()>
 
 fn stash(workspace: &str, local: &Path, rel: &str, keep_original: bool) -> io::Result<()> {
     let mut stamp = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+    purge_expired(workspace, stamp);
     // Bump on collision so two deletions in the same millisecond stay separate entries.
     while trash_root(workspace).join(stamp.to_string()).exists() {
         stamp += 1;
@@ -128,6 +143,7 @@ fn restore_into(src: &Path, dst: &Path) -> Result<(), String> {
 #[tauri::command]
 pub fn list_trash(app_handle: tauri::AppHandle, path: String) -> Result<Vec<TrashItem>, String> {
     validate_allowed_root(&app_handle, &path)?;
+    purge_expired(&path, SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0));
     let mut items: Vec<TrashItem> = fs::read_dir(trash_root(&path))
         .map(|rd| rd.flatten().collect::<Vec<_>>())
         .unwrap_or_default()
@@ -230,6 +246,19 @@ mod tests {
     fn test_entry_id_must_be_numeric() {
         assert!(entry_dir("/ws", "../etc").is_err());
         assert!(entry_dir("/ws", "").is_err());
+    }
+
+    #[test]
+    fn test_old_entries_are_purged_and_recent_ones_kept() {
+        let ws = temp_ws("expiry");
+        let ws_str = ws.to_string_lossy().to_string();
+        let now: u128 = 100 * 24 * 60 * 60 * 1000;
+        for age_days in [1u128, 29, 31, 90] {
+            fs::create_dir_all(trash_root(&ws_str).join((now - age_days * 24 * 60 * 60 * 1000).to_string())).unwrap();
+        }
+        purge_expired(&ws_str, now);
+        assert_eq!(fs::read_dir(trash_root(&ws_str)).unwrap().count(), 2);
+        let _ = fs::remove_dir_all(ws);
     }
 
     #[test]
