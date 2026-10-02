@@ -53,6 +53,7 @@ import { bindGuestMember, canChangeRole, roleTable } from "@/lib/roles";
 import { applyCatchUp, buildInventory, editDoc, updatesFor, type Inventory } from "@/lib/p2p/yjsCatchUp";
 import { replaceText, revertHunk, type TextHunk } from "@/lib/catchup";
 import { readSelfName, setSelfName } from "@/lib/p2p/selfName";
+import { readRejoin, saveRejoin, type Rejoin } from "@/lib/p2p/rejoin";
 import { newMentions } from "@/lib/comments";
 import { LiveJournal } from "@/lib/p2p/liveJournal";
 
@@ -160,6 +161,7 @@ interface P2PContextType {
 	disconnectPeer: (peerId: string) => Promise<void>;
 	disconnectAll: () => Promise<void>;
 	retryConnection: () => Promise<void>;
+	reconnectToHost: () => Promise<boolean>; // Goes back to the host this copy joined, as a member and without an invite; false when there is none saved or it could not be reached
 	network: p2p.NetworkStatus; // Whether the relay is reachable, and why not
 }
 
@@ -196,6 +198,9 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	// Note catch-up steps run one at a time, so two updates to the same closed note cannot overwrite each other
 	const catchUpQueueRef = useRef<Promise<void>>(Promise.resolve());
 	const sendInventoryRef = useRef<(peerId: string) => void>(() => {});
+	// What a peer said it has, kept when it arrives before any workspace is open (joining from the Welcome page), and answered once one is
+	const heldInventoriesRef = useRef<Map<string, string>>(new Map());
+	const answerInventoryRef = useRef<(path: string, peerId: string, raw: string) => void>(() => {});
 	const [transfers, setTransfers] = useState<FileTransfer[]>([]);
 	// Set when the user cancels everything, so a snapshot download loop stops instead of starting the next file
 	const cancelledRef = useRef(false);
@@ -207,6 +212,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const syncVersionRef = useRef(0);
 	// Display name used for the most recent join, saved once we know the local workspace path
 	const pendingSelfNameRef = useRef<string | null>(null);
+	// Where the host just joined can be found again; saved with the local copy once its snapshot arrives
+	const pendingRejoinRef = useRef<Rejoin | null>(null);
 	// Incoming changes are applied one at a time, in the order the peer sent them
 	const applyQueueRef = useRef<Promise<void>>(Promise.resolve());
 
@@ -296,6 +303,20 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		);
 	}, [workspace?.path]);
 
+	// Peers can be connected before a workspace is open (joining from the Welcome page). Their note exchange could not
+	// start then, so it starts now: ours goes out, and theirs, kept when it arrived, is answered.
+	useEffect(() => {
+		const path = workspace?.path;
+		if (!path) return;
+		for (const peer of peersRef.current) {
+			sendInventoryRef.current(peer.id);
+			const held = heldInventoriesRef.current.get(peer.id);
+			if (held === undefined) continue;
+			heldInventoriesRef.current.delete(peer.id);
+			answerInventoryRef.current(path, peer.id, held);
+		}
+	}, [workspace?.path]);
+
 	// The OS knows the network changed before Iroh does: show offline at once, and make Iroh re-probe when it returns.
 	// The backend then confirms reachability of the relay itself and re-dials a lost host.
 	useEffect(() => {
@@ -374,6 +395,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		const offLeft = p2p.onPeerLeft(({ peerId }) => {
 			syncProvidersRef.current.forEach((provider) => provider.removePeer(peerId));
 			pendingSnapshotsRef.current.delete(peerId);
+			heldInventoriesRef.current.delete(peerId);
 		});
 		return () => {
 			offPeers();
@@ -448,6 +470,10 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 						// Only affects the "(You)" label
 					}
 					pendingSelfNameRef.current = null;
+					if (pendingRejoinRef.current) {
+						saveRejoin(local.workspace.id, pendingRejoinRef.current);
+						pendingRejoinRef.current = null;
+					}
 					setSelfNameVersion((v) => v + 1);
 				}
 				await writeWorkspaceMetadata({
@@ -504,6 +530,8 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				]);
 				await refreshMetadataRef.current(path);
 				markSynced("");
+				// The notes' files are in place now, so the exchange of what is inside them can start
+				sendInventoryRef.current(fromPeerId);
 				if (failed > 0) {
 					console.warn(`[P2P] Workspace synced with ${failed} file(s) missing.`);
 				}
@@ -561,6 +589,20 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			const inventory = await buildInventory(path, liveDocs());
 			send({ kind: "YDOC_INVENTORY", timestamp: Date.now(), payload: JSON.stringify(inventory) }, peerId);
 		});
+	};
+
+	// Sends a peer the notes it is missing, given what it said it has
+	answerInventoryRef.current = (path, peerId, raw) => {
+		try {
+			const inventory: Inventory = JSON.parse(raw);
+			runCatchUp(async () => {
+				for (const { docId, update } of await updatesFor(path, inventory, liveDocs())) {
+					send({ kind: "YDOC_UPDATE", timestamp: Date.now(), docId, payload: update }, peerId);
+				}
+			});
+		} catch {
+			console.warn("[P2P] Ignoring a malformed note inventory.");
+		}
 	};
 
 	const refreshData = useCallback(() => setDataVersion((v) => v + 1), []);
@@ -722,17 +764,10 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 
 				case "YDOC_INVENTORY": {
 					const path = workspaceRef.current?.path;
-					if (!path || !message.payload) break;
-					try {
-						const inventory: Inventory = JSON.parse(message.payload);
-						runCatchUp(async () => {
-							for (const { docId, update } of await updatesFor(path, inventory, liveDocs())) {
-								send({ kind: "YDOC_UPDATE", timestamp: Date.now(), docId, payload: update }, peerId);
-							}
-						});
-					} catch {
-						console.warn("[P2P] Ignoring a malformed note inventory.");
-					}
+					if (!message.payload) break;
+					// No workspace is open yet: keep it, and answer when one is
+					if (!path) heldInventoriesRef.current.set(peerId, message.payload);
+					else answerInventoryRef.current(path, peerId, message.payload);
 					break;
 				}
 
@@ -1016,6 +1051,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				"Collaborator";
 			const result = await p2p.joinWithTicket(ticket.trim(), name);
 			pendingSelfNameRef.current = name;
+			pendingRejoinRef.current = { ticket: result.rejoinTicket, name, hostWorkspaceId: result.workspaceId };
 			return result;
 		} finally {
 			setIsJoining(false);
@@ -1032,6 +1068,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				"Collaborator";
 			const result = await p2p.joinWithCode(code, name);
 			pendingSelfNameRef.current = name;
+			pendingRejoinRef.current = { ticket: result.rejoinTicket, name, hostWorkspaceId: result.workspaceId };
 			return result;
 		} finally {
 			setIsJoining(false);
@@ -1114,14 +1151,61 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		[workspace?.id, selfNameVersion],
 	);
 	selfNameRef.current = selfName;
+	const workspaceId = workspace?.id;
+	const workspaceName = workspace?.name ?? "";
 
 	// The host enforces roles by device key, so it hands the current member list to the backend
 	useEffect(() => {
 		if (selfName !== null || membersJson === "null") return;
-		p2p.setRoles(roleTable(JSON.parse(membersJson))).catch((err) =>
+		const members: Member[] = JSON.parse(membersJson);
+		p2p.setRoles(roleTable(members)).catch((err) =>
 			console.error("[P2P] Failed to apply member roles:", err),
 		);
-	}, [membersJson, selfName]);
+		// The same list says who may come back without an invite; a removed member drops off it at once
+		if (workspaceId) {
+			p2p.setKnownMembers({
+				workspaceId,
+				workspaceName,
+				hostName: members.find((m) => m.role === "Owner")?.name ?? "Host",
+				members: roleTable(members),
+			}).catch((err) => console.error("[P2P] Failed to share who may reconnect:", err));
+		}
+	}, [membersJson, selfName, workspaceId, workspaceName]);
+
+	// A device that joined a workspace goes back to its host by itself when the workspace is opened, as a member
+	const reconnectToHost = useCallback(async (): Promise<boolean> => {
+		const ws = workspaceRef.current;
+		const saved = readRejoin(ws?.id);
+		if (!ws || !saved || peersRef.current.some((p) => p.isHost)) return false;
+		setIsJoining(true);
+		try {
+			const result = await p2p.joinWithTicket(saved.ticket, saved.name);
+			if (result.workspaceId !== saved.hostWorkspaceId) {
+				await p2p.disconnectAll().catch(() => {});
+				notifyRef.current("The host at the saved address is not sharing this workspace, so it was not reconnected.");
+				return false;
+			}
+			saveRejoin(ws.id, { ...saved, ticket: result.rejoinTicket });
+			// Bring tasks, cards and files up to date; the notes follow once the connection is announced
+			pendingSnapshotsRef.current.set(result.peerId, null);
+			await p2p.sendMessage({ kind: "WORKSPACE_SYNC_REQUEST", timestamp: Date.now() }, result.peerId);
+			notifyRef.current(`Reconnected to ${result.hostName}.`);
+			return true;
+		} catch (err) {
+			const reason = err instanceof Error ? err.message : String(err);
+			notifyRef.current(`Couldn't reconnect to the host. ${reason} Open Collaborate and press Reconnect to try again.`);
+			return false;
+		} finally {
+			setIsJoining(false);
+		}
+	}, []);
+
+	const rejoinTriedRef = useRef<string | null>(null);
+	useEffect(() => {
+		if (!workspaceId || selfName === null || rejoinTriedRef.current === workspaceId) return;
+		rejoinTriedRef.current = workspaceId;
+		void reconnectToHost();
+	}, [workspaceId, selfName, reconnectToHost]);
 
 	// A joined copy identifies itself in the member list by its device key
 	const [selfId, setSelfId] = useState<string | null>(null);
@@ -1277,6 +1361,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				blockDevice,
 				disconnectAll,
 				retryConnection,
+				reconnectToHost,
 				network,
 			}}
 		>

@@ -23,6 +23,18 @@ export interface JoinResult {
 	workspaceName: string;
 	role: string;
 	hostName: string;
+	// The host's address without the invite secret, kept so this device can come back as a member
+	rejoinTicket: string;
+}
+
+// Tells the host who is already in the open workspace, as [device key, role] pairs, so they can come back without an invite
+export function setKnownMembers(args: {
+	workspaceId: string;
+	workspaceName: string;
+	hostName: string;
+	members: [string, string][];
+}): Promise<void> {
+	return invoke("p2p_set_known_members", args);
 }
 
 export interface ShortCodeInfo {

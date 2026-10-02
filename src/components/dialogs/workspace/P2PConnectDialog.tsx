@@ -50,6 +50,7 @@ export default function P2PConnectDialog({
 		requestWorkspaceSnapshot,
 		disconnectPeer,
 		retryConnection,
+		reconnectToHost,
 		network,
 	} = useP2P();
 
@@ -122,7 +123,8 @@ export default function P2PConnectDialog({
 		try {
 			await retryConnection();
 		} catch (err) {
-			setErrorMessage(errorText(err, "Couldn't retry the connection."));
+			// Nothing to re-dial since the app was opened: go back to the host this copy joined, as a member
+			if (!(await reconnectToHost())) setErrorMessage(errorText(err, "Couldn't retry the connection."));
 		}
 	};
 

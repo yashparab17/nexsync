@@ -28,7 +28,6 @@ import {
 	getWorkspaceStats,
 	addRecentWorkspace,
 	setLastWorkspace,
-	clearLastWorkspace,
 	setActiveSessionToken,
 	getActiveSessionToken,
 } from "@/lib/tauri";
@@ -221,8 +220,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 		if (metadata && options?.save !== false) {
 			await saveWorkspace();
 		}
-		// Clear last workspace file so app reopens to Welcome page
-		await clearLastWorkspace();
+		// The last workspace stays remembered: Welcome marks it, and the app no longer reopens it by itself
 		setActiveSessionToken(null);
 		setWorkspace(null);
 		setMetadata(null);

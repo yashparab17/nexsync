@@ -115,7 +115,12 @@ pub struct P2pState {
     workspace: SharedWorkspace,
     /// Latest role table, kept here so a node that starts later still enforces it
     roles: Mutex<Vec<(String, String)>>,
+    /// Latest member list of the open workspace, likewise kept for a node that starts later
+    known: Mutex<Option<KnownArgs>>,
 }
+
+/// Workspace id, workspace name, host name, and each member's device key with role
+type KnownArgs = (String, String, String, Vec<(String, String)>);
 
 impl P2pState {
     /// Returns the running node, starting the Iroh endpoint on first use
@@ -135,8 +140,20 @@ impl P2pState {
         });
         let node = Node::start(events, self.workspace.clone(), secret, proxy).await?;
         node.set_roles(self.roles.lock().unwrap_or_else(|p| p.into_inner()).clone());
+        if let Some((id, name, host, members)) = self.known.lock().unwrap_or_else(|p| p.into_inner()).clone() {
+            node.set_known_members(id, name, host, members);
+        }
         *guard = Some(node.clone());
         Ok(node)
+    }
+
+    /// Records who may come back without an invite and applies it to the running node, if there is one
+    pub async fn set_known(&self, args: KnownArgs) {
+        *self.known.lock().unwrap_or_else(|p| p.into_inner()) = Some(args.clone());
+        if let Some(node) = self.existing().await {
+            let (id, name, host, members) = args;
+            node.set_known_members(id, name, host, members);
+        }
     }
 
     /// Records the role table and applies it to the running node, if there is one
@@ -235,6 +252,8 @@ pub struct JoinResult {
     pub workspace_name: String,
     pub role: String,
     pub host_name: String,
+    /// Where to find this host again, without the invite secret: a member the host knows can rejoin with it alone
+    pub rejoin_ticket: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -304,6 +323,19 @@ struct NodeState {
     mesh_allow: HashMap<EndpointId, MeshAllow>,
     /// Host side: the token shared by each pair of guests
     mesh_tokens: mesh::MeshTokens,
+    /// Host side: the members of the open workspace, who may reconnect without an invite
+    known: KnownMembers,
+}
+
+/// The people already in a workspace, as the host's member list has them. A device on this list proves who it is with
+/// its key when it connects, so it needs no invite to come back.
+#[derive(Default, Clone)]
+struct KnownMembers {
+    workspace_id: String,
+    workspace_name: String,
+    host_name: String,
+    /// Device key to role
+    roles: HashMap<String, String>,
 }
 
 /// Whether this device can reach the relay that connects it to peers outside its own network
@@ -571,6 +603,8 @@ impl Node {
                 workspace_id: String::new(),
                 workspace_name: String::new(),
             })
+        } else if let Some(welcome) = self.check_known_member(&conn.remote_id()) {
+            Ok(welcome)
         } else {
             self.check_invite(&hello.secret, &conn.remote_id())
         };
@@ -605,6 +639,31 @@ impl Node {
         let allow = st.mesh_allow.get(id)?;
         let presented = ticket::decode_secret(presented)?;
         bool::from(presented.ct_eq(&allow.token)).then(|| allow.clone())
+    }
+
+    /// Replaces the list of people who may come back without an invite. Call it whenever the member list changes, so a
+    /// removed member stops being let in at once.
+    pub fn set_known_members(&self, workspace_id: String, workspace_name: String, host_name: String, members: Vec<(String, String)>) {
+        let roles = members.into_iter().filter(|(_, role)| GUEST_ROLES.contains(&role.as_str())).collect();
+        self.lock().known = KnownMembers { workspace_id, workspace_name, host_name, roles };
+    }
+
+    /// Welcomes a device the host already has as a member. The connection has proved the device's key, so nothing else
+    /// is asked of it; a device the host removed, or one it does not know, goes on to the invite check.
+    fn check_known_member(&self, guest: &EndpointId) -> Option<HandshakeReply> {
+        let st = self.lock();
+        let id = guest.to_string();
+        if st.blocked.contains(&id) || st.known.workspace_id.is_empty() {
+            return None;
+        }
+        let role = st.roles.get(&id).or_else(|| st.known.roles.get(&id))?.clone();
+        Some(HandshakeReply::Welcome {
+            v: wire::PROTOCOL_VERSION,
+            host_name: st.known.host_name.clone(),
+            role,
+            workspace_id: st.known.workspace_id.clone(),
+            workspace_name: st.known.workspace_name.clone(),
+        })
     }
 
     fn check_invite(&self, presented: &str, guest: &EndpointId) -> Result<HandshakeReply, String> {
@@ -658,6 +717,8 @@ impl Node {
     async fn join_impl(self: &Arc<Self>, ticket_str: &str, display_name: &str) -> Result<JoinResult, (String, bool)> {
         let ticket = Ticket::decode(ticket_str).map_err(|e| (e, true))?;
         let host_id = ticket.addr.id;
+        // The same address with the invite secret left out, to keep for coming back
+        let rejoin_ticket = Ticket { addr: ticket.addr.clone(), secret: [0u8; SECRET_LEN] }.encode();
         if host_id == self.endpoint.id() {
             return Err(("That invite was created on this device. Share it with your collaborator instead.".into(), true));
         }
@@ -712,6 +773,7 @@ impl Node {
                     workspace_name,
                     role,
                     host_name,
+                    rejoin_ticket,
                 })
             }
             HandshakeReply::Reject { error } => {
@@ -1407,6 +1469,41 @@ mod tests {
         let fresh = make(InviteOptions::default()).await.unwrap();
         first.node.join(&fresh.ticket, "First").await.unwrap();
         let _ = rejoined;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_a_known_member_comes_back_without_an_invite_and_nobody_else_can() {
+        let mut host = start_test_node("km-host").await;
+        let guest = start_test_node("km-guest").await;
+        let stranger = start_test_node("km-stranger").await;
+
+        let invite = host.node.create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into()).await.unwrap();
+        let joined = guest.node.join(&invite.ticket, "Guesty").await.unwrap();
+        let guest_id = next_event(&mut host.events, EVENT_PEER_JOINED).await["id"].as_str().unwrap().to_string();
+        assert!(!joined.rejoin_ticket.is_empty() && joined.rejoin_ticket != invite.ticket, "the kept address must not carry the invite secret");
+
+        // The invite is gone and the guest left. Nothing is known about the guest yet, so it is turned away.
+        host.node.revoke_invite();
+        guest.node.disconnect(&joined.peer_id).unwrap();
+        let err = guest.node.join(&joined.rejoin_ticket, "Guesty").await.unwrap_err();
+        assert!(err.contains("isn't accepting"), "unexpected error: {err}");
+
+        // Once the member list names the device, it comes back with its role and no invite
+        host.node.set_known_members("ws".into(), "Demo".into(), "Host".into(), vec![(guest_id.clone(), "Editor".into())]);
+        let back = guest.node.join(&joined.rejoin_ticket, "Guesty").await.unwrap();
+        assert_eq!((back.role.as_str(), back.workspace_id.as_str()), ("Editor", "ws"));
+
+        // A device that is not on the list cannot, even with the same address
+        let err = stranger.node.join(&joined.rejoin_ticket, "Stranger").await.unwrap_err();
+        assert!(err.contains("isn't accepting"), "unexpected error: {err}");
+
+        // A removed member is refused at once, and so is one that is no longer on the list
+        host.node.block_device(&guest_id).unwrap();
+        let err = guest.node.join(&joined.rejoin_ticket, "Guesty").await.unwrap_err();
+        assert!(err.contains("removed you"), "unexpected error: {err}");
+        host.node.set_known_members("ws".into(), "Demo".into(), "Host".into(), vec![]);
+        assert!(guest.node.join(&joined.rejoin_ticket, "Guesty").await.is_err());
     }
 
     #[tokio::test(flavor = "multi_thread")]

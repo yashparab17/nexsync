@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/card";
 
 // Tauri IPC
-import { getRecentWorkspaces, loadConfig } from "@/lib/tauri";
+import { getLastWorkspace, getRecentWorkspaces, loadConfig } from "@/lib/tauri";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -58,6 +58,8 @@ export default function Welcome() {
 		[],
 	);
 	const [loading, setLoading] = useState(true);
+	// The workspace that was open when the app was last used
+	const [lastId, setLastId] = useState<string | null>(null);
 	// The name from Settings, for the greeting; empty until loaded or when none is set
 	const [userName, setUserName] = useState("");
 
@@ -86,6 +88,8 @@ export default function Welcome() {
 		try {
 			const workspaces = await getRecentWorkspaces();
 			setRecentWorkspaces(workspaces);
+			// Only used to mark the card; not knowing it must not hide the list
+			setLastId((await getLastWorkspace().catch(() => null))?.id ?? null);
 		} catch (err) {
 			console.error("Failed to load recent workspaces:", err);
 			logError(err, { source: "recent_load" });
@@ -205,9 +209,11 @@ export default function Welcome() {
 													"Local Workspace"}
 											</CardDescription>
 
-											<p className="pt-2 text-green-500">
-												● Synced
-											</p>
+											{ws.id === lastId && (
+												<p className="pt-2 text-sm text-muted-foreground">
+													You visited this last time
+												</p>
+											)}
 										</CardHeader>
 									</Card>
 								))}

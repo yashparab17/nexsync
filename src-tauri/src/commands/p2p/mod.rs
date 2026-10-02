@@ -53,6 +53,26 @@ pub async fn p2p_create_invite(
     node.create_invite_with(role, workspace_id, workspace_name, host_name, options.unwrap_or_default()).await
 }
 
+/// Tells the host who is already a member of the open workspace, as (device key, role) pairs, so they can come back
+/// without an invite. Call it whenever the member list changes. A workspace with members starts the network, because
+/// they need a host that is there to be reached.
+#[tauri::command]
+pub async fn p2p_set_known_members(
+    app: AppHandle,
+    state: State<'_, P2pState>,
+    workspace_id: String,
+    workspace_name: String,
+    host_name: String,
+    members: Vec<(String, String)>,
+) -> Result<(), String> {
+    let any = !members.is_empty();
+    state.set_known((workspace_id, workspace_name, host_name, members)).await;
+    if any {
+        state.node(&app).await?;
+    }
+    Ok(())
+}
+
 /// Disconnects a guest and stops them rejoining with an earlier invite or code
 #[tauri::command]
 pub async fn p2p_block_device(state: State<'_, P2pState>, device_id: String) -> Result<(), String> {

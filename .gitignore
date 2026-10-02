@@ -54,7 +54,7 @@ COMMENT_STYLE_GUIDE.md
 IMPLEMENTATION_PLAN.md
 nexsync-synopsis.pdf
 RESEARCH.md
-LITERATURE-REVIEW.md
+LITERATURE_REVIEW.md
 
 # pnpm only
 package-lock.json

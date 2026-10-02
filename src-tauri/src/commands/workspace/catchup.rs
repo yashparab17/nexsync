@@ -193,6 +193,7 @@ pub fn mark_catchup(app_handle: tauri::AppHandle, path: String, ids: Vec<i64>, s
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // the arguments are the fields the frontend sends
 pub fn add_text_catchup(app_handle: tauri::AppHandle, path: String, doc_id: String, label: String, who: Option<String>, before: String, after: String, live: Option<bool>) -> Result<(), String> {
     if doc_id.is_empty() || doc_id.len() > 512 || label.len() > 512 || who.as_ref().is_some_and(|w| w.len() > 128) {
         return Err("Invalid change.".into());
