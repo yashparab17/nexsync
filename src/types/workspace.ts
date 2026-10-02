@@ -225,6 +225,29 @@ export interface DraftPreview {
 	deleted: boolean;
 }
 
+// A private try-out of a reorganised board: cards moved in it stay where they are on the real board until it is merged
+export interface BoardDraft {
+	id: string;
+	name: string;
+	author: string | null;
+	created_at: number;
+	status: "open" | "merged";
+}
+
+// What merging a board draft would change in one card
+export interface CardReview {
+	id: string;
+	title: string;
+	changes: DraftChange[];
+	collisions: Conflict[];
+	// The card was deleted meanwhile, so its part of the draft is dropped
+	deleted: boolean;
+}
+
+export interface BoardPreview {
+	cards: CardReview[];
+}
+
 // A rule about the whole record that it breaks right now; unlike a conflict, there is no value to choose between
 export interface Violation {
 	rule: string;

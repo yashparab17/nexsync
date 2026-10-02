@@ -10,21 +10,25 @@ import { useP2P } from "@/store/p2p/P2PContext";
 import type { RuleInfo } from "@/types/workspace";
 
 export default function RulesCard({ workspacePath }: { workspacePath: string }) {
-	const { refreshData } = useP2P();
+	const { refreshData, shareRules, selfName, dataVersion } = useP2P();
 	const [rules, setRules] = useState<RuleInfo[]>([]);
 	const [error, setError] = useState<string | null>(null);
+	// Somebody who joined a workspace uses the rules its host chose; the host's choice reaches them when it changes
+	const guest = selfName !== null;
 
 	useEffect(() => {
 		getRules(workspacePath)
 			.then(setRules)
 			.catch((err) => setError(errorText(err, "Could not load the rules.")));
-	}, [workspacePath]);
+	}, [workspacePath, dataVersion]);
 
 	const toggle = async (rule: RuleInfo, enabled: boolean) => {
 		setError(null);
 		try {
 			await setRule(workspacePath, rule.id, enabled);
 			setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, enabled } : r)));
+			// Everyone in the workspace uses the host's rules, so a change is sent on
+			shareRules();
 			// Pages show the flags, so they load again
 			refreshData();
 		} catch (err) {
@@ -38,7 +42,7 @@ export default function RulesCard({ workspacePath }: { workspacePath: string }) 
 				<CardTitle className="text-base">Rules for tasks and cards</CardTitle>
 				<CardDescription>
 					Two people can each make a correct edit at the same time and still leave a task that breaks a rule, such as a finished task with nobody assigned. With a rule on, that task is flagged until
-					someone fixes it. These choices are kept on this device only.
+					someone fixes it. {guest ? "The host of this workspace chooses these, and they apply to everyone." : "These apply to everyone in the workspace, and are sent to them whenever you change them."}
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
@@ -49,7 +53,7 @@ export default function RulesCard({ workspacePath }: { workspacePath: string }) 
 				)}
 				{rules.map((rule) => (
 					<label key={rule.id} className="flex cursor-pointer items-start gap-3 text-sm">
-						<input type="checkbox" checked={rule.enabled} onChange={(e) => void toggle(rule, e.target.checked)} className="mt-1 size-4 accent-primary" />
+						<input type="checkbox" checked={rule.enabled} disabled={guest} onChange={(e) => void toggle(rule, e.target.checked)} className="mt-1 size-4 accent-primary" />
 						<span>
 							{rule.text}
 							<span className="block text-xs text-muted-foreground">Applies to {rule.applies_to}</span>

@@ -18,14 +18,28 @@ pub fn get_kanban(app_handle: tauri::AppHandle, path: String, with_state: Option
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&path, ".")?;
     let db = crate::database::WorkspaceDb::open_existing(&path)?;
     let ws_id: String = get_workspace_id(&db)?;
-    let mut columns: Vec<KanbanColumn> = db
-        .conn
+    let mut columns = read_columns(&db.conn, &ws_id)?;
+    for col in &mut columns {
+        crdt::attach_conflicts(&db.conn, &mut col.cards)?;
+        super::invariants::attach(&db.conn, &mut col.cards)?;
+        if with_state.unwrap_or(false) {
+            for card in &mut col.cards {
+                crdt::attach(&db.conn, card)?;
+            }
+        }
+    }
+    Ok(columns)
+}
+
+/// The board as stored: the columns in order, each with its cards in order (equal positions ordered by id)
+pub(super) fn read_columns(conn: &rusqlite::Connection, ws_id: &str) -> Result<Vec<KanbanColumn>, String> {
+    let mut columns: Vec<KanbanColumn> = conn
         .prepare(
             "SELECT id, title, position FROM kanban_columns
              WHERE workspace_id = ?1 ORDER BY position ASC, created_at ASC",
         )
         .map_err(|e| e.to_string())?
-        .query_map([&ws_id], |r| {
+        .query_map([ws_id], |r| {
             Ok(KanbanColumn {
                 id: r.get(0)?,
                 title: r.get(1)?,
@@ -38,12 +52,11 @@ pub fn get_kanban(app_handle: tauri::AppHandle, path: String, with_state: Option
         .collect();
 
     for col in &mut columns {
-        let cards: Vec<KanbanCard> = db
-            .conn
+        col.cards = conn
             .prepare(
                 "SELECT id, title, description, column_id, position, created_at, updated_at,
                  tags, due_date, assignee_id, checklist, comments
-                 FROM kanban_cards WHERE column_id = ?1 ORDER BY position ASC",
+                 FROM kanban_cards WHERE column_id = ?1 ORDER BY position ASC, id ASC",
             )
             .map_err(|e| e.to_string())?
             .query_map([&col.id], |r| {
@@ -66,14 +79,6 @@ pub fn get_kanban(app_handle: tauri::AppHandle, path: String, with_state: Option
             .map_err(|e| e.to_string())?
             .filter_map(|r| r.ok())
             .collect();
-        col.cards = cards;
-        crdt::attach_conflicts(&db.conn, &mut col.cards)?;
-        super::invariants::attach(&db.conn, &mut col.cards)?;
-        if with_state.unwrap_or(false) {
-            for card in &mut col.cards {
-                crdt::attach(&db.conn, card)?;
-            }
-        }
     }
     Ok(columns)
 }

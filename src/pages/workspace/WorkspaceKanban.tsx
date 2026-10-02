@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ChecklistEditor, DueBadge, TagChip, TagInput } from "@/components/elements/PlanningFields";
-import { collectTags, planMove } from "@/lib/planning";
+import { collectTags, endPosition, planMove } from "@/lib/planning";
 import { cn } from "@/lib/utils";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -32,17 +32,20 @@ import {
 	createKanbanColumn,
 	deleteKanbanCard,
 	deleteKanbanColumn,
+	getBoardDraft,
 	getKanban,
+	moveInBoardDraft,
 	moveKanbanCard,
 	resolveCardConflict,
 	updateKanbanCard,
 } from "@/lib/tauri";
+import BoardDraftBar from "@/components/dialogs/workspace/BoardDraftBar";
 import ConflictPanel from "@/components/elements/ConflictPanel";
 import RuleFlag from "@/components/elements/RuleFlag";
 import DraftsButton from "@/components/dialogs/workspace/DraftsDialog";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
-import type { ChecklistItem, KanbanCard, KanbanColumn } from "@/types/workspace";
+import type { BoardDraft, ChecklistItem, KanbanCard, KanbanColumn } from "@/types/workspace";
 import Loading from "@/components/Loading";
 import { itemTarget } from "@/lib/insights";
 import Comments from "@/components/elements/Comments";
@@ -60,6 +63,9 @@ export default function WorkspaceKanban() {
 
 	const [columns, setColumns] = useState<KanbanColumn[]>([]);
 	const [loading, setLoading] = useState(true);
+	// A reorganisation being tried out: the board shows the draft, and cards can be moved but nothing else changed
+	const [board, setBoard] = useState<BoardDraft | null>(null);
+	const canChange = !isViewer && !board;
 
 	// Modals & Dialog States
 	const [isCreateColOpen, setIsCreateColOpen] = useState(false);
@@ -104,7 +110,7 @@ export default function WorkspaceKanban() {
 		if (!workspace?.path) return;
 		try {
 			setLoading(true);
-			const data = await getKanban(workspace.path);
+			const data = board ? await getBoardDraft(workspace.path, board.id) : await getKanban(workspace.path);
 			setColumns(data);
 		} catch (err) {
 			console.error("Failed to load kanban:", err);
@@ -112,7 +118,7 @@ export default function WorkspaceKanban() {
 		} finally {
 			setLoading(false);
 		}
-	}, [workspace?.path, logError]);
+	}, [workspace?.path, board, logError]);
 
 	useEffect(() => {
 		loadKanban();
@@ -121,7 +127,8 @@ export default function WorkspaceKanban() {
 	// Reload silently when a collaborator changes the board
 	useEffect(() => {
 		if (!dataVersion || !workspace?.path) return;
-		getKanban(workspace.path).then(setColumns).catch(console.error);
+		(board ? getBoardDraft(workspace.path, board.id) : getKanban(workspace.path)).then(setColumns).catch(console.error);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [dataVersion, workspace?.path]);
 
 	// Create Column Submit
@@ -187,7 +194,7 @@ export default function WorkspaceKanban() {
 		try {
 			setSubmitting(true);
 			const col = columns.find((c) => c.id === activeColIdForNewCard);
-			const nextPos = col ? col.cards.length : 0;
+			const nextPos = endPosition(col?.cards ?? []);
 			const now = new Date().toISOString();
 
 			const newCard: KanbanCard = {
@@ -332,7 +339,14 @@ export default function WorkspaceKanban() {
 		if (isViewer || !workspace?.path) return;
 		try {
 			const targetCol = columns.find((c) => c.id === targetColId);
-			const newPos = targetCol ? targetCol.cards.length : 0;
+			const newPos = endPosition(targetCol?.cards ?? []);
+
+			// While trying out a reorganisation the move goes to the draft, and nobody else hears of it
+			if (board) {
+				await moveInBoardDraft(workspace.path, board.id, card.id, targetColId, newPos);
+				setColumns(await getBoardDraft(workspace.path, board.id));
+				return;
+			}
 
 			await moveKanbanCard({
 				path: workspace.path,
@@ -398,6 +412,11 @@ export default function WorkspaceKanban() {
 		const moves = planMove(columns, id, target.colId, target.index);
 		if (moves.length === 0) return;
 		try {
+			if (board) {
+				for (const move of moves) await moveInBoardDraft(workspace.path, board.id, move.id, move.column_id, move.position);
+				setColumns(await getBoardDraft(workspace.path, board.id));
+				return;
+			}
 			const cards = new Map(columns.flatMap((c) => c.cards).map((c) => [c.id, c]));
 			const now = new Date().toISOString();
 			for (const move of moves) {
@@ -481,8 +500,9 @@ export default function WorkspaceKanban() {
 						Organise work in columns and cards.
 					</p>
 				</div>
-				{!isViewer && (
-					<div className="flex items-center gap-2">
+				<div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+					{workspace?.path && <BoardDraftBar workspacePath={workspace.path} columns={columns} board={board} onBoard={setBoard} canDraft={!isViewer} />}
+					{canChange && (
 						<Button
 							variant="outline"
 							size="sm"
@@ -492,8 +512,8 @@ export default function WorkspaceKanban() {
 							<Plus className="size-4" />
 							New Column
 						</Button>
-					</div>
-				)}
+					)}
+				</div>
 			</div>
 
 			{allTags.length > 0 && (
@@ -522,7 +542,7 @@ export default function WorkspaceKanban() {
 					<p className="mt-1 text-sm text-muted-foreground max-w-sm">
 						Your Kanban board is currently empty. Create a column to get started.
 					</p>
-					{!isViewer && (
+					{canChange && (
 						<div className="mt-4 flex gap-3">
 							<Button
 								size="sm"
@@ -558,7 +578,7 @@ export default function WorkspaceKanban() {
 										</span>
 									</div>
 
-									{!isViewer && (
+									{canChange && (
 										<div className="flex items-center gap-1">
 											<Button
 												variant="ghost"
@@ -649,7 +669,7 @@ export default function WorkspaceKanban() {
 															<AlertTriangle className="ml-1 inline size-3.5 text-amber-500" aria-label="Has a change to sort out" />
 														)}
 													</h4>
-													{!isViewer && (
+													{canChange && (
 														<div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
 															<Button
 																variant="ghost"
@@ -743,7 +763,7 @@ export default function WorkspaceKanban() {
 								</div>
 
 								{/* Add Card Quick Button */}
-								{!isViewer && (
+								{canChange && (
 									<Button
 										variant="ghost"
 										size="sm"

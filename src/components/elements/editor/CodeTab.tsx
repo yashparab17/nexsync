@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 import { openSearchPanel } from "@codemirror/search";
 import { EditorView } from "@codemirror/view";
-import { AlertTriangle, Check, GitBranch, History, Loader2, Save, Search, Sparkles } from "lucide-react";
+import { AlertTriangle, Check, GitBranch, History, Loader2, MessageSquareDiff, Save, Search, Sparkles } from "lucide-react";
 
 import CodeEditor from "./CodeEditor";
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
 import { useAutoSnapshot } from "@/hooks/useAutoSnapshot";
 import BranchesDialog from "@/components/dialogs/workspace/BranchesDialog";
+import SuggestEditDialog from "@/components/dialogs/workspace/SuggestEditDialog";
+import { proposalMarks } from "@/lib/editor/proposalsView";
 import { useCollabDoc } from "@/hooks/useCollabDoc";
 import { useSeededText } from "@/hooks/useSeededText";
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -75,6 +77,10 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 	const lastMerge = useRef<{ before: string; merged: string; hunks: Hunk[] } | null>(null);
 	const [repair, setRepair] = useState<Suggestion | "none" | null>(null);
 	const [historyOpen, setHistoryOpen] = useState(false);
+	// The part of the text a person is writing a suggestion for
+	const [suggesting, setSuggesting] = useState<{ from: number; to: number } | null>(null);
+	// Open suggestions of this file show inside the editor, for whoever has the file open
+	const suggestionMarks = useMemo(() => (collab ? [proposalMarks(collab.doc, collab.doc.getText("content"), userName, !readOnly)] : []), [collab, userName, readOnly]);
 	const [blame, setBlame] = useState<{ ranges: BlameRange[]; people: Contribution[] } | null>(null);
 
 	// Read the file from disk; the shared document is seeded from it the first time it is opened
@@ -279,6 +285,19 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 							Branches
 						</Button>
 					)}
+					{!readOnly && collab && (
+						<Button
+							variant="ghost"
+							size="xs"
+							onPress={() => {
+								const { from, to } = viewRef.current?.state.selection.main ?? { from: 0, to: 0 };
+								setSuggesting({ from, to });
+							}}
+						>
+							<MessageSquareDiff className="size-3.5" />
+							Suggest edit
+						</Button>
+					)}
 					<Button variant="ghost" size="xs" onPress={() => viewRef.current && (openSearchPanel(viewRef.current), viewRef.current.focus())}>
 						<Search className="size-3.5" />
 						Find
@@ -384,6 +403,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 							minHeight="0px"
 							onReady={(view) => (viewRef.current = view)}
 							onLanguage={setLanguage}
+							extraExtensions={suggestionMarks}
 						/>
 					)}
 				</div>
@@ -448,6 +468,8 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 					onClose={() => setBranchesOpen(false)}
 				/>
 			)}
+
+			{suggesting && collab && <SuggestEditDialog doc={collab.doc} userName={userName} from={suggesting.from} to={suggesting.to} onClose={() => setSuggesting(null)} />}
 
 			{historyOpen && (
 				<FileHistoryDialog

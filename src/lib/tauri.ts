@@ -29,6 +29,8 @@ import type {
 	RuleInfo,
 	Draft,
 	DraftPreview,
+	BoardDraft,
+	BoardPreview,
 } from "@/types/workspace";
 
 // ────────────────────────────
@@ -284,6 +286,31 @@ export function mergeDraft<T extends Task | KanbanCard>(path: string, draftId: s
 }
 export function discardDraft(path: string, draftId: string): Promise<void> {
 	return invoke("discard_draft", { path, draftId });
+}
+
+// Drafts of a whole board: move cards around privately, review what that would change, then merge them all or none
+export function listBoardDrafts(path: string): Promise<BoardDraft[]> {
+	return invoke("list_board_drafts", { path });
+}
+export function startBoardDraft(path: string, name: string): Promise<BoardDraft> {
+	return invoke("start_board_draft", { path, name, author: writeAuthor() });
+}
+// The board as the draft would leave it
+export function getBoardDraft(path: string, boardId: string): Promise<KanbanColumn[]> {
+	return invoke("get_board_draft", { path, boardId });
+}
+export function moveInBoardDraft(path: string, boardId: string, cardId: string, columnId: string, position: number): Promise<void> {
+	return invoke("move_in_board_draft", { path, boardId, cardId, columnId, position, author: writeAuthor() });
+}
+export function previewBoardDraft(path: string, boardId: string): Promise<BoardPreview> {
+	return invoke("preview_board_draft", { path, boardId });
+}
+// Resolves to the ids of the cards that were changed, to send on like any other edit
+export function mergeBoardDraft(path: string, boardId: string): Promise<string[]> {
+	return invoke("merge_board_draft", { path, boardId });
+}
+export function discardBoardDraft(path: string, boardId: string): Promise<void> {
+	return invoke("discard_board_draft", { path, boardId });
 }
 
 // Delete a kanban column and its cards

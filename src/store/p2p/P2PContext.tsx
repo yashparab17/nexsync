@@ -33,6 +33,9 @@ import {
 } from "@/store/workspace/WorkspaceContext";
 import { useNotifications } from "@/store/notifications/NotificationContext";
 import {
+	addTextCatchup,
+	getRules,
+	setRule,
 	base64ToUint8Array,
 	uint8ArrayToBase64,
 	readWorkspaceMetadata,
@@ -51,6 +54,7 @@ import { applyCatchUp, buildInventory, editDoc, updatesFor, type Inventory } fro
 import { replaceText, revertHunk, type TextHunk } from "@/lib/catchup";
 import { readSelfName, setSelfName } from "@/lib/p2p/selfName";
 import { newMentions } from "@/lib/comments";
+import { LiveJournal } from "@/lib/p2p/liveJournal";
 
 // Files above this size are listed as placeholders during sync and downloaded on demand
 export const LAZY_LOAD_THRESHOLD_BYTES = 10 * 1024 * 1024;
@@ -136,6 +140,7 @@ interface P2PContextType {
 	transferHost: (peerId: string) => Promise<void>; // Owner only: hand ownership and hosting to a connected member
 	publishDataChange: (change: DataChange) => void;
 	refreshData: () => void; // Makes pages reload their tasks and cards after a change made outside them
+	shareRules: () => void; // The host sends the rules it has turned on to everyone, who then use them too
 	revertTextHunk: (docId: string, hunk: TextHunk) => Promise<boolean>; // Undoes one change a collaborator made to a note's text; false when it can no longer be found
 	shareNamedVersion: (path: string, label: string, content: string) => boolean; // False when the text is too large to send
 	createInvite: (role?: string, options?: p2p.InviteOptions) => Promise<InviteInfo>;
@@ -262,6 +267,19 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		return null;
 	};
 	const syncProvidersRef = useRef<Set<P2PSyncProvider>>(new Set());
+	// Live typing by collaborators in open notes, written down for the catch-up review once each burst ends
+	const liveJournal = useMemo(
+		() =>
+			new LiveJournal((docId, who, before, after) => {
+				const path = workspaceRef.current?.path;
+				if (!path || docId.startsWith("branch:")) return;
+				// Reviewing is optional, so failing to note a change must never get in the way of editing
+				void addTextCatchup(path, docId, docId.split("/").pop() || docId, who, before, after)
+					.then(() => setDataVersion((v) => v + 1))
+					.catch(() => {});
+			}),
+		[],
+	);
 	// Peers we asked for a snapshot, mapped to the local workspace path to apply it to
 	const pendingSnapshotsRef = useRef<Map<string, string | null>>(new Map());
 
@@ -504,6 +522,21 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			const members = metadataRef.current?.members.members;
 			if (!members) return;
 			send({ kind: "MEMBERS_UPDATE", timestamp: Date.now(), payload: JSON.stringify(members) }, peerId);
+		},
+		[send],
+	);
+
+	// The rules the host has turned on are the workspace's rules: guests take them, and only the host changes them
+	const sendRules = useCallback(
+		async (peerId?: string) => {
+			const path = workspaceRef.current?.path;
+			if (!path || selfNameRef.current !== null) return;
+			try {
+				const on = (await getRules(path)).filter((r) => r.enabled).map((r) => r.id);
+				send({ kind: "RULES_UPDATE", timestamp: Date.now(), payload: JSON.stringify(on) }, peerId);
+			} catch (err) {
+				console.warn("[P2P] Could not share the rules:", err);
+			}
 		},
 		[send],
 	);
@@ -796,6 +829,27 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 					break;
 				}
 
+				case "RULES_UPDATE": {
+					// The backend only delivers this from the host we joined
+					const path = workspaceRef.current?.path;
+					if (!path || !message.payload) break;
+					try {
+						const ids: unknown = JSON.parse(message.payload);
+						if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string")) break;
+						let changed = false;
+						for (const rule of await getRules(path)) {
+							const want = (ids as string[]).includes(rule.id);
+							if (want === rule.enabled) continue;
+							await setRule(path, rule.id, want);
+							changed = true;
+						}
+						if (changed) setDataVersion((v) => v + 1);
+					} catch (err) {
+						console.error("[P2P] Failed to apply the rules:", err);
+					}
+					break;
+				}
+
 				case "ACTIVITY_EVENT": {
 					const path = workspaceRef.current?.path;
 					if (!path || !message.payload) break;
@@ -1022,18 +1076,21 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	// Create a Yjs provider that stays in sync with every connected peer
 	const createSyncProvider = useCallback(
 		(doc: Y.Doc, docId: string = "root", awareness: Awareness | null = null) => {
-			const provider = new P2PSyncProvider(doc, (message, peerId) => send(message, peerId), docId, awareness);
+			const provider = new P2PSyncProvider(doc, (message, peerId) => send(message, peerId), docId, awareness, (id, who, before, after) =>
+				liveJournal.record(id, who, before, after),
+			);
 			peersRef.current.forEach((peer) => provider.addPeer(peer.id));
 			syncProvidersRef.current.add(provider);
 			// A closed editor must leave the list, or catch-up would treat its stale document as open
 			const destroy = provider.destroy.bind(provider);
 			provider.destroy = () => {
 				syncProvidersRef.current.delete(provider);
+				liveJournal.flush(docId);
 				destroy();
 			};
 			return provider;
 		},
-		[send],
+		[send, liveJournal],
 	);
 
 	const disconnectPeer = useCallback((peerId: string) => p2p.disconnectPeer(peerId), []);
@@ -1045,8 +1102,11 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const membersJson = JSON.stringify(metadata?.members.members ?? null);
 	const guestCount = peers.filter((p) => !p.isHost).length;
 	useEffect(() => {
-		if (guestCount > 0 && membersJson !== "null" && selfNameRef.current === null) sendMembers();
-	}, [membersJson, guestCount, sendMembers]);
+		if (guestCount > 0 && membersJson !== "null" && selfNameRef.current === null) {
+			sendMembers();
+			void sendRules();
+		}
+	}, [membersJson, guestCount, sendMembers, sendRules]);
 
 	const selfName = useMemo(
 		() => readSelfName(workspace?.id),
@@ -1197,6 +1257,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				transferHost,
 				publishDataChange,
 				refreshData,
+				shareRules: () => void sendRules(),
 				revertTextHunk,
 				shareNamedVersion,
 				createInvite,

@@ -669,6 +669,8 @@ mod tests {
             id: "k1".into(),
             title: "card".into(),
             column_id: "c1".into(),
+            // Halfway between two cards; it must come back as exactly this, not as 2
+            position: 2.5,
             tags: vec!["ui".into()],
             due_date: Some("2026-03-01".into()),
             assignee_id: Some("m1".into()),
@@ -716,7 +718,7 @@ mod tests {
             title: "card".into(),
             description: String::new(),
             column_id: "c1".into(),
-            position: 0,
+            position: 0.0,
             created_at: "2026-01-01T00:00:00Z".into(),
             updated_at: "2026-01-01T00:00:00Z".into(),
             ..Default::default()

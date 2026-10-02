@@ -141,7 +141,8 @@ pub struct KanbanCard {
     pub title: String,
     pub description: String,
     pub column_id: String,
-    pub position: i64,
+    /// Where the card sits in its column. A drop puts it halfway between its neighbours, so this is not always whole
+    pub position: f64,
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -317,7 +318,7 @@ pub struct MoveCardRequest {
     pub path: String,
     pub card_id: String,
     pub column_id: String,
-    pub position: i64,
+    pub position: f64,
     #[serde(default)]
     pub author: Option<String>,
 }

@@ -12,6 +12,7 @@ export type P2PMessageKind =
 	| "ACTIVITY_EVENT"
 	| "DATA_CHANGE" // Task/kanban edit; hosts drop these from Viewers and relay the rest
 	| "MEMBERS_UPDATE" // Host's member list; only accepted from the host
+	| "RULES_UPDATE" // The rules the host has turned on, as a list of ids; only accepted from the host
 	| "WORKSPACE_DELETED" // The host deleted the workspace; only accepted from the host
 	| "ROLE_REQUEST" // An Admin guest asking the host to change a role; only delivered to the host
 	| "HOST_HANDOFF" // The host offering a guest to take over hosting; only accepted from the host

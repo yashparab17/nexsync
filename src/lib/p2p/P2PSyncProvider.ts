@@ -22,7 +22,14 @@ export class P2PSyncProvider {
 	private peers = new Set<string>();
 	private destroyed = false;
 
-	constructor(doc: Y.Doc, send: SyncSend, docId = "root", awareness: Awareness | null = null) {
+	// `onRemoteText` hears of each peer update that changed the note's text, with who sent it
+	constructor(
+		doc: Y.Doc,
+		send: SyncSend,
+		docId = "root",
+		awareness: Awareness | null = null,
+		private readonly onRemoteText?: (docId: string, who: string | null, before: string, after: string) => void,
+	) {
 		this.doc = doc;
 		this.docId = docId;
 		this.awareness = awareness;
@@ -85,7 +92,10 @@ export class P2PSyncProvider {
 				);
 			} else if (message.kind === "SYNC_STEP_2" || message.kind === "SYNC_UPDATE") {
 				// Origin = this provider, so the update isn't echoed back out
+				const text = this.doc.getText("content");
+				const before = this.onRemoteText ? text.toString() : "";
 				Y.applyUpdate(this.doc, base64ToBytes(message.payload), this);
+				this.onRemoteText?.(this.docId, message.author ?? null, before, text.toString());
 			} else if (message.kind === "AWARENESS_UPDATE" && this.awareness) {
 				applyAwarenessUpdate(this.awareness, base64ToBytes(message.payload), this);
 			}

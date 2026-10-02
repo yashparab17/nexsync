@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
-import { Check, Download, FileText, GitBranch, History, Loader2, PanelRight, Save, Type, Users, X } from "lucide-react";
+import { Check, Download, FileText, GitBranch, History, Loader2, MessageSquareDiff, PanelRight, Save, Type, Users, X } from "lucide-react";
 
 import CodeEditor from "./CodeEditor";
 import RichTextEditor from "./RichTextEditor";
 import NoteSidePanel from "./NoteSidePanel";
 import BranchesDialog from "@/components/dialogs/workspace/BranchesDialog";
+import SuggestEditDialog from "@/components/dialogs/workspace/SuggestEditDialog";
+import { proposalMarks } from "@/lib/editor/proposalsView";
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
 import { useAutoSnapshot } from "@/hooks/useAutoSnapshot";
@@ -81,6 +83,12 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 		if (note) onOpenNote?.(note.path);
 	};
 	const linkExtensions = useMemo(() => wikiLinks((target) => openLinkRef.current(target)), []);
+	// Open suggestions show inside the editor for whoever has the note open; the button writes a new one
+	const [suggesting, setSuggesting] = useState<{ from: number; to: number } | null>(null);
+	const markdownExtensions = useMemo(
+		() => [linkExtensions, ...(collab ? [proposalMarks(collab.doc, collab.doc.getText("content"), userName, !readOnly)] : [])],
+		[linkExtensions, collab, userName, readOnly],
+	);
 	const goToLine = (line: number) => {
 		const view = viewRef.current;
 		if (!view) return;
@@ -214,6 +222,20 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 									Outline
 								</Button>
 							)}
+							{isMarkdown && collab && !readOnly && !branch && (
+								<Button
+									variant="ghost"
+									size="sm"
+									onPress={() => {
+										const { from, to } = viewRef.current?.state.selection.main ?? { from: 0, to: 0 };
+										setSuggesting({ from, to });
+									}}
+									className="gap-1.5"
+								>
+									<MessageSquareDiff className="size-3.5" />
+									Suggest edit
+								</Button>
+							)}
 							{isMarkdown && mainCollab && (
 								<Button variant="ghost" size="sm" onPress={() => setBranchesOpen(true)} className="gap-1.5">
 									<GitBranch className="size-3.5" />
@@ -285,7 +307,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 							userName={userName}
 							minHeight="0px"
 							onReady={(view) => (viewRef.current = view)}
-							extraExtensions={linkExtensions}
+							extraExtensions={markdownExtensions}
 						/>
 					)
 				) : !collab ? (
@@ -319,6 +341,8 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 					{exportNotice.text}
 				</p>
 			)}
+
+			{suggesting && collab && <SuggestEditDialog doc={collab.doc} userName={userName} from={suggesting.from} to={suggesting.to} onClose={() => setSuggesting(null)} />}
 
 			{branchesOpen && workspacePath && mainCollab && (
 				<BranchesDialog

@@ -430,3 +430,98 @@ fn merging_field_by_field_can_break_rules_that_no_device_broke() {
     assert_eq!(lww.broken_trials, 0, "taking one device's whole record keeps the rules, since that device kept them");
     assert!(fields.broken_trials > 0, "merging field by field can combine two correct records into a broken one");
 }
+
+// ────────────────────────────
+// How far it scales
+// ────────────────────────────
+
+fn bytes<T: serde::Serialize>(value: &T) -> usize {
+    serde_json::to_vec(value).unwrap().len()
+}
+
+/// `replicas` devices each make `edits` edits to one card while apart; returns the merged state's size in bytes, how
+/// long folding all the copies together took in milliseconds, and whether folding in the opposite order agrees.
+fn grow(replicas: usize, edits: usize) -> (usize, f64, bool) {
+    let mut rng = StdRng::seed_from_u64(replicas as u64 * 1_000 + edits as u64);
+    let base = base_card();
+    let start = RecordState::from_legacy(base.paths(false), 1_000);
+    let states: Vec<RecordState> = (0..replicas)
+        .map(|who| {
+            let (mut card, mut state, mut at) = (base.clone(), start.clone(), 2_000);
+            for n in 0..edits {
+                at += rng.gen_range(1..400);
+                random_edit(&mut rng, who, n, &mut card);
+                state.diff_write(&format!("d{who}"), &card.paths(false), at, None);
+            }
+            state
+        })
+        .collect();
+    let clock = std::time::Instant::now();
+    let forward = states.iter().skip(1).fold(states[0].clone(), |a, b| a.merge(b));
+    let ms = clock.elapsed().as_secs_f64() * 1000.0;
+    let backward = states.iter().rev().skip(1).fold(states[replicas - 1].clone(), |a, b| a.merge(b));
+    (bytes(&forward), ms, forward.resolved() == backward.resolved())
+}
+
+/// Run with `cargo test scale -- --ignored --nocapture`. Times are from an unoptimised test build, so a release
+/// build is faster; the sizes do not depend on the build.
+#[test]
+#[ignore = "a measurement, not a check; takes a while"]
+fn scale_of_a_record_and_of_a_workspace() {
+    println!("\nOne card, each device making 20 edits while apart, then everyone merges");
+    println!("| devices | merged state | merge all | same either order |");
+    for replicas in [2usize, 12, 50, 100, 200] {
+        let (size, ms, same) = grow(replicas, 20);
+        println!("| {replicas:>7} | {size:>9} B | {ms:>7.1} ms | {same:>17} |");
+        assert!(same, "merging must not depend on order");
+    }
+
+    // Overwriting one field leaves one value however often it is done; adding comments and items adds content
+    println!("\nOne card, one device editing it over and over (does history pile up?)");
+    println!("| edits | overwrite the title | random edits (adds comments, items, tags) |");
+    let overwrite = |times: usize| {
+        let mut card = base_card();
+        let mut state = RecordState::from_legacy(card.paths(false), 1_000);
+        for n in 0..times {
+            card.title = format!("version {n}");
+            state.diff_write("d0", &card.paths(false), 2_000 + n as u64, None);
+        }
+        bytes(&state)
+    };
+    let counts = [10usize, 100, 1000, 10_000];
+    let overwritten: Vec<usize> = counts.iter().map(|&n| overwrite(n)).collect();
+    for (edits, same) in counts.iter().zip(&overwritten) {
+        let random = if *edits <= 1000 { format!("{} B", grow(1, *edits).0) } else { "-".into() };
+        println!("| {edits:>5} | {same:>17} B | {random:>40} |");
+    }
+    assert!(overwritten[3] < overwritten[0] * 2, "overwriting a field must not keep its history");
+
+    // Edits travel one record at a time; the whole workspace goes only when someone joins or asks for a re-sync
+    println!("\nA workspace of N tasks: what a join or a manual re-sync sends");
+    println!("| tasks | wire size | export | first merge | re-sync when nothing changed |");
+    for n in [1_000usize, 5_000, 20_000] {
+        let conn = |ws: &str| {
+            let c = rusqlite::Connection::open_in_memory().unwrap();
+            c.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+            crate::database::schema::init_schema(&c).unwrap();
+            c.execute("INSERT INTO workspace (id, name, description, path, created_at, updated_at) VALUES (?1, 'w', '', '/w', 't', 't')", [ws]).unwrap();
+            c
+        };
+        let (a, b) = (conn("a"), conn("b"));
+        let tasks: Vec<Task> = (0..n).map(|i| Task { id: format!("t{i}"), title: format!("Task {i}"), assignee_id: None, ..base_task() }).collect();
+        super::data_sync::merge_state(&a, "a", super::data_sync::DataState { tasks, ..Default::default() }).unwrap();
+
+        let clock = std::time::Instant::now();
+        let state = super::data_sync::export_state(&a, "a").unwrap();
+        let export = clock.elapsed().as_secs_f64();
+        let wire = bytes(&state);
+        let clock = std::time::Instant::now();
+        super::data_sync::merge_state(&b, "b", state).unwrap();
+        let first = clock.elapsed().as_secs_f64();
+        let clock = std::time::Instant::now();
+        let changed = super::data_sync::merge_state(&b, "b", super::data_sync::export_state(&a, "a").unwrap()).unwrap();
+        let again = clock.elapsed().as_secs_f64();
+        assert!(!changed, "a second identical exchange changes nothing");
+        println!("| {n:>5} | {:>6.1} MB | {export:>5.2} s | {first:>9.2} s | {again:>9.2} s (incl. export) |", wire as f64 / 1e6);
+    }
+}

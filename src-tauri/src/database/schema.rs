@@ -293,6 +293,21 @@ CREATE TABLE IF NOT EXISTS drafts (
 CREATE INDEX IF NOT EXISTS idx_drafts_target ON drafts(entity, target);
 "##,
 	},
+	Migration {
+		version: 14,
+		description: "drafts of a whole board",
+		up: r##"
+ALTER TABLE drafts ADD COLUMN board TEXT;
+CREATE TABLE IF NOT EXISTS board_drafts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    author TEXT,
+    created_at INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open'
+);
+CREATE INDEX IF NOT EXISTS idx_drafts_board ON drafts(board);
+"##,
+	},
 ];
 
 /// Initialises the schema on a fresh database, running pending migrations

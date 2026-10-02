@@ -17,7 +17,7 @@ use serde_json::Value;
 
 use super::crdt::{self, now_ms, Conflict, Crdt, RecordState};
 use super::data_sync::{put_card, put_task_row, read_card, read_task, valid_card, valid_task};
-use super::models::{KanbanCard, Task};
+use super::models::{KanbanCard, KanbanColumn, Task};
 
 const MAX_NAME: usize = 80;
 /// Drafts open at once; each merged draft also adds a replica to its record's merge state, which peers bound
@@ -130,10 +130,15 @@ pub fn start<T: Stored>(conn: &Connection, id: &str, name: &str, author: Option<
     if name.is_empty() || name.chars().count() > MAX_NAME {
         return Err(format!("Give the draft a name of up to {MAX_NAME} characters."));
     }
-    let open: i64 = conn.query_row("SELECT COUNT(*) FROM drafts WHERE status = 'open'", [], |r| r.get(0)).map_err(err)?;
+    let open: i64 = conn.query_row("SELECT COUNT(*) FROM drafts WHERE status = 'open' AND board IS NULL", [], |r| r.get(0)).map_err(err)?;
     if open >= MAX_OPEN {
         return Err("Too many drafts are open. Merge or discard some first.".into());
     }
+    insert_draft::<T>(conn, id, name, author, None)
+}
+
+/// Starts a draft of the record as it stands now, optionally as part of a draft of the whole board
+fn insert_draft<T: Stored>(conn: &Connection, id: &str, name: &str, author: Option<&str>, board: Option<&str>) -> Result<Draft, String> {
     let row = T::read(conn, id)?.ok_or("That record no longer exists.")?;
     crdt::ensure(conn, &row)?;
     let state = crdt::load(conn, T::ENTITY, id)?.ok_or("That record has no merge state.")?;
@@ -142,8 +147,8 @@ pub fn start<T: Stored>(conn: &Connection, id: &str, name: &str, author: Option<
     let replica = format!("{}~{}", crdt::replica_id(conn)?, &draft_id[..6]);
     let draft = Draft { id: draft_id, entity: T::ENTITY.into(), target: id.into(), name: name.into(), author: author.map(str::to_string), created_at: now_ms() as i64, status: "open".into() };
     conn.execute(
-        "INSERT INTO drafts (id, entity, target, name, author, created_at, replica, state) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        params![draft.id, draft.entity, draft.target, draft.name, draft.author, draft.created_at, replica, serde_json::to_string(&state).map_err(|e| e.to_string())?],
+        "INSERT INTO drafts (id, entity, target, name, author, created_at, replica, state, board) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![draft.id, draft.entity, draft.target, draft.name, draft.author, draft.created_at, replica, serde_json::to_string(&state).map_err(|e| e.to_string())?, board],
     )
     .map_err(err)?;
     Ok(draft)
@@ -195,19 +200,26 @@ pub fn preview<T: Stored>(conn: &Connection, draft_id: &str) -> Result<Preview, 
 /// Merges the draft into the real record; returns the record as it now reads
 pub fn merge<T: Stored>(conn: &Connection, workspace: &str, draft_id: &str) -> Result<T, String> {
     let tx = conn.unchecked_transaction().map_err(err)?;
-    let Loaded { draft, state, .. } = load_open(&tx, draft_id)?;
-    let live = T::read(&tx, &draft.target)?.ok_or("The record was deleted, so there is nothing to merge into.")?;
-    crdt::ensure(&tx, &live)?;
-    let live_state = crdt::load(&tx, T::ENTITY, &draft.target)?.ok_or("That record has no merge state.")?;
+    let row = merge_in::<T>(&tx, workspace, draft_id)?;
+    tx.commit().map_err(err)?;
+    Ok(row)
+}
+
+/// The merge itself, inside a transaction the caller owns, so several drafts can be merged together or not at all
+fn merge_in<T: Stored>(tx: &Connection, workspace: &str, draft_id: &str) -> Result<T, String> {
+    let Loaded { draft, state, .. } = load_open(tx, draft_id)?;
+    let live = T::read(tx, &draft.target)?.ok_or("The record was deleted, so there is nothing to merge into.")?;
+    crdt::ensure(tx, &live)?;
+    let live_state = crdt::load(tx, T::ENTITY, &draft.target)?.ok_or("That record has no merge state.")?;
     let merged = live_state.merge(&state);
     let mut row = T::materialize(&live, &merged.resolved());
     row.set_updated_at(crdt::rfc3339_of(merged.max_ts()));
     if !row.valid() {
         return Err("The merged record would not be valid, so nothing was merged.".into());
     }
-    crdt::save(&tx, T::ENTITY, &draft.target, &merged)?;
+    crdt::save(tx, T::ENTITY, &draft.target, &merged)?;
     // The database refuses an assignee that is not a member, which a draft can hold if the member was removed since
-    T::put(&tx, workspace, &row).map_err(|e| {
+    T::put(tx, workspace, &row).map_err(|e| {
         if e.contains("FOREIGN KEY") {
             "The assignee is no longer a member, so this draft cannot be merged. Change the assignee in the draft and try again.".to_string()
         } else {
@@ -215,7 +227,6 @@ pub fn merge<T: Stored>(conn: &Connection, workspace: &str, draft_id: &str) -> R
         }
     })?;
     tx.execute("UPDATE drafts SET status = 'merged' WHERE id = ?1", [draft_id]).map_err(err)?;
-    tx.commit().map_err(err)?;
     Ok(row)
 }
 
@@ -225,12 +236,191 @@ pub fn discard(conn: &Connection, draft_id: &str) -> Result<(), String> {
 
 /// Open drafts of one record, newest first
 pub fn list(conn: &Connection, entity: &str, target: &str) -> Result<Vec<Draft>, String> {
-    conn.prepare("SELECT id, entity, target, name, author, created_at, status FROM drafts WHERE entity = ?1 AND target = ?2 AND status = 'open' ORDER BY created_at DESC")
+    conn.prepare("SELECT id, entity, target, name, author, created_at, status FROM drafts WHERE entity = ?1 AND target = ?2 AND status = 'open' AND board IS NULL ORDER BY created_at DESC")
         .map_err(err)?
         .query_map(params![entity, target], |r| Ok(Draft { id: r.get(0)?, entity: r.get(1)?, target: r.get(2)?, name: r.get(3)?, author: r.get(4)?, created_at: r.get(5)?, status: r.get(6)? }))
         .map_err(err)?
         .collect::<Result<_, _>>()
         .map_err(err)
+}
+
+// ────────────────────────────
+// Drafts of a whole board
+// ────────────────────────────
+//
+// Reorganising a board touches many cards at once, and it is only worth trying out if it can be thrown away. A draft of
+// the board is a named group of card drafts, each made the first time its card is moved, so a board of any size costs
+// only what was moved. Merging the board merges every one of those drafts in a single transaction: all of the moves are
+// made or none of them are, and each is the same field-by-field merge a lone card draft makes, so what other people
+// changed meanwhile is kept. Like any draft it is private to this device until it is merged.
+
+const MAX_BOARDS: i64 = 10;
+const MAX_BOARD_CARDS: i64 = 500;
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct BoardDraft {
+    pub id: String,
+    pub name: String,
+    pub author: Option<String>,
+    /// Milliseconds since 1970
+    pub created_at: i64,
+    /// "open" or "merged"
+    pub status: String,
+}
+
+/// One card the board draft would change
+#[derive(Serialize, Debug)]
+pub struct CardReview {
+    pub id: String,
+    pub title: String,
+    pub changes: Vec<Change>,
+    pub collisions: Vec<Conflict>,
+    /// The card was deleted meanwhile, so its part of the draft will be dropped
+    pub deleted: bool,
+}
+
+#[derive(Serialize, Default, Debug)]
+pub struct BoardPreview {
+    pub cards: Vec<CardReview>,
+}
+
+fn load_board(conn: &Connection, id: &str) -> Result<BoardDraft, String> {
+    conn.query_row("SELECT id, name, author, created_at, status FROM board_drafts WHERE id = ?1", [id], |r| {
+        Ok(BoardDraft { id: r.get(0)?, name: r.get(1)?, author: r.get(2)?, created_at: r.get(3)?, status: r.get(4)? })
+    })
+    .optional()
+    .map_err(err)?
+    .ok_or_else(|| "That board draft no longer exists.".to_string())
+}
+
+fn open_board(conn: &Connection, id: &str) -> Result<BoardDraft, String> {
+    let board = load_board(conn, id)?;
+    if board.status != "open" {
+        return Err("That board draft was already merged.".into());
+    }
+    Ok(board)
+}
+
+/// The card drafts of a board draft as (draft id, card id), oldest first
+fn card_drafts(conn: &Connection, board_id: &str) -> Result<Vec<(String, String)>, String> {
+    conn.prepare("SELECT id, target FROM drafts WHERE board = ?1 AND status = 'open' ORDER BY created_at, id")
+        .map_err(err)?
+        .query_map([board_id], |r| Ok((r.get(0)?, r.get(1)?)))
+        .map_err(err)?
+        .collect::<Result<_, _>>()
+        .map_err(err)
+}
+
+pub fn start_board(conn: &Connection, name: &str, author: Option<&str>) -> Result<BoardDraft, String> {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > MAX_NAME {
+        return Err(format!("Give the draft a name of up to {MAX_NAME} characters."));
+    }
+    let open: i64 = conn.query_row("SELECT COUNT(*) FROM board_drafts WHERE status = 'open'", [], |r| r.get(0)).map_err(err)?;
+    if open >= MAX_BOARDS {
+        return Err("Too many board drafts are open. Merge or discard some first.".into());
+    }
+    let board = BoardDraft { id: uuid::Uuid::new_v4().simple().to_string()[..16].to_string(), name: name.into(), author: author.map(str::to_string), created_at: now_ms() as i64, status: "open".into() };
+    conn.execute("INSERT INTO board_drafts (id, name, author, created_at) VALUES (?1, ?2, ?3, ?4)", params![board.id, board.name, board.author, board.created_at]).map_err(err)?;
+    Ok(board)
+}
+
+pub fn list_boards(conn: &Connection) -> Result<Vec<BoardDraft>, String> {
+    conn.prepare("SELECT id, name, author, created_at, status FROM board_drafts WHERE status = 'open' ORDER BY created_at DESC")
+        .map_err(err)?
+        .query_map([], |r| Ok(BoardDraft { id: r.get(0)?, name: r.get(1)?, author: r.get(2)?, created_at: r.get(3)?, status: r.get(4)? }))
+        .map_err(err)?
+        .collect::<Result<_, _>>()
+        .map_err(err)
+}
+
+/// Puts a card in a list at a position, in the draft only
+pub fn move_card(conn: &Connection, board_id: &str, card_id: &str, column_id: &str, position: f64, who: Option<&str>) -> Result<(), String> {
+    let board = open_board(conn, board_id)?;
+    if !position.is_finite() {
+        return Err("That is not a valid position.".into());
+    }
+    let known: bool = conn.query_row("SELECT COUNT(*) > 0 FROM kanban_columns WHERE id = ?1", [column_id], |r| r.get(0)).map_err(err)?;
+    if !known {
+        return Err("That list no longer exists.".into());
+    }
+    let existing = conn.query_row("SELECT id FROM drafts WHERE board = ?1 AND target = ?2 AND status = 'open'", params![board_id, card_id], |r| r.get::<_, String>(0)).optional().map_err(err)?;
+    let draft_id = match existing {
+        Some(id) => id,
+        None => {
+            let held: i64 = conn.query_row("SELECT COUNT(*) FROM drafts WHERE board = ?1", [board_id], |r| r.get(0)).map_err(err)?;
+            if held >= MAX_BOARD_CARDS {
+                return Err("This draft already moves as many cards as one draft can hold.".into());
+            }
+            insert_draft::<KanbanCard>(conn, card_id, &board.name, board.author.as_deref(), Some(board_id))?.id
+        }
+    };
+    let mut card = view::<KanbanCard>(conn, &draft_id)?;
+    card.column_id = column_id.into();
+    card.position = position;
+    edit::<KanbanCard>(conn, &draft_id, &card, who).map(|_| ())
+}
+
+/// The board as the draft would leave it: the real board with the drafted cards where the draft puts them
+pub fn board_view(conn: &Connection, workspace: &str, board_id: &str) -> Result<Vec<KanbanColumn>, String> {
+    load_board(conn, board_id)?;
+    let mut columns = super::kanban::read_columns(conn, workspace)?;
+    let mut moved = std::collections::HashMap::new();
+    for (draft_id, _) in card_drafts(conn, board_id)? {
+        // A card deleted since cannot be shown
+        if let Ok(card) = view::<KanbanCard>(conn, &draft_id) {
+            moved.insert(card.id.clone(), card);
+        }
+    }
+    let mut cards: Vec<KanbanCard> = columns.iter_mut().flat_map(|c| std::mem::take(&mut c.cards)).map(|c| moved.remove(&c.id).unwrap_or(c)).collect();
+    cards.sort_by(|a, b| a.position.partial_cmp(&b.position).unwrap_or(std::cmp::Ordering::Equal).then_with(|| a.id.cmp(&b.id)));
+    for card in cards {
+        if let Some(column) = columns.iter_mut().find(|c| c.id == card.column_id) {
+            column.cards.push(card);
+        }
+    }
+    Ok(columns)
+}
+
+/// What merging the board draft would change, card by card; a card put back where it was is not listed
+pub fn preview_board(conn: &Connection, board_id: &str) -> Result<BoardPreview, String> {
+    open_board(conn, board_id)?;
+    let mut cards = Vec::new();
+    for (draft_id, target) in card_drafts(conn, board_id)? {
+        let p = preview::<KanbanCard>(conn, &draft_id)?;
+        if p.changes.is_empty() && p.collisions.is_empty() && !p.deleted {
+            continue;
+        }
+        let title = read_card(conn, &target)?.map(|c| c.title).unwrap_or_default();
+        cards.push(CardReview { id: target, title, changes: p.changes, collisions: p.collisions, deleted: p.deleted });
+    }
+    Ok(BoardPreview { cards })
+}
+
+/// Merges every card draft, all or none; returns the ids of the cards that were merged
+pub fn merge_board(conn: &Connection, workspace: &str, board_id: &str) -> Result<Vec<String>, String> {
+    let tx = conn.unchecked_transaction().map_err(err)?;
+    open_board(&tx, board_id)?;
+    let mut merged = Vec::new();
+    for (draft_id, target) in card_drafts(&tx, board_id)? {
+        if read_card(&tx, &target)?.is_none() {
+            // Deleted meanwhile: nothing to merge into, so its part of the draft is dropped
+            tx.execute("DELETE FROM drafts WHERE id = ?1", [&draft_id]).map_err(err)?;
+            continue;
+        }
+        merge_in::<KanbanCard>(&tx, workspace, &draft_id)?;
+        merged.push(target);
+    }
+    tx.execute("UPDATE board_drafts SET status = 'merged' WHERE id = ?1", [board_id]).map_err(err)?;
+    tx.commit().map_err(err)?;
+    Ok(merged)
+}
+
+pub fn discard_board(conn: &Connection, board_id: &str) -> Result<(), String> {
+    let tx = conn.unchecked_transaction().map_err(err)?;
+    tx.execute("DELETE FROM drafts WHERE board = ?1", [board_id]).map_err(err)?;
+    tx.execute("DELETE FROM board_drafts WHERE id = ?1", [board_id]).map_err(err)?;
+    tx.commit().map_err(err)
 }
 
 // ────────────────────────────
@@ -319,6 +509,47 @@ pub fn merge_draft(app_handle: tauri::AppHandle, path: String, draft_id: String)
 #[tauri::command]
 pub fn discard_draft(app_handle: tauri::AppHandle, path: String, draft_id: String) -> Result<(), String> {
     discard(&open(&app_handle, &path)?.conn, &draft_id)
+}
+
+#[tauri::command]
+pub fn list_board_drafts(app_handle: tauri::AppHandle, path: String) -> Result<Vec<BoardDraft>, String> {
+    list_boards(&open(&app_handle, &path)?.conn)
+}
+
+#[tauri::command]
+pub fn start_board_draft(app_handle: tauri::AppHandle, path: String, name: String, author: Option<String>) -> Result<BoardDraft, String> {
+    start_board(&open(&app_handle, &path)?.conn, &name, author.as_deref())
+}
+
+/// The board as the draft would leave it
+#[tauri::command]
+pub fn get_board_draft(app_handle: tauri::AppHandle, path: String, board_id: String) -> Result<Vec<KanbanColumn>, String> {
+    let db = open(&app_handle, &path)?;
+    let workspace = super::helpers::get_workspace_id(&db)?;
+    board_view(&db.conn, &workspace, &board_id)
+}
+
+#[tauri::command]
+pub fn move_in_board_draft(app_handle: tauri::AppHandle, path: String, board_id: String, card_id: String, column_id: String, position: f64, author: Option<String>) -> Result<(), String> {
+    move_card(&open(&app_handle, &path)?.conn, &board_id, &card_id, &column_id, position, author.as_deref())
+}
+
+#[tauri::command]
+pub fn preview_board_draft(app_handle: tauri::AppHandle, path: String, board_id: String) -> Result<BoardPreview, String> {
+    preview_board(&open(&app_handle, &path)?.conn, &board_id)
+}
+
+/// Merges the board draft; returns the ids of the cards that changed, so the caller can send each to collaborators
+#[tauri::command]
+pub fn merge_board_draft(app_handle: tauri::AppHandle, path: String, board_id: String) -> Result<Vec<String>, String> {
+    let db = open(&app_handle, &path)?;
+    let workspace = super::helpers::get_workspace_id(&db)?;
+    merge_board(&db.conn, &workspace, &board_id)
+}
+
+#[tauri::command]
+pub fn discard_board_draft(app_handle: tauri::AppHandle, path: String, board_id: String) -> Result<(), String> {
+    discard_board(&open(&app_handle, &path)?.conn, &board_id)
 }
 
 #[cfg(test)]
@@ -480,5 +711,105 @@ mod tests {
             start::<Task>(&c, "t1", &format!("Draft {i}"), None).unwrap();
         }
         assert!(start::<Task>(&c, "t1", "One too many", None).is_err());
+    }
+
+    // A board with two lists and three cards in the first
+    fn board_db() -> Connection {
+        let c = db();
+        for (id, title, position) in [("c1", "Todo", 0), ("c2", "Doing", 1)] {
+            c.execute("INSERT INTO kanban_columns (id, workspace_id, title, position, created_at, updated_at) VALUES (?1, 'w', ?2, ?3, 't', 't')", params![id, title, position]).unwrap();
+        }
+        for (i, id) in ["k1", "k2", "k3"].iter().enumerate() {
+            let card = KanbanCard { id: id.to_string(), title: format!("Card {id}"), column_id: "c1".into(), position: i as f64, created_at: "2026-01-01T00:00:00Z".into(), updated_at: "2026-01-01T00:00:00Z".into(), ..Default::default() };
+            put_card(&c, "w", &card).unwrap();
+        }
+        c
+    }
+
+    fn ids(columns: &[KanbanColumn], column: &str) -> Vec<String> {
+        columns.iter().find(|c| c.id == column).unwrap().cards.iter().map(|c| c.id.clone()).collect()
+    }
+
+    fn live_board(c: &Connection) -> Vec<KanbanColumn> {
+        super::super::kanban::read_columns(c, "w").unwrap()
+    }
+
+    #[test]
+    fn a_board_draft_moves_cards_without_touching_the_board_until_merged() {
+        let c = board_db();
+        let b = start_board(&c, "Reorganise", Some("Me")).unwrap();
+        move_card(&c, &b.id, "k1", "c2", 0.0, Some("Me")).unwrap();
+        move_card(&c, &b.id, "k3", "c1", -1.0, Some("Me")).unwrap();
+
+        let shown = board_view(&c, "w", &b.id).unwrap();
+        assert_eq!((ids(&shown, "c1"), ids(&shown, "c2")), (vec!["k3".to_string(), "k2".to_string()], vec!["k1".to_string()]));
+        // The real board is as it was, and the card drafts of a board do not show up as drafts of the card
+        assert_eq!(ids(&live_board(&c), "c1"), ["k1", "k2", "k3"]);
+        assert!(list(&c, "card", "k1").unwrap().is_empty());
+
+        let mut merged = merge_board(&c, "w", &b.id).unwrap();
+        merged.sort();
+        assert_eq!(merged, ["k1", "k3"]);
+        let after = live_board(&c);
+        assert_eq!((ids(&after, "c1"), ids(&after, "c2")), (vec!["k3".to_string(), "k2".to_string()], vec!["k1".to_string()]));
+        assert!(list_boards(&c).unwrap().is_empty());
+        assert!(merge_board(&c, "w", &b.id).is_err(), "a board draft merges once");
+    }
+
+    #[test]
+    fn merging_a_board_keeps_what_others_changed_meanwhile_and_drops_cards_deleted_meanwhile() {
+        let c = board_db();
+        let b = start_board(&c, "Try", None).unwrap();
+        move_card(&c, &b.id, "k1", "c2", 0.0, None).unwrap();
+        move_card(&c, &b.id, "k2", "c2", 1.0, None).unwrap();
+
+        // Meanwhile someone retitles k1 and someone deletes k2
+        let mut row = read_card(&c, "k1").unwrap().unwrap();
+        crdt::ensure(&c, &row).unwrap();
+        let before = row.clone();
+        row.title = "Renamed".into();
+        crdt::record_write(&c, &row, Some("Ana"), Some(&before)).unwrap();
+        put_card(&c, "w", &row).unwrap();
+        c.execute("DELETE FROM kanban_cards WHERE id = 'k2'", []).unwrap();
+
+        let review = preview_board(&c, &b.id).unwrap();
+        assert!(review.cards.iter().any(|r| r.id == "k2" && r.deleted));
+        assert!(review.cards.iter().any(|r| r.id == "k1" && r.changes.iter().any(|c| c.path == "column_id")));
+
+        let merged = merge_board(&c, "w", &b.id).unwrap();
+        assert_eq!(merged, ["k1"]);
+        let k1 = read_card(&c, "k1").unwrap().unwrap();
+        assert_eq!((k1.title.as_str(), k1.column_id.as_str()), ("Renamed", "c2"));
+        assert!(read_card(&c, "k2").unwrap().is_none());
+    }
+
+    #[test]
+    fn a_board_draft_can_be_thrown_away_and_checks_its_input() {
+        let c = board_db();
+        let b = start_board(&c, "Idea", None).unwrap();
+        move_card(&c, &b.id, "k1", "c2", 0.0, None).unwrap();
+        assert!(move_card(&c, &b.id, "k1", "nowhere", 0.0, None).is_err());
+        assert!(move_card(&c, &b.id, "k1", "c2", f64::NAN, None).is_err());
+        assert!(move_card(&c, &b.id, "missing", "c2", 0.0, None).is_err());
+        assert!(start_board(&c, "  ", None).is_err());
+
+        discard_board(&c, &b.id).unwrap();
+        assert!(list_boards(&c).unwrap().is_empty());
+        assert!(board_view(&c, "w", &b.id).is_err());
+        assert_eq!(ids(&live_board(&c), "c1"), ["k1", "k2", "k3"]);
+
+        for i in 0..MAX_BOARDS {
+            start_board(&c, &format!("Board {i}"), None).unwrap();
+        }
+        assert!(start_board(&c, "One too many", None).is_err());
+    }
+
+    #[test]
+    fn a_card_put_back_where_it_was_is_not_part_of_the_review() {
+        let c = board_db();
+        let b = start_board(&c, "Undo", None).unwrap();
+        move_card(&c, &b.id, "k1", "c2", 0.0, None).unwrap();
+        move_card(&c, &b.id, "k1", "c1", 0.0, None).unwrap();
+        assert!(preview_board(&c, &b.id).unwrap().cards.is_empty());
     }
 }

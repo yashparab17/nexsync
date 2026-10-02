@@ -59,6 +59,8 @@ const CLOSE_REPLACED: u32 = 2;
 const KIND_DATA_CHANGE: &str = "DATA_CHANGE";
 /// The host's member list; accepted only from the host
 const KIND_MEMBERS_UPDATE: &str = "MEMBERS_UPDATE";
+/// The rules the host has turned on, which become the workspace's rules; accepted only from the host
+const KIND_RULES_UPDATE: &str = "RULES_UPDATE";
 /// The host telling guests the workspace was deleted; accepted only from the host
 const KIND_WORKSPACE_DELETED: &str = "WORKSPACE_DELETED";
 /// The host offering a guest to take over hosting; accepted only from the host
@@ -950,7 +952,7 @@ impl Node {
                 return;
             }
             // Only the host decides who is in the workspace
-            KIND_MEMBERS_UPDATE | KIND_WORKSPACE_DELETED | KIND_HOST_HANDOFF | KIND_HOST_MOVED if !from_host => return,
+            KIND_MEMBERS_UPDATE | KIND_RULES_UPDATE | KIND_WORKSPACE_DELETED | KIND_HOST_HANDOFF | KIND_HOST_MOVED if !from_host => return,
             // Only Admin guests may ask for role changes, and only a host acts on them
             KIND_ROLE_REQUEST if from_host || !is_admin || !hosting => {
                 eprintln!("[P2P] Ignoring a role request from {}", from.fmt_short());
@@ -961,7 +963,8 @@ impl Node {
         // Only the host passes changes on; guests linked directly to each other would otherwise loop them
         // Who named a version is decided here, not by the sender, so nobody can sign as someone else
         let mut relayed = bytes.to_vec();
-        if kind == KIND_VERSION_NAMED {
+        // The same goes for note text: the catch-up review credits a change to whoever it says sent it
+        if matches!(kind.as_str(), KIND_VERSION_NAMED | KIND_YDOC_UPDATE | "SYNC_UPDATE" | "SYNC_STEP_2") {
             stamp_author(&mut message, &sender, from_host && !hosting);
             relayed = serde_json::to_vec(&message).unwrap_or(relayed);
         }

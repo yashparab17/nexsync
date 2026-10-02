@@ -59,17 +59,37 @@ export interface CardMove {
 	position: number;
 }
 
-// The position changes needed to drop a card at `index` of a column: the moved card and any card
-// whose slot shifted. Empty when the card is already there.
+// A card's place in its column is a number, and dropping a card writes only that number, halfway between its new
+// neighbours. So two devices moving different cards never write the same field, and two moves into the same gap
+// still keep every card. The order is by position and then id, so equal positions sort the same on every device.
+export const byOrder = (a: { position: number; id: string }, b: { position: number; id: string }) =>
+	a.position - b.position || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+// The position that puts a card after every card in a column
+export const endPosition = (cards: { position: number }[]) => (cards.length ? Math.max(...cards.map((c) => c.position)) + 1 : 0);
+
+// Below this a gap is too small to halve again (about twenty drops into the same gap); the column is numbered afresh
+const MIN_GAP = 1e-6;
+
+// The position changes needed to drop a card at `index` of a column: normally just the moved card. Only when the
+// neighbours are too close to halve again is the column renumbered. Empty when the card is already there.
 export function planMove(columns: KanbanColumn[], cardId: string, targetColumnId: string, index: number): CardMove[] {
 	const card = columns.flatMap((c) => c.cards).find((c) => c.id === cardId);
 	const target = columns.find((c) => c.id === targetColumnId);
 	if (!card || !target) return [];
-	const rest = target.cards.filter((c) => c.id !== cardId);
+	const sorted = [...target.cards].sort(byOrder);
+	const rest = sorted.filter((c) => c.id !== cardId);
 	const at = Math.max(0, Math.min(index, rest.length));
+	if (card.column_id === targetColumnId && sorted.findIndex((c) => c.id === cardId) === at) return [];
+	const prev = rest[at - 1]?.position;
+	const next = rest[at]?.position;
+	if (prev === undefined || next === undefined || next - prev > MIN_GAP) {
+		const position = prev === undefined ? (next === undefined ? 0 : next - 1) : next === undefined ? prev + 1 : (prev + next) / 2;
+		return [{ id: cardId, column_id: targetColumnId, position }];
+	}
 	const ordered = [...rest.slice(0, at), card, ...rest.slice(at)];
 	return ordered
-		.map((c, position) => ({ id: c.id, column_id: targetColumnId, position, was: c }))
+		.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i, was: c }))
 		.filter(({ was, position }) => was.position !== position || was.column_id !== targetColumnId)
 		.map(({ id, column_id, position }) => ({ id, column_id, position }));
 }

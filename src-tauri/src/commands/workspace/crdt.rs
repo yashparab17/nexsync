@@ -443,7 +443,9 @@ impl Crdt for KanbanCard {
         p.insert("title".into(), json!(self.title));
         p.insert("description".into(), json!(self.description));
         p.insert("column_id".into(), json!(self.column_id));
-        p.insert("position".into(), json!(self.position));
+        // A whole position stays an integer, so cards written before positions could be fractions still compare equal
+        let position = if self.position.fract() == 0.0 && self.position.abs() < 1e15 { json!(self.position as i64) } else { json!(self.position) };
+        p.insert("position".into(), position);
         p.insert("due_date".into(), opt_value(&self.due_date));
         p.insert("assignee_id".into(), opt_value(&self.assignee_id));
         tag_paths(&self.tags, whole, &mut p);
@@ -485,7 +487,7 @@ impl Crdt for KanbanCard {
             title: text(r, "title", &base.title),
             description: text(r, "description", &base.description),
             column_id: text(r, "column_id", &base.column_id),
-            position: r.get("position").and_then(Value::as_i64).unwrap_or(base.position),
+            position: r.get("position").and_then(Value::as_f64).unwrap_or(base.position),
             tags: tags_from(r),
             due_date: optional(r, "due_date", &base.due_date),
             assignee_id: optional(r, "assignee_id", &base.assignee_id),
