@@ -121,11 +121,15 @@ pub fn record_deleted(conn: &Connection, entity: &str, id: &str, label: &str) ->
 }
 
 /// Writes down a change to a file's text that arrived from someone else
-pub fn record_text(conn: &Connection, doc_id: &str, label: &str, who: Option<&str>, before: &str, after: &str) -> Result<(), String> {
+pub fn record_text(conn: &Connection, doc_id: &str, label: &str, who: Option<&str>, before: &str, after: &str, live: bool) -> Result<(), String> {
     if before == after {
         return Ok(());
     }
     let mut e = entry("text", "file", doc_id, label, who.map(str::to_string));
+    // Typing seen as it happened is marked, so it is not later announced as made while the person was away
+    if live {
+        e.path = "live".into();
+    }
     if before.len() <= MAX_TEXT && after.len() <= MAX_TEXT {
         e.before = Some(before.to_string());
         e.after = Some(after.to_string());
@@ -189,11 +193,11 @@ pub fn mark_catchup(app_handle: tauri::AppHandle, path: String, ids: Vec<i64>, s
 }
 
 #[tauri::command]
-pub fn add_text_catchup(app_handle: tauri::AppHandle, path: String, doc_id: String, label: String, who: Option<String>, before: String, after: String) -> Result<(), String> {
+pub fn add_text_catchup(app_handle: tauri::AppHandle, path: String, doc_id: String, label: String, who: Option<String>, before: String, after: String, live: Option<bool>) -> Result<(), String> {
     if doc_id.is_empty() || doc_id.len() > 512 || label.len() > 512 || who.as_ref().is_some_and(|w| w.len() > 128) {
         return Err("Invalid change.".into());
     }
-    record_text(&open(&app_handle, &path)?.conn, &doc_id, &label, who.as_deref(), &before, &after)
+    record_text(&open(&app_handle, &path)?.conn, &doc_id, &label, who.as_deref(), &before, &after, live.unwrap_or(false))
 }
 
 #[cfg(test)]
@@ -350,9 +354,9 @@ mod tests {
     #[test]
     fn text_changes_keep_their_content_unless_too_large() {
         let a = db("a");
-        record_text(&a, "notes/a.md", "a.md", Some("Sam"), "one", "two").unwrap();
-        record_text(&a, "notes/b.md", "b.md", Some("Sam"), &"x".repeat(MAX_TEXT + 1), "y").unwrap();
-        record_text(&a, "notes/c.md", "c.md", None, "same", "same").unwrap();
+        record_text(&a, "notes/a.md", "a.md", Some("Sam"), "one", "two", false).unwrap();
+        record_text(&a, "notes/b.md", "b.md", Some("Sam"), &"x".repeat(MAX_TEXT + 1), "y", false).unwrap();
+        record_text(&a, "notes/c.md", "c.md", None, "same", "same", false).unwrap();
         let log = list(&a).unwrap();
         assert_eq!(log.len(), 2);
         assert!(log.iter().find(|e| e.target == "notes/b.md").unwrap().before.is_none());

@@ -47,7 +47,7 @@ export default function CatchUp() {
 	useEffect(() => {
 		if (announced.current || entries.length === 0) return;
 		announced.current = true;
-		const away = entries.filter((e) => e.state === "new" && e.at < sessionStart.current).length;
+		const away = entries.filter((e) => e.state === "new" && e.at < sessionStart.current && e.path !== "live").length;
 		if (away > 0) notify(`${away} ${away === 1 ? "change was" : "changes were"} made by others while you were away. Open Catch up to review.`);
 	}, [entries, notify]);
 

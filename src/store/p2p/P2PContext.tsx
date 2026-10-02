@@ -274,7 +274,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				const path = workspaceRef.current?.path;
 				if (!path || docId.startsWith("branch:")) return;
 				// Reviewing is optional, so failing to note a change must never get in the way of editing
-				void addTextCatchup(path, docId, docId.split("/").pop() || docId, who, before, after)
+				void addTextCatchup(path, docId, docId.split("/").pop() || docId, who, before, after, true)
 					.then(() => setDataVersion((v) => v + 1))
 					.catch(() => {});
 			}),

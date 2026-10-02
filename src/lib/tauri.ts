@@ -252,8 +252,8 @@ export function getCatchup(path: string): Promise<CatchupEntry[]> {
 export function markCatchup(path: string, ids: number[], state: "seen" | "reverted"): Promise<void> {
 	return invoke("mark_catchup", { path, ids, state });
 }
-export function addTextCatchup(path: string, docId: string, label: string, who: string | null, before: string, after: string): Promise<void> {
-	return invoke("add_text_catchup", { path, docId, label, who, before, after });
+export function addTextCatchup(path: string, docId: string, label: string, who: string | null, before: string, after: string, live = false): Promise<void> {
+	return invoke("add_text_catchup", { path, docId, label, who, before, after, live });
 }
 
 // Rules about whole records (a finished task has an assignee), which a workspace can turn on

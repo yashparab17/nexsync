@@ -20,6 +20,8 @@ export class P2PSyncProvider {
 	public readonly awareness: Awareness | null;
 	private readonly send: SyncSend;
 	private peers = new Set<string>();
+	// Peers that have answered our request for state at least once
+	private answered = new Set<string>();
 	private destroyed = false;
 
 	// `onRemoteText` hears of each peer update that changed the note's text, with who sent it
@@ -43,6 +45,12 @@ export class P2PSyncProvider {
 	public addPeer(peerId: string) {
 		if (this.destroyed || this.peers.has(peerId)) return;
 		this.peers.add(peerId);
+		this.requestState(peerId);
+		this.shareAwareness(peerId);
+	}
+
+	// Asks a peer for what we are missing (sync step 1)
+	private requestState(peerId: string) {
 		this.send(
 			{
 				kind: "SYNC_STEP_1",
@@ -52,24 +60,27 @@ export class P2PSyncProvider {
 			},
 			peerId,
 		);
-		if (this.awareness) {
-			const clients = Array.from(this.awareness.getStates().keys());
-			if (clients.length > 0) {
-				this.send(
-					{
-						kind: "AWARENESS_UPDATE",
-						docId: this.docId,
-						timestamp: Date.now(),
-						payload: bytesToBase64(encodeAwarenessUpdate(this.awareness, clients)),
-					},
-					peerId,
-				);
-			}
-		}
+	}
+
+	// Tells a peer where our cursor and everyone else's we know of are, so one who opens the note later sees them
+	private shareAwareness(peerId: string) {
+		if (!this.awareness) return;
+		const clients = Array.from(this.awareness.getStates().keys());
+		if (clients.length === 0) return;
+		this.send(
+			{
+				kind: "AWARENESS_UPDATE",
+				docId: this.docId,
+				timestamp: Date.now(),
+				payload: bytesToBase64(encodeAwarenessUpdate(this.awareness, clients)),
+			},
+			peerId,
+		);
 	}
 
 	public removePeer(peerId: string) {
 		this.peers.delete(peerId);
+		this.answered.delete(peerId);
 	}
 
 	// Applies a SYNC_*/AWARENESS_UPDATE message from a peer; other kinds and other documents are ignored
@@ -90,12 +101,19 @@ export class P2PSyncProvider {
 					},
 					peerId,
 				);
+				// A request that reaches us means the peer's editor has just opened, so whatever we asked of it before
+				// was lost. Ask again, and show them where our cursor is. Once they have answered us there is nothing
+				// left to ask, which is what stops the two from asking each other for ever.
+				if (!this.answered.has(peerId)) this.requestState(peerId);
+				this.shareAwareness(peerId);
 			} else if (message.kind === "SYNC_STEP_2" || message.kind === "SYNC_UPDATE") {
+				if (message.kind === "SYNC_STEP_2") this.answered.add(peerId);
 				// Origin = this provider, so the update isn't echoed back out
 				const text = this.doc.getText("content");
 				const before = this.onRemoteText ? text.toString() : "";
 				Y.applyUpdate(this.doc, base64ToBytes(message.payload), this);
-				this.onRemoteText?.(this.docId, message.author ?? null, before, text.toString());
+				// A catch-up answer holds what several people wrote, so it is not credited to the one who sent it
+				this.onRemoteText?.(this.docId, message.kind === "SYNC_UPDATE" ? (message.author ?? null) : null, before, text.toString());
 			} else if (message.kind === "AWARENESS_UPDATE" && this.awareness) {
 				applyAwarenessUpdate(this.awareness, base64ToBytes(message.payload), this);
 			}

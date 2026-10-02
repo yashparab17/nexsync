@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type * as Y from "yjs";
 
 import type { CollabDoc } from "@/hooks/useCollabDoc";
+import { seedText } from "@/lib/yjs/seed";
 
 // The shared text of a document that is ready for an editor: its Yjs document and what it holds
 export interface SeededText {
@@ -16,7 +17,7 @@ export function useSeededText(collab: CollabDoc | null, fileText: string | null)
 	useEffect(() => {
 		if (!collab?.synced || fileText === null) return;
 		const ytext = collab.doc.getText("content");
-		if (ytext.length === 0 && fileText) ytext.insert(0, fileText);
+		seedText(collab.doc, fileText);
 		setSeeded({ doc: collab.doc, text: ytext.toString() });
 	}, [collab, fileText]);
 	return seeded && collab && seeded.doc === collab.doc ? seeded : null;

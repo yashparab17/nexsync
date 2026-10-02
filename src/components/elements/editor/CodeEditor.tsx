@@ -12,6 +12,7 @@ import { loadLanguage, type LoadedLanguage } from "@/lib/editor/languages";
 import { syntaxLinter } from "@/lib/editor/syntax";
 import { useEditorPrefs } from "@/lib/editorPrefs";
 import { useSeedOnce } from "@/hooks/useSeedOnce";
+import { seedText } from "@/lib/yjs/seed";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
 
 interface CodeEditorProps {
@@ -90,10 +91,7 @@ export default function CodeEditor({
 		!!collab?.synced,
 		() => {
 			if (!collab) return;
-			const ytext = collab.doc.getText("content");
-			if (ytext.length === 0 && value) {
-				ytext.insert(0, value);
-			}
+			seedText(collab.doc, value);
 		},
 		[collab, value],
 	);
