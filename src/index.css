@@ -189,3 +189,5 @@ svg.lucide.size-6 { width: 1.625rem; height: 1.625rem; }
 svg.lucide.size-8 { width: 2.125rem; height: 2.125rem; }
 /* Button icons that take their size from the button */
 .group\/button svg.lucide:not([class*='size-']) { width: 1rem; height: 1rem; }
+/* The rich-text editor would otherwise ask for Inter first */
+.bn-root.bn-root { --bn-font-family: "Plus Jakarta Sans Variable", system-ui, sans-serif; }

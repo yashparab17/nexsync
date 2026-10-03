@@ -31,6 +31,10 @@ pub struct Hello {
     pub v: u32,
     pub secret: String,
     pub name: String,
+    /// Asks only for the other device's member list and then hangs up: no link is made and no data moves. A device that
+    /// has just come online uses it to learn of a removal before it lets any member in.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub probe: bool,
 }
 
 /// Host's answer to a [`Hello`]
@@ -46,6 +50,8 @@ pub enum HandshakeReply {
         workspace_name: String,
     },
     Reject { error: String },
+    /// The answer to a probe: the signed member list this device holds, as JSON, if it holds one
+    Membership { doc: Option<String> },
 }
 
 /// Sent on a file stream by the side that wants the file

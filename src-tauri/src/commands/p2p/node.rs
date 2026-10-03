@@ -55,8 +55,8 @@ const MESH_DIAL_DELAY: Duration = Duration::from_secs(2);
 /// starts before its address can be found
 const MEMBER_DIAL_EVERY: Duration = Duration::from_secs(10);
 const MEMBER_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-/// How long the lists of the members just linked to are given to arrive before this device trusts its own
-const MEMBER_SETTLE: Duration = Duration::from_secs(1);
+/// The most members a device that has just come online asks for their lists before it links to anyone
+const MEMBER_PROBES: usize = 16;
 const MEMBER_DIAL_PARALLEL: usize = 6;
 
 const CLOSE_NORMAL: u32 = 0;
@@ -651,8 +651,12 @@ impl Node {
         .await
         .map_err(|_| "handshake timed out".to_string())??;
 
+        if hello.probe {
+            return self.answer_probe(&conn, send, &conn.remote_id()).await;
+        }
+
         // A guest the host vouched for shows the token from the host instead of an invite secret.
-        let mesh_peer = (hello.v == wire::PROTOCOL_VERSION)
+        let mesh_peer =(hello.v == wire::PROTOCOL_VERSION)
             .then(|| self.check_mesh(&hello.secret, &conn.remote_id()))
             .flatten();
         let mut member_link = false;
@@ -944,15 +948,11 @@ impl Node {
         loop {
             self.refresh_lease();
             self.drop_stale_links();
-            let first_look = !self.lock().caught_up;
-            let dials: Vec<_> = self.member_targets().into_iter().map(|id| tokio::spawn(self.clone().dial_member(id))).collect();
-            if first_look {
-                // The lists of the members that answered arrive just after the links come up
-                for dial in dials {
-                    let _ = dial.await;
-                }
-                tokio::time::sleep(MEMBER_SETTLE).await;
-                self.lock().caught_up = true;
+            if !self.lock().caught_up {
+                self.look_for_the_others().await;
+            }
+            for id in self.member_targets() {
+                tokio::spawn(self.clone().dial_member(id));
             }
             tokio::time::sleep(MEMBER_DIAL_EVERY).await;
         }
@@ -982,7 +982,7 @@ impl Node {
         // No secret: the other device knows this one's key from the member list
         wire::write_json(
             &mut send,
-            &Hello { v: wire::PROTOCOL_VERSION, secret: ticket::encode_secret(&[0u8; SECRET_LEN]), name: "Member".to_string() },
+            &Hello { v: wire::PROTOCOL_VERSION, secret: ticket::encode_secret(&[0u8; SECRET_LEN]), name: "Member".to_string(), probe: false },
         )
         .await?;
         let reply: HandshakeReply = tokio::time::timeout(HANDSHAKE_TIMEOUT, wire::read_json(&mut recv, wire::MAX_SMALL_FRAME))
@@ -1001,7 +1001,89 @@ impl Node {
                 conn.close(CLOSE_REJECTED.into(), b"rejected");
                 Err(error)
             }
+            HandshakeReply::Membership { .. } => {
+                conn.close(CLOSE_REJECTED.into(), b"unexpected reply");
+                Err("that device answered a link with a probe reply".into())
+            }
         }
+    }
+
+    /// Answers a probe with the member list this device holds, to a device on that list and to nobody else. Nothing is
+    /// registered, so no data can move over the connection.
+    async fn answer_probe(&self, conn: &Connection, mut send: SendStream, from: &EndpointId) -> Result<(), String> {
+        let reply = {
+            let st = self.lock();
+            let a_member = st.known.roles.contains_key(&from.to_string()) && !st.blocked.contains(&from.to_string());
+            match (&st.membership, a_member) {
+                (Some(m), true) => HandshakeReply::Membership { doc: serde_json::to_string(m).ok() },
+                _ => HandshakeReply::Reject { error: "not a member".into() },
+            }
+        };
+        wire::write_json(&mut send, &reply).await?;
+        let _ = send.finish();
+        let _ = tokio::time::timeout(REJECT_LINGER, conn.closed()).await;
+        conn.close(CLOSE_REJECTED.into(), b"probe answered");
+        Ok(())
+    }
+
+    /// Asks one member for its list, without linking to it, and takes the list if it is newer and genuine
+    async fn ask_for_list(self: Arc<Self>, id: EndpointId) -> Result<(), String> {
+        let conn = tokio::time::timeout(MEMBER_CONNECT_TIMEOUT, self.endpoint.connect(EndpointAddr::new(id), wire::ALPN))
+            .await
+            .map_err(|_| "no answer".to_string())?
+            .map_err(|e| e.to_string())?;
+        let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+        send.write_all(&[wire::STREAM_CONTROL]).await.map_err(|e| e.to_string())?;
+        wire::write_json(
+            &mut send,
+            &Hello { v: wire::PROTOCOL_VERSION, secret: ticket::encode_secret(&[0u8; SECRET_LEN]), name: "Member".to_string(), probe: true },
+        )
+        .await?;
+        let reply: Result<HandshakeReply, String> =
+            match tokio::time::timeout(HANDSHAKE_TIMEOUT, wire::read_json(&mut recv, wire::MAX_SMALL_FRAME)).await {
+                Ok(r) => r,
+                Err(_) => Err("no answer".to_string()),
+            };
+        conn.close(CLOSE_REJECTED.into(), b"probe done");
+        if let HandshakeReply::Membership { doc: Some(doc) } = reply? {
+            self.take_probed_list(&doc);
+        }
+        Ok(())
+    }
+
+    /// A list that came back from a probe is believed on the same terms as one pushed over a link
+    fn take_probed_list(self: &Arc<Self>, doc: &str) {
+        let Ok(doc) = serde_json::from_str::<Membership>(doc) else { return };
+        let Some(current) = self.lock().membership.clone() else { return };
+        if membership::accept(Some(&current), &doc).is_ok() {
+            self.install_membership(doc, true);
+            self.push_membership(None, None);
+        }
+    }
+
+    /// Before a member that is not the owner lets anyone in or links to anyone, it asks the owner and the other members
+    /// for their lists. A removal this device missed while it was off is then learned from whichever of them is online,
+    /// before the removed member can be admitted. If nobody answers, the 24-hour limit on the list is all there is.
+    async fn look_for_the_others(self: &Arc<Self>) {
+        let mine = self.endpoint.id().to_string();
+        let targets: Vec<EndpointId> = {
+            let st = self.lock();
+            match &st.membership {
+                Some(m) if m.owner != mine => std::iter::once(&m.owner)
+                    .chain(m.members.iter().map(|(id, _)| id))
+                    .filter(|id| **id != mine)
+                    .filter_map(|id| parse_peer_id(id).ok())
+                    .filter(|id| !st.peers.contains_key(id))
+                    .take(MEMBER_PROBES)
+                    .collect(),
+                _ => Vec::new(),
+            }
+        };
+        let probes: Vec<_> = targets.into_iter().map(|id| tokio::spawn(self.clone().ask_for_list(id))).collect();
+        for probe in probes {
+            let _ = probe.await;
+        }
+        self.lock().caught_up = true;
     }
 
     /// Welcomes a device the host already has as a member. The connection has proved the device's key, so nothing else
@@ -1103,6 +1185,7 @@ impl Node {
                 v: wire::PROTOCOL_VERSION,
                 secret: ticket::encode_secret(&ticket.secret),
                 name: sanitize_name(display_name),
+                probe: false,
             },
         )
         .await
@@ -1143,6 +1226,10 @@ impl Node {
             HandshakeReply::Reject { error } => {
                 conn.close(CLOSE_REJECTED.into(), b"rejected");
                 Err((error, true))
+            }
+            HandshakeReply::Membership { .. } => {
+                conn.close(CLOSE_REJECTED.into(), b"unexpected reply");
+                Err(("the host answered with a probe reply".to_string(), true))
             }
         }
     }
@@ -1523,6 +1610,7 @@ impl Node {
                 v: wire::PROTOCOL_VERSION,
                 secret: ticket::encode_secret(&allow.token),
                 name: "Guest".to_string(),
+                probe: false,
             },
         )
         .await?;
@@ -1538,6 +1626,10 @@ impl Node {
             HandshakeReply::Reject { error } => {
                 conn.close(CLOSE_REJECTED.into(), b"rejected");
                 Err(error)
+            }
+            HandshakeReply::Membership { .. } => {
+                conn.close(CLOSE_REJECTED.into(), b"unexpected reply");
+                Err("that device answered a link with a probe reply".to_string())
             }
         }
     }
@@ -1924,6 +2016,91 @@ mod tests {
         // Loading a different list starts the check over
         me.node.reload_membership();
         assert!(me.node.check_known_member(&member.public()).is_none());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_a_device_that_missed_a_removal_learns_of_it_by_asking_before_it_lets_anyone_in() {
+        let host = start_test_node("probe-host").await;
+        let stale = start_test_node("probe-stale").await;
+        let _dbs = [
+            crate::database::WorkspaceDb::open(host.dir.to_str().unwrap()).unwrap(),
+            crate::database::WorkspaceDb::open(stale.dir.to_str().unwrap()).unwrap(),
+        ];
+        let (stale_id, removed) = (stale.node.self_id(), iroh::SecretKey::generate().public());
+        let both = vec![(stale_id.clone(), "Editor".to_string()), (removed.to_string(), "Editor".to_string())];
+        host.node.set_known_members("ws".into(), "Demo".into(), "Host".into(), both);
+        // The stale device holds the first version, as it would after being offline when the owner removes a member
+        membership::store(stale.dir.to_str().unwrap(), &host.node.lock().membership.clone().unwrap()).unwrap();
+        stale.node.reload_membership();
+        host.node.set_known_members("ws".into(), "Demo".into(), "Host".into(), vec![(stale_id, "Editor".to_string())]);
+        assert_eq!(stale.node.membership_epoch(), Some(1));
+
+        // Until it has asked, the stale device would let the removed member in; once the owner answers, it will not
+        assert!(stale.node.check_known_member(&removed).is_none(), "gate is shut before the first look");
+        let began = std::time::Instant::now();
+        let mut attempts = 0;
+        while stale.node.membership_epoch() != Some(2) && began.elapsed() < Duration::from_secs(60) {
+            attempts += 1;
+            stale.node.look_for_the_others().await;
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+        println!("stale device learned of the removal by asking after {} ms and {attempts} attempt(s)", began.elapsed().as_millis());
+        assert_eq!(stale.node.membership_epoch(), Some(2), "the device never learned of the removal");
+        assert!(stale.node.lock().caught_up);
+        assert!(stale.node.check_known_member(&removed).is_none(), "the removed member was let in after the look");
+        assert!(stale.node.lock().peers.is_empty(), "asking must not leave a link behind");
+    }
+
+    /// One trial of the removal race. The owner has removed a member; a device that was off holds the older list; the
+    /// removed member's client is hostile and dials that device again and again from the moment the trial starts.
+    /// Returns whether the removed member was ever let in, and the epoch the stale device ended with.
+    async fn removal_race(with_probe: bool) -> (bool, Option<u64>, u128) {
+        let host = start_test_node("race-host").await;
+        let stale = start_test_node("race-stale").await;
+        let hostile = start_test_node("race-removed").await;
+        let _dbs = [host.dir.clone(), stale.dir.clone(), hostile.dir.clone()]
+            .map(|d| crate::database::WorkspaceDb::open(d.to_str().unwrap()).unwrap());
+        let (stale_id, removed_id) = (stale.node.self_id(), hostile.node.self_id());
+        let both = vec![(stale_id.clone(), "Editor".to_string()), (removed_id.clone(), "Editor".to_string())];
+        host.node.set_known_members("ws".into(), "Demo".into(), "Host".into(), both);
+        let old = host.node.lock().membership.clone().unwrap();
+        for node in [&stale, &hostile] {
+            membership::store(node.dir.to_str().unwrap(), &old).unwrap();
+            node.node.reload_membership();
+        }
+        host.node.set_known_members("ws".into(), "Demo".into(), "Host".into(), vec![(stale_id.clone(), "Editor".to_string())]);
+        // Without the probe the stale device behaves as it did before: it trusts its list at once
+        stale.node.lock().caught_up = !with_probe;
+        let target = stale.node.endpoint.id();
+        let began = std::time::Instant::now();
+        let mut let_in = false;
+        while began.elapsed() < Duration::from_secs(40) && !let_in {
+            let_in = hostile.node.try_dial_member(target).await.is_ok() && stale.node.lock().peers.contains_key(&hostile.node.endpoint.id());
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+        (let_in, stale.node.membership_epoch(), began.elapsed().as_millis())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access; takes about ten minutes; prints the numbers used in RESEARCH.md"]
+    async fn measure_the_removal_race_with_and_without_the_probe() {
+        let trials = 10;
+        for with_probe in [false, true] {
+            let (mut in_count, mut times, mut epochs) = (0, Vec::new(), Vec::new());
+            for _ in 0..trials {
+                let (let_in, epoch, ms) = removal_race(with_probe).await;
+                in_count += usize::from(let_in);
+                times.push(ms);
+                epochs.push(epoch);
+            }
+            times.sort_unstable();
+            println!(
+                "RACE probe={with_probe}: removed member let in {in_count}/{trials}; stale device ended on epoch 2 in {}/{trials}; median time {} ms",
+                epochs.iter().filter(|e| **e == Some(2)).count(),
+                times[times.len() / 2]
+            );
+        }
     }
 
     #[test]
