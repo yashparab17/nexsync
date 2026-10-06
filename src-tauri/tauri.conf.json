@@ -41,7 +41,7 @@
 	},
 	"plugins": {
 		"updater": {
-			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc2MkREMUY4QUM5RjdDRDAKUldUUWZKK3MrTkV0ZGxFRE5nV2s1cCtLenZOOVhya2VkT0xpajNVWmlua2ZHSU9wOGJLZGd1ZFAK",
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgwRkE0MjhFQzYxMjE5M0IKUldRN0dSTEdqa0w2Z0YwZm1CYzlreDFHdmhvNzlDUzJpMkU2NVQ1SkxrT0F4NGRQQklDRGJ6UXkK",
 			"endpoints": [
 				"https://github.com/yashparab17/nexsync/releases/latest/download/latest.json"
 			]
