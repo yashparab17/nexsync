@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Download, FolderOpen, Loader2, Moon, Save, SlidersHorizontal, Radio, ShieldCheck, Sun, Trash2, Undo2, User, X } from "lucide-react";
+import { AlertTriangle, Download, FolderOpen, Loader2, Save, SlidersHorizontal, ShieldCheck, Undo2, User, X } from "lucide-react";
+import { Moon, Radio, Sun, Trash2 } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import {

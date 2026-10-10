@@ -1,7 +1,8 @@
 // Small building blocks shared by the Tasks and Kanban pages: tags, due-date badge and a card checklist
 
 import { useState } from "react";
-import { Calendar, Plus, X } from "lucide-react";
+import { Calendar, X } from "lucide-react";
+import { Plus } from "@/components/animate-icons";
 
 import { addTags, dueState, tagHue, type DueState } from "@/lib/planning";
 import { cn } from "@/lib/utils";

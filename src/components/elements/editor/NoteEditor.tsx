@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
-import { Check, Download, FileText, GitBranch, History, Loader2, MessageSquareDiff, PanelRight, Save, Type, Users, X } from "lucide-react";
+import { Download, FileText, GitBranch, History, Loader2, MessageSquareDiff, PanelRight, Save, Type, Users, X } from "lucide-react";
+import { Check } from "@/components/animate-icons";
 
 import CodeEditor from "./CodeEditor";
 import RichTextEditor from "./RichTextEditor";

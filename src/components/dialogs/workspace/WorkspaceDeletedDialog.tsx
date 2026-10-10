@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import {

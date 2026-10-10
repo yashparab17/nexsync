@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, BellOff } from "lucide-react";
+import { Bell, BellOff } from "@/components/animate-icons";
 
 import { initialOf } from "@/components/elements/Avatar";
 import { colorForName } from "@/lib/collabColor";

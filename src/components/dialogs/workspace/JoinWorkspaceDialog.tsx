@@ -1,15 +1,7 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-	Check,
-	FolderOpen,
-	Globe,
-	Lock,
-	Radio,
-	RefreshCw,
-	ShieldCheck,
-	Sparkles,
-} from "lucide-react";
+import { FolderOpen, Globe, Lock, ShieldCheck, Sparkles } from "lucide-react";
+import { Check, Radio, RefreshCw } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

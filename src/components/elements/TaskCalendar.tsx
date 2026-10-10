@@ -1,7 +1,7 @@
 // Month view of tasks by due date; clicking a task opens it
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { dueState, localDay, monthGrid } from "@/lib/planning";

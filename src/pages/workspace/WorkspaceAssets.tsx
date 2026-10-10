@@ -1,21 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import {
-	Copy,
-	Check,
-	FileText,
-	Film,
-	Headphones,
-	Image as ImageIcon,
-	LayoutGrid,
-	List,
-	History,
-	Pencil,
-	Search,
-	Sparkles,
-	Trash2,
-	Upload,
-	UploadCloud,
-} from "lucide-react";
+import { FileText, Film, Headphones, Image as ImageIcon, LayoutGrid, List, History, Pencil, Sparkles, Upload, UploadCloud } from "lucide-react";
+import { Copy, Check, Search, Trash2 } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

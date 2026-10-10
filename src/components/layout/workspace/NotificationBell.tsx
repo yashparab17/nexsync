@@ -1,7 +1,7 @@
 // Header bell: unread count, and a list of what happened since the app opened
 
 import { useState } from "react";
-import { Bell } from "lucide-react";
+import { Bell } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/store/notifications/NotificationContext";

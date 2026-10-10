@@ -2,7 +2,8 @@
 // move it for everyone, double-click a card to open the note. Other people's pointers show while they are on the board.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { ExternalLink, Link2, Trash2 } from "lucide-react";
+import { ExternalLink, Link2 } from "lucide-react";
+import { Trash2 } from "@/components/animate-icons";
 import type { Awareness } from "y-protocols/awareness";
 
 import PresenceDots from "@/components/elements/PresenceDots";

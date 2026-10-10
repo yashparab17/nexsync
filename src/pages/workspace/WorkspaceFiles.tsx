@@ -3,18 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import {
-	ChevronRight,
-	File,
-	FilePlus,
-	FolderInput,
-	FolderOpen,
-	History,
-	Loader2,
-	Pencil,
-	RefreshCw,
-	Trash2,
-} from "lucide-react";
+import { File, FilePlus, FolderInput, FolderOpen, History, Loader2, Pencil } from "lucide-react";
+import { ChevronRight, RefreshCw, Trash2 } from "@/components/animate-icons";
 
 // Components
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";

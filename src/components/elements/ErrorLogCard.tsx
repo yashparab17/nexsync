@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, RefreshCw, Trash2 } from "lucide-react";
+import { Check, Copy, RefreshCw, Trash2 } from "@/components/animate-icons";
 import { APP_VERSION } from "@/lib/version";
 
 import { Button } from "@/components/ui/button";
