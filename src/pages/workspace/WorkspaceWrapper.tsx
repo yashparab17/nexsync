@@ -81,7 +81,7 @@ export default function Workspace() {
 
 				{/* Page content */}
 				<div className="flex-1 overflow-auto p-4 md:p-6">
-					<div key={pathname} className="relative flex min-h-full flex-col animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
+					<div key={pathname} className={`relative mx-auto flex min-h-full w-full flex-col animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none ${pathname.startsWith("/workspace/editor") ? "" : "max-w-[88rem]"}`}>
 						<Outlet />
 					</div>
 				</div>

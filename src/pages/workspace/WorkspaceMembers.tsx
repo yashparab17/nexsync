@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Activity, Trash2, Crown, KeyRound, Pencil, Shield, ShieldCheck, UserCheck, UserPlus } from "@/components/animate-icons";
 
+import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -251,17 +252,18 @@ export default function WorkspaceMembers() {
 		}
 	};
 
+	// Discord-style: people grouped under their role, highest first; a role the app does not know counts as Viewer
+	const roleGroups = ["Owner", "Admin", "Editor", "Viewer"]
+		.map((role) => ({ role, list: members.filter((m) => (ROLE_CONFIG[m.role] ? m.role : "Viewer") === role) }))
+		.filter((g) => g.list.length > 0);
+
 	return (
-		<div className="space-y-6">
-			{/* Header */}
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight">Members & Roles</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Manage collaborators and role-based permissions in this workspace.
-					</p>
-				</div>
-				<div className="flex items-center gap-2">
+		<div className="flex flex-col">
+			<PageHeader
+				title="Members"
+				description="Who is in this workspace, who is online, and what each role can do."
+				actions={
+					<>
 					<Button
 						variant="outline"
 						onPress={() => setIsInviteOpen(true)}
@@ -285,8 +287,9 @@ export default function WorkspaceMembers() {
 						<UserPlus className="size-4" />
 						Add Member
 					</Button>
-				</div>
-			</div>
+					</>
+				}
+			/>
 
 			{/* Members Grid & Roles Overview */}
 			<div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -294,9 +297,9 @@ export default function WorkspaceMembers() {
 				<div className="space-y-3 lg:col-span-2">
 					<Card>
 						<CardHeader>
-							<CardTitle className="text-base">Workspace Collaborators</CardTitle>
+							<CardTitle className="text-base">People</CardTitle>
 							<CardDescription>
-								People who currently have access to this workspace and files.
+								Grouped by role. Offline people are dimmed.
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-3">
@@ -312,10 +315,10 @@ export default function WorkspaceMembers() {
 									No members registered.
 								</p>
 							) : (
-								members.map((member) => {
-									const roleConf =
-										ROLE_CONFIG[member.role] || ROLE_CONFIG.Viewer;
-									const RoleIcon = roleConf.icon;
+								roleGroups.map(({ role, list }) => (
+									<div key={role} className="flex flex-col gap-1">
+										<h3 className="px-3 pb-1 font-mono text-xs text-muted-foreground">{role.toLowerCase()} / {list.length}</h3>
+										{list.map((member) => {
 									const isOwner = member.role.toLowerCase() === "owner";
 									const isYou = isJoinedCopy
 										? selfId ? member.deviceId === selfId : member.name === selfName
@@ -330,10 +333,13 @@ export default function WorkspaceMembers() {
 									return (
 										<div
 											key={member.id}
-											className="flex items-center justify-between rounded-none border bg-muted/20 p-3.5 transition-colors hover:bg-muted/30"
+											className="flex items-center justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted"
 										>
 											<div className="flex items-center gap-3">
-												<Avatar name={member.name} className="size-10" />
+												<span className="relative">
+													<Avatar name={member.name} className={cn("size-10", !isOnline && !isYou && "opacity-50")} />
+													<span className={cn("absolute -right-0.5 -bottom-0.5 size-3 ring-2 ring-background", isOnline || isYou ? (here?.away ? "bg-warning" : "bg-success") : "bg-muted-foreground/50")} />
+												</span>
 												<div>
 													<div className="flex items-center gap-2">
 														<span className="font-semibold text-sm">
@@ -369,18 +375,6 @@ export default function WorkspaceMembers() {
 																{probes[member.id] === "running" ? "Looking for them by device key…" : probeText(probes[member.id] as ProbeResult)}
 															</p>
 														)}
-														<div className="flex items-center gap-2 mt-0.5">
-														<span
-															className={cn(
-																"inline-flex items-center gap-1 rounded-none border px-2 py-0.5 text-xs font-semibold ",
-																roleConf.color,
-																roleConf.bg,
-															)}
-														>
-															<RoleIcon className="size-3" />
-															{roleConf.label}
-														</span>
-													</div>
 												</div>
 											</div>
 
@@ -452,7 +446,9 @@ export default function WorkspaceMembers() {
 											)}
 										</div>
 									);
-								})
+								})}
+									</div>
+								))
 							)}
 						</CardContent>
 					</Card>
@@ -460,7 +456,7 @@ export default function WorkspaceMembers() {
 
 				{/* Right 1 Col: Permissions Summary */}
 				<div>
-					<Card className="bg-card/50">
+					<Card>
 						<CardHeader>
 							<CardTitle className="text-base flex items-center gap-2">
 								<Shield className="size-4 text-primary" />
@@ -471,7 +467,7 @@ export default function WorkspaceMembers() {
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-4 text-xs">
-							<div className="rounded-none border p-3 bg-muted/10">
+							<div className="border-l-2 border-border py-1 pl-4">
 								<div className="flex items-center gap-1.5 font-semibold text-warning">
 									<Crown className="size-3.5" />
 									Owner
@@ -481,7 +477,7 @@ export default function WorkspaceMembers() {
 								</p>
 							</div>
 
-							<div className="rounded-none border p-3 bg-muted/10">
+							<div className="border-l-2 border-border py-1 pl-4">
 								<div className="flex items-center gap-1.5 font-semibold text-info">
 									<ShieldCheck className="size-3.5" />
 									Admin
@@ -492,7 +488,7 @@ export default function WorkspaceMembers() {
 								</p>
 							</div>
 
-							<div className="rounded-none border p-3 bg-muted/10">
+							<div className="border-l-2 border-border py-1 pl-4">
 								<div className="flex items-center gap-1.5 font-semibold text-info">
 									<Shield className="size-3.5" />
 									Editor
@@ -502,7 +498,7 @@ export default function WorkspaceMembers() {
 								</p>
 							</div>
 
-							<div className="rounded-none border p-3 bg-muted/10">
+							<div className="border-l-2 border-border py-1 pl-4">
 								<div className="flex items-center gap-1.5 font-semibold text-success">
 									<UserCheck className="size-3.5" />
 									Viewer

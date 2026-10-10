@@ -39,12 +39,12 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 	// One small colored dot says how the connection is: green when people are connected or the network is ready, amber while connecting, red when offline
 	const connecting = connectionStatus === "connecting" || connectionStatus === "reconnecting";
 	const status = connectedCount > 0
-		? { label: `Collaborate, ${connectedCount} connected`, dot: "bg-success" }
+		? { label: `Collaborate, ${connectedCount} connected`, short: `${connectedCount} online`, dot: "bg-success" }
 		: !network.online
-			? { label: "Collaborate, offline", dot: "bg-destructive" }
+			? { label: "Collaborate, offline", short: "Offline", dot: "bg-destructive" }
 			: connecting
-				? { label: "Collaborate, connecting", dot: "bg-warning animate-pulse" }
-				: { label: "Collaborate, online", dot: "bg-success" };
+				? { label: "Collaborate, connecting", short: "Connecting", dot: "bg-warning animate-pulse" }
+				: { label: "Collaborate, online", short: "Ready to share", dot: "bg-success" };
 
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 lg:px-6">
@@ -65,18 +65,11 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 				<PresenceStrip />
 				<CatchUp />
 					<NotificationBell />
-				<span title={status.label}>
-				<Button
-					variant="ghost"
-					size="icon"
-					onPress={() => setIsP2POpen(true)}
-					aria-label={status.label}
-					className="relative"
-				>
-					<Radio className="size-5" />
-					<span className={cn("absolute right-1.5 top-1.5 size-2.5 rounded-full ring-2 ring-background", status.dot)} />
+				<Button variant="outline" size="sm" onPress={() => setIsP2POpen(true)} aria-label={status.label} className="gap-2" data-testid="connection-chip">
+					<span className={cn("size-2 rounded-full", status.dot)} aria-hidden />
+					<Radio className="size-4" />
+					<span className="hidden lg:inline">{status.short}</span>
 				</Button>
-				</span>
 
 				<Button
 					variant="ghost"

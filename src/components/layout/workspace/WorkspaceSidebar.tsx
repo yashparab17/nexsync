@@ -80,6 +80,15 @@ const navigation: NavigationItem[] = [
 	},
 ];
 
+// The main list in Discord-style categories: the first group has no label
+const byPath = (path: string) => navigation.find((item) => item.path === path)!;
+const navGroups: { label?: MessageKey; items: NavigationItem[] }[] = [
+	{ items: [byPath("/workspace")] },
+	{ label: "nav.groupWrite", items: [byPath("/workspace/notes"), byPath("/workspace/editor")] },
+	{ label: "nav.groupStorage", items: [byPath("/workspace/files"), byPath("/workspace/assets")] },
+	{ label: "nav.groupPlan", items: [byPath("/workspace/tasks"), byPath("/workspace/kanban"), byPath("/workspace/insights")] },
+];
+
 // Bottom workspace navigation links
 const bottomNavigation: NavigationItem[] = [
 	{
@@ -124,9 +133,9 @@ function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; 
 				onBlur={() => setHot(false)}
 				className={({ isActive }) =>
 					cn(
-						"flex w-full items-center gap-3 overflow-hidden rounded-none px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
+						"relative flex w-full items-center gap-3 overflow-hidden rounded-none px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
 						expanded ? "justify-start" : "justify-center",
-						isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted",
+						isActive ? "bg-primary/10 text-primary before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:bg-primary" : "text-foreground hover:bg-muted",
 					)
 				}
 				title={t(item.label)}
@@ -185,9 +194,14 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 			</div>
 
 			{/* Main Navigation */}
-			<nav aria-label={t("nav.main")} className={cn("flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden", showLabels ? "p-3" : "p-2")}>
-				{navigation.map((item) => (
-					<NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />
+			<nav aria-label={t("nav.main")} className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden", showLabels ? "gap-4 p-3" : "gap-2 p-2")}>
+				{navGroups.map((group, i) => (
+					<div key={i} className={cn("flex flex-col gap-0.5", !showLabels && i > 0 && "border-t pt-2")}>
+						{group.label && showLabels && <h3 className="px-3 pb-1 font-mono text-xs text-muted-foreground">{t(group.label)}</h3>}
+						{group.items.map((item) => (
+							<NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />
+						))}
+					</div>
 				))}
 			</nav>
 
