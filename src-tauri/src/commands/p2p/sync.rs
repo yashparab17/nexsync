@@ -373,12 +373,20 @@ async fn pull(node: &Arc<Node>, peer_id: &str, workspace: &str, rel: String, siz
 async fn handle_manifest(node: &Arc<Node>, peer_id: &str, workspace: &str, entries: Vec<ManifestEntry>) {
     let last_sync = read_last_sync(workspace);
     let generation = node.sync().generation();
+    // A copy of a file that was erased here is not brought back, unless it was written after the erasure
+    let erased = {
+        let ws = workspace.to_string();
+        tokio::task::spawn_blocking(move || crate::commands::workspace::erase::erased_list(&ws)).await.unwrap_or_default()
+    };
     for entry in entries {
         // The user cancelled the transfers, so don't start the rest of this catch-up.
         if node.sync().generation() != generation {
             break;
         }
         let Ok(rel) = files::check_rel_path(&entry.rel_path) else { continue };
+        if crate::commands::workspace::erase::covers(&erased, &rel, entry.modified) {
+            continue;
+        }
         let Ok(local) = resolve_workspace_path(workspace, &rel) else { continue };
         let meta = tokio::fs::metadata(&local).await.ok().filter(|m| m.is_file());
         if let Some(meta) = meta {

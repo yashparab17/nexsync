@@ -80,6 +80,28 @@ fn prune(db: &WorkspaceDb, workspace: &str, ws_id: &str, rel: &str, named: bool,
     Ok(())
 }
 
+/// Removes every saved version of a file, or of everything inside a folder, and the contents nothing else uses.
+/// Returns how many versions went.
+pub fn erase_path(db: &WorkspaceDb, workspace: &str, ws_id: &str, rel: &str) -> Result<usize, String> {
+    let inside = format!("{rel}/");
+    let doomed: Vec<(i64, String)> = {
+        let mut stmt = db
+            .conn
+            .prepare("SELECT id, hash FROM file_versions WHERE workspace_id = ?1 AND (path = ?2 OR substr(path, 1, ?3) = ?4)")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt.query_map(params![ws_id, rel, inside.len() as i64, inside], |r| Ok((r.get(0)?, r.get(1)?))).map_err(|e| e.to_string())?;
+        rows.filter_map(Result::ok).collect()
+    };
+    for (id, hash) in &doomed {
+        db.conn.execute("DELETE FROM file_versions WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
+        let still_used: i64 = db.conn.query_row("SELECT COUNT(*) FROM file_versions WHERE hash = ?1", [hash], |r| r.get(0)).map_err(|e| e.to_string())?;
+        if still_used == 0 {
+            let _ = fs::remove_file(blob_dir(workspace).join(hash));
+        }
+    }
+    Ok(doomed.len())
+}
+
 fn record_with_limit(
     workspace: &str,
     rel: &str,

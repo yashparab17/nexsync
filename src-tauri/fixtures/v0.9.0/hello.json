@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "secret": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "name": "Ada",
+  "versions": {
+    "app": "0.9.0",
+    "record": 1,
+    "list": 1
+  }
+}

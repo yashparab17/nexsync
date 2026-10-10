@@ -48,6 +48,9 @@ pub struct Sibling {
     pub by: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sig: Option<String>,
+    /// Anything a newer version of the app added to a write: kept and passed on untouched, so an older app never drops it
+    #[serde(flatten, default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Everything a replica knows about one record
@@ -55,6 +58,30 @@ pub struct Sibling {
 pub struct RecordState {
     pub vv: BTreeMap<String, u64>,
     pub fields: BTreeMap<String, Vec<Sibling>>,
+    /// Anything a newer version of the app added to the record itself; see `Sibling::extra`
+    #[serde(flatten, default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// The paths this version of the app reads and writes. A path outside this set came from a newer version: it is kept in
+/// the record and merged like any other, but it is never removed by an edit made from a view that could not show it.
+fn is_known_path(path: &str) -> bool {
+    const FIELDS: &[&str] = &["title", "description", "status", "priority", "due_date", "assignee_id", "column_id", "position", "tags", "comments", "checklist"];
+    FIELDS.contains(&path) || path.starts_with("tags/") || path.starts_with("comments/") || path.starts_with("checklist/")
+}
+
+/// Combines the extra fields of two copies; where both hold the same key, the larger text wins, so the result does
+/// not depend on which copy is first
+fn merge_extra(a: &BTreeMap<String, Value>, b: &BTreeMap<String, Value>) -> BTreeMap<String, Value> {
+    let mut out = a.clone();
+    for (k, v) in b {
+        let as_text = |value: &Value| value.to_string();
+        let keep_mine = out.get(k).is_some_and(|mine| as_text(mine) >= as_text(v));
+        if !keep_mine {
+            out.insert(k.clone(), v.clone());
+        }
+    }
+    out
 }
 
 /// A value another person wrote to the same field at the same time
@@ -141,6 +168,11 @@ fn merge_siblings(a: &[Sibling], a_vv: &BTreeMap<String, u64>, b: &[Sibling], b_
 }
 
 impl RecordState {
+    /// False if any write is stamped more than a day later than `now`
+    pub fn stamps_sane(&self, now: u64) -> bool {
+        self.max_ts() <= now.saturating_add(MAX_AHEAD_MS)
+    }
+
     /// The newest write time in the record
     pub fn max_ts(&self) -> u64 {
         self.fields.values().flatten().map(|s| s.ts).max().unwrap_or(0)
@@ -151,7 +183,7 @@ impl RecordState {
         let mut state = RecordState::default();
         state.vv.insert(LEGACY.to_string(), 0);
         for (path, value) in values {
-            state.fields.insert(path, vec![Sibling { dot: Dot { r: LEGACY.to_string(), c: 0 }, ts, value, who: None, by: None, sig: None }]);
+            state.fields.insert(path, vec![Sibling { dot: Dot { r: LEGACY.to_string(), c: 0 }, ts, value, who: None, by: None, sig: None, extra: BTreeMap::new() }]);
         }
         state
     }
@@ -161,7 +193,7 @@ impl RecordState {
         let c = self.vv.get(replica).copied().unwrap_or(0) + 1;
         self.vv.insert(replica.to_string(), c);
         let ts = now.max(self.max_ts() + 1);
-        self.fields.insert(path.to_string(), vec![Sibling { dot: Dot { r: replica.to_string(), c }, ts, value, who: who.map(str::to_string), by: None, sig: None }]);
+        self.fields.insert(path.to_string(), vec![Sibling { dot: Dot { r: replica.to_string(), c }, ts, value, who: who.map(str::to_string), by: None, sig: None, extra: BTreeMap::new() }]);
     }
 
     /// Makes the record read as `desired`, writing only the paths that differ; returns whether anything was written.
@@ -186,7 +218,7 @@ impl RecordState {
         }
         for (path, value) in &current {
             // Not in the editor's copy at all means someone else added it since: it is theirs to keep
-            if desired.contains_key(path) || value.is_null() || base.is_some_and(|b| !b.contains_key(path)) {
+            if desired.contains_key(path) || !is_known_path(path) || value.is_null() || base.is_some_and(|b| !b.contains_key(path)) {
                 continue;
             }
             self.write(replica, path, Value::Null, now, who);
@@ -218,7 +250,7 @@ impl RecordState {
                 fields.insert(path.clone(), merged);
             }
         }
-        RecordState { vv, fields }
+        RecordState { vv, fields, extra: merge_extra(&self.extra, &other.extra) }
     }
 
     /// Who wrote the value a path shows, when that is known
@@ -510,9 +542,22 @@ pub fn rfc3339_of(ts: u64) -> String {
     DateTime::<Utc>::from_timestamp_millis(ts as i64).unwrap_or_default().to_rfc3339()
 }
 
-pub fn now_ms() -> u64 {
-    Utc::now().timestamp_millis().max(0) as u64
+/// How far this device's clock is moved before it stamps a write, set from what the linked devices say the time is
+/// (see `p2p::clock`). Zero when there is nothing to correct.
+static CLOCK_CORRECTION: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
+pub fn set_clock_correction(ms: i64) {
+    CLOCK_CORRECTION.store(ms, std::sync::atomic::Ordering::Relaxed);
 }
+
+/// The time to stamp a write with: the device's clock, moved to the middle of the clocks of the devices it is linked to
+pub fn now_ms() -> u64 {
+    (Utc::now().timestamp_millis() + CLOCK_CORRECTION.load(std::sync::atomic::Ordering::Relaxed)).max(0) as u64
+}
+
+/// How far ahead of this device's clock a stamp may be and still be taken. A write stamped further out would win every
+/// contest it was ever in, whether from a clock set wrong or from a device that meant it.
+pub const MAX_AHEAD_MS: u64 = 24 * 60 * 60 * 1000;
 
 // ────────────────────────────
 // Storage
@@ -602,6 +647,11 @@ pub fn merge_remote<T: Crdt>(conn: &Connection, remote: &T, local: Option<&T>, v
     // A write whose signature does not check out was altered, or never made by the key it names: the record is refused
     if !theirs.signatures_ok(T::ENTITY, remote.id()) {
         eprintln!("[sync] Refused {} {}: a write in it is not signed by the device it names", T::ENTITY, remote.id());
+        return Ok(None);
+    }
+    // A stamp days in the future would win every contest the field was ever in: refused like an unsigned alteration
+    if !theirs.stamps_sane(now_ms()) {
+        eprintln!("[sync] Refused {} {}: a write in it is stamped more than a day ahead of this device's clock", T::ENTITY, remote.id());
         return Ok(None);
     }
     let ours = match load(conn, T::ENTITY, remote.id())? {
@@ -841,5 +891,47 @@ mod tests {
         edited.tags.clear();
         assert!(s.diff_write("me", &edited.paths(false), 52, None));
         assert_eq!(Task::materialize(&t, &s.resolved()).tags, Vec::<String>::new());
+    }
+
+    /// A record as a newer version of the app might write it: an extra field on the record, on a write, and a path this
+    /// version has never heard of
+    const FUTURE: &str = r#"{"vv":{"n":2},"schema":2,"fields":{
+        "title":[{"dot":{"r":"n","c":1},"ts":5,"value":"ship","style":"bold"}],
+        "emoji":[{"dot":{"r":"n","c":2},"ts":6,"value":"party","shape":"star"}]}}"#;
+
+    #[test]
+    fn what_a_newer_version_added_survives_an_edit_by_this_one() {
+        let state: RecordState = serde_json::from_str(FUTURE).unwrap();
+        let mut t = task("t1");
+        t.title = "ship it".into();
+        // This version's view of the record has no "emoji", so the edit it makes must not remove it
+        let mut edited = state.clone();
+        assert!(edited.diff_write("old", &t.paths(false), 10, None));
+        let out = serde_json::to_value(&edited).unwrap();
+        assert_eq!(out["schema"], 2, "a field on the record itself was dropped");
+        assert_eq!(out["fields"]["emoji"][0]["shape"], "star", "a field on a write was dropped");
+        assert_eq!(out["fields"]["emoji"][0]["value"], "party", "a path this version cannot show was removed");
+        assert_eq!(edited.resolved().get("title"), Some(&json!("ship it")), "the edit itself was lost");
+    }
+
+    #[test]
+    fn extra_fields_do_not_change_what_merging_does() {
+        let a: RecordState = serde_json::from_str(FUTURE).unwrap();
+        let mut b = a.clone();
+        b.write("old", "title", json!("other"), 9, None);
+        let mut c: RecordState = serde_json::from_str(FUTURE).unwrap();
+        c.extra.insert("schema".into(), json!(3));
+        assert_eq!(a.merge(&b), b.merge(&a));
+        assert_eq!(a.merge(&c), c.merge(&a), "the order of the copies changed the result");
+        assert_eq!(a.merge(&a), a, "merging a copy with itself changed it");
+        assert_eq!(a.merge(&c).extra.get("schema"), Some(&json!(3)));
+    }
+
+    #[test]
+    fn a_state_without_extra_fields_is_written_exactly_as_before() {
+        let s = RecordState::from_legacy(task("t1").paths(false), 1);
+        let text = serde_json::to_string(&s).unwrap();
+        assert!(!text.contains("extra"), "the placeholder leaked into the stored form: {text}");
+        assert_eq!(serde_json::from_str::<RecordState>(&text).unwrap(), s);
     }
 }

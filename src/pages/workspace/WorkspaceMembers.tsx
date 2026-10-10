@@ -35,7 +35,7 @@ import { useErrorLog } from "@/hooks/useErrorLog";
 import { writeWorkspaceMetadata } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { ASSIGNABLE_ROLES, canChangeRole } from "@/lib/roles";
-import { lastSeenText, placeLabel, probeText } from "@/lib/p2p/presence";
+import { lastSeenText, placeLabel, probeText, skewText } from "@/lib/p2p/presence";
 import { probeMember, type ProbeResult } from "@/lib/p2p/transport";
 import { cleanName, nameProblem } from "@/lib/memberNames";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -335,6 +335,7 @@ export default function WorkspaceMembers() {
 										(member.deviceId ? onlineIds.has(member.deviceId) : onlineNames.has(member.name.toLowerCase()));
 									const canEdit = !isJoinedCopy || (!!member.deviceId && rolesFor(member).length > 0);
 									const here = presenceOf(member);
+									const peer = member.deviceId ? peers.find((p) => p.id === member.deviceId) : undefined;
 
 									return (
 										<div
@@ -359,6 +360,15 @@ export default function WorkspaceMembers() {
 																{here?.away ? "Away" : "Online"}
 																{here && !here.away && ` · ${placeLabel(here)}`}
 															</span>
+														)}
+														{isOnline && peer?.appVersion && (
+															<span className="text-[10px] text-muted-foreground">v{peer.appVersion}</span>
+														)}
+														{isOnline && peer?.clockSkewMs != null && Math.abs(peer.clockSkewMs) >= 120_000 && (
+															<span className="text-[10px] text-amber-400">Their clock is {skewText(peer.clockSkewMs)}; Nexsync adjusts for it</span>
+														)}
+														{isOnline && peer?.needsUpdate && (
+															<span className="text-[10px] text-amber-400">Runs a newer Nexsync: update to keep syncing</span>
 														)}
 														{!isOnline && !isYou && member.lastSeen && (
 															<span className="text-[10px] text-muted-foreground">Last seen {lastSeenText(member.lastSeen)}</span>

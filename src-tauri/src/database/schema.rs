@@ -344,7 +344,45 @@ CREATE TABLE IF NOT EXISTS membership (
 );
 "##,
 	},
+	Migration {
+		version: 19,
+		description: "erased records and files, so devices that were away erase them too",
+		up: r##"
+ALTER TABLE tombstones ADD COLUMN erased INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS erased_paths (
+    path TEXT PRIMARY KEY,
+    erased_at TEXT NOT NULL
+);
+"##,
+	},
 ];
+
+/// The newest schema version this build knows how to read and write
+pub fn schema_version() -> usize {
+	MIGRATIONS.last().map_or(0, |m| m.version)
+}
+
+/// Refuses a database that a newer build has already migrated, and keeps a copy of one that is about to be migrated.
+/// An older app that opened a newer workspace would write rows the newer app could not trust.
+fn guard_version(conn: &Connection) -> SqlResult<()> {
+	let applied: Option<usize> = conn.query_row("SELECT MAX(version) FROM schema_migrations", [], |r| r.get(0)).unwrap_or(None);
+	let Some(applied) = applied else { return Ok(()) };
+	if applied > schema_version() {
+		let msg = format!("This workspace was made by a newer version of Nexsync (database version {applied}; this app understands up to {}). Update Nexsync to open it.", schema_version());
+		return Err(rusqlite::Error::ToSqlConversionFailure(msg.into()));
+	}
+	if applied < schema_version() {
+		// A copy to go back to if a migration goes wrong; one per starting version, never overwritten
+		if let Some(dir) = conn.path().and_then(|p| std::path::Path::new(p).parent()) {
+			let copy = dir.join(format!("before-migration-{applied}.db"));
+			if !copy.exists() {
+				let _ = conn.execute("VACUUM INTO ?1", rusqlite::params![copy.to_string_lossy()]);
+			}
+		}
+	}
+	Ok(())
+}
 
 /// Initialises the schema on a fresh database, running pending migrations
 pub fn init_schema(conn: &Connection) -> SqlResult<()> {
@@ -356,6 +394,7 @@ pub fn init_schema(conn: &Connection) -> SqlResult<()> {
             applied_at TEXT NOT NULL DEFAULT (datetime('now'))
         );",
 	)?;
+	guard_version(conn)?;
 
 	for mig in MIGRATIONS {
 		let applied: bool = conn
@@ -378,4 +417,60 @@ pub fn init_schema(conn: &Connection) -> SqlResult<()> {
 	}
 
 	Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	fn temp_db(label: &str) -> (std::path::PathBuf, Connection) {
+		let dir = std::env::temp_dir().join(format!("nexsync-schema-{label}-{}", uuid::Uuid::new_v4()));
+		std::fs::create_dir_all(&dir).unwrap();
+		let conn = Connection::open(dir.join("nexsync.db")).unwrap();
+		(dir, conn)
+	}
+
+	#[test]
+	fn a_workspace_made_by_a_newer_build_is_refused_and_left_alone() {
+		let (dir, conn) = temp_db("newer");
+		init_schema(&conn).unwrap();
+		let future = schema_version() + 1;
+		conn.execute("INSERT INTO schema_migrations (version, description) VALUES (?1, 'from the future')", [future]).unwrap();
+		let err = init_schema(&conn).unwrap_err().to_string();
+		assert!(err.contains("newer version of Nexsync"), "{err}");
+		let rows: usize = conn.query_row("SELECT COUNT(*) FROM schema_migrations", [], |r| r.get(0)).unwrap();
+		assert_eq!(rows, schema_version() + 1, "nothing was written to a database from a newer build");
+		drop(conn);
+		let _ = std::fs::remove_dir_all(dir);
+	}
+
+	#[test]
+	fn a_database_that_is_about_to_be_migrated_is_copied_first_and_the_copy_is_kept() {
+		let (dir, conn) = temp_db("older");
+		init_schema(&conn).unwrap();
+		let last = schema_version();
+		conn.execute("DELETE FROM schema_migrations WHERE version = ?1", [last]).unwrap();
+		guard_version(&conn).unwrap();
+		let copy = dir.join(format!("before-migration-{}.db", last - 1));
+		assert!(copy.is_file(), "no copy was made before migrating");
+		let old = Connection::open(&copy).unwrap();
+		let versions: usize = old.query_row("SELECT MAX(version) FROM schema_migrations", [], |r| r.get(0)).unwrap();
+		assert_eq!(versions, last - 1, "the copy is the database as it was before the migration");
+		// A second run does not replace the copy
+		let before = std::fs::metadata(&copy).unwrap().modified().unwrap();
+		guard_version(&conn).unwrap();
+		assert_eq!(std::fs::metadata(&copy).unwrap().modified().unwrap(), before);
+		drop((old, conn));
+		let _ = std::fs::remove_dir_all(dir);
+	}
+
+	#[test]
+	fn a_fresh_database_makes_no_copy() {
+		let (dir, conn) = temp_db("fresh");
+		init_schema(&conn).unwrap();
+		let copies = std::fs::read_dir(&dir).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().starts_with("before-migration")).count();
+		assert_eq!(copies, 0);
+		drop(conn);
+		let _ = std::fs::remove_dir_all(dir);
+	}
 }

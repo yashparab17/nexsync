@@ -86,6 +86,8 @@ pub fn run() {
             commands::workspace::create_task,
             commands::workspace::update_task,
             commands::workspace::delete_task,
+            commands::workspace::erase_record_for_good,
+            commands::workspace::erase_file_for_good,
 
             // Kanban board
             commands::workspace::get_kanban,

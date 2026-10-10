@@ -1,0 +1,13 @@
+{
+  "type": "welcome",
+  "v": 1,
+  "hostName": "Host",
+  "role": "Editor",
+  "workspaceId": "ws-fixture",
+  "workspaceName": "Fixture",
+  "versions": {
+    "app": "0.9.0",
+    "record": 1,
+    "list": 1
+  }
+}

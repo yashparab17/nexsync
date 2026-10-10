@@ -188,6 +188,28 @@ export function deleteTask(request: TaskIdRequest): Promise<void> {
 	return invoke("delete_task", { request });
 }
 
+// What an erase removed, store by store
+export interface Erased {
+	records: number;
+	journal: number;
+	activity: number;
+	drafts: number;
+	versions: number;
+	documents: number;
+	trash: number;
+	files: number;
+}
+
+// Erase a task or card for good on this device: its journal entries, drafts and activity too
+export function eraseRecordForGood(path: string, entity: "task" | "card", id: string): Promise<Erased> {
+	return invoke("erase_record_for_good", { path, entity, id });
+}
+
+// Erase a file or folder for good on this device: its trash copy, saved versions, shared text and journal entries too
+export function eraseFileForGood(path: string, relPath: string, docIds: string[] = []): Promise<Erased> {
+	return invoke("erase_file_for_good", { path, relPath, docIds });
+}
+
 // ────────────────────────────
 // Kanban commands
 // ────────────────────────────

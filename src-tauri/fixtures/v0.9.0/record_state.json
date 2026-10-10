@@ -1,0 +1,59 @@
+{
+  "vv": {
+    "dev-a": 1,
+    "dev-b": 2,
+    "legacy": 0
+  },
+  "fields": {
+    "status": [
+      {
+        "dot": {
+          "r": "legacy",
+          "c": 0
+        },
+        "ts": 1000,
+        "value": "todo"
+      }
+    ],
+    "tags/late": [
+      {
+        "dot": {
+          "r": "dev-b",
+          "c": 2
+        },
+        "ts": 2002,
+        "value": true
+      }
+    ],
+    "tags/urgent": [
+      {
+        "dot": {
+          "r": "legacy",
+          "c": 0
+        },
+        "ts": 1000,
+        "value": true
+      }
+    ],
+    "title": [
+      {
+        "dot": {
+          "r": "dev-a",
+          "c": 1
+        },
+        "ts": 2000,
+        "value": "Ship it",
+        "who": "Ada"
+      },
+      {
+        "dot": {
+          "r": "dev-b",
+          "c": 1
+        },
+        "ts": 2001,
+        "value": "Release",
+        "who": "Bo"
+      }
+    ]
+  }
+}

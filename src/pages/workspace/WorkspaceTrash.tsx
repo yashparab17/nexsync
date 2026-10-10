@@ -11,16 +11,18 @@ import {
 } from "@/components/ui/dialog";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
-import { emptyTrash, listTrash, purgeTrashItem, restoreTrashItem } from "@/lib/tauri";
+import { emptyTrash, eraseFileForGood, listTrash, purgeTrashItem, restoreTrashItem } from "@/lib/tauri";
+import EraseOption from "@/components/elements/EraseOption";
 import { errorText, formatBytes } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
-import { useIsViewer } from "@/store/p2p/P2PContext";
+import { useIsViewer, useP2P } from "@/store/p2p/P2PContext";
 import type { TrashItem } from "@/types/workspace";
 
 // Deleted files and folders that can be restored or permanently removed
 export default function WorkspaceTrash() {
 	const { workspace, refreshStats } = useWorkspace();
 	const isViewer = useIsViewer();
+	const { publishDataChange } = useP2P();
 	const logError = useErrorLog();
 	const path = workspace?.path ?? "";
 
@@ -28,6 +30,7 @@ export default function WorkspaceTrash() {
 	const [loading, setLoading] = useState(true);
 	const [message, setMessage] = useState<string | null>(null);
 	const [confirm, setConfirm] = useState<TrashItem | "all" | null>(null);
+	const [erase, setErase] = useState(false);
 
 	const load = useCallback(async () => {
 		if (!path) return;
@@ -57,9 +60,16 @@ export default function WorkspaceTrash() {
 
 	const doConfirmed = async () => {
 		const target = confirm;
+		const eraseIt = erase;
 		setConfirm(null);
+		setErase(false);
 		if (target === "all") await run(() => emptyTrash(path));
-		else if (target) await run(() => purgeTrashItem(path, target.id));
+		else if (target && eraseIt) {
+			await run(async () => {
+				await eraseFileForGood(path, target.relPath);
+				publishDataChange({ entity: "file", op: "erase", path: target.relPath, docIds: [] });
+			});
+		} else if (target) await run(() => purgeTrashItem(path, target.id));
 	};
 
 	return (
@@ -131,7 +141,15 @@ export default function WorkspaceTrash() {
 			)}
 
 			{confirm && (
-				<Dialog isOpen onOpenChange={(open) => !open && setConfirm(null)}>
+				<Dialog
+					isOpen
+					onOpenChange={(open) => {
+						if (!open) {
+							setConfirm(null);
+							setErase(false);
+						}
+					}}
+				>
 					<div className="space-y-4">
 						<DialogHeader>
 							<DialogTitle>Delete Permanently</DialogTitle>
@@ -142,12 +160,19 @@ export default function WorkspaceTrash() {
 								This cannot be undone.
 							</DialogDescription>
 						</DialogHeader>
+						{confirm !== "all" && <EraseOption checked={erase} onChange={setErase} what={confirm.relPath} />}
 						<DialogFooter>
-							<Button variant="outline" onPress={() => setConfirm(null)}>
+							<Button
+								variant="outline"
+								onPress={() => {
+									setConfirm(null);
+									setErase(false);
+								}}
+							>
 								Cancel
 							</Button>
 							<Button variant="destructive" onPress={doConfirmed}>
-								Delete
+								{erase && confirm !== "all" ? "Erase" : "Delete"}
 							</Button>
 						</DialogFooter>
 					</div>

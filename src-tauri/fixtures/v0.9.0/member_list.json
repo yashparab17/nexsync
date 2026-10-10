@@ -1,0 +1,16 @@
+{
+  "workspace_id": "ws-fixture",
+  "workspace_name": "Fixture",
+  "epoch": 1,
+  "owner": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+  "signer": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+  "members": [
+    [
+      "1398f62c6d1a457c51ba6a4b5f3dbd2f69fca93216218dc8997e416bd17d93ca",
+      "Editor"
+    ]
+  ],
+  "removed": [],
+  "issued_at": 1791646094470,
+  "sig": "5eac76958cc7d48a91b282ad4b32ab28eeba8d9182ccc5ebed34d44e635702a9bbfa895bbd6562f1a5c530552577a1829fcd3509e681665ccb52c953a0cb6b02"
+}

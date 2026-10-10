@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 
 # Build output
 build/
@@ -8,14 +9,27 @@ dist-ssr/
 out/
 src-tauri/gen/
 src-tauri/target/
-graphify-out/
 *.tgz
+*.tsbuildinfo
+.vite/
+coverage/
+graphify-out/
 
 # Environment and local configuration
 .env
 .env.local
 .env.*.local
 *.local
+
+# Signing keys and certificates (updater, Windows, Apple): never commit these
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.p8
+*.mobileprovision
+.tauri/
 
 # Logs
 logs/
@@ -33,30 +47,30 @@ Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
 
-# Editor and IDE files
-.vscode/*
-.vscode/extensions.json
-.vscode/settings.json
-.vscode/launch.json
-.vscode/tasks.json
-.idea
-.DS_Store
-.claude
+# Editor, IDE and AI tool files
+.vscode/
+.idea/
+.claude/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# Project documentation
+# Package managers other than pnpm
+package-lock.json
+yarn.lock
+
+# Research and paper (the whole folder, plus the notes)
+research/
+RESEARCH.md
+RESEARCH_PAPER.md
+LITERATURE_REVIEW.md
+HOSTLESS_SYNC_SCOPE.md
+
+# Planning and internal documentation
 PROJECT_GUIDE.md
 COMMENT_STYLE_GUIDE.md
 IMPLEMENTATION_PLAN.md
-nexsync-synopsis.pdf
-RESEARCH.md
-HOSTLESS_SYNC_SCOPE.md
 ALPHA_CHECKLIST.md
-
-# pnpm only
-package-lock.json
-yarn.lock
+nexsync-synopsis.pdf

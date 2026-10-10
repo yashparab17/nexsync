@@ -34,7 +34,8 @@ import { collectTags } from "@/lib/planning";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
-import { createTask, deleteTask, getTasks, resolveTaskConflict, updateTask } from "@/lib/tauri";
+import { createTask, deleteTask, eraseRecordForGood, getTasks, resolveTaskConflict, updateTask } from "@/lib/tauri";
+import EraseOption from "@/components/elements/EraseOption";
 import ConflictPanel from "@/components/elements/ConflictPanel";
 import RuleFlag from "@/components/elements/RuleFlag";
 import DraftsButton from "@/components/dialogs/workspace/DraftsDialog";
@@ -123,6 +124,7 @@ export default function WorkspaceTasks() {
 	const [editingTask, setEditingTask] = useState<Task | null>(null);
 	useReportItem(editingTask?.id ?? null);
 	const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+	const [eraseTask, setEraseTask] = useState(false);
 
 	// Form State for Create/Edit
 	const [formTitle, setFormTitle] = useState("");
@@ -353,14 +355,21 @@ export default function WorkspaceTasks() {
 		if (isViewer || !workspace?.path || !deletingTaskId) return;
 		try {
 			const deleted = tasks.find((t) => t.id === deletingTaskId);
-			await deleteTask({ path: workspace.path, id: deletingTaskId });
-			publishDataChange({ entity: "task", op: "delete", id: deletingTaskId });
-			await addActivityEvent(
-				"Deleted task",
-				`Deleted task: ${deleted?.title || "Task"}`,
-				itemTarget("task", deletingTaskId),
-				"task",
-			);
+			if (eraseTask) {
+				// No activity entry: it would put the title back into the history that is being erased
+				await eraseRecordForGood(workspace.path, "task", deletingTaskId);
+				publishDataChange({ entity: "task", op: "delete", id: deletingTaskId, erase: true });
+			} else {
+				await deleteTask({ path: workspace.path, id: deletingTaskId });
+				publishDataChange({ entity: "task", op: "delete", id: deletingTaskId });
+				await addActivityEvent(
+					"Deleted task",
+					`Deleted task: ${deleted?.title || "Task"}`,
+					itemTarget("task", deletingTaskId),
+					"task",
+				);
+			}
+			setEraseTask(false);
 			setDeletingTaskId(null);
 			await loadTasks();
 			await refreshMetadata();
@@ -976,7 +985,12 @@ export default function WorkspaceTasks() {
 			{deletingTaskId && (
 				<Dialog
 					isOpen={!!deletingTaskId}
-					onOpenChange={(open) => !open && setDeletingTaskId(null)}
+					onOpenChange={(open) => {
+						if (!open) {
+							setDeletingTaskId(null);
+							setEraseTask(false);
+						}
+					}}
 				>
 					<div className="space-y-4">
 						<DialogHeader>
@@ -986,16 +1000,20 @@ export default function WorkspaceTasks() {
 								undone.
 							</DialogDescription>
 						</DialogHeader>
+						<EraseOption checked={eraseTask} onChange={setEraseTask} what="the task" />
 
 						<DialogFooter>
 							<Button
 								variant="outline"
-								onPress={() => setDeletingTaskId(null)}
+								onPress={() => {
+									setDeletingTaskId(null);
+									setEraseTask(false);
+								}}
 							>
 								Cancel
 							</Button>
 							<Button variant="destructive" onPress={handleDeleteTask}>
-								Delete Task
+								{eraseTask ? "Erase Task" : "Delete Task"}
 							</Button>
 						</DialogFooter>
 					</div>

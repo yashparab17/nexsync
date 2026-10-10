@@ -27,6 +27,17 @@ pub struct Tombstone {
     pub entity: String,
     pub id: String,
     pub deleted_at: String,
+    /// The record was erased for good, not only deleted: a device that was away scrubs its history of it too
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub erased: bool,
+}
+
+/// A file or folder that was erased for good, and when
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ErasedPath {
+    pub path: String,
+    pub erased_at: String,
 }
 
 /// A kanban column without its cards
@@ -44,6 +55,9 @@ pub struct DataState {
     pub columns: Vec<ColumnRecord>,
     pub cards: Vec<KanbanCard>,
     pub tombstones: Vec<Tombstone>,
+    /// Files and folders erased for good; absent from a device that predates erasing
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub erased_paths: Vec<ErasedPath>,
 }
 
 fn parse_time(s: &str) -> Option<DateTime<Utc>> {
@@ -165,9 +179,16 @@ pub fn export_state(conn: &Connection, ws_id: &str) -> Result<DataState, String>
         .collect::<Result<Vec<_>, _>>()
         .map_err(e)?;
     let tombstones = conn
-        .prepare("SELECT entity, id, deleted_at FROM tombstones WHERE workspace_id = ?1")
+        .prepare("SELECT entity, id, deleted_at, erased FROM tombstones WHERE workspace_id = ?1")
         .map_err(e)?
-        .query_map([ws_id], |r| Ok(Tombstone { entity: r.get(0)?, id: r.get(1)?, deleted_at: r.get(2)? }))
+        .query_map([ws_id], |r| Ok(Tombstone { entity: r.get(0)?, id: r.get(1)?, deleted_at: r.get(2)?, erased: r.get::<_, i64>(3)? != 0 }))
+        .map_err(e)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(e)?;
+    let erased_paths = conn
+        .prepare("SELECT path, erased_at FROM erased_paths")
+        .map_err(e)?
+        .query_map([], |r| Ok(ErasedPath { path: r.get(0)?, erased_at: r.get(1)? }))
         .map_err(e)?
         .collect::<Result<Vec<_>, _>>()
         .map_err(e)?;
@@ -178,7 +199,7 @@ pub fn export_state(conn: &Connection, ws_id: &str) -> Result<DataState, String>
     for c in &mut cards {
         crdt::attach(conn, c)?;
     }
-    Ok(DataState { tasks, columns, cards, tombstones })
+    Ok(DataState { tasks, columns, cards, tombstones, erased_paths })
 }
 
 pub fn read_task(conn: &Connection, id: &str) -> Result<Option<Task>, String> {
@@ -356,11 +377,15 @@ pub fn merge_state(conn: &Connection, ws_id: &str, remote: DataState) -> Result<
             tx.execute(&format!("DELETE FROM {table} WHERE id = ?1"), [&t.id]).map_err(e)?;
             changed = true;
         }
+        if t.erased && matches!(t.entity.as_str(), ENTITY_TASK | ENTITY_CARD) {
+            super::erase::scrub_record(&tx, &t.entity, &t.id)?;
+            changed = true;
+        }
         let key = (t.entity.clone(), t.id.clone());
-        if tombs.get(&key).is_none_or(|old| is_later(&t.deleted_at, old)) {
+        if t.erased || tombs.get(&key).is_none_or(|old| is_later(&t.deleted_at, old)) {
             tx.execute(
-                "INSERT OR REPLACE INTO tombstones (workspace_id, entity, id, deleted_at) VALUES (?1, ?2, ?3, ?4)",
-                params![ws_id, t.entity, t.id, t.deleted_at],
+                "INSERT OR REPLACE INTO tombstones (workspace_id, entity, id, deleted_at, erased) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![ws_id, t.entity, t.id, t.deleted_at, t.erased],
             )
             .map_err(e)?;
             tombs.insert(key, t.deleted_at.clone());
@@ -475,7 +500,11 @@ pub fn export_for(path: &str) -> Result<DataState, String> {
 pub fn merge_into(path: &str, remote: DataState) -> Result<bool, String> {
     let db = crate::database::WorkspaceDb::open_existing(path)?;
     let ws_id = get_workspace_id(&db)?;
-    merge_state(&db.conn, &ws_id, remote)
+    let erasures = remote.erased_paths.clone();
+    let changed = merge_state(&db.conn, &ws_id, remote)?;
+    // Files another device erased for good are erased here too
+    let erased_files = super::erase::apply_remote_erasures(&db, path, &erasures)?;
+    Ok(changed || erased_files)
 }
 
 // ────────────────────────────
@@ -557,6 +586,23 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_write_stamped_days_ahead_is_refused_and_one_a_few_hours_ahead_is_taken() {
+        use crate::commands::workspace::crdt::{self, Crdt};
+        let conn = db("w");
+        let mut remote = task("t1", "hello", "2026-01-01T00:00:00Z");
+        let day = 24 * 60 * 60 * 1000;
+        let mut state = crdt::RecordState::from_legacy(remote.paths(false), 1_000);
+        state.write("far", "title", serde_json::json!("hijack"), crdt::now_ms() + 3 * day, None);
+        remote.crdt = Some(state);
+        assert!(crdt::merge_remote(&conn, &remote, None, |_| true).unwrap().is_none(), "a stamp three days ahead was taken");
+        let mut near = task("t2", "hello", "2026-01-01T00:00:00Z");
+        let mut state = crdt::RecordState::from_legacy(near.paths(false), 1_000);
+        state.write("near", "title", serde_json::json!("fine"), crdt::now_ms() + 3 * 60 * 60 * 1000, None);
+        near.crdt = Some(state);
+        assert!(crdt::merge_remote(&conn, &near, None, |_| true).unwrap().is_some(), "a stamp three hours ahead was refused");
+    }
+
     // What a record says apart from the merge bookkeeping: tags are kept in a fixed order and times are instants
     fn plain_task(t: &Task) -> Task {
         let mut t = Task { crdt: None, updated_at: crdt::rfc3339_of(crdt::ts_of(&t.updated_at)), ..t.clone() };
@@ -625,7 +671,8 @@ mod tests {
     fn test_edit_after_deletion_survives() {
         let a = db("a");
         record_tombstone(&a, "a", ENTITY_TASK, "1").unwrap();
-        put_task(&a, "a", &task("1", "revived", "2999-01-01T00:00:00Z"));
+        // An edit made an hour from now: after the deletion, and not so far ahead that the clock check refuses it
+        put_task(&a, "a", &task("1", "revived", &(Utc::now() + chrono::Duration::hours(1)).to_rfc3339()));
         assert_eq!(titles(&a, "a"), vec![("1".into(), "revived".into())]);
         assert!(export_state(&a, "a").unwrap().tombstones.is_empty());
     }
@@ -735,7 +782,7 @@ mod tests {
         assert_eq!((home.cards.len(), home.cards[0].column_id.as_str()), (1, "c1"));
 
         // Deleting the column removes its cards, and the old column can't come back.
-        let tomb = Tombstone { entity: ENTITY_COLUMN.into(), id: "c1".into(), deleted_at: "2999-01-01T00:00:00Z".into() };
+        let tomb = Tombstone { entity: ENTITY_COLUMN.into(), id: "c1".into(), deleted_at: "2999-01-01T00:00:00Z".into(), erased: false };
         merge_state(&a, "a", DataState { tombstones: vec![tomb], ..Default::default() }).unwrap();
         let s = export_state(&a, "a").unwrap();
         assert!(s.columns.iter().all(|c| c.id == RECOVERED_COLUMN) && s.cards.is_empty());

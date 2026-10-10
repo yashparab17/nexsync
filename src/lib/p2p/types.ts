@@ -53,11 +53,12 @@ export interface WorkspaceSyncFileItem {
 // One task or kanban edit, sent as the payload of a DATA_CHANGE message
 export type DataChange =
 	| { entity: "task"; op: "upsert"; task: Task }
-	| { entity: "task"; op: "delete"; id: string }
+	| { entity: "task"; op: "delete"; id: string; erase?: boolean }
 	| { entity: "column"; op: "upsert"; column: KanbanColumn }
 	| { entity: "column"; op: "delete"; id: string }
 	| { entity: "card"; op: "upsert"; card: KanbanCard }
-	| { entity: "card"; op: "delete"; id: string };
+	| { entity: "card"; op: "delete"; id: string; erase?: boolean }
+	| { entity: "file"; op: "erase"; path: string; docIds: string[] };
 
 // Workspace state sent by a host to a guest that asks for it
 export interface WorkspaceSyncSnapshot {
@@ -84,4 +85,7 @@ export interface ConnectedPeerInfo {
 	connectedAt: number;
 	connectionType: PeerConnectionType;
 	isHost: boolean; // True for the host whose workspace we joined
+	appVersion?: string; // The Nexsync version the other device announced, when it announced one
+	needsUpdate?: boolean; // True when it stores data in a newer format than this app understands
+	clockSkewMs?: number | null; // How far its clock is ahead of this device's (negative: behind), when it has said
 }

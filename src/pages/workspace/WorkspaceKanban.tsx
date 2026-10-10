@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import EraseOption from "@/components/elements/EraseOption";
 import {
 	Dialog,
 	DialogDescription,
@@ -32,6 +33,7 @@ import {
 	createKanbanCard,
 	createKanbanColumn,
 	deleteKanbanCard,
+	eraseRecordForGood,
 	deleteKanbanColumn,
 	getBoardDraft,
 	getKanban,
@@ -82,6 +84,7 @@ export default function WorkspaceKanban() {
 	const [editingCard, setEditingCard] = useState<KanbanCard | null>(null);
 	useReportItem(editingCard?.id ?? null);
 	const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
+	const [eraseCard, setEraseCard] = useState(false);
 	const [deletingColId, setDeletingColId] = useState<string | null>(null);
 
 	const [submitting, setSubmitting] = useState(false);
@@ -388,14 +391,21 @@ export default function WorkspaceKanban() {
 					break;
 				}
 			}
-			await deleteKanbanCard({ path: workspace.path, id: deletingCardId });
-			publishDataChange({ entity: "card", op: "delete", id: deletingCardId });
-			await addActivityEvent(
-				"Deleted card",
-				`Deleted card "${deletedTitle}"`,
-				itemTarget("card", deletingCardId),
-				"kanban",
-			);
+			if (eraseCard) {
+				// No activity entry: it would put the title back into the history that is being erased
+				await eraseRecordForGood(workspace.path, "card", deletingCardId);
+				publishDataChange({ entity: "card", op: "delete", id: deletingCardId, erase: true });
+			} else {
+				await deleteKanbanCard({ path: workspace.path, id: deletingCardId });
+				publishDataChange({ entity: "card", op: "delete", id: deletingCardId });
+				await addActivityEvent(
+					"Deleted card",
+					`Deleted card "${deletedTitle}"`,
+					itemTarget("card", deletingCardId),
+					"kanban",
+				);
+			}
+			setEraseCard(false);
 			setDeletingCardId(null);
 			await loadKanban();
 			await refreshMetadata();
@@ -991,7 +1001,12 @@ export default function WorkspaceKanban() {
 			{deletingCardId && (
 				<Dialog
 					isOpen={!!deletingCardId}
-					onOpenChange={(open) => !open && setDeletingCardId(null)}
+					onOpenChange={(open) => {
+						if (!open) {
+							setDeletingCardId(null);
+							setEraseCard(false);
+						}
+					}}
 				>
 					<div className="space-y-4">
 						<DialogHeader>
@@ -1000,13 +1015,20 @@ export default function WorkspaceKanban() {
 								Are you sure you want to delete this card?
 							</DialogDescription>
 						</DialogHeader>
+						<EraseOption checked={eraseCard} onChange={setEraseCard} what="the card" />
 
 						<DialogFooter>
-							<Button variant="outline" onPress={() => setDeletingCardId(null)}>
+							<Button
+								variant="outline"
+								onPress={() => {
+									setDeletingCardId(null);
+									setEraseCard(false);
+								}}
+							>
 								Cancel
 							</Button>
 							<Button variant="destructive" onPress={handleDeleteCard}>
-								Delete Card
+								{eraseCard ? "Erase Card" : "Delete Card"}
 							</Button>
 						</DialogFooter>
 					</div>

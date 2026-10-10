@@ -1,6 +1,6 @@
 // Applies collaborators' task and kanban edits to the local workspace database
 
-import { createKanbanColumn, deleteKanbanCard, deleteKanbanColumn, deleteTask, mergeCardRecord, mergeTaskRecord } from "@/lib/tauri";
+import { createKanbanColumn, deleteKanbanCard, deleteKanbanColumn, deleteTask, eraseFileForGood, eraseRecordForGood, mergeCardRecord, mergeTaskRecord } from "@/lib/tauri";
 import type { KanbanCard, Task } from "@/types/workspace";
 import type { DataChange } from "./types";
 
@@ -18,6 +18,7 @@ export async function applyDataChange(path: string, change: DataChange): Promise
 	switch (change.entity) {
 		case "task":
 			if (change.op === "upsert") await upsertTask(path, change.task);
+			else if (change.erase) await eraseRecordForGood(path, "task", change.id);
 			else await deleteTask({ path, id: change.id });
 			break;
 		case "column":
@@ -30,7 +31,12 @@ export async function applyDataChange(path: string, change: DataChange): Promise
 			break;
 		case "card":
 			if (change.op === "upsert") await upsertKanbanCard(path, change.card);
+			else if (change.erase) await eraseRecordForGood(path, "card", change.id);
 			else await deleteKanbanCard({ path, id: change.id });
+			break;
+		case "file":
+			// Another device erased a file for good; the same is done here
+			await eraseFileForGood(path, change.path, change.docIds);
 			break;
 	}
 }

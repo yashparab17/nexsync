@@ -7,11 +7,16 @@ pub mod workspace;
 pub mod loaders;
 pub mod crdt;
 pub mod catchup;
+pub mod erase;
 pub mod invariants;
 pub mod signing;
 pub mod drafts;
 #[cfg(test)]
 mod crdt_sim;
+#[cfg(test)]
+mod clock_sim;
+#[cfg(test)]
+mod reach_sim;
 pub mod filesystem;
 pub mod registry;
 pub mod tasks;
@@ -31,6 +36,7 @@ pub use registry::*;
 pub use tasks::*;
 pub use kanban::*;
 pub use trash::*;
+pub use erase::*;
 pub use workspace_delete::*;
 pub use yjs::*;
 pub use error_log::*;

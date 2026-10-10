@@ -84,6 +84,20 @@ fn stash(workspace: &str, local: &Path, rel: &str, keep_original: bool) -> io::R
     fs::write(entry.join(ORIGIN_FILE), rel)
 }
 
+/// Deletes every trash entry that holds `rel` or something inside it; used when a file is erased for good. Returns how many.
+pub fn erase_matching(workspace: &str, rel: &str) -> usize {
+    let Ok(rd) = fs::read_dir(trash_root(workspace)) else { return 0 };
+    let inside = format!("{rel}/");
+    let mut gone = 0;
+    for entry in rd.flatten() {
+        let origin = origin_of(&entry.path());
+        if (origin == rel || origin.starts_with(&inside)) && fs::remove_dir_all(entry.path()).is_ok() {
+            gone += 1;
+        }
+    }
+    gone
+}
+
 /// Total size of a file or directory tree.
 fn tree_size(path: &Path) -> u64 {
     match fs::symlink_metadata(path) {

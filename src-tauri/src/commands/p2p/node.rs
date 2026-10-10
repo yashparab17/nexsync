@@ -24,7 +24,7 @@ use tokio::{
 };
 
 use super::{
-    files,
+    clock, files,
     membership::{self, Membership},
     mesh::{self, MeshAllow},
     short_code::ShortCodes,
@@ -75,6 +75,8 @@ const KIND_PRESENCE: &str = "PRESENCE";
 const KIND_NAME_REQUEST: &str = "NAME_REQUEST";
 /// A version of the signed member list; any device may pass one on, and each takes it only if it is genuine and newer
 const KIND_MEMBERSHIP: &str = "MEMBERSHIP";
+/// Sent to every peer now and then: the sender's own clock, so a clock that is minutes out is noticed (see `clock`)
+const KIND_CLOCK: &str = "CLOCK";
 /// The host telling guests whether the workspace needs the host online to be worked in; only accepted from the host
 const KIND_POLICY_UPDATE: &str = "POLICY_UPDATE";
 /// An Admin guest asking the host to change that; only delivered to the host
@@ -250,6 +252,12 @@ pub struct PeerInfo {
     pub connection_type: &'static str,
     /// True when this peer is the host whose workspace we joined
     pub is_host: bool,
+    /// The Nexsync version the other device announced, when it announced one
+    pub app_version: Option<String>,
+    /// True when the other device runs a newer storage format than this app, so it should be updated
+    pub needs_update: bool,
+    /// How far the other device's clock is ahead of this one's (negative: behind), when it has said; shown when large
+    pub clock_skew_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -317,11 +325,17 @@ struct PeerIdentity {
     role: String,
     is_host: bool,
     mesh: bool,
+    versions: Option<wire::Versions>,
 }
 
 impl PeerIdentity {
     fn guest(name: String, role: String, mesh: bool) -> Self {
-        Self { name, role, is_host: false, mesh }
+        Self { name, role, is_host: false, mesh, versions: None }
+    }
+
+    fn versions(mut self, versions: Option<wire::Versions>) -> Self {
+        self.versions = versions;
+        self
     }
 }
 
@@ -334,6 +348,8 @@ struct Peer {
     /// True for a link made directly between two guests rather than through the host
     mesh: bool,
     connected_at: u64,
+    /// What the other device announced it runs, when it announced anything
+    versions: Option<wire::Versions>,
 }
 
 #[derive(Default)]
@@ -361,6 +377,8 @@ struct NodeState {
     pending_membership: Option<Membership>,
     /// Members being dialed right now, so one is not dialed twice
     dialing: std::collections::HashSet<EndpointId>,
+    /// What the linked devices say the time is, to notice and correct a clock that is out
+    skew: clock::SkewWatch,
     /// Whether this device has looked for the other members since its list was loaded. Until it has, its list may be out of
     /// date, so it does not let a member in by key: otherwise a removed member could get in during the moments after a
     /// device that missed their removal comes back online.
@@ -662,6 +680,8 @@ impl Node {
         let mut member_link = false;
         let verdict = if hello.v != wire::PROTOCOL_VERSION {
             Err("You're running a different version of Nexsync than the host. Update both apps and try again.".to_string())
+        } else if let Err(e) = wire::check_versions(hello.versions.as_ref()) {
+            Err(e)
         } else if let Some(allow) = &mesh_peer {
             Ok(HandshakeReply::Welcome {
                 v: wire::PROTOCOL_VERSION,
@@ -669,6 +689,7 @@ impl Node {
                 role: allow.role.clone(),
                 workspace_id: String::new(),
                 workspace_name: String::new(),
+                versions: Some(wire::Versions::ours()),
             })
         } else if let Some(welcome) = self.check_known_member(&conn.remote_id()) {
             // A device that is not the owner and is let in as a member is another member's direct link, not a guest of a host
@@ -686,8 +707,8 @@ impl Node {
                 let role = role.clone();
                 wire::write_json(&mut send, &welcome).await?;
                 match mesh_peer {
-                    Some(allow) => self.register_peer(conn, send, recv, PeerIdentity::guest(allow.name, role, true)),
-                    None => self.register_peer(conn, send, recv, PeerIdentity::guest(sanitize_name(&hello.name), role, member_link)),
+                    Some(allow) => self.register_peer(conn, send, recv, PeerIdentity::guest(allow.name, role, true).versions(hello.versions.clone())),
+                    None => self.register_peer(conn, send, recv, PeerIdentity::guest(sanitize_name(&hello.name), role, member_link).versions(hello.versions.clone())),
                 }
                 Ok(())
             }
@@ -797,6 +818,30 @@ impl Node {
         for id in removed_now {
             let _ = self.disconnect(&id);
         }
+    }
+
+    /// Tells one peer, or all of them, what this device's clock reads
+    fn push_clock(&self, to: Option<EndpointId>) {
+        let message = serde_json::json!({ "kind": KIND_CLOCK, "timestamp": now_ms() });
+        let Ok(bytes) = serde_json::to_vec(&message) else { return };
+        let outboxes: Vec<mpsc::Sender<Vec<u8>>> = self.lock().peers.iter().filter(|(id, _)| to.is_none_or(|t| **id == t)).map(|(_, p)| p.outbox.clone()).collect();
+        tokio::spawn(async move {
+            for outbox in outboxes {
+                let _ = outbox.send(bytes.clone()).await;
+            }
+        });
+    }
+
+    /// A peer told us its clock reading. Keep it, and move this device's own stamps to the middle of the clocks of the
+    /// devices it is linked to (nothing happens unless they differ by a minute or more).
+    fn on_clock(&self, from: &EndpointId, message: &serde_json::Value) {
+        let Some(theirs) = message.get("timestamp").and_then(|t| t.as_u64()) else { return };
+        let mut st = self.lock();
+        st.skew.observe(*from, theirs, now_ms());
+        let linked: Vec<EndpointId> = st.peers.keys().copied().collect();
+        let correction = st.skew.correction(&linked);
+        drop(st);
+        crate::commands::workspace::crdt::set_clock_correction(correction);
     }
 
     /// Sends this device's list to one peer, or to all but `except`; a device that is behind then catches up, and a
@@ -911,7 +956,7 @@ impl Node {
         let stale: Vec<String> = {
             let st = self.lock();
             match &st.membership {
-                Some(m) if !m.vouches(&mine, now_ms()) => st.peers.iter().filter(|(_, p)| p.mesh && !p.is_host).map(|(id, _)| id.to_string()).collect(),
+                Some(m) if !m.vouches(&mine, lease_now()) => st.peers.iter().filter(|(_, p)| p.mesh && !p.is_host).map(|(id, _)| id.to_string()).collect(),
                 _ => Vec::new(),
             }
         };
@@ -927,7 +972,7 @@ impl Node {
         let mine = self.endpoint.id().to_string();
         let mut st = self.lock();
         let Some(m) = &st.membership else { return Vec::new() };
-        if m.owner == mine || m.role_of(&mine).is_none() || m.lease_expired(now_ms()) {
+        if m.owner == mine || m.role_of(&mine).is_none() || m.lease_expired(lease_now()) {
             return Vec::new();
         }
         let ids: Vec<EndpointId> = m
@@ -945,11 +990,17 @@ impl Node {
     /// Looks for the other members by key every so often, which is what keeps a workspace working when the host is away
     async fn member_loop(self: Arc<Self>) {
         tokio::time::sleep(Duration::from_secs(2)).await;
+        let mut tick = 0u32;
         loop {
             self.refresh_lease();
             self.drop_stale_links();
             if !self.lock().caught_up {
                 self.look_for_the_others().await;
+            }
+            // About once a minute, say what this device's clock reads
+            tick += 1;
+            if tick % 6 == 1 {
+                self.push_clock(None);
             }
             for id in self.member_targets() {
                 tokio::spawn(self.clone().dial_member(id));
@@ -982,15 +1033,19 @@ impl Node {
         // No secret: the other device knows this one's key from the member list
         wire::write_json(
             &mut send,
-            &Hello { v: wire::PROTOCOL_VERSION, secret: ticket::encode_secret(&[0u8; SECRET_LEN]), name: "Member".to_string(), probe: false },
+            &Hello { v: wire::PROTOCOL_VERSION, secret: ticket::encode_secret(&[0u8; SECRET_LEN]), name: "Member".to_string(), probe: false, versions: Some(wire::Versions::ours()) },
         )
         .await?;
         let reply: HandshakeReply = tokio::time::timeout(HANDSHAKE_TIMEOUT, wire::read_json(&mut recv, wire::MAX_SMALL_FRAME))
             .await
             .map_err(|_| "no answer".to_string())??;
         match reply {
-            HandshakeReply::Welcome { workspace_id: theirs, .. } if theirs == workspace_id => {
-                self.register_peer(conn, send, recv, PeerIdentity::guest("Member".to_string(), role, true));
+            HandshakeReply::Welcome { workspace_id: theirs, versions, .. } if theirs == workspace_id => {
+                if let Err(e) = wire::check_versions(versions.as_ref()) {
+                    conn.close(CLOSE_REJECTED.into(), b"format mismatch");
+                    return Err(e);
+                }
+                self.register_peer(conn, send, recv, PeerIdentity::guest("Member".to_string(), role, true).versions(versions));
                 Ok(())
             }
             HandshakeReply::Welcome { .. } => {
@@ -1036,7 +1091,7 @@ impl Node {
         send.write_all(&[wire::STREAM_CONTROL]).await.map_err(|e| e.to_string())?;
         wire::write_json(
             &mut send,
-            &Hello { v: wire::PROTOCOL_VERSION, secret: ticket::encode_secret(&[0u8; SECRET_LEN]), name: "Member".to_string(), probe: true },
+            &Hello { v: wire::PROTOCOL_VERSION, secret: ticket::encode_secret(&[0u8; SECRET_LEN]), name: "Member".to_string(), probe: true, versions: Some(wire::Versions::ours()) },
         )
         .await?;
         let reply: Result<HandshakeReply, String> =
@@ -1096,7 +1151,7 @@ impl Node {
         }
         // A device that is not the owner and has not had a fresh list for a day does not vouch for anyone: it may have missed
         // a removal, and this is what stops it being a way back in for the removed
-        if st.membership.as_ref().is_some_and(|m| !m.vouches(&self.endpoint.id().to_string(), now_ms())) {
+        if st.membership.as_ref().is_some_and(|m| !m.vouches(&self.endpoint.id().to_string(), lease_now())) {
             return None;
         }
         if !st.caught_up && st.membership.as_ref().is_some_and(|m| m.owner != self.endpoint.id().to_string()) {
@@ -1109,6 +1164,7 @@ impl Node {
             role,
             workspace_id: st.known.workspace_id.clone(),
             workspace_name: st.known.workspace_name.clone(),
+            versions: Some(wire::Versions::ours()),
         })
     }
 
@@ -1136,6 +1192,7 @@ impl Node {
             role,
             workspace_id: invite.workspace_id.clone(),
             workspace_name: invite.workspace_name.clone(),
+            versions: Some(wire::Versions::ours()),
         };
         if invite.single_use {
             st.invite = None;
@@ -1186,6 +1243,7 @@ impl Node {
                 secret: ticket::encode_secret(&ticket.secret),
                 name: sanitize_name(display_name),
                 probe: false,
+                versions: Some(wire::Versions::ours()),
             },
         )
         .await
@@ -1206,14 +1264,19 @@ impl Node {
                 role,
                 workspace_id,
                 workspace_name,
+                versions,
             } => {
                 if v != wire::PROTOCOL_VERSION {
                     conn.close(CLOSE_REJECTED.into(), b"version mismatch");
                     return Err(("The host is running a different version of Nexsync. Update both apps and try again.".into(), true));
                 }
+                if let Err(e) = wire::check_versions(versions.as_ref()) {
+                    conn.close(CLOSE_REJECTED.into(), b"format mismatch");
+                    return Err((e, true));
+                }
                 let host_name = sanitize_name(&host_name);
                 self.lock().last_join = Some((ticket_str.to_string(), display_name.to_string()));
-                self.register_peer(conn, send, recv, PeerIdentity { name: host_name.clone(), role: role.clone(), is_host: true, mesh: false });
+                self.register_peer(conn, send, recv, PeerIdentity { name: host_name.clone(), role: role.clone(), is_host: true, mesh: false, versions });
                 Ok(JoinResult {
                     peer_id: host_id.to_string(),
                     workspace_id,
@@ -1245,7 +1308,7 @@ impl Node {
         recv: RecvStream,
         who: PeerIdentity,
     ) {
-        let PeerIdentity { name, role, is_host, mesh } = who;
+        let PeerIdentity { name, role, is_host, mesh, versions } = who;
         let id = conn.remote_id();
         let (outbox, rx) = mpsc::channel(OUTBOX_CAPACITY);
         let peer = Peer {
@@ -1256,8 +1319,9 @@ impl Node {
             is_host,
             mesh,
             connected_at: now_ms(),
+            versions,
         };
-        let info = peer_info(&id, &peer);
+        let info = peer_info(&id, &peer, None);
 
         let replaced = {
             let mut st = self.lock();
@@ -1285,6 +1349,7 @@ impl Node {
         tokio::spawn(sync::send_catch_up(self.clone(), id.to_string()));
         // Each side tells the other which version of the member list it holds, so whichever is behind catches up
         self.push_membership(Some(id), None);
+        self.push_clock(Some(id));
     }
 
     /// Reads app messages and serves file requests until the connection ends
@@ -1437,6 +1502,12 @@ impl Node {
         // Who belongs to the workspace is settled by signed lists, which the backend checks itself
         if kind == KIND_MEMBERSHIP {
             self.on_membership(from, &message);
+            return;
+        }
+
+        // A peer's clock reading: kept, and our own stamps are moved toward the middle of the linked clocks
+        if kind == KIND_CLOCK {
+            self.on_clock(from, &message);
             return;
         }
 
@@ -1611,6 +1682,7 @@ impl Node {
                 secret: ticket::encode_secret(&allow.token),
                 name: "Guest".to_string(),
                 probe: false,
+                versions: Some(wire::Versions::ours()),
             },
         )
         .await?;
@@ -1619,8 +1691,12 @@ impl Node {
                 .await
                 .map_err(|_| "no answer".to_string())??;
         match reply {
-            HandshakeReply::Welcome { .. } => {
-                self.register_peer(conn, send, recv, PeerIdentity::guest(allow.name.clone(), allow.role.clone(), true));
+            HandshakeReply::Welcome { versions, .. } => {
+                if let Err(e) = wire::check_versions(versions.as_ref()) {
+                    conn.close(CLOSE_REJECTED.into(), b"format mismatch");
+                    return Err(e);
+                }
+                self.register_peer(conn, send, recv, PeerIdentity::guest(allow.name.clone(), allow.role.clone(), true).versions(versions));
                 Ok(())
             }
             HandshakeReply::Reject { error } => {
@@ -1695,7 +1771,10 @@ impl Node {
         let removed = {
             let mut st = self.lock();
             match st.peers.get(id) {
-                Some(peer) if peer.conn.stable_id() == stable_id => st.peers.remove(id),
+                Some(peer) if peer.conn.stable_id() == stable_id => {
+                    st.skew.forget(id);
+                    st.peers.remove(id)
+                }
                 _ => None,
             }
         };
@@ -1712,6 +1791,7 @@ impl Node {
         let id = parse_peer_id(peer_id)?;
         let removed = {
             let mut st = self.lock();
+            st.skew.forget(&id);
             let removed = st.peers.remove(&id);
             if removed.as_ref().is_some_and(|p| p.is_host) {
                 st.last_join = None;
@@ -1784,7 +1864,7 @@ impl Node {
 
     pub fn peers(&self) -> Vec<PeerInfo> {
         let st = self.lock();
-        let mut peers: Vec<PeerInfo> = st.peers.iter().map(|(id, p)| peer_info(id, p)).collect();
+        let mut peers: Vec<PeerInfo> = st.peers.iter().map(|(id, p)| peer_info(id, p, st.skew.offset_of(id))).collect();
         peers.sort_by_key(|p| p.connected_at);
         peers
     }
@@ -1833,7 +1913,7 @@ fn is_hosting(st: &NodeState) -> bool {
     st.last_join.is_none() && st.peers.values().all(|p| !p.is_host)
 }
 
-fn peer_info(id: &EndpointId, peer: &Peer) -> PeerInfo {
+fn peer_info(id: &EndpointId, peer: &Peer, skew: Option<i64>) -> PeerInfo {
     let paths = peer.conn.paths();
     let selected = paths.iter().find(|p| p.is_selected());
     let (latency_ms, connection_type) = match selected {
@@ -1856,6 +1936,9 @@ fn peer_info(id: &EndpointId, peer: &Peer) -> PeerInfo {
         connected_at: peer.connected_at,
         connection_type,
         is_host: peer.is_host,
+        app_version: peer.versions.as_ref().map(|v| v.app.clone()),
+        needs_update: wire::check_versions(peer.versions.as_ref()) == Ok(wire::Skew::TheyAreNewer),
+        clock_skew_ms: skew,
     }
 }
 
@@ -1881,6 +1964,13 @@ pub(super) fn now_ms() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
+}
+
+/// The time the lease of the member list is read against: the device clock moved to the middle of the linked devices'
+/// clocks (see `clock.rs`), not the bare clock. A clock set a day back would otherwise never let a list run out, and one
+/// set a day ahead would refuse a list that is still good (RESEARCH.md §8h). The clock watch itself reads the bare clock.
+fn lease_now() -> u64 {
+    crate::commands::workspace::crdt::now_ms()
 }
 
 #[cfg(test)]
@@ -2877,6 +2967,69 @@ mod tests {
         let mut empty = serde_json::json!({ "kind": KIND_VERSION_NAMED, "author": "" });
         stamp_author(&mut empty, "Host", "key-host", true);
         assert_eq!(empty["author"], "Host");
+    }
+
+    #[test]
+    fn test_the_lease_is_read_against_the_corrected_clock() {
+        use crate::commands::workspace::crdt::set_clock_correction;
+        let owner = SecretKey::from_bytes(&[1u8; 32]);
+        let list = membership::next(None, &owner, "ws", "w", vec![(SecretKey::from_bytes(&[2u8; 32]).public().to_string(), "Editor".into())]).unwrap().unwrap();
+        let me = SecretKey::from_bytes(&[2u8; 32]).public().to_string();
+        // A list the owner signed just now
+        set_clock_correction(0);
+        assert!(list.vouches(&me, lease_now()));
+        // This device's clock reads a day and an hour behind the others, so the watch moves it forward: the list has run out
+        set_clock_correction(25 * 60 * 60 * 1000);
+        let (expired, corrected) = (list.lease_expired(lease_now()), lease_now() > now_ms() + 24 * 60 * 60 * 1000);
+        // And a device whose clock was set a day back, moved forward by the watch, no longer treats an old list as good
+        set_clock_correction(0);
+        assert!(expired && corrected, "the lease did not follow the corrected clock");
+        assert!(!list.lease_expired(lease_now()));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_an_erasure_made_while_a_device_was_away_reaches_it_over_a_real_link() {
+        use crate::commands::workspace::{data_sync, erase};
+        const MARKER: &str = "ZEBRA-4410-MARKER";
+        let host = start_test_node("er-host").await;
+        let guest = start_test_node("er-guest").await;
+        let note = |n: &TestNode| n.dir.join("notes").join("secret.md");
+        let has_marker = |n: &TestNode| -> bool {
+            fn walk(dir: &std::path::Path) -> bool {
+                std::fs::read_dir(dir).into_iter().flatten().flatten().any(|e| {
+                    let p = e.path();
+                    if p.is_dir() { walk(&p) } else { std::fs::read(&p).map(|b| b.windows(MARKER.len()).any(|w| w == MARKER.as_bytes())).unwrap_or(false) }
+                })
+            }
+            walk(&n.dir)
+        };
+        // Both hold the same task and note; the host then erases them while the guest is away
+        for n in [&host, &guest] {
+            seed_workspace(n, vec![test_task("keep", "kept task", "2026-01-02T00:00:00Z"), test_task("secret", &format!("plan {MARKER}"), "2026-01-02T00:00:00Z")]);
+            std::fs::write(note(n), format!("# note\n{MARKER}\n")).unwrap();
+        }
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        {
+            let dir = host.dir.to_string_lossy().into_owned();
+            let db = crate::database::WorkspaceDb::open(&dir).unwrap();
+            erase::erase_record(&db.conn, "ws", "task", "secret").unwrap();
+            erase::erase_file(&db, &dir, "notes/secret.md", &[]).unwrap();
+        }
+        assert!(!has_marker(&host), "the host should hold nothing after erasing");
+
+        let invite = host.node.create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into()).await.unwrap();
+        guest.node.join(&invite.ticket, "Guesty").await.unwrap();
+
+        wait_until("the guest erases the task", || task_titles(&guest) == vec!["kept task".to_string()]).await;
+        wait_until("the guest erases the note", || !note(&guest).exists()).await;
+        wait_until("nothing of it is left on the guest's disk", || !has_marker(&guest)).await;
+        // And it did not come back to the host
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        assert_eq!(task_titles(&host), vec!["kept task".to_string()]);
+        assert!(!note(&host).exists(), "the note came back to the host");
+        assert!(!has_marker(&host), "the marker is back on the host");
+        let _ = data_sync::export_for(&guest.dir.to_string_lossy()).unwrap();
     }
 
     #[test]

@@ -36,6 +36,7 @@ impl WorkspaceDb {
 		conn.execute_batch(
 			"PRAGMA journal_mode = WAL;
 			 PRAGMA foreign_keys = ON;
+			 PRAGMA secure_delete = ON;
 			 PRAGMA synchronous = NORMAL;
 			 PRAGMA temp_store = MEMORY;
 			 PRAGMA cache_size = -2000;",
@@ -66,6 +67,7 @@ impl WorkspaceDb {
 		conn.execute_batch(
 			"PRAGMA journal_mode = WAL;
 			 PRAGMA foreign_keys = ON;
+			 PRAGMA secure_delete = ON;
 			 PRAGMA synchronous = NORMAL;
 			 PRAGMA temp_store = MEMORY;
 			 PRAGMA cache_size = -2000;",

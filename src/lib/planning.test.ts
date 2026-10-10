@@ -118,14 +118,14 @@ describe("two devices reordering a column at once", () => {
 	// A small deterministic generator, so a failure can be reproduced
 	const rng = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
 
-	function run(plan: Plan, step: number) {
+	function run(plans: [Plan, Plan], step: number) {
 		const rand = rng(7);
 		let broken = 0;
 		let writes = 0;
 		for (let t = 0; t < TRIALS; t++) {
 			const cards = Array.from({ length: N }, (_, i) => card(`c${i}`, "a", i * step));
 			const drops = [0, 1].map(() => ({ id: `c${Math.floor(rand() * N)}`, index: Math.floor(rand() * N) }));
-			const moves = drops.map((d) => plan(cards, d.id, d.index));
+			const moves = drops.map((d, who) => plans[who](cards, d.id, d.index));
 			writes += moves[0].length + moves[1].length;
 			const final = new Map(cards.map((c) => [c.id, c.position]));
 			for (const m of moves.flat()) final.set(m.id, m.position); // device 1 writes last, so it wins a shared field
@@ -147,11 +147,23 @@ describe("two devices reordering a column at once", () => {
 	}
 
 	it("keeps every drop in place with fractional positions, which renumbering does not", () => {
-		const before = run(renumber, 1);
-		const after = run(halving, 1);
+		const before = run([renumber, renumber], 1);
+		const after = run([halving, halving], 1);
 		console.log(`drops misplaced: renumbering ${(before.broken * 100).toFixed(1)}% (${before.writes.toFixed(1)} writes per drop); fractional ${(after.broken * 100).toFixed(1)}% (${after.writes.toFixed(2)} writes per drop)`);
 		expect(before.broken).toBeGreaterThan(0.1);
 		expect(after.broken).toBe(0);
+	});
+
+	// A pair of devices on different versions: one still renumbers the column, the other halves. Nobody has shipped the
+	// renumbering version, so this is the cost of a future skew like it, and the reason a format change needs a plan.
+	it("loses drops when one device renumbers and the other halves, and no translation is built because no release did", () => {
+		const mixed = run([renumber, halving], 1);
+		const mixedOther = run([halving, renumber], 1);
+		console.log(`drops misplaced, mixed pair: old device first ${(mixed.broken * 100).toFixed(1)}%, new device first ${(mixedOther.broken * 100).toFixed(1)}%`);
+		expect(mixed.broken).toBeGreaterThan(0);
+		expect(mixedOther.broken).toBeGreaterThan(0);
+		// Both are worse than two devices that agree on the halving scheme
+		expect(Math.min(mixed.broken, mixedOther.broken)).toBeGreaterThan(run([halving, halving], 1).broken);
 	});
 });
 

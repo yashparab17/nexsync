@@ -149,13 +149,13 @@ pub fn delete_task(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Resu
     let _canonical_path = crate::commands::path_utils::resolve_workspace_path(&request.path, ".")?;
     let db = crate::database::WorkspaceDb::open_existing(&request.path)?;
     let ws_id = get_workspace_id(&db)?;
-    db.conn
-        .execute(
-            "DELETE FROM tasks WHERE id = ?1 AND workspace_id = ?2",
-            [&request.id, &ws_id],
-        )
-        .map_err(|e| e.to_string())?;
-    super::data_sync::record_tombstone(&db.conn, &ws_id, super::data_sync::ENTITY_TASK, &request.id)?;
-    crdt::forget(&db.conn, <Task as crdt::Crdt>::ENTITY, &request.id)?;
+    delete_task_row(&db.conn, &ws_id, &request.id)
+}
+
+/// Deletes a task: its row, a tombstone so peers do not bring it back, and its merge state
+pub(super) fn delete_task_row(conn: &rusqlite::Connection, ws_id: &str, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM tasks WHERE id = ?1 AND workspace_id = ?2", [id, ws_id]).map_err(|e| e.to_string())?;
+    super::data_sync::record_tombstone(conn, ws_id, super::data_sync::ENTITY_TASK, id)?;
+    crdt::forget(conn, <Task as crdt::Crdt>::ENTITY, id)?;
     Ok(())
 }

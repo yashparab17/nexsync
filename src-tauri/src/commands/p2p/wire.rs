@@ -13,6 +13,53 @@ pub const ALPN: &[u8] = b"nexsync/p2p/1";
 /// Bumped whenever the handshake or message format changes incompatibly
 pub const PROTOCOL_VERSION: u32 = 1;
 
+/// Format number of a task or card's merge state (`RecordState`). Raise it only for a change that an older app would
+/// misread; a change that only adds a field does not need it (older apps keep what they cannot read).
+pub const RECORD_FORMAT: u32 = 1;
+
+/// The oldest record format this build still merges with
+pub const MIN_RECORD_FORMAT: u32 = 1;
+
+/// Format number of the signed member list
+pub const LIST_FORMAT: u32 = 1;
+
+/// What a device runs, announced in the handshake. Optional on the wire, so an app from before this existed sends
+/// nothing and is treated as running the first formats.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Versions {
+    pub app: String,
+    pub record: u32,
+    pub list: u32,
+}
+
+impl Versions {
+    pub fn ours() -> Self {
+        Versions { app: env!("CARGO_PKG_VERSION").to_string(), record: RECORD_FORMAT, list: LIST_FORMAT }
+    }
+}
+
+/// How the other device's formats compare with ours
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Skew {
+    /// The same formats
+    Same,
+    /// They run a newer format: link, keep what we cannot read, and tell the person to update
+    TheyAreNewer,
+}
+
+/// Decides whether to link to a device that announced `theirs`. A device that announced nothing is taken to run the
+/// first formats. Only a record format older than the oldest we merge with is refused, and the reason names it.
+pub fn check_versions(theirs: Option<&Versions>) -> Result<Skew, String> {
+    let Some(v) = theirs else { return Ok(Skew::Same) };
+    if v.record < MIN_RECORD_FORMAT {
+        return Err(format!(
+            "That device (Nexsync {}) stores tasks and cards in an older format (record format {}; this app needs {} or newer). Ask them to update.",
+            v.app, v.record, MIN_RECORD_FORMAT
+        ));
+    }
+    Ok(if v.record > RECORD_FORMAT || v.list > LIST_FORMAT { Skew::TheyAreNewer } else { Skew::Same })
+}
+
 /// Opened once by the guest after connecting; carries the handshake then app messages
 pub const STREAM_CONTROL: u8 = 1;
 
@@ -35,6 +82,9 @@ pub struct Hello {
     /// has just come online uses it to learn of a removal before it lets any member in.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub probe: bool,
+    /// The formats this device runs; absent from an app that predates it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub versions: Option<Versions>,
 }
 
 /// Host's answer to a [`Hello`]
@@ -48,6 +98,9 @@ pub enum HandshakeReply {
         role: String,
         workspace_id: String,
         workspace_name: String,
+        /// The formats the host runs; absent from an app that predates it
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        versions: Option<Versions>,
     },
     Reject { error: String },
     /// The answer to a probe: the signed member list this device holds, as JSON, if it holds one
@@ -147,6 +200,42 @@ mod tests {
         write_frame(&mut buf, &[0u8; 100]).await.unwrap();
         let mut reader = buf.as_slice();
         assert!(read_frame(&mut reader, 10).await.is_err());
+    }
+
+    fn theirs(record: u32, list: u32) -> Versions {
+        Versions { app: "9.9.9".into(), record, list }
+    }
+
+    #[test]
+    fn a_device_that_announces_nothing_or_the_same_formats_is_linked() {
+        assert_eq!(check_versions(None), Ok(Skew::Same));
+        assert_eq!(check_versions(Some(&Versions::ours())), Ok(Skew::Same));
+    }
+
+    #[test]
+    fn a_newer_format_is_linked_and_flagged_and_an_older_one_than_we_merge_with_is_refused_by_name() {
+        assert_eq!(check_versions(Some(&theirs(RECORD_FORMAT + 1, LIST_FORMAT))), Ok(Skew::TheyAreNewer));
+        assert_eq!(check_versions(Some(&theirs(RECORD_FORMAT, LIST_FORMAT + 1))), Ok(Skew::TheyAreNewer));
+        let err = check_versions(Some(&theirs(MIN_RECORD_FORMAT - 1, LIST_FORMAT))).unwrap_err();
+        assert!(err.contains("record format 0") && err.contains("9.9.9") && err.contains("update"), "{err}");
+    }
+
+    #[test]
+    fn handshakes_from_before_the_versions_existed_and_from_after_still_read() {
+        // What an app from before this field sent
+        let old = r#"{"v":1,"secret":"s","name":"A"}"#;
+        let hello: Hello = serde_json::from_str(old).unwrap();
+        assert!(hello.versions.is_none() && !hello.probe);
+        // What a later app might send, with a field this one has never heard of
+        let future = r#"{"v":1,"secret":"s","name":"A","versions":{"app":"2.0.0","record":2,"list":1,"theme":"x"},"colour":"red"}"#;
+        let hello: Hello = serde_json::from_str(future).unwrap();
+        assert_eq!(hello.versions.unwrap().record, 2);
+        // And the host's side
+        let welcome = r#"{"type":"welcome","v":1,"hostName":"H","role":"Editor","workspaceId":"w","workspaceName":"W"}"#;
+        assert!(matches!(serde_json::from_str::<HandshakeReply>(welcome).unwrap(), HandshakeReply::Welcome { versions: None, .. }));
+        // This app's own announcement does not add noise when there is nothing to say
+        let ours = serde_json::to_string(&Hello { v: 1, secret: "s".into(), name: "A".into(), probe: false, versions: None }).unwrap();
+        assert!(!ours.contains("versions") && !ours.contains("probe"), "{ours}");
     }
 
     #[tokio::test]

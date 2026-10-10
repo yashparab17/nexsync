@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { followPath, lastSeenText, pageOf, parsePresence, placeLabel, probeText, whoIsAt, type PeerPresence } from "@/lib/p2p/presence";
+import { followPath, lastSeenText, pageOf, parsePresence, placeLabel, probeText, skewText, whoIsAt, type PeerPresence } from "@/lib/p2p/presence";
 
 describe("presence messages", () => {
 	it("accepts a known page and drops anything else", () => {
@@ -53,5 +53,13 @@ describe("saying where", () => {
 		expect(lastSeenText(now - 5 * 60_000, now)).toBe("5 min ago");
 		expect(lastSeenText(now - 3_600_000, now)).toBe("1 hour ago");
 		expect(lastSeenText(now - 50 * 3_600_000, now)).toBe("2 days ago");
+	});
+
+	it("words how far another device's clock is from this one's", () => {
+		expect(skewText(7 * 60_000)).toBe("7 minutes ahead");
+		expect(skewText(-60_000)).toBe("1 minute behind");
+		expect(skewText(-3 * 3_600_000)).toBe("3 hours behind");
+		expect(skewText(86_400_000)).toBe("1 day ahead");
+		expect(skewText(3 * 86_400_000)).toBe("3 days ahead");
 	});
 });

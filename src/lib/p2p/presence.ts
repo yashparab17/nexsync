@@ -81,6 +81,14 @@ export function lastSeenText(at: number, now = Date.now()): string {
 	return `${days} ${days === 1 ? "day" : "days"} ago`;
 }
 
+// "7 minutes ahead", for a device whose clock differs from this one's (positive: its clock is ahead)
+export function skewText(ms: number): string {
+	const mins = Math.round(Math.abs(ms) / 60000);
+	const amount =
+		mins >= 1440 ? `${Math.round(mins / 1440)} ${Math.round(mins / 1440) === 1 ? "day" : "days"}` : mins >= 120 ? `${Math.round(mins / 60)} hours` : `${mins} ${mins === 1 ? "minute" : "minutes"}`;
+	return `${amount} ${ms > 0 ? "ahead" : "behind"}`;
+}
+
 // A setting for this device: join and leave toasts off
 const QUIET_KEY = "nexsync.quietPresence";
 
