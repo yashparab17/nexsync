@@ -2,15 +2,18 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource-variable/jetbrains-mono";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
     --font-heading: var(--font-sans);
+    --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
     --font-sans: 'Plus Jakarta Sans Variable', system-ui, sans-serif;
     --text-xs: 0.8125rem;
     --text-sm: 0.9375rem;
     --text-base: 1.0625rem;
+    --color-edge: var(--edge);
     --color-success: var(--success);
     --color-warning: var(--warning);
     --color-info: var(--info);
@@ -54,80 +57,84 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Catppuccin Latte (light) and Mocha (dark). Page background is always the darkest tone of each (crust);
+   mantle and base step up from it for panels and raised surfaces. Latte's teal, red, green, yellow and blue are
+   deepened from the stock values so they hold 4.5:1 as text on crust. */
 :root {
-    --background: oklch(0.992 0.003 190);
-    --foreground: oklch(0.141 0.005 285.823);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.141 0.005 285.823);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.141 0.005 285.823);
-    --primary: oklch(0.511 0.096 186.391);
-    --primary-foreground: oklch(0.984 0.014 180.72);
-    --secondary: oklch(0.962 0.006 190);
-    --secondary-foreground: oklch(0.21 0.006 285.885);
-    --muted: oklch(0.962 0.006 190);
-    --muted-foreground: oklch(0.52 0.016 285.938);
-    --accent: oklch(0.962 0.006 190);
-    --accent-foreground: oklch(0.21 0.006 285.885);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.91 0.008 190);
-    --input: oklch(0.91 0.008 190);
-    --ring: oklch(0.705 0.015 286.067);
-    --chart-1: oklch(0.855 0.138 181.071);
-    --chart-2: oklch(0.704 0.14 182.503);
-    --chart-3: oklch(0.6 0.118 184.704);
-    --chart-4: oklch(0.511 0.096 186.391);
-    --chart-5: oklch(0.437 0.078 188.216);
+    --background: #dce0e8;            /* crust */
+    --foreground: #4c4f69;            /* text */
+    --card: #eff1f5;                  /* base */
+    --card-foreground: #4c4f69;
+    --popover: #eff1f5;
+    --popover-foreground: #4c4f69;
+    --primary: #0e6269;               /* teal, deepened */
+    --primary-foreground: #eff1f5;
+    --secondary: #ccd0da;             /* surface0 */
+    --secondary-foreground: #4c4f69;
+    --muted: #ccd0da;
+    --muted-foreground: #5c5f77;      /* subtext1 */
+    --accent: #ccd0da;
+    --accent-foreground: #4c4f69;
+    --destructive: #b00d31;
+    --success: #26701a;
+    --warning: #8f5200;
+    --info: #1850c9;
+    --border: #bcc0cc;                /* surface1 */
+    --input: #bcc0cc;
+    --ring: #0e6269;
+    --edge: #acb0be;                  /* surface2: the lip under a keycap button */
+    --chart-1: #7fd3c8;
+    --chart-2: #3fb0a8;
+    --chart-3: #1f8c90;
+    --chart-4: #0e6269;
+    --chart-5: #0a4a50;
     --radius: 0;
-    /* Meaning colours: success = connected/done, warning = needs attention, info = neutral notice. Dark text-safe tones are set in .dark */
-    --success: oklch(0.52 0.12 155);
-    --warning: oklch(0.58 0.13 70);
-    --info: oklch(0.5 0.1 235);
-    --sidebar: oklch(0.975 0.005 190);
-    --sidebar-foreground: oklch(0.141 0.005 285.823);
-    --sidebar-primary: oklch(0.6 0.118 184.704);
-    --sidebar-primary-foreground: oklch(0.984 0.014 180.72);
-    --sidebar-accent: oklch(0.967 0.001 286.375);
-    --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-    --sidebar-border: oklch(0.92 0.004 286.32);
-    --sidebar-ring: oklch(0.705 0.015 286.067);
+    --sidebar: #e6e9ef;               /* mantle */
+    --sidebar-foreground: #4c4f69;
+    --sidebar-primary: #0e6269;
+    --sidebar-primary-foreground: #eff1f5;
+    --sidebar-accent: #ccd0da;
+    --sidebar-accent-foreground: #4c4f69;
+    --sidebar-border: #bcc0cc;
+    --sidebar-ring: #0e6269;
 }
 
 .dark {
-    --background: oklch(0.141 0.005 285.823);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.21 0.006 285.885);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.21 0.006 285.885);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.437 0.078 188.216);
-    --primary-foreground: oklch(0.984 0.014 180.72);
-    --secondary: oklch(0.274 0.006 286.033);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.274 0.006 286.033);
-    --muted-foreground: oklch(0.705 0.015 286.067);
-    --accent: oklch(0.274 0.006 286.033);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.552 0.016 285.938);
-    --chart-1: oklch(0.855 0.138 181.071);
-    --chart-2: oklch(0.704 0.14 182.503);
-    --chart-3: oklch(0.6 0.118 184.704);
-    --chart-4: oklch(0.511 0.096 186.391);
-    --chart-5: oklch(0.437 0.078 188.216);
-    --success: oklch(0.78 0.14 155);
-    --warning: oklch(0.82 0.14 80);
-    --info: oklch(0.78 0.1 235);
-    --sidebar: oklch(0.21 0.006 285.885);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.704 0.14 182.503);
-    --sidebar-primary-foreground: oklch(0.277 0.046 192.524);
-    --sidebar-accent: oklch(0.274 0.006 286.033);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.552 0.016 285.938);
+    --background: #11111b;            /* crust */
+    --foreground: #cdd6f4;            /* text */
+    --card: #181825;                  /* mantle */
+    --card-foreground: #cdd6f4;
+    --popover: #1e1e2e;               /* base */
+    --popover-foreground: #cdd6f4;
+    --primary: #94e2d5;               /* teal */
+    --primary-foreground: #11111b;
+    --secondary: #313244;             /* surface0 */
+    --secondary-foreground: #cdd6f4;
+    --muted: #313244;
+    --muted-foreground: #a6adc8;      /* subtext0 */
+    --accent: #313244;
+    --accent-foreground: #cdd6f4;
+    --destructive: #f38ba8;
+    --success: #a6e3a1;
+    --warning: #f9e2af;
+    --info: #89b4fa;
+    --border: #313244;
+    --input: #45475a;                 /* surface1 */
+    --ring: #94e2d5;
+    --edge: #000000;
+    --chart-1: #94e2d5;
+    --chart-2: #74c7ba;
+    --chart-3: #56a99f;
+    --chart-4: #3b8b83;
+    --chart-5: #2a6d67;
+    --sidebar: #181825;
+    --sidebar-foreground: #cdd6f4;
+    --sidebar-primary: #94e2d5;
+    --sidebar-primary-foreground: #11111b;
+    --sidebar-accent: #313244;
+    --sidebar-accent-foreground: #cdd6f4;
+    --sidebar-border: #313244;
+    --sidebar-ring: #94e2d5;
 }
 
 @layer base {
@@ -164,16 +171,8 @@
 
 /* Keyboard focus: a ring that stands out in both themes, on top of what individual components add */
 :root {
-  --focus: oklch(0.511 0.096 186.391);
+  --focus: var(--primary);
   --primary-text: var(--primary);
-}
-.dark {
-  --focus: oklch(0.78 0.1 186);
-  /* The dark primary is a fill colour; as text it needs a lighter tone to be readable on the dark background */
-  --primary-text: oklch(0.78 0.1 186);
-}
-.dark .text-primary {
-  color: var(--primary-text);
 }
 :focus-visible {
   outline: 2px solid var(--focus);
