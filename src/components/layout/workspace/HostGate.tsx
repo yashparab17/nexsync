@@ -3,7 +3,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, WifiOff } from "lucide-react";
+import { WifiOff } from "@/components/animate-icons";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useP2P } from "@/store/p2p/P2PContext";

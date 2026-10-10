@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { FolderOpen, FolderUp } from "lucide-react";
+import { FolderOpen, FolderUp } from "@/components/animate-icons";
 
 // Components
 import { Button } from "@/components/ui/button";

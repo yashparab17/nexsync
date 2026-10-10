@@ -1,4 +1,4 @@
-import { Minus, Square, X } from "lucide-react";
+import { Minus, Square, X } from "@/components/animate-icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { cn } from "@/lib/utils";

@@ -1,7 +1,7 @@
 // Outline, outgoing [[links]] and backlinks for the open note
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, Link2, ListTree } from "lucide-react";
+import { ArrowUpRight, Link2, ListTree } from "@/components/animate-icons";
 
 import { extractHeadings, extractLinks, findBacklinks, resolveLink, type NoteRef } from "@/lib/notes/links";
 import { readWorkspaceFile } from "@/lib/tauri";

@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { useP2P } from "@/store/p2p/P2PContext";

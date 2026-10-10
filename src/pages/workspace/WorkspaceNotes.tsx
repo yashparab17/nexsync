@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LayoutGrid, Network } from "lucide-react";
-import { Plus, Search } from "@/components/animate-icons";
+import { Plus, Search, LayoutGrid, Network } from "@/components/animate-icons";
 
 import NoteEditor from "@/components/elements/editor/NoteEditor";
 import NoteBoard from "@/components/elements/notes/NoteBoard";

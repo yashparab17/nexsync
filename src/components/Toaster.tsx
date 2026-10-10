@@ -2,7 +2,7 @@
 // They show whatever the notification bell receives, and a screen reader announces them.
 
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { X } from "@/components/animate-icons";
 
 import { t } from "@/i18n";
 import { useNotifications } from "@/store/notifications/NotificationContext";

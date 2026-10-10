@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 import { openSearchPanel } from "@codemirror/search";
 import { EditorView } from "@codemirror/view";
-import { AlertTriangle, GitBranch, History, Loader2, MessageSquareDiff, Save, Sparkles } from "lucide-react";
-import { Check, Search } from "@/components/animate-icons";
+import { Loader2 } from "lucide-react";
+import { Check, Search, AlertTriangle, GitBranch, History, MessageSquareDiff, Save, Sparkles } from "@/components/animate-icons";
 
 import CodeEditor from "./CodeEditor";
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";

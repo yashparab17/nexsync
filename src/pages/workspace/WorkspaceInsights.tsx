@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { History, X } from "lucide-react";
-import { ChartColumn as BarChart3 } from "@/components/animate-icons";
+import { ChartColumn as BarChart3, History, X } from "@/components/animate-icons";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

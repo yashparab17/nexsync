@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Code2, Terminal, X } from "lucide-react";
-import { UsersRound } from "@/components/animate-icons";
+import { UsersRound, Code2, Terminal, X } from "@/components/animate-icons";
 
 import CodeTab from "@/components/elements/editor/CodeTab";
 import FileExplorer from "@/components/elements/editor/FileExplorer";

@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Crown, KeyRound, Pencil, Shield, ShieldCheck, UserCheck, UserPlus } from "lucide-react";
-import { Activity, Trash2 } from "@/components/animate-icons";
+import { Activity, Trash2, Crown, KeyRound, Pencil, Shield, ShieldCheck, UserCheck, UserPlus } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import {

@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, AlertTriangle, CalendarDays, CheckCircle2, Clock, Filter, List, ListTodo, Pencil, Sparkles } from "lucide-react";
-import { Plus, Search, Trash2 } from "@/components/animate-icons";
+import { useCallback, useEffect, useMemo, useState, type ElementType } from "react";
+import { Plus, Search, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, Filter, List, ListTodo, Pencil, Sparkles } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -68,7 +67,7 @@ const PRIORITY_CONFIG: Record<
 
 const STATUS_CONFIG: Record<
 	TaskStatus,
-	{ label: string; icon: typeof Clock; color: string; border: string }
+	{ label: string; icon: ElementType; color: string; border: string }
 > = {
 	todo: {
 		label: "To Do",

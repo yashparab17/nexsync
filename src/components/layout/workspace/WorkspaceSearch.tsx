@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, Code2, Compass, File, FileText, ListTodo, X } from "lucide-react";
-import { SquareKanban as KanbanSquare, Search } from "@/components/animate-icons";
+import { SquareKanban as KanbanSquare, Search, Clock, Code2, Compass, File, FileText, ListTodo, X } from "@/components/animate-icons";
 
 import { isBinaryFile, isDocumentFile, isNoteFile } from "@/lib/editor/languages";
 import { getKanban, getTasks, searchWorkspaceFiles } from "@/lib/tauri";
