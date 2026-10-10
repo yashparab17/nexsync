@@ -36,6 +36,6 @@ export function wikiLinks(onOpen: (target: string) => void) {
 				return true;
 			},
 		}),
-		EditorView.baseTheme({ ".cm-wikilink": { color: "#38bdf8", textDecoration: "underline", cursor: "pointer" } }),
+		EditorView.baseTheme({ ".cm-wikilink": { color: "var(--info)", textDecoration: "underline", cursor: "pointer" } }),
 	];
 }

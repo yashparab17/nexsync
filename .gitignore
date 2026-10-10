@@ -78,3 +78,7 @@ nexsync-synopsis.pdf
 # Agent skills (installed locally)
 .agents/
 skills-lock.json
+
+# Local agent notes
+CLAUDE.md
+PRODUCT.md

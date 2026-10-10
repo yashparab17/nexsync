@@ -303,7 +303,7 @@ export default function AssetPreviewModal({
 									<iframe
 										src={dataUrl}
 										title={asset.name}
-										className="h-full min-h-[60vh] w-full border bg-white"
+										className="h-full min-h-[60vh] w-full border bg-card"
 									/>
 								)}
 

@@ -64,9 +64,9 @@ class ProposalWidget extends WidgetType {
 }
 
 const theme = EditorView.baseTheme({
-	".cm-proposal-old": { textDecoration: "line-through", backgroundColor: "rgba(239, 68, 68, 0.18)" },
-	".cm-proposal": { display: "inline-flex", alignItems: "baseline", gap: "6px", marginLeft: "2px", padding: "0 4px", backgroundColor: "rgba(16, 185, 129, 0.15)", outline: "1px solid rgba(16, 185, 129, 0.4)" },
-	".cm-proposal-new": { textDecoration: "none", color: "rgb(16, 185, 129)" },
+	".cm-proposal-old": { textDecoration: "line-through", backgroundColor: "color-mix(in oklch, var(--destructive) 18%, transparent)" },
+	".cm-proposal": { display: "inline-flex", alignItems: "baseline", gap: "6px", marginLeft: "2px", padding: "0 4px", backgroundColor: "color-mix(in oklch, var(--success) 15%, transparent)", outline: "1px solid color-mix(in oklch, var(--success) 40%, transparent)" },
+	".cm-proposal-new": { textDecoration: "none", color: "var(--success)" },
 	".cm-proposal-by": { fontSize: "0.85em", opacity: "0.7" },
 	".cm-proposal button": { fontSize: "0.85em", padding: "0 4px", border: "1px solid currentColor", background: "transparent", color: "inherit", cursor: "pointer" },
 });

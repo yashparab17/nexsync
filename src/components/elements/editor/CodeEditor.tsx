@@ -3,7 +3,7 @@ import CodeMirror from "@uiw/react-codemirror";
 import { lintGutter } from "@codemirror/lint";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
-import { vscodeDark, vscodeLight } from "@uiw/codemirror-theme-vscode";
+import { catppuccinLatte, catppuccinMocha } from "@catppuccin/codemirror";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
 
 import { useThemeContext } from "@/store/ThemeContext";
@@ -79,7 +79,11 @@ export default function CodeEditor({
 	const { fontSize, tabSize, wrap } = useEditorPrefs();
 	const lookExtensions = useMemo(
 		() => [
-			EditorView.theme({ "&": { fontSize: `${fontSize}px` } }),
+			EditorView.theme({
+				"&": { fontSize: `${fontSize}px`, backgroundColor: "var(--background)" },
+				".cm-scroller": { fontFamily: "var(--font-mono)" },
+				".cm-gutters": { backgroundColor: "var(--sidebar)", borderRight: "1px solid var(--border)" },
+			}),
 			EditorState.tabSize.of(tabSize),
 			...(wrap || language.name === "Markdown" ? [EditorView.lineWrapping] : []),
 		],
@@ -122,7 +126,7 @@ export default function CodeEditor({
 				{...(collab ? (startedWithCollab.current ? { value: startingText.current } : {}) : { value })}
 				height="100%"
 				minHeight={minHeight}
-				theme={isDark ? vscodeDark : vscodeLight}
+				theme={isDark ? catppuccinMocha : catppuccinLatte}
 				extensions={extensions}
 				onChange={onChange}
 				onCreateEditor={onReady}

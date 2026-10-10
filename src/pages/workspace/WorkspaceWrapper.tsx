@@ -70,7 +70,7 @@ export default function Workspace() {
 					<div className="relative h-full animate-in slide-in-from-left duration-200 motion-reduce:animate-none">
 						<WorkspaceSidebar expanded onNavigate={() => setNavOpen(false)} />
 					</div>
-					<button type="button" aria-label={t("nav.close")} className="flex-1 cursor-default bg-black/50" onClick={() => setNavOpen(false)} />
+					<button type="button" aria-label={t("nav.close")} className="flex-1 cursor-default bg-scrim" onClick={() => setNavOpen(false)} />
 				</div>
 			)}
 

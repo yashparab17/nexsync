@@ -53,7 +53,7 @@ function DialogOverlay({
 		<ModalOverlayPrimitive
 			data-slot="dialog-overlay"
 			className={cn(
-				"fixed inset-0 isolate z-50 bg-black/20 duration-100 data-entering:animate-in data-entering:fade-in-0 data-exiting:animate-out data-exiting:fade-out-0 supports-backdrop-filter:backdrop-blur-sm",
+				"fixed inset-0 isolate z-50 bg-scrim duration-100 data-entering:animate-in data-entering:fade-in-0 data-exiting:animate-out data-exiting:fade-out-0 supports-backdrop-filter:backdrop-blur-sm",
 				className,
 			)}
 			{...props}
