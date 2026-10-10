@@ -50,26 +50,26 @@ const ROLE_CONFIG: Record<
 	Owner: {
 		label: "Owner",
 		icon: Crown,
-		color: "text-amber-400",
-		bg: "bg-amber-500/10 border-amber-500/20",
+		color: "text-warning",
+		bg: "bg-warning/10 border-warning/20",
 	},
 	Admin: {
 		label: "Admin",
 		icon: ShieldCheck,
-		color: "text-violet-400",
-		bg: "bg-violet-500/10 border-violet-500/20",
+		color: "text-info",
+		bg: "bg-info/10 border-info/20",
 	},
 	Editor: {
 		label: "Editor",
 		icon: Shield,
-		color: "text-sky-400",
-		bg: "bg-sky-500/10 border-sky-500/20",
+		color: "text-info",
+		bg: "bg-info/10 border-info/20",
 	},
 	Viewer: {
 		label: "Viewer",
 		icon: UserCheck,
-		color: "text-emerald-400",
-		bg: "bg-emerald-500/10 border-emerald-500/20",
+		color: "text-success",
+		bg: "bg-success/10 border-success/20",
 	},
 };
 
@@ -277,10 +277,10 @@ export default function WorkspaceMembers() {
 						onPress={() => setIsInviteOpen(true)}
 						className="gap-1.5"
 					>
-						<KeyRound className="size-4 text-sky-400" />
+						<KeyRound className="size-4 text-info" />
 						Sharing & Invites
 						{peers.length > 0 && (
-							<span className="flex h-2 w-2 rounded-none bg-emerald-400 animate-ping ml-1" />
+							<span className="flex h-2 w-2 rounded-none bg-success animate-ping ml-1" />
 						)}
 					</Button>
 					<Button
@@ -350,39 +350,39 @@ export default function WorkspaceMembers() {
 															{member.name}
 														</span>
 														{isYou && (
-															<span className="text-[10px] text-muted-foreground">
+															<span className="text-xs text-muted-foreground">
 																(You)
 															</span>
 														)}
 														{isOnline && (
-															<span className={cn("inline-flex items-center gap-1 text-[10px]", here?.away ? "text-amber-400" : "text-emerald-400")}>
-																<span className={cn("size-1.5 rounded-none", here?.away ? "bg-amber-400" : "bg-emerald-400")} />
+															<span className={cn("inline-flex items-center gap-1 text-xs", here?.away ? "text-warning" : "text-success")}>
+																<span className={cn("size-1.5 rounded-none", here?.away ? "bg-warning" : "bg-success")} />
 																{here?.away ? "Away" : "Online"}
 																{here && !here.away && ` · ${placeLabel(here)}`}
 															</span>
 														)}
 														{isOnline && peer?.appVersion && (
-															<span className="text-[10px] text-muted-foreground">v{peer.appVersion}</span>
+															<span className="text-xs text-muted-foreground">v{peer.appVersion}</span>
 														)}
 														{isOnline && peer?.clockSkewMs != null && Math.abs(peer.clockSkewMs) >= 120_000 && (
-															<span className="text-[10px] text-amber-400">Their clock is {skewText(peer.clockSkewMs)}; Nexsync adjusts for it</span>
+															<span className="text-xs text-warning">Their clock is {skewText(peer.clockSkewMs)}; Nexsync adjusts for it</span>
 														)}
 														{isOnline && peer?.needsUpdate && (
-															<span className="text-[10px] text-amber-400">Runs a newer Nexsync: update to keep syncing</span>
+															<span className="text-xs text-warning">Runs a newer Nexsync: update to keep syncing</span>
 														)}
 														{!isOnline && !isYou && member.lastSeen && (
-															<span className="text-[10px] text-muted-foreground">Last seen {lastSeenText(member.lastSeen)}</span>
+															<span className="text-xs text-muted-foreground">Last seen {lastSeenText(member.lastSeen)}</span>
 														)}
 													</div>
 													{probes[member.id] && (
-															<p className="mt-0.5 text-[10px] text-muted-foreground">
+															<p className="mt-0.5 text-xs text-muted-foreground">
 																{probes[member.id] === "running" ? "Looking for them by device key…" : probeText(probes[member.id] as ProbeResult)}
 															</p>
 														)}
 														<div className="flex items-center gap-2 mt-0.5">
 														<span
 															className={cn(
-																"inline-flex items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+																"inline-flex items-center gap-1 rounded-none border px-2 py-0.5 text-xs font-semibold ",
 																roleConf.color,
 																roleConf.bg,
 															)}
@@ -445,7 +445,7 @@ export default function WorkspaceMembers() {
 		}}
 		aria-label="Make Host"
 	>
-		<Crown className="size-3.5 text-muted-foreground hover:text-amber-400" />
+		<Crown className="size-3.5 text-muted-foreground hover:text-warning" />
 	</Button>
 )}
 {!isOwner && !isJoinedCopy && (
@@ -482,7 +482,7 @@ export default function WorkspaceMembers() {
 						</CardHeader>
 						<CardContent className="space-y-4 text-xs">
 							<div className="rounded-none border p-3 bg-muted/10">
-								<div className="flex items-center gap-1.5 font-semibold text-amber-400">
+								<div className="flex items-center gap-1.5 font-semibold text-warning">
 									<Crown className="size-3.5" />
 									Owner
 								</div>
@@ -492,7 +492,7 @@ export default function WorkspaceMembers() {
 							</div>
 
 							<div className="rounded-none border p-3 bg-muted/10">
-								<div className="flex items-center gap-1.5 font-semibold text-violet-400">
+								<div className="flex items-center gap-1.5 font-semibold text-info">
 									<ShieldCheck className="size-3.5" />
 									Admin
 								</div>
@@ -503,7 +503,7 @@ export default function WorkspaceMembers() {
 							</div>
 
 							<div className="rounded-none border p-3 bg-muted/10">
-								<div className="flex items-center gap-1.5 font-semibold text-sky-400">
+								<div className="flex items-center gap-1.5 font-semibold text-info">
 									<Shield className="size-3.5" />
 									Editor
 								</div>
@@ -513,7 +513,7 @@ export default function WorkspaceMembers() {
 							</div>
 
 							<div className="rounded-none border p-3 bg-muted/10">
-								<div className="flex items-center gap-1.5 font-semibold text-emerald-400">
+								<div className="flex items-center gap-1.5 font-semibold text-success">
 									<UserCheck className="size-3.5" />
 									Viewer
 								</div>
@@ -626,7 +626,7 @@ export default function WorkspaceMembers() {
 								className="mt-1"
 							/>
 							{editingMember.role.toLowerCase() === "owner" && (
-								<p className="mt-1 text-[11px] text-muted-foreground">
+								<p className="mt-1 text-xs text-muted-foreground">
 									Collaborators see this name when you invite them.
 								</p>
 							)}

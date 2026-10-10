@@ -130,7 +130,7 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 	return (
 		<div className="flex h-full min-h-0 flex-col">
 			<div className="flex items-center gap-2 border-b px-3 py-1.5">
-				<span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Run</span>
+				<span className="text-xs font-semibold text-muted-foreground">Run</span>
 				<Input
 					value={command}
 					onChange={(e) => setCommand(e.target.value)}
@@ -165,7 +165,7 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 							key={line.id}
 							className={cn(
 								"whitespace-pre-wrap break-all",
-								line.stream === "stderr" && "text-red-400",
+								line.stream === "stderr" && "text-destructive",
 								line.stream === "info" && "text-muted-foreground",
 							)}
 						>

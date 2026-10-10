@@ -155,7 +155,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 												· {rows.length} {rows.length === 1 ? "change" : "changes"}
 											</span>
 											{group.vouched ? (
-												<span className="inline-flex items-center gap-1 text-xs font-normal text-emerald-500" title="Signed with this member's device key">
+												<span className="inline-flex items-center gap-1 text-xs font-normal text-success" title="Signed with this member's device key">
 													<ShieldCheck className="size-3.5" aria-hidden />
 													Verified
 												</span>
@@ -195,7 +195,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 																Edited {first.label}
 																{row.length > 1 && <span className="text-muted-foreground"> · {row.length} edits</span>}
 															</span>
-															<span className="block truncate font-mono text-xs text-emerald-500">+ {previewText(first)}</span>
+															<span className="block truncate font-mono text-xs text-success">+ {previewText(first)}</span>
 														</span>
 														<span className="shrink-0 text-xs text-muted-foreground">{when(first.at)}</span>
 													</button>

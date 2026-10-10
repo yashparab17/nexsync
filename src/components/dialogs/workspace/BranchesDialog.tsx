@@ -121,7 +121,7 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 						{error}
 					</p>
 				)}
-				{done && <p className="p-2 text-xs text-emerald-400">{done}</p>}
+				{done && <p className="p-2 text-xs text-success">{done}</p>}
 
 				{review ? (
 					<div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -131,8 +131,8 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 							<>
 								<div className="flex flex-wrap items-center justify-between gap-2">
 									<p className="text-sm">
-										Merging <span className="font-semibold">{review.branch.name}</span> would change {fileName}: <span className="text-emerald-400">+{review.diff.added}</span>{" "}
-										<span className="text-red-400">-{review.diff.removed}</span>
+										Merging <span className="font-semibold">{review.branch.name}</span> would change {fileName}: <span className="text-success">+{review.diff.added}</span>{" "}
+										<span className="text-destructive">-{review.diff.removed}</span>
 									</p>
 									{canEdit && review.branch.status === "open" && (
 										<div className="flex gap-2">

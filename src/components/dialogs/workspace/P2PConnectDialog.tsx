@@ -175,14 +175,14 @@ export default function P2PConnectDialog({
 				? `${hostName ?? "The host"} is offline`
 				: "Online";
 	const statusDot = !network.online
-		? "bg-red-400"
+		? "bg-destructive"
 		: peers.length > 0
-		  ? "bg-emerald-400 animate-ping"
+		  ? "bg-success animate-ping"
 		  : connectionStatus === "reconnecting" || connectionStatus === "connecting"
-			? "bg-amber-400 animate-pulse"
+			? "bg-warning animate-pulse"
 			: hostUnreachable
-			  ? "bg-red-400"
-			  : "bg-emerald-400";
+			  ? "bg-destructive"
+			  : "bg-success";
 
 	const tabClass = (tab: typeof activeTab) =>
 		cn(
@@ -197,7 +197,7 @@ export default function P2PConnectDialog({
 			<div className="space-y-4">
 				<DialogHeader>
 					<div className="flex items-center gap-2">
-						<div className="flex h-9 w-9 items-center justify-center rounded-none bg-sky-500/10 text-sky-400 border border-sky-500/20">
+						<div className="flex h-9 w-9 items-center justify-center rounded-none bg-info/10 text-info border border-info/20">
 							<Radio className="h-5 w-5 animate-pulse" />
 						</div>
 						<div>
@@ -211,13 +211,13 @@ export default function P2PConnectDialog({
 					</div>
 				</DialogHeader>
 
-					<div className="flex items-center gap-1.5 font-mono text-[11px]" role="status">
+					<div className="flex items-center gap-1.5 font-mono text-xs" role="status">
 						<span className={cn("h-2 w-2 rounded-none", statusDot)} />
 						<span>{statusLabel}</span>
 					</div>
 
 				{network.online && hostUnreachable && peers.length === 0 && (
-					<div className="flex items-start gap-2 rounded-none border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+					<div className="flex items-start gap-2 rounded-none border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
 						<AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
 						<div className="space-y-1">
 							<p>
@@ -233,7 +233,7 @@ export default function P2PConnectDialog({
 				)}
 
 				{network.online && hostName !== null && link === "members" && (
-					<div className="flex items-start gap-2 rounded-none border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-300">
+					<div className="flex items-start gap-2 rounded-none border border-info/30 bg-info/10 px-3 py-2 text-xs text-info">
 						<Radio className="mt-0.5 h-3.5 w-3.5 shrink-0" />
 						<p>
 							{hostName} is offline. You are working with the other members who are online, and your changes reach {hostName} when
@@ -243,14 +243,14 @@ export default function P2PConnectDialog({
 				)}
 
 				{!network.online && (
-					<div className="flex items-start gap-2 rounded-none border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+					<div className="flex items-start gap-2 rounded-none border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
 						<AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
 						<div className="space-y-1">
 							<p>
 								Nexsync can't reach the service that connects you to people on other networks.
 								Check your internet, then press Retry.
 							</p>
-							{network.detail && <p className="font-mono text-[11px] opacity-80">Details: {network.detail}</p>}
+							{network.detail && <p className="font-mono text-xs opacity-80">Details: {network.detail}</p>}
 							<p className="opacity-80">
 								On a college or office network a firewall may be blocking it. Try a phone hotspot,
 								a VPN, or ask IT to allow access to *.relay.n0.iroh.link.
@@ -270,7 +270,7 @@ export default function P2PConnectDialog({
 				)}
 
 				{syncProgress && (
-					<div className="flex items-center gap-2 rounded-none border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs text-sky-400">
+					<div className="flex items-center gap-2 rounded-none border border-info/20 bg-info/10 px-3 py-2 text-xs text-info">
 						<RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" />
 						<span className="truncate">{describeSyncProgress(syncProgress)}</span>
 					</div>
@@ -325,13 +325,13 @@ export default function P2PConnectDialog({
 									You will be asked to allow them when they use it.
 								</p>
 								{!shortCode.relayConnected && (
-									<p className="text-[11px] text-amber-400">
+									<p className="text-xs text-warning">
 										Couldn't reach the internet service that connects you to other networks, so only people on your local network can join.
 									</p>
 								)}
 								<div className="flex justify-center gap-2">
 									<Button size="sm" variant="secondary" onPress={() => copy(shortCode.code, "code")} className="h-8 px-3 text-xs gap-1.5">
-										{copiedKey === "code" ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+										{copiedKey === "code" ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
 										{copiedKey === "code" ? "Copied" : "Copy"}
 									</Button>
 									<Button size="sm" variant="ghost" onPress={handleStopInviting} className="h-8 text-xs text-muted-foreground hover:text-destructive">
@@ -400,7 +400,7 @@ export default function P2PConnectDialog({
 									>
 										{copiedKey === "copied" ? (
 											<>
-												<Check className="h-4 w-4 text-emerald-400" />
+												<Check className="h-4 w-4 text-success" />
 												Copied
 											</>
 										) : (
@@ -411,16 +411,16 @@ export default function P2PConnectDialog({
 										)}
 									</Button>
 								</div>
-								<div className="max-h-28 overflow-y-auto rounded-none border border-primary/30 bg-background px-3 py-2 font-mono text-[11px] leading-relaxed break-all select-all text-primary">
+								<div className="max-h-28 overflow-y-auto rounded-none border border-primary/30 bg-background px-3 py-2 font-mono text-xs leading-relaxed break-all select-all text-primary">
 									{invite.ticket}
 								</div>
-								<p className="text-[11px] text-muted-foreground">
+								<p className="text-xs text-muted-foreground">
 									{invite.expiresAt ? `Works until ${new Date(invite.expiresAt).toLocaleString()}` : "Works until you stop it"}
 									{invite.singleUse ? ", for one person." : "."}
 								</p>
 
 								{!invite.relayConnected && (
-									<div className="flex items-start gap-2 rounded-none border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-400">
+									<div className="flex items-start gap-2 rounded-none border border-warning/30 bg-warning/10 p-2.5 text-xs text-warning">
 										<AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
 										<span>
 											Couldn't reach the internet service that connects you to other networks, so only people on your local
@@ -432,13 +432,13 @@ export default function P2PConnectDialog({
 								{/* Live rendezvous status */}
 								<div className="rounded-none border border-border/50 bg-background/60 p-3 text-xs flex items-center justify-between">
 									{hasGuests ? (
-										<div className="flex items-center gap-2 text-emerald-400 font-medium">
+										<div className="flex items-center gap-2 text-success font-medium">
 											<Check className="h-4 w-4" />
 											<span>Collaborator connected. Your changes now show up for both of you.</span>
 										</div>
 									) : (
 										<div className="flex items-center gap-2 text-muted-foreground">
-											<RefreshCw className="h-3.5 w-3.5 animate-spin text-sky-400" />
+											<RefreshCw className="h-3.5 w-3.5 animate-spin text-info" />
 											<span>Waiting for a collaborator to join…</span>
 										</div>
 									)}
@@ -447,7 +447,7 @@ export default function P2PConnectDialog({
 											variant="ghost"
 											size="sm"
 											onPress={handleGenerateInvite}
-											className="h-7 text-[11px] text-muted-foreground hover:text-foreground"
+											className="h-7 text-xs text-muted-foreground hover:text-foreground"
 										>
 											New Invite
 										</Button>
@@ -455,13 +455,13 @@ export default function P2PConnectDialog({
 											variant="ghost"
 											size="sm"
 											onPress={handleStopInviting}
-											className="h-7 text-[11px] text-muted-foreground hover:text-destructive"
+											className="h-7 text-xs text-muted-foreground hover:text-destructive"
 										>
 											Stop
 										</Button>
 									</div>
 								</div>
-								<p className="text-[11px] text-muted-foreground">
+								<p className="text-xs text-muted-foreground">
 									Making a new invite or pressing Stop turns this one off. People who
 									already joined stay connected.
 								</p>
@@ -480,16 +480,16 @@ export default function P2PConnectDialog({
 								value={ticketInput}
 								onChange={(e) => setTicketInput(e.target.value)}
 								rows={4}
-								className="font-mono text-[11px] break-all rounded-none border border-input px-3 py-2"
+								className="font-mono text-xs break-all rounded-none border border-input px-3 py-2"
 								autoFocus
 							/>
-							<p className="text-[11px] text-muted-foreground">
+							<p className="text-xs text-muted-foreground">
 								Their workspace will be copied into the workspace you have open and kept up to date.
 							</p>
 						</div>
 
 						{joinSuccess ? (
-							<div className="flex items-center justify-center gap-2 p-3 text-xs text-emerald-400 font-medium">
+							<div className="flex items-center justify-center gap-2 p-3 text-xs text-success font-medium">
 								<Sparkles className="h-4 w-4" />
 								<span>Connected! Getting the workspace…</span>
 							</div>
@@ -522,7 +522,7 @@ export default function P2PConnectDialog({
 							<div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
 								<Radio className="h-8 w-8 stroke-[1.25] text-muted-foreground/40 mb-2" />
 								<p className="text-xs font-medium">No one is connected</p>
-								<p className="text-[11px] text-muted-foreground/70">
+								<p className="text-xs text-muted-foreground/70">
 									Create an invite or paste one from a collaborator to connect.
 								</p>
 									<Button variant="outline" size="sm" className="mt-3 gap-1.5" onPress={handleRetry}>
@@ -557,19 +557,19 @@ export default function P2PConnectDialog({
 											className="flex items-center justify-between rounded-none border bg-card p-2.5 text-xs"
 										>
 											<div className="flex items-center gap-2.5">
-												<span className="h-2 w-2 rounded-none bg-emerald-400" />
+												<span className="h-2 w-2 rounded-none bg-success" />
 												<div>
 													<div className="flex items-center gap-1.5 font-medium">
 														<span>{peer.name}</span>
-														<span className="rounded-none bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground uppercase tracking-wider">
+														<span className="rounded-none bg-muted px-1.5 py-0.5 text-xs text-muted-foreground ">
 															{peer.isHost ? "Host" : peer.role}
 														</span>
 														<span
 															className={cn(
-																"rounded-none px-1.5 py-0.5 text-[10px] uppercase tracking-wider",
+																"rounded-none px-1.5 py-0.5 text-xs ",
 																peer.connectionType === "direct"
-																	? "text-emerald-400"
-																	: "text-amber-400",
+																	? "text-success"
+																	: "text-warning",
 															)}
 															title={
 																peer.connectionType === "relay"
@@ -584,7 +584,7 @@ export default function P2PConnectDialog({
 																	: "Connecting"}
 														</span>
 													</div>
-													<div className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+													<div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
 														<span>Delay: {peer.latencyMs} ms</span>
 														<span>•</span>
 														<span>
@@ -596,7 +596,7 @@ export default function P2PConnectDialog({
 											</div>
 
 											<div className="flex items-center gap-1.5">
-												<div className="flex items-center gap-1 text-[11px] text-emerald-400 py-0.5">
+												<div className="flex items-center gap-1 text-xs text-success py-0.5">
 													<Lock className="h-3 w-3" />
 													<span>Private</span>
 												</div>

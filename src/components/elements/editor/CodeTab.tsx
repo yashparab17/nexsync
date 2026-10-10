@@ -333,7 +333,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 			)}
 
 			{mergeWarning !== null && (
-				<div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400">
+				<div className="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-1.5 text-xs text-warning">
 					<AlertTriangle className="size-3.5 shrink-0" />
 					<span className="min-w-0 flex-1">
 						A collaborator&apos;s edit merged with yours and added {mergeWarning} syntax error{mergeWarning > 1 ? "s" : ""}.
@@ -360,7 +360,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 				</div>
 			)}
 			{mergeWarning !== null && repair && (
-				<div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-xs">
+				<div className="flex items-center gap-2 border-b border-warning/30 bg-warning/5 px-3 py-1.5 text-xs">
 					{repair === "none" ? (
 						<span className="min-w-0 flex-1 text-muted-foreground">No part of their change can be kept without the errors, so it needs a manual fix.</span>
 					) : (
@@ -415,7 +415,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 						) : (
 							<>
 								<section className="space-y-2">
-									<h3 className="font-semibold uppercase tracking-widest text-muted-foreground">Contributions</h3>
+									<h3 className="font-semibold text-muted-foreground">Contributions</h3>
 									{blame.people.map((person) => (
 										<div key={person.author} className="space-y-1">
 											<div className="flex justify-between gap-2">
@@ -428,13 +428,13 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 												<div className="h-full" style={{ width: `${person.percent}%`, background: colorForName(person.author) }} />
 											</div>
 											{person.lastEdit && (
-												<p className="text-[10px] text-muted-foreground">Last edit {new Date(person.lastEdit).toLocaleString()}</p>
+												<p className="text-xs text-muted-foreground">Last edit {new Date(person.lastEdit).toLocaleString()}</p>
 											)}
 										</div>
 									))}
 								</section>
 								<section className="space-y-1">
-									<h3 className="font-semibold uppercase tracking-widest text-muted-foreground">Blame</h3>
+									<h3 className="font-semibold text-muted-foreground">Blame</h3>
 									{blame.ranges.map((range) => (
 										<button
 											key={`${range.from}-${range.author}`}

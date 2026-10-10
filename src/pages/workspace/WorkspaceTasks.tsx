@@ -61,21 +61,21 @@ const PRIORITY_CONFIG: Record<
 > = {
 	low: {
 		label: "Low",
-		color: "text-blue-400",
-		bg: "bg-blue-500/10",
-		border: "border-blue-500/20",
+		color: "text-info",
+		bg: "bg-info/10",
+		border: "border-info/20",
 	},
 	medium: {
 		label: "Medium",
-		color: "text-amber-400",
-		bg: "bg-amber-500/10",
-		border: "border-amber-500/20",
+		color: "text-warning",
+		bg: "bg-warning/10",
+		border: "border-warning/20",
 	},
 	high: {
 		label: "High",
-		color: "text-rose-400",
-		bg: "bg-rose-500/10",
-		border: "border-rose-500/20",
+		color: "text-destructive",
+		bg: "bg-destructive/10",
+		border: "border-destructive/20",
 	},
 };
 
@@ -92,14 +92,14 @@ const STATUS_CONFIG: Record<
 	in_progress: {
 		label: "In Progress",
 		icon: AlertCircle,
-		color: "text-amber-400",
-		border: "border-amber-500/30",
+		color: "text-warning",
+		border: "border-warning/30",
 	},
 	done: {
 		label: "Done",
 		icon: CheckCircle2,
-		color: "text-emerald-400",
-		border: "border-emerald-500/30",
+		color: "text-success",
+		border: "border-success/30",
 	},
 };
 
@@ -457,7 +457,7 @@ export default function WorkspaceTasks() {
 				<Card className="border-border/60 bg-card/40 backdrop-blur-xs">
 					<CardContent className="flex items-center justify-between p-4">
 						<div>
-							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+							<p className="text-xs font-semibold text-muted-foreground">
 								Total Tasks
 							</p>
 							<p className="mt-1 text-2xl font-bold">{stats.total}</p>
@@ -469,42 +469,42 @@ export default function WorkspaceTasks() {
 				<Card className="border-border/60 bg-card/40 backdrop-blur-xs">
 					<CardContent className="flex items-center justify-between p-4">
 						<div>
-							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+							<p className="text-xs font-semibold text-muted-foreground">
 								To Do
 							</p>
-							<p className="mt-1 text-2xl font-bold text-sky-400">
+							<p className="mt-1 text-2xl font-bold text-info">
 								{stats.todo}
 							</p>
 						</div>
-						<Clock className="size-6 text-sky-400/60" />
+						<Clock className="size-6 text-info/60" />
 					</CardContent>
 				</Card>
 
 				<Card className="border-border/60 bg-card/40 backdrop-blur-xs">
 					<CardContent className="flex items-center justify-between p-4">
 						<div>
-							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+							<p className="text-xs font-semibold text-muted-foreground">
 								In Progress
 							</p>
-							<p className="mt-1 text-2xl font-bold text-amber-400">
+							<p className="mt-1 text-2xl font-bold text-warning">
 								{stats.inProgress}
 							</p>
 						</div>
-						<AlertCircle className="size-6 text-amber-400/60" />
+						<AlertCircle className="size-6 text-warning/60" />
 					</CardContent>
 				</Card>
 
 				<Card className="border-border/60 bg-card/40 backdrop-blur-xs">
 					<CardContent className="flex items-center justify-between p-4">
 						<div>
-							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+							<p className="text-xs font-semibold text-muted-foreground">
 								Completed
 							</p>
-							<p className="mt-1 text-2xl font-bold text-emerald-400">
+							<p className="mt-1 text-2xl font-bold text-success">
 								{stats.done}
 							</p>
 						</div>
-						<CheckCircle2 className="size-6 text-emerald-400/60" />
+						<CheckCircle2 className="size-6 text-success/60" />
 					</CardContent>
 				</Card>
 			</div>
@@ -670,9 +670,9 @@ export default function WorkspaceTasks() {
 											"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-none border transition-colors",
 											isViewer ? "cursor-default" : "cursor-pointer",
 											task.status === "done"
-												? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
+												? "border-success bg-success/20 text-success"
 												: task.status === "in_progress"
-													? "border-amber-500 bg-amber-500/20 text-amber-400"
+													? "border-warning bg-warning/20 text-warning"
 													: "border-muted-foreground/40 hover:border-primary",
 										)}
 									>
@@ -692,13 +692,13 @@ export default function WorkspaceTasks() {
 											</h4>
 											<PresenceDots names={viewersAt("tasks", task.id)} doing="editing this task" />
 											{(task.conflicts?.length ?? 0) > 0 && (
-												<span title="Two people changed this at the same time" className="text-amber-500">
+												<span title="Two people changed this at the same time" className="text-warning">
 													<AlertTriangle className="size-3.5" aria-label="Has a change to sort out" />
 												</span>
 											)}
 											<span
 												className={cn(
-													"inline-flex items-center rounded-none border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+													"inline-flex items-center rounded-none border px-2 py-0.5 text-xs font-semibold ",
 													priorityConf.color,
 													priorityConf.bg,
 													priorityConf.border,
@@ -708,7 +708,7 @@ export default function WorkspaceTasks() {
 											</span>
 											<span
 												className={cn(
-													"inline-flex items-center rounded-none border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/30",
+													"inline-flex items-center rounded-none border px-2 py-0.5 text-xs font-semibold text-muted-foreground bg-muted/30",
 													statusConf.border,
 												)}
 											>

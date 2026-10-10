@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
@@ -24,9 +24,6 @@ import {
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
-
-// Assets
-import logo from "@/assets/logos/logo.svg";
 
 // ────────────────────────────
 // Helpers
@@ -60,47 +57,24 @@ function getActivityIcon(targetType?: string, action?: string) {
 	const type = (targetType || "").toLowerCase();
 
 	if (type === "note" || act.includes("note")) {
-		return <StickyNote className="size-4 text-sky-400 shrink-0" />;
+		return <StickyNote className="size-4 shrink-0 text-muted-foreground" />;
 	}
 	if (type === "asset" || act.includes("asset")) {
-		return <Upload className="size-4 text-emerald-400 shrink-0" />;
+		return <Upload className="size-4 shrink-0 text-muted-foreground" />;
 	}
 	if (type === "task" || act.includes("task")) {
-		return <ListTodo className="size-4 text-purple-400 shrink-0" />;
+		return <ListTodo className="size-4 shrink-0 text-muted-foreground" />;
 	}
 	if (type === "kanban" || act.includes("card") || act.includes("list") || act.includes("column")) {
-		return <ListTodo className="size-4 text-indigo-400 shrink-0" />;
+		return <ListTodo className="size-4 shrink-0 text-muted-foreground" />;
 	}
 	if (type === "folder") {
-		return <FolderOpen className="size-4 text-primary shrink-0" />;
+		return <FolderOpen className="size-4 shrink-0 text-muted-foreground" />;
 	}
 	if (type === "member" || act.includes("member")) {
-		return <UsersRound className="size-4 text-primary shrink-0" />;
+		return <UsersRound className="size-4 shrink-0 text-muted-foreground" />;
 	}
-	return <FilePlus className="size-4 text-amber-400 shrink-0" />;
-}
-
-interface StatCardProps {
-	label: string;
-	value: number;
-	icon: ReactNode;
-}
-
-// Read-only metric card
-function StatCard({ label, value, icon }: StatCardProps) {
-	return (
-		<Card>
-			<CardContent className="flex items-center justify-between py-5">
-				<div>
-					<p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-						{label}
-					</p>
-					<p className="mt-1 text-3xl font-bold">{value}</p>
-				</div>
-				{icon}
-			</CardContent>
-		</Card>
-	);
+	return <FilePlus className="size-4 shrink-0 text-muted-foreground" />;
 }
 
 // ────────────────────────────
@@ -120,25 +94,32 @@ export default function WorkspaceDashboard() {
 
 	const activity = metadata?.activity.events ?? [];
 
+	const counts: [string, number, string][] = [
+		["files", stats?.files ?? 0, "/workspace/files"],
+		["assets", stats?.assets ?? 0, "/workspace/assets"],
+		["tasks", stats?.tasks ?? 0, "/workspace/tasks"],
+		["members", stats?.members ?? 0, "/workspace/members"],
+	];
+
 	// Quick action shortcuts
 	const quickActions = [
 		{
-			label: "New Note",
+			label: "Open notes",
 			icon: StickyNote,
 			onClick: () => navigate("/workspace/notes"),
 		},
 		{
-			label: "New File",
+			label: "Open files",
 			icon: FilePlus,
 			onClick: () => navigate("/workspace/files"),
 		},
 		{
-			label: "New Task",
+			label: "Open tasks",
 			icon: ListTodo,
 			onClick: () => navigate("/workspace/tasks"),
 		},
 		{
-			label: "Upload Asset",
+			label: "Open assets",
 			icon: Upload,
 			onClick: () => navigate("/workspace/assets"),
 		},
@@ -146,11 +127,6 @@ export default function WorkspaceDashboard() {
 
 	return (
 		<div className="space-y-6">
-			{/* Watermark logo */}
-			<div className="pointer-events-none absolute inset-0 flex items-center justify-center z-[-1]">
-				<img src={logo} className="h-150 w-150 opacity-10" alt="" />
-			</div>
-
 			{/* Header */}
 			<div>
 				<h1 className="text-2xl font-semibold">Dashboard</h1>
@@ -159,7 +135,7 @@ export default function WorkspaceDashboard() {
 					<span className="font-semibold text-foreground">
 						{workspace?.name}
 					</span>
-					. Here's what's happening in your workspace.
+					. Here is what changed lately.
 				</p>
 			</div>
 
@@ -180,29 +156,15 @@ export default function WorkspaceDashboard() {
 				})}
 			</div>
 
-			{/* Stats Grid */}
-			<div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-				<StatCard
-					label="Files"
-					value={stats?.files ?? 0}
-					icon={<FilePlus className="size-8 text-primary/60" />}
-				/>
-				<StatCard
-					label="Assets"
-					value={stats?.assets ?? 0}
-					icon={<Upload className="size-8 text-primary/60" />}
-				/>
-				<StatCard
-					label="Tasks"
-					value={stats?.tasks ?? 0}
-					icon={<ListTodo className="size-8 text-primary/60" />}
-				/>
-				<StatCard
-					label="Members"
-					value={stats?.members ?? 0}
-					icon={<UsersRound className="size-8 text-primary/60" />}
-				/>
-			</div>
+			{/* What is in the workspace, each count opens its page */}
+			<dl className="flex flex-wrap gap-x-8 gap-y-2 border-y py-3">
+				{counts.map(([label, value, path]) => (
+					<button key={label} type="button" onClick={() => navigate(path)} className="flex items-baseline gap-2 hover:text-primary">
+						<dd className="text-2xl font-bold tabular-nums">{value}</dd>
+						<dt className="text-sm text-muted-foreground">{label}</dt>
+					</button>
+				))}
+			</dl>
 
 			{/* Recent Activity */}
 			<div>
@@ -219,7 +181,7 @@ export default function WorkspaceDashboard() {
 					<CardContent>
 						{activity.length === 0 ? (
 							<p className="text-sm text-muted-foreground">
-								No activity yet. Start by creating a note, file, or task.
+								Nothing has changed yet. Create a note, file or task to get started.
 							</p>
 						) : (
 							<ul className="divide-y divide-border/50">
@@ -241,7 +203,7 @@ export default function WorkspaceDashboard() {
 												</p>
 											</div>
 										</div>
-										<span className="shrink-0 text-[11px] font-mono text-muted-foreground">
+										<span className="shrink-0 text-xs tabular-nums text-muted-foreground">
 											{formatRelative(event.timestamp)}
 										</span>
 									</li>

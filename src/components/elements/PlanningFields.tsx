@@ -14,7 +14,7 @@ export function TagChip({ tag, active, onClick }: { tag: string; active?: boolea
 		backgroundColor: `hsl(${hue} 60% 50% / ${active ? 0.35 : 0.15})`,
 		borderColor: `hsl(${hue} 60% 50% / 0.4)`,
 	};
-	const className = "inline-flex items-center rounded-none border px-1.5 py-0.5 text-[10px] font-semibold text-foreground";
+	const className = "inline-flex items-center rounded-none border px-1.5 py-0.5 text-xs font-semibold text-foreground";
 	if (!onClick) {
 		return (
 			<span className={className} style={style}>
@@ -98,9 +98,9 @@ export function TagInput({
 }
 
 const DUE_STYLE: Record<DueState, string> = {
-	overdue: "border-rose-500/40 bg-rose-500/10 text-rose-400",
-	today: "border-amber-500/40 bg-amber-500/10 text-amber-400",
-	soon: "border-amber-500/30 bg-amber-500/5 text-amber-300",
+	overdue: "border-destructive/40 bg-destructive/10 text-destructive",
+	today: "border-warning/40 bg-warning/10 text-warning",
+	soon: "border-warning/30 bg-warning/5 text-warning",
 	later: "border-border text-muted-foreground",
 };
 const DUE_LABEL: Record<DueState, string> = { overdue: "Overdue", today: "Due today", soon: "Due soon", later: "Due" };
@@ -111,7 +111,7 @@ export function DueBadge({ due, done }: { due?: string | null; done: boolean }) 
 	const state = dueState(due, done) ?? "later";
 	const day = new Date(`${due.slice(0, 10)}T00:00:00`);
 	return (
-		<span className={cn("inline-flex items-center gap-1 rounded-none border px-1.5 py-0.5 text-[10px] font-medium", DUE_STYLE[state])}>
+		<span className={cn("inline-flex items-center gap-1 rounded-none border px-1.5 py-0.5 text-xs font-medium", DUE_STYLE[state])}>
 			<Calendar className="size-3" />
 			{DUE_LABEL[state]} {day.toLocaleDateString(undefined, { day: "numeric", month: "short" })}
 		</span>

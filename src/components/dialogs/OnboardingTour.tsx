@@ -40,7 +40,7 @@ export default function OnboardingTour({ open, onClose }: { open: boolean; onClo
 	return (
 		<Dialog isOpen={open} onOpenChange={(next) => !next && finish()} className="max-w-md">
 			<DialogHeader>
-				<p className="text-xs uppercase tracking-widest text-muted-foreground">{t("tour.step", { current: step, total: STEPS.length })}</p>
+				<p className="text-xs text-muted-foreground">{t("tour.step", { current: step, total: STEPS.length })}</p>
 				<DialogTitle>{t(`tour.${step}.title` as const)}</DialogTitle>
 			</DialogHeader>
 			<p className="py-2 text-sm text-muted-foreground">{t(`tour.${step}.body` as const)}</p>

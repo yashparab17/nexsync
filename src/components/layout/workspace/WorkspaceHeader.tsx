@@ -39,12 +39,12 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 	// One small colored dot says how the connection is: green when people are connected or the network is ready, amber while connecting, red when offline
 	const connecting = connectionStatus === "connecting" || connectionStatus === "reconnecting";
 	const status = connectedCount > 0
-		? { label: `Collaborate, ${connectedCount} connected`, dot: "bg-emerald-400" }
+		? { label: `Collaborate, ${connectedCount} connected`, dot: "bg-success" }
 		: !network.online
-			? { label: "Collaborate, offline", dot: "bg-red-400" }
+			? { label: "Collaborate, offline", dot: "bg-destructive" }
 			: connecting
-				? { label: "Collaborate, connecting", dot: "bg-amber-400 animate-pulse" }
-				: { label: "Collaborate, online", dot: "bg-emerald-400" };
+				? { label: "Collaborate, connecting", dot: "bg-warning animate-pulse" }
+				: { label: "Collaborate, online", dot: "bg-success" };
 
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 lg:px-6">

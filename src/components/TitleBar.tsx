@@ -15,7 +15,7 @@ export default function TitleBar() {
 	return (
 		<header className="relative z-[60] flex h-8 shrink-0 select-none items-center border-b bg-background">
 			<div data-tauri-drag-region className="flex h-full flex-1 items-center px-3">
-				<span data-tauri-drag-region className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+				<span data-tauri-drag-region className="text-xs font-semibold text-muted-foreground">
 					Nexsync <span className="font-normal normal-case tracking-normal">v{APP_VERSION}</span>
 				</span>
 			</div>
@@ -26,7 +26,7 @@ export default function TitleBar() {
 					aria-label={label}
 					className={cn(
 						"flex h-full w-11 items-center justify-center text-muted-foreground transition-colors",
-						danger ? "hover:bg-red-600 hover:text-white" : "hover:bg-muted hover:text-foreground",
+						danger ? "hover:bg-destructive hover:text-white" : "hover:bg-muted hover:text-foreground",
 					)}
 				>
 					<Icon className={label === "Maximize" ? "size-3" : "size-3.5"} />

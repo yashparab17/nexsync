@@ -181,19 +181,19 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 					<Button variant="ghost" size="icon-xs" onPress={onClose} aria-label="Close note">
 						<X className="size-4" />
 					</Button>
-					{isMarkdown ? <FileText className="size-4 shrink-0 text-sky-400" /> : <Type className="size-4 shrink-0 text-amber-400" />}
+					{isMarkdown ? <FileText className="size-4 shrink-0 text-info" /> : <Type className="size-4 shrink-0 text-warning" />}
 					<span className="truncate text-sm font-semibold">{fileName}</span>
-					<span className="hidden shrink-0 border px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground sm:inline">
+					<span className="hidden shrink-0 border px-1.5 py-0.5 text-xs text-muted-foreground sm:inline">
 						{isMarkdown ? "Markdown" : "Rich text · saved as plain text"}
 					</span>
 					{dirty ? (
-						<span className="flex shrink-0 items-center gap-1 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400">
-							<span className="size-1.5 animate-pulse bg-amber-400" />
+						<span className="flex shrink-0 items-center gap-1 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+							<span className="size-1.5 animate-pulse bg-warning" />
 							Unsaved changes
 						</span>
 					) : (
-						<span className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
-							<Check className="size-3 text-emerald-400" />
+						<span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+							<Check className="size-3 text-success" />
 							Saved to disk
 						</span>
 					)}
@@ -201,13 +201,13 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 
 				<div className="flex items-center gap-2">
 					{collab && peers.length > 0 && (
-						<span className="flex items-center gap-1 py-0.5 text-[11px] font-medium text-emerald-400">
+						<span className="flex items-center gap-1 py-0.5 text-xs font-medium text-success">
 							<Users className="size-3" />
 							Live
 						</span>
 					)}
 					<div
-						className="hidden items-center gap-2 border bg-muted/20 px-2.5 py-1 font-mono text-[11px] text-muted-foreground sm:flex"
+						className="hidden items-center gap-2 border bg-muted/20 px-2.5 py-1 font-mono text-xs text-muted-foreground sm:flex"
 						aria-label="Note statistics"
 					>
 						<span>
@@ -277,7 +277,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 					)}
 					{!readOnly && !branch && (
 						<Button size="sm" onPress={() => void save()} isDisabled={saving || !dirty} className="gap-1.5">
-							{saving ? <Loader2 className="size-3.5 animate-spin" /> : justSaved ? <Check className="size-3.5 text-emerald-400" /> : <Save className="size-3.5" />}
+							{saving ? <Loader2 className="size-3.5 animate-spin" /> : justSaved ? <Check className="size-3.5 text-success" /> : <Save className="size-3.5" />}
 							{saving ? "Saving…" : justSaved ? "Saved!" : "Save"}
 						</Button>
 					)}
@@ -345,7 +345,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 			</div>
 
 			{exportNotice && (
-				<p role={exportNotice.ok ? "status" : "alert"} className={`mt-2 truncate text-xs ${exportNotice.ok ? "text-emerald-400" : "text-destructive"}`}>
+				<p role={exportNotice.ok ? "status" : "alert"} className={`mt-2 truncate text-xs ${exportNotice.ok ? "text-success" : "text-destructive"}`}>
 					{exportNotice.text}
 				</p>
 			)}

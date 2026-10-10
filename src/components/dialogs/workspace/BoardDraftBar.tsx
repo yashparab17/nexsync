@@ -195,7 +195,7 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 									<li key={card.id} className="space-y-1 px-3 py-2 text-sm">
 										<p className="font-medium">{card.title || "Untitled card"}</p>
 										{card.deleted ? (
-											<p className="text-xs text-amber-400">Deleted since you started, so its move is dropped.</p>
+											<p className="text-xs text-warning">Deleted since you started, so its move is dropped.</p>
 										) : (
 											<ul className="text-xs text-muted-foreground">
 												{card.changes.map((c) => (
@@ -203,7 +203,7 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 												))}
 											</ul>
 										)}
-										{card.collisions.length > 0 && <p className="text-xs text-amber-400">Someone else also changed {card.collisions.map((c) => c.field).join(", ")}; you will be asked which to keep.</p>}
+										{card.collisions.length > 0 && <p className="text-xs text-warning">Someone else also changed {card.collisions.map((c) => c.field).join(", ")}; you will be asked which to keep.</p>}
 									</li>
 								))}
 							</ul>

@@ -204,7 +204,7 @@ export default function WorkspaceSearch() {
 								type="button"
 								aria-pressed={filter === f}
 								onClick={() => setFilter(f)}
-								className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+								className={`px-2 py-0.5 text-xs font-semibold ${
 									filter === f ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
 								}`}
 							>
@@ -213,7 +213,7 @@ export default function WorkspaceSearch() {
 						))}
 					</li>
 					{!q && results.length > 0 && (
-						<li className="flex items-center gap-1.5 px-3 pt-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+						<li className="flex items-center gap-1.5 px-3 pt-2 text-xs font-semibold text-muted-foreground">
 							<Clock className="size-3" /> Recent
 						</li>
 					)}
@@ -232,9 +232,9 @@ export default function WorkspaceSearch() {
 										<Icon className="size-4 shrink-0 text-primary" />
 										<span className="min-w-0 flex-1">
 											<span className="block truncate text-sm font-medium">{h.title}</span>
-											<span className="block truncate text-[11px] text-muted-foreground">{h.sub}</span>
+											<span className="block truncate text-xs text-muted-foreground">{h.sub}</span>
 										</span>
-										<span className="text-[10px] uppercase tracking-widest text-muted-foreground">{h.kind}</span>
+										<span className="text-xs text-muted-foreground">{h.kind}</span>
 									</button>
 								</li>
 							);

@@ -152,7 +152,7 @@ export default function JoinWorkspaceDialog({
 			<Dialog className="sm:max-w-xl">
 				<DialogHeader>
 					<div className="flex items-center gap-2">
-						<div className="flex h-9 w-9 items-center justify-center rounded-none bg-sky-500/10 text-sky-400 border border-sky-500/20">
+						<div className="flex h-9 w-9 items-center justify-center rounded-none bg-info/10 text-info border border-info/20">
 							<Radio className="h-5 w-5 animate-pulse" />
 						</div>
 						<div>
@@ -165,12 +165,12 @@ export default function JoinWorkspaceDialog({
 				</DialogHeader>
 
 				{/* Security banner */}
-				<div className="flex items-center justify-between px-3 py-2 text-xs text-emerald-400">
+				<div className="flex items-center justify-between px-3 py-2 text-xs text-success">
 					<div className="flex items-center gap-2">
 						<ShieldCheck className="h-4 w-4" />
 						<span>Private: only you and your collaborators can read your files</span>
 					</div>
-					<div className="flex items-center gap-1 font-mono text-[11px]">
+					<div className="flex items-center gap-1 font-mono text-xs">
 						<Lock className="h-3 w-3" />
 						<span>No cloud</span>
 					</div>
@@ -191,7 +191,7 @@ export default function JoinWorkspaceDialog({
 							value={ticket}
 							onChange={(e) => setTicket(e.target.value)}
 							rows={3}
-							className="font-mono text-[11px] break-all rounded-none border border-input px-3 py-2"
+							className="font-mono text-xs break-all rounded-none border border-input px-3 py-2"
 							autoFocus
 						/>
 					</div>
@@ -230,11 +230,11 @@ export default function JoinWorkspaceDialog({
 					</div>
 
 					{statusMessage && (
-						<div className="flex items-center gap-2 rounded-none border border-sky-500/20 bg-sky-500/10 p-2.5 text-xs text-sky-400">
+						<div className="flex items-center gap-2 rounded-none border border-info/20 bg-info/10 p-2.5 text-xs text-info">
 							{isSuccess ? (
-								<Sparkles className="h-4 w-4 text-emerald-400" />
+								<Sparkles className="h-4 w-4 text-success" />
 							) : (
-								<RefreshCw className="h-4 w-4 animate-spin text-sky-400" />
+								<RefreshCw className="h-4 w-4 animate-spin text-info" />
 							)}
 							<span>{statusMessage}</span>
 						</div>
@@ -253,7 +253,7 @@ export default function JoinWorkspaceDialog({
 								</>
 							) : isSuccess ? (
 								<>
-									<Check className="h-3.5 w-3.5 text-emerald-400" />
+									<Check className="h-3.5 w-3.5 text-success" />
 									Connected!
 								</>
 							) : (

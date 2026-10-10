@@ -46,7 +46,7 @@ export default function HostGate() {
 				{hostGate === "connecting" ? (
 					<Loader2 className="mx-auto size-10 animate-spin text-muted-foreground" aria-hidden />
 				) : (
-					<WifiOff className="mx-auto size-10 text-amber-400" aria-hidden />
+					<WifiOff className="mx-auto size-10 text-warning" aria-hidden />
 				)}
 				<h1 id="host-gate-title" className="text-xl font-semibold">
 					{hostGate === "connecting" ? `Connecting to ${host}…` : `${host} is offline`}

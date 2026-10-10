@@ -283,7 +283,7 @@ export default function WorkspaceEditor() {
 							>
 								<button type="button" onClick={() => setActive(path)} title={path} className="flex items-center gap-1.5">
 									{path.split("/").pop()}
-									{dirty.has(path) && <span className="size-1.5 bg-amber-400" aria-label="Unsaved changes" />}
+									{dirty.has(path) && <span className="size-1.5 bg-warning" aria-label="Unsaved changes" />}
 								</button>
 								<button type="button" aria-label={`Close ${path}`} onClick={() => closeTab(path)}>
 									<X className="size-3" />

@@ -36,7 +36,7 @@ export default function HostHandoffDialog() {
 			<div className="space-y-4">
 				<DialogHeader>
 					<div className="flex items-center gap-2">
-						<Crown className="size-5 text-amber-400" />
+						<Crown className="size-5 text-warning" />
 						<DialogTitle>Become the Host?</DialogTitle>
 					</div>
 					<DialogDescription>

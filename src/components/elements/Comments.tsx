@@ -30,7 +30,7 @@ export default function Comments({ comments, me, memberNames, canComment, onChan
 
 	return (
 		<section aria-label="Comments" className="space-y-2">
-			<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Comments ({comments.length})</p>
+			<p className="text-xs font-semibold text-muted-foreground">Comments ({comments.length})</p>
 			{comments.length > 0 && (
 				<ul className="max-h-48 space-y-2 overflow-y-auto">
 					{comments.map((c) => (

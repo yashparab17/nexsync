@@ -9,9 +9,9 @@ export default function PresenceDots({ names, doing = "here" }: { names: string[
 	return (
 		<span className="inline-flex shrink-0 items-center -space-x-1" title={`${names.join(", ")} ${names.length === 1 ? "is" : "are"} ${doing}`}>
 			{shown.map((n) => (
-				<Avatar key={n} name={n} className="size-4 text-[9px] ring-1 ring-background" />
+				<Avatar key={n} name={n} className="size-4 text-xs ring-1 ring-background" />
 			))}
-			{names.length > shown.length && <span className="pl-1.5 text-[9px] text-muted-foreground">+{names.length - shown.length}</span>}
+			{names.length > shown.length && <span className="pl-1.5 text-xs text-muted-foreground">+{names.length - shown.length}</span>}
 		</span>
 	);
 }

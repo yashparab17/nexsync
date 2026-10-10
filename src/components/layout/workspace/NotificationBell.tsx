@@ -23,7 +23,7 @@ export default function NotificationBell() {
 			<Button variant="ghost" size="icon" onPress={toggle} aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"} aria-expanded={open}>
 				<Bell className="size-5" />
 				{unread > 0 && (
-					<span className="absolute right-1 top-1 flex min-w-4 items-center justify-center bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+					<span className="absolute right-1 top-1 flex min-w-4 items-center justify-center bg-primary px-1 text-xs font-bold text-primary-foreground">
 						{unread > 9 ? "9+" : unread}
 					</span>
 				)}
@@ -33,7 +33,7 @@ export default function NotificationBell() {
 					<button type="button" aria-label="Close notifications" className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
 					<div role="region" aria-label="Notifications" className="absolute right-0 z-20 mt-1 w-80 border bg-popover shadow-md">
 						<div className="flex items-center justify-between border-b px-3 py-2">
-							<span className="text-xs font-semibold uppercase tracking-widest">Notifications</span>
+							<span className="text-xs font-semibold ">Notifications</span>
 							{items.length > 0 && (
 								<button type="button" onClick={clear} className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
 									Clear
@@ -47,7 +47,7 @@ export default function NotificationBell() {
 								{items.map((n) => (
 									<li key={n.id} className="border-b px-3 py-2 text-sm last:border-b-0">
 										<p>{n.text}</p>
-										<p className="text-[11px] text-muted-foreground">{time(n.at)}</p>
+										<p className="text-xs text-muted-foreground">{time(n.at)}</p>
 									</li>
 								))}
 							</ul>

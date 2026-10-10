@@ -213,7 +213,7 @@ export default function AssetPreviewModal({
 
 						{asset.syncStatus === "remote_placeholder" && (
 							<div className="m-auto flex max-w-md flex-col items-center gap-4 border bg-card p-8 text-center">
-								<div className="p-3 rounded-none bg-amber-500/10 text-amber-500 border border-amber-500/20">
+								<div className="p-3 rounded-none bg-warning/10 text-warning border border-warning/20">
 									<Sparkles className="size-8" />
 								</div>
 								<div>
@@ -335,7 +335,7 @@ export default function AssetPreviewModal({
 					{/* Metadata & Embed Inspector Sidebar */}
 					<div className="flex max-h-[40%] w-full shrink-0 flex-col gap-5 overflow-y-auto border-t bg-card p-5 md:max-h-none md:w-72 md:border-t-0 md:border-l">
 						<div>
-							<h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+							<h4 className="text-xs font-semibold text-muted-foreground mb-3">
 								Asset Details
 							</h4>
 							<dl className="space-y-2.5 text-xs">
@@ -363,10 +363,10 @@ export default function AssetPreviewModal({
 									<dt className="text-muted-foreground">Status</dt>
 									<dd>
 										{asset.syncStatus === "synced" ?
-											<span className="text-emerald-500 font-medium flex items-center gap-1">
+											<span className="text-success font-medium flex items-center gap-1">
 												● Local Storage
 											</span>
-										:	<span className="text-amber-500 font-medium flex items-center gap-1">
+										:	<span className="text-warning font-medium flex items-center gap-1">
 												○ Not downloaded
 											</span>
 										}
@@ -389,17 +389,17 @@ export default function AssetPreviewModal({
 						{/* Markdown Embed Snippet */}
 						<div className="space-y-2">
 							<div className="flex items-center justify-between">
-								<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+								<span className="text-xs font-semibold text-muted-foreground">
 									Markdown Embed
 								</span>
 								<Button
 									variant="ghost"
 									size="sm"
 									onPress={handleCopyMarkdown}
-									className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary"
+									className="h-6 px-2 text-xs gap-1 text-primary hover:text-primary"
 								>
 									{copiedKey === "markdown" ?
-										<Check className="size-3 text-emerald-400" />
+										<Check className="size-3 text-success" />
 									:	<Copy className="size-3" />}
 									{copiedKey === "markdown" ? "Copied" : "Copy"}
 								</Button>
@@ -407,7 +407,7 @@ export default function AssetPreviewModal({
 							<div className="p-2.5 rounded-none bg-muted/60 border border-border/60 font-mono text-xs break-all select-all text-muted-foreground">
 								{markdownSnippet}
 							</div>
-							<p className="text-[11px] text-muted-foreground">
+							<p className="text-xs text-muted-foreground">
 								Paste directly into BlockNote or Markdown notes to embed this
 								asset.
 							</p>
@@ -416,17 +416,17 @@ export default function AssetPreviewModal({
 						{/* Relative Path */}
 						<div className="space-y-2">
 							<div className="flex items-center justify-between">
-								<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+								<span className="text-xs font-semibold text-muted-foreground">
 									Relative Path
 								</span>
 								<Button
 									variant="ghost"
 									size="sm"
 									onPress={handleCopyPath}
-									className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary"
+									className="h-6 px-2 text-xs gap-1 text-primary hover:text-primary"
 								>
 									{copiedKey === "path" ?
-										<Check className="size-3 text-emerald-400" />
+										<Check className="size-3 text-success" />
 									:	<Copy className="size-3" />}
 									{copiedKey === "path" ? "Copied" : "Copy"}
 								</Button>
