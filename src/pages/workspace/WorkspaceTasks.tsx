@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ElementType } from "rea
 import { Plus, Search, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, Sparkles } from "@/components/animate-icons";
 
 import PageHeader from "@/components/layout/PageHeader";
+import { Segmented } from "@/components/elements/SettingsParts";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -88,30 +89,6 @@ const STATUS_CONFIG: Record<
 		border: "border-success/30",
 	},
 };
-
-// A row of mutually exclusive choices, optionally with counts; the one control style for views and filters
-function Segmented<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string; count?: number; icon?: ElementType }[] }) {
-	return (
-		<div role="group" aria-label={label} className="flex border">
-			{options.map((o) => {
-				const Icon = o.icon;
-				return (
-					<button
-						key={o.value}
-						type="button"
-						aria-pressed={value === o.value}
-						onClick={() => onChange(o.value)}
-						className={cn("flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors", value === o.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
-					>
-						{Icon && <Icon className="size-4" />}
-						{o.label}
-						{o.count !== undefined && <span className="font-mono text-xs tabular-nums opacity-70">{o.count}</span>}
-					</button>
-				);
-			})}
-		</div>
-	);
-}
 
 export default function WorkspaceTasks() {
 	const { workspace, metadata, refreshMetadata, addActivityEvent } = useWorkspace();
@@ -464,7 +441,7 @@ export default function WorkspaceTasks() {
 					label="View"
 					value={view}
 					onChange={setView}
-					options={[{ value: "list", label: "List", icon: List }, { value: "calendar", label: "Calendar", icon: CalendarDays }]}
+					options={[{ value: "list", label: "List", icon: <List className="size-4" /> }, { value: "calendar", label: "Calendar", icon: <CalendarDays className="size-4" /> }]}
 				/>
 
 				<Segmented

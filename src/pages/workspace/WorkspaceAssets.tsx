@@ -333,7 +333,7 @@ export default function WorkspaceAssets() {
 			{/* Drag & Drop Window Overlay */}
 			{isDraggingOver && (
 				<div className="absolute inset-0 z-50 bg-primary/20 backdrop-blur-sm border-2 border-dashed border-primary rounded-none flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-150">
-					<UploadCloud className="size-16 text-primary animate-bounce mb-3" />
+					<UploadCloud className="size-16 text-primary animate-pulse mb-3" />
 					<h3 className="text-xl font-bold text-foreground">
 						Drop files to upload directly to assets/
 					</h3>

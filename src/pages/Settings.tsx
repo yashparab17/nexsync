@@ -6,7 +6,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { Loader2 } from "lucide-react";
 import { Check, Moon, Plus, Sun, Trash2, Bug, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, ShieldCheck, Undo2, User, X } from "@/components/animate-icons";
 
-import { Row, Segmented, SectionCard } from "@/components/elements/SettingsParts";
+import { Row, Segmented, SectionCard, SectionNav } from "@/components/elements/SettingsParts";
 import Avatar from "@/components/elements/Avatar";
 import ErrorLogCard from "@/components/elements/ErrorLogCard";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ const SECTIONS = [
 	{ id: "updates", label: "Updates & About", icon: DownloadCloud },
 	{ id: "diagnostics", label: "Diagnostics", icon: Bug },
 ];
+const NAV = SECTIONS.map(({ id, label, icon: Icon }) => ({ id, label, icon: <Icon className="size-4 shrink-0" /> }));
 
 // Two paths are the same folder if they differ only in slashes, a trailing slash or letter case
 const samePath = (a: string, b: string) => {
@@ -178,19 +179,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 			<div className="mx-auto flex max-w-5xl gap-8 p-8">
 				{/* Section list */}
 				<aside className="hidden w-44 shrink-0 md:block">
-					<nav aria-label="Settings sections" className="sticky top-8 space-y-1">
-						{SECTIONS.map(({ id, label, icon: Icon }) => (
-							<button
-								key={id}
-								type="button"
-								onClick={() => document.getElementById(id)?.scrollIntoView?.({ behavior: "smooth", block: "start" })}
-								className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-							>
-								<Icon className="size-4 shrink-0" />
-								{label}
-							</button>
-						))}
-					</nav>
+					<SectionNav label="Settings sections" sections={NAV} />
 				</aside>
 
 				<div className="min-w-0 flex-1 space-y-6">
