@@ -13,6 +13,10 @@ mod compat;
 #[cfg(test)]
 mod hostless_sim;
 mod membership;
+#[cfg(test)]
+mod membership_sim;
+#[cfg(test)]
+mod peer_check;
 mod mesh;
 mod node;
 pub(crate) mod short_code;
