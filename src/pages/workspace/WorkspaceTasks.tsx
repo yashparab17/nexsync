@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ElementType } from "react";
-import { Plus, Search, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, Filter, List, ListTodo, Pencil, Sparkles } from "@/components/animate-icons";
+import { Plus, Search, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, Sparkles } from "@/components/animate-icons";
 
+import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
 	Dialog,
 	DialogDescription,
@@ -88,6 +88,30 @@ const STATUS_CONFIG: Record<
 		border: "border-success/30",
 	},
 };
+
+// A row of mutually exclusive choices, optionally with counts; the one control style for views and filters
+function Segmented<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string; count?: number; icon?: ElementType }[] }) {
+	return (
+		<div role="group" aria-label={label} className="flex border">
+			{options.map((o) => {
+				const Icon = o.icon;
+				return (
+					<button
+						key={o.value}
+						type="button"
+						aria-pressed={value === o.value}
+						onClick={() => onChange(o.value)}
+						className={cn("flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors", value === o.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
+					>
+						{Icon && <Icon className="size-4" />}
+						{o.label}
+						{o.count !== undefined && <span className="font-mono text-xs tabular-nums opacity-70">{o.count}</span>}
+					</button>
+				);
+			})}
+		</div>
+	);
+}
 
 export default function WorkspaceTasks() {
 	const { workspace, metadata, refreshMetadata, addActivityEvent } = useWorkspace();
@@ -419,154 +443,48 @@ export default function WorkspaceTasks() {
 
 	return (
 		<div className="space-y-6">
-			{/* Header & Controls */}
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Organize, track, and manage your workspace priorities.
-					</p>
-				</div>
-				{!isViewer && (
-					<Button
-						onPress={handleOpenCreate}
-						className="w-fit gap-2 shadow-sm transition-transform active:scale-95"
-					>
+			<PageHeader
+				title="Tasks"
+				description={`${stats.total - stats.done} open, ${stats.done} done. Click the box on a task to move it along.`}
+				actions={!isViewer && (
+					<Button onPress={handleOpenCreate}>
 						<Plus className="size-4" />
-						New Task
+						New task
 					</Button>
 				)}
-			</div>
+			/>
 
-			{/* Metric Stat Cards */}
-			<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-				<Card className="border-border/60 bg-card/40 backdrop-blur-xs">
-					<CardContent className="flex items-center justify-between p-4">
-						<div>
-							<p className="text-xs font-semibold text-muted-foreground">
-								Total Tasks
-							</p>
-							<p className="mt-1 text-2xl font-bold">{stats.total}</p>
-						</div>
-						<ListTodo className="size-6 text-muted-foreground/60" />
-					</CardContent>
-				</Card>
-
-				<Card className="border-border/60 bg-card/40 backdrop-blur-xs">
-					<CardContent className="flex items-center justify-between p-4">
-						<div>
-							<p className="text-xs font-semibold text-muted-foreground">
-								To Do
-							</p>
-							<p className="mt-1 text-2xl font-bold text-info">
-								{stats.todo}
-							</p>
-						</div>
-						<Clock className="size-6 text-info/60" />
-					</CardContent>
-				</Card>
-
-				<Card className="border-border/60 bg-card/40 backdrop-blur-xs">
-					<CardContent className="flex items-center justify-between p-4">
-						<div>
-							<p className="text-xs font-semibold text-muted-foreground">
-								In Progress
-							</p>
-							<p className="mt-1 text-2xl font-bold text-warning">
-								{stats.inProgress}
-							</p>
-						</div>
-						<AlertCircle className="size-6 text-warning/60" />
-					</CardContent>
-				</Card>
-
-				<Card className="border-border/60 bg-card/40 backdrop-blur-xs">
-					<CardContent className="flex items-center justify-between p-4">
-						<div>
-							<p className="text-xs font-semibold text-muted-foreground">
-								Completed
-							</p>
-							<p className="mt-1 text-2xl font-bold text-success">
-								{stats.done}
-							</p>
-						</div>
-						<CheckCircle2 className="size-6 text-success/60" />
-					</CardContent>
-				</Card>
-			</div>
-
-			{/* Search and Filters Bar */}
-			<div className="flex flex-col gap-3 rounded-none border bg-muted/20 p-3 sm:flex-row sm:items-center">
-				<div className="relative flex-1">
+			<div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+				<div className="relative min-w-56 flex-1">
 					<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-					<Input
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						placeholder="Search tasks..."
-						className="pl-9 bg-background/60"
-					/>
+					<Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search tasks" className="pl-9" />
 				</div>
 
-				<div className="flex items-center border" role="group" aria-label="View">
-					{(["list", "calendar"] as const).map((v) => (
-						<button
-							key={v}
-							type="button"
-							aria-pressed={view === v}
-							onClick={() => setView(v)}
-							className={cn(
-								"flex cursor-pointer items-center gap-1 px-2.5 py-1 text-xs font-medium transition-colors",
-								view === v
-									? "bg-primary text-primary-foreground"
-									: "bg-muted text-muted-foreground hover:text-foreground",
-							)}
-						>
-							{v === "list" ? <List className="size-3.5" /> : <CalendarDays className="size-3.5" />}
-							{v === "list" ? "List" : "Calendar"}
-						</button>
-					))}
-				</div>
+				<Segmented
+					label="View"
+					value={view}
+					onChange={setView}
+					options={[{ value: "list", label: "List", icon: List }, { value: "calendar", label: "Calendar", icon: CalendarDays }]}
+				/>
 
-				<div className="flex flex-wrap items-center gap-2">
-					<div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-						<Filter className="size-3.5" />
-						Status:
-					</div>
-					{(["all", "todo", "in_progress", "done"] as const).map((s) => (
-						<button
-							key={s}
-							type="button"
-							onClick={() => setStatusFilter(s)}
-							className={cn(
-								"rounded-none px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
-								statusFilter === s
-									? "bg-primary text-primary-foreground font-semibold"
-									: "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
-							)}
-						>
-							{s === "all" ? "All" : STATUS_CONFIG[s].label}
-						</button>
-					))}
+				<Segmented
+					label="Status"
+					value={statusFilter}
+					onChange={setStatusFilter}
+					options={[
+						{ value: "all", label: "All", count: stats.total },
+						{ value: "todo", label: "To do", count: stats.todo },
+						{ value: "in_progress", label: "In progress", count: stats.inProgress },
+						{ value: "done", label: "Done", count: stats.done },
+					]}
+				/>
 
-					<div className="ml-2 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-						Priority:
-					</div>
-					{(["all", "high", "medium", "low"] as const).map((p) => (
-						<button
-							key={p}
-							type="button"
-							onClick={() => setPriorityFilter(p)}
-							className={cn(
-								"rounded-none px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
-								priorityFilter === p
-									? "bg-primary text-primary-foreground font-semibold"
-									: "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
-							)}
-						>
-							{p === "all" ? "All" : PRIORITY_CONFIG[p].label}
-						</button>
-					))}
-				</div>
+				<Segmented
+					label="Priority"
+					value={priorityFilter}
+					onChange={setPriorityFilter}
+					options={[{ value: "all", label: "Any" }, { value: "high", label: "High" }, { value: "medium", label: "Medium" }, { value: "low", label: "Low" }]}
+				/>
 			</div>
 
 			{allTags.length > 0 && (
@@ -627,7 +545,7 @@ export default function WorkspaceTasks() {
 					)}
 				</div>
 			) : (
-				<div className="grid gap-2">
+				<div className="divide-y border bg-card">
 					{filteredTasks.map((task) => {
 						const statusConf = STATUS_CONFIG[task.status];
 						const priorityConf = PRIORITY_CONFIG[task.priority];
@@ -637,8 +555,9 @@ export default function WorkspaceTasks() {
 							<div
 								key={task.id}
 								className={cn(
-									"group flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-none border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-xs",
-									task.status === "done" && "opacity-75 bg-muted/10",
+									"group flex flex-col justify-between gap-3 border-l-2 px-4 py-3.5 transition-colors hover:bg-muted/40 sm:flex-row sm:items-center",
+									task.priority === "high" ? "border-l-destructive" : task.priority === "medium" ? "border-l-warning" : "border-l-transparent",
+									task.status === "done" && "opacity-60",
 								)}
 							>
 								{/* Left: Checkmark & Title/Description */}
@@ -669,7 +588,7 @@ export default function WorkspaceTasks() {
 										<div className="flex items-center gap-2 flex-wrap">
 											<h4
 												className={cn(
-													"font-medium text-sm text-foreground",
+													"font-medium text-foreground",
 													task.status === "done" &&
 														"line-through text-muted-foreground",
 												)}
@@ -691,14 +610,6 @@ export default function WorkspaceTasks() {
 												)}
 											>
 												{priorityConf.label}
-											</span>
-											<span
-												className={cn(
-													"inline-flex items-center rounded-none border px-2 py-0.5 text-xs font-semibold text-muted-foreground bg-muted/30",
-													statusConf.border,
-												)}
-											>
-												{statusConf.label}
 											</span>
 										</div>
 

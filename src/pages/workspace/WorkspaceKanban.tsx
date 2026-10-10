@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, AlertTriangle, ArrowRight, CheckSquare, Columns3, Pencil } from "@/components/animate-icons";
 
+import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import EraseOption from "@/components/elements/EraseOption";
 import {
@@ -489,16 +490,12 @@ export default function WorkspaceKanban() {
 	);
 
 	return (
-		<div className="flex h-[calc(100vh-10rem)] flex-col space-y-4">
-			{/* Header */}
-			<div className="flex shrink-0 items-center justify-between">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight">Kanban Board</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Organise work in columns and cards.
-					</p>
-				</div>
-				<div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+		<div className="flex h-[calc(100vh-10rem)] flex-col gap-4">
+			<PageHeader
+				title="Kanban"
+				description="Move cards across columns as work progresses."
+				actions={
+					<>
 					{workspace?.path && <BoardDraftBar workspacePath={workspace.path} columns={columns} board={board} onBoard={setBoard} canDraft={!isViewer} />}
 					{canChange && (
 						<Button
@@ -511,8 +508,9 @@ export default function WorkspaceKanban() {
 							New Column
 						</Button>
 					)}
-				</div>
-			</div>
+					</>
+				}
+			/>
 
 			{allTags.length > 0 && (
 				<div className="flex shrink-0 flex-wrap items-center gap-1.5">
@@ -563,15 +561,15 @@ export default function WorkspaceKanban() {
 						return (
 							<div
 								key={col.id}
-								className="flex w-80 shrink-0 flex-col border-t-2 border-primary bg-muted/30 p-3"
+								className="flex min-w-72 flex-1 basis-72 flex-col border bg-card/40 p-3"
 							>
 								{/* Column Header */}
 								<div className="flex items-center justify-between pb-2">
 									<div className="flex items-center gap-2">
-										<h3 className="text-xs font-bold text-foreground">
+										<h3 className="text-sm font-semibold text-foreground">
 											{col.title}
 										</h3>
-										<span className="flex h-5 min-w-5 items-center justify-center bg-primary/10 px-1 text-xs font-bold text-primary">
+										<span className="flex h-5 min-w-5 items-center justify-center bg-muted px-1 font-mono text-xs tabular-nums text-muted-foreground">
 											{col.cards.length}
 										</span>
 									</div>
@@ -669,7 +667,7 @@ export default function WorkspaceKanban() {
 													</h4>
 													<PresenceDots names={viewersAt("kanban", card.id)} doing="editing this card" />
 													{canChange && (
-														<div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+														<div className="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100">
 															<Button
 																variant="ghost"
 																size="icon-xs"

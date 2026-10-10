@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { Copy, Check, Search, Trash2, FileText, Film, Headphones, Image as ImageIcon, LayoutGrid, List, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
 
+import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -343,19 +344,16 @@ export default function WorkspaceAssets() {
 			)}
 
 			{/* Page Header */}
-			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight">Assets</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Store and manage images, media, and binary files in your local{" "}
+			<PageHeader
+				title="Assets"
+				description={<>Store and manage images, media, and binary files in your local{" "}
 						<code className="bg-muted px-1.5 py-0.5 rounded-none text-xs font-mono text-foreground">
 							assets/
 						</code>{" "}
-						folder.
-					</p>
-				</div>
-
-				<div className="flex items-center gap-2">
+						folder.</>}
+				actions={
+					<>
+<div className="flex items-center gap-2">
 					{!isViewer && (
 						<Button
 							onPress={() => setIsUploadOpen(true)}
@@ -366,7 +364,9 @@ export default function WorkspaceAssets() {
 						</Button>
 					)}
 				</div>
-			</div>
+					</>
+				}
+			/>
 
 			{/* Toolbar: Search, Categories, View Toggle */}
 			<div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2 border-b border-border/60">
@@ -489,7 +489,7 @@ export default function WorkspaceAssets() {
 							<Card
 								key={asset.name}
 								onClick={() => setPreviewAsset(asset)}
-								className="group relative overflow-hidden cursor-pointer border-border hover:border-primary/60 hover:shadow-lg transition-all duration-200 bg-card/60 flex flex-col"
+								className="group relative flex cursor-pointer flex-col gap-0 overflow-hidden border-border bg-card py-0 transition-colors hover:border-primary"
 							>
 								{/* Thumbnail Header Area */}
 								<div className="relative h-36 bg-muted flex items-center justify-center overflow-hidden border-b border-border/40">
