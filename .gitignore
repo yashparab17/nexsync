@@ -77,3 +77,4 @@ nexsync-synopsis.pdf
 
 # Agent skills (installed locally)
 .agents/
+skills-lock.json
