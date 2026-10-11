@@ -9,3 +9,9 @@ Drag them onto a Figma canvas: text, boxes, borders and icons arrive as editable
 - Colours in the SVGs are plain fills, not variables. Recolour with Figma's "Select matching colour", or rebuild from the tokens.
 
 Regenerate after UI changes by running the capture script against the dev server.
+
+## Tokens Studio
+
+`tokens-studio.json` has four token sets (Catppuccin light and dark, original light and dark) and four themes, in the
+format the Tokens Studio for Figma plugin reads. In the plugin: Settings, then Sync / Import, load the file; then use
+Styles and variables to create Figma variables or styles from a theme.
