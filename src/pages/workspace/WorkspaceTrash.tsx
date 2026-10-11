@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { FileText, Folder, Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { FileText, Folder, Loader2, RotateCcw } from "lucide-react";
+import { Trash2 } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import {

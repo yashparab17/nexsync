@@ -1,19 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-	AlertCircle,
-	AlertTriangle,
-	CalendarDays,
-	CheckCircle2,
-	Clock,
-	Filter,
-	List,
-	ListTodo,
-	Pencil,
-	Plus,
-	Search,
-	Sparkles,
-	Trash2,
-} from "lucide-react";
+import { AlertCircle, AlertTriangle, CalendarDays, CheckCircle2, Clock, Filter, List, ListTodo, Pencil, Sparkles } from "lucide-react";
+import { Plus, Search, Trash2 } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

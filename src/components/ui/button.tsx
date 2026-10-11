@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import {
@@ -8,6 +9,7 @@ import {
 } from "react-aria-components";
 
 import { cn } from "@/lib/utils";
+import { AnimateIcon } from "@/components/animate-icons";
 
 // Button variant and sizing definitions
 const buttonVariants = cva(
@@ -56,14 +58,23 @@ function Button({
   VariantProps<typeof buttonVariants> & {
     className?: string;
   }) {
+  // Hovering or pressing the button plays any animated icon inside it
+  const [active, setActive] = useState(false);
+  const { onHoverStart, onHoverEnd, onPressStart, onPressEnd, ...rest } = props;
   return (
-    <ButtonPrimitive
-      data-slot="button"
-      data-variant={variant}
-      data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
+    <AnimateIcon animate={active} className="contents">
+      <ButtonPrimitive
+        data-slot="button"
+        data-variant={variant}
+        data-size={size}
+        className={cn(buttonVariants({ variant, size, className }))}
+        onHoverStart={(e) => { setActive(true); onHoverStart?.(e); }}
+        onHoverEnd={(e) => { setActive(false); onHoverEnd?.(e); }}
+        onPressStart={(e) => { setActive(true); onPressStart?.(e); }}
+        onPressEnd={(e) => { onPressEnd?.(e); }}
+        {...rest}
+      />
+    </AnimateIcon>
   );
 }
 

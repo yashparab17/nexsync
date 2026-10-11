@@ -3,28 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { open } from "@tauri-apps/plugin-dialog";
 import { APP_VERSION } from "@/lib/version";
 import { relaunch } from "@tauri-apps/plugin-process";
-import {
-	Bug,
-	Check,
-	Code2,
-	DownloadCloud,
-	FolderPlus,
-	Globe,
-	HardDrive,
-	Loader2,
-	Minus,
-	Monitor,
-	Moon,
-	Palette,
-	Plus,
-	Save,
-	ShieldCheck,
-	Sun,
-	Trash2,
-	Undo2,
-	User,
-	X,
-} from "lucide-react";
+import { Bug, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Loader2, Minus, Monitor, Palette, Save, ShieldCheck, Undo2, User, X } from "lucide-react";
+import { Check, Moon, Plus, Sun, Trash2 } from "@/components/animate-icons";
 
 import { Row, Segmented, SectionCard } from "@/components/elements/SettingsParts";
 import Avatar from "@/components/elements/Avatar";

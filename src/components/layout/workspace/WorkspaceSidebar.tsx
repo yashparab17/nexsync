@@ -1,25 +1,13 @@
 // React
+import { AnimateIcon } from "@/components/animate-icons";
 import { useState, type ElementType } from "react";
 
 // React Router
 import { NavLink, useNavigate } from "react-router-dom";
 
 // Icons
-import {
-	ArrowLeft,
-	BarChart3,
-	Code2,
-	Files,
-	FolderOpen,
-	KanbanSquare,
-	LayoutDashboard,
-	ListTodo,
-	ChevronLeft,
-	ChevronRight,
-	StickyNote,
-	Trash2,
-	UsersRound,
-} from "lucide-react";
+import { Code2, Files, FolderOpen, ListTodo, StickyNote } from "lucide-react";
+import { ArrowLeft, ChartColumn as BarChart3, SquareKanban as KanbanSquare, LayoutDashboard, ChevronLeft, ChevronRight, Trash2, UsersRound } from "@/components/animate-icons";
 
 // Components
 import { Button } from "@/components/ui/button";
@@ -123,30 +111,37 @@ function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; 
 	const Icon = item.icon;
 	const { viewersAt } = useP2P();
 	const page = pageOf(item.path);
+	const [hot, setHot] = useState(false);
 
 	return (
-		<NavLink
-			to={item.path}
-			end={item.end}
-			onClick={onNavigate}
-			className={({ isActive }) =>
-				cn(
-					"flex w-full items-center gap-3 overflow-hidden rounded-none px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
-					expanded ? "justify-start" : "justify-center",
-					isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted",
-				)
-			}
-			title={t(item.label)}
-			aria-label={t(item.label)}
-		>
-			<Icon className="size-5 shrink-0" aria-hidden />
-			<span className={cn("whitespace-nowrap", expanded ? "inline" : "hidden")}>{t(item.label)}</span>
-			{page && (
-				<span className={cn("ml-auto", !expanded && "hidden")}>
-					<PresenceDots names={viewersAt(page)} />
-				</span>
-			)}
-		</NavLink>
+		<AnimateIcon animate={hot} className="contents">
+			<NavLink
+				to={item.path}
+				end={item.end}
+				onClick={onNavigate}
+				onMouseEnter={() => setHot(true)}
+				onMouseLeave={() => setHot(false)}
+				onFocus={() => setHot(true)}
+				onBlur={() => setHot(false)}
+				className={({ isActive }) =>
+					cn(
+						"flex w-full items-center gap-3 overflow-hidden rounded-none px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
+						expanded ? "justify-start" : "justify-center",
+						isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted",
+					)
+				}
+				title={t(item.label)}
+				aria-label={t(item.label)}
+			>
+				<Icon className="size-5 shrink-0" aria-hidden />
+				<span className={cn("whitespace-nowrap", expanded ? "inline" : "hidden")}>{t(item.label)}</span>
+				{page && (
+					<span className={cn("ml-auto", !expanded && "hidden")}>
+						<PresenceDots names={viewersAt(page)} />
+					</span>
+				)}
+			</NavLink>
+		</AnimateIcon>
 	);
 }
 
@@ -191,14 +186,14 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 			</div>
 
 			{/* Main Navigation */}
-			<nav aria-label={t("nav.main")} className={cn("flex-1 space-y-1 overflow-y-auto overflow-x-hidden", showLabels ? "p-3" : "p-2")}>
+			<nav aria-label={t("nav.main")} className={cn("flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden", showLabels ? "p-3" : "p-2")}>
 				{navigation.map((item) => (
 					<NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />
 				))}
 			</nav>
 
 			{/* Bottom Navigation */}
-			<nav className={cn("space-y-1 border-t", showLabels ? "p-3" : "p-2")}>
+			<nav className={cn("flex flex-col gap-1 border-t", showLabels ? "p-3" : "p-2")}>
 				{bottomNavigation.map((item) => (
 					<NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />
 				))}
@@ -207,15 +202,17 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 
 			{/* The tab on the sidebar edge, level with the header */}
 			{!expanded && (
-				<button
-					type="button"
-					onClick={toggle}
-					aria-label={t(collapsed ? "nav.expand" : "nav.collapse")}
-					title={t(collapsed ? "nav.expand" : "nav.collapse")}
-					className="absolute top-5 -right-3 z-10 flex size-6 items-center justify-center border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-				>
-					{collapsed ? <ChevronRight className="size-3.5" aria-hidden /> : <ChevronLeft className="size-3.5" aria-hidden />}
-				</button>
+				<AnimateIcon animateOnHover asChild>
+					<button
+						type="button"
+						onClick={toggle}
+						aria-label={t(collapsed ? "nav.expand" : "nav.collapse")}
+						title={t(collapsed ? "nav.expand" : "nav.collapse")}
+						className="absolute top-5 -right-3 z-10 flex size-6 items-center justify-center border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					>
+						{collapsed ? <ChevronRight className="size-3.5" aria-hidden /> : <ChevronLeft className="size-3.5" aria-hidden />}
+					</button>
+				</AnimateIcon>
 			)}
 		</div>
 	);

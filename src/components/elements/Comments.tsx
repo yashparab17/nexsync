@@ -1,7 +1,7 @@
 // A comment thread for a task or card: who said what, @mentions highlighted, and a box to add one
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";

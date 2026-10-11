@@ -1,5 +1,6 @@
 import { parseDate } from "@internationalized/date";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Calendar as CalendarIcon, X } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "@/components/animate-icons";
 import {
 	Button,
 	Calendar,

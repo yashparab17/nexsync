@@ -1,22 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import {
-	ChevronDown,
-	ChevronRight,
-	ChevronsDownUp,
-	Download,
-	File,
-	FileCode,
-	FilePlus,
-	FileText,
-	Folder,
-	FolderOpen,
-	FolderPlus,
-	Pencil,
-	RefreshCw,
-	Search,
-	Trash2,
-	X,
-} from "lucide-react";
+import { ChevronDown, ChevronsDownUp, Download, File, FileCode, FilePlus, FileText, Folder, FolderOpen, FolderPlus, Pencil, X } from "lucide-react";
+import { ChevronRight, RefreshCw, Search, Trash2 } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import PresenceDots from "@/components/elements/PresenceDots";

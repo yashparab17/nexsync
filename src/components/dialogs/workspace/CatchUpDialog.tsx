@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, ChevronRight, History, ShieldCheck, Undo2 } from "lucide-react";
+import { ChevronDown, History, ShieldCheck, Undo2 } from "lucide-react";
+import { Check, ChevronRight } from "@/components/animate-icons";
 
 import { DiffView } from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
