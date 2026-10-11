@@ -2,6 +2,7 @@ import { MAX_TITLE } from "@/lib/validation";
 import { useCallback, useEffect, useMemo, useState, type ElementType } from "react";
 import { Plus, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, Sparkles } from "@/components/animate-icons";
 
+import { EmptyState } from "@/components/layout/Page";
 import Toolbar, { ToolbarSearch, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -481,23 +482,26 @@ export default function WorkspaceTasks() {
 						<TaskCalendar tasks={filteredTasks} onOpen={handleOpenEdit} />
 					</div>
 				) : filteredTasks.length === 0 ? (
-					<div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
-						<Sparkles className="size-10 text-muted-foreground" />
-						<h3 className="text-base font-semibold">{filtering ? "No matching tasks" : "No tasks yet"}</h3>
-						<p className="max-w-sm text-sm text-muted-foreground">{filtering ? "Nothing matches the search or filters." : "Create one to start tracking what needs doing."}</p>
-						{filtering ? (
-							<Button variant="outline" size="sm" className="mt-2" onPress={clearFilters}>
-								Clear filters
-							</Button>
-						) : (
-							!isViewer && (
-								<Button size="sm" className="mt-2" onPress={handleOpenCreate}>
-									<Plus className="size-4" />
-									Create task
+					<EmptyState
+						icon={<Sparkles />}
+						title={filtering ? "No matching tasks" : "No tasks yet"}
+						action={
+							filtering ? (
+								<Button variant="outline" size="sm" onPress={clearFilters}>
+									Clear filters
 								</Button>
+							) : (
+								!isViewer && (
+									<Button size="sm" onPress={handleOpenCreate}>
+										<Plus className="size-4" />
+										Create task
+									</Button>
+								)
 							)
-						)}
-					</div>
+						}
+					>
+						{filtering ? "Nothing matches the search or filters." : "Create one to start tracking what needs doing."}
+					</EmptyState>
 				) : (
 					<ul className="divide-y">
 						{filteredTasks.map((task) => {

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Trash2, FileText, Folder, RotateCcw } from "@/components/animate-icons";
 
-import PageHeader from "@/components/layout/PageHeader";
+import { EmptyState, Page, PageBody } from "@/components/layout/Page";
+import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 
@@ -69,72 +70,56 @@ export default function WorkspaceTrash() {
 	};
 
 	return (
-		<div className="space-y-6">
-			<PageHeader
-				title="Trash"
-				description="Deleted files and folders, including ones removed by collaborators. Restore them or remove them for good."
-				actions={
-					<>
-{!isViewer && items.length > 0 && (
-					<Button variant="outline" size="sm" onPress={() => setConfirm("all")} className="gap-1.5">
-						<Trash2 className="size-3.5" />
+		<Page>
+			<Toolbar>
+				<ToolbarTitle name="trash" meta={items.length ? `${items.length} ${items.length === 1 ? "item" : "items"}` : undefined} />
+				<span className="ml-1 hidden min-w-0 flex-1 truncate border-l pl-3 text-sm text-muted-foreground md:block">Deleted files and folders, including ones removed by collaborators</span>
+				<span className="flex-1 md:hidden" />
+				{!isViewer && items.length > 0 && (
+					<Button variant="outline" size="sm" onPress={() => setConfirm("all")}>
+						<Trash2 className="size-4" />
 						Empty trash
 					</Button>
 				)}
-					</>
-				}
-			/>
+			</Toolbar>
 
-			{message && <p className="text-sm text-destructive">{message}</p>}
-
-			{loading ? (
-				<div className="flex h-32 items-center justify-center">
-					<Loader2 className="size-5 animate-spin text-muted-foreground" />
-				</div>
-			) : items.length === 0 ? (
-				<div className="border border-dashed p-12 text-center text-sm text-muted-foreground">
-					Trash is empty.
-				</div>
-			) : (
-				<ul className="divide-y border">
-					{items.map((item) => (
-						<li key={item.id} className="flex items-center gap-3 px-4 py-3">
-							{item.isDir ? (
-								<Folder className="size-4 shrink-0 text-warning" />
-							) : (
-								<FileText className="size-4 shrink-0 text-info" />
-							)}
-							<div className="min-w-0 flex-1">
-								<p className="truncate text-sm font-medium">{item.relPath}</p>
-								<p className="text-xs text-muted-foreground">
-									{formatBytes(item.size)} • Deleted {new Date(item.deletedAt).toLocaleString()}
-								</p>
-							</div>
-							{!isViewer && (
-								<div className="flex shrink-0 gap-2">
-									<Button
-										variant="outline"
-										size="sm"
-										onPress={() => run(() => restoreTrashItem(path, item.id))}
-										className="gap-1.5"
-									>
-										<RotateCcw className="size-3.5" />
-										Restore
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon-xs"
-										onPress={() => setConfirm(item)}
-										aria-label={`Delete ${item.relPath} permanently`}
-									>
-										<Trash2 className="size-3.5 text-destructive" />
-									</Button>
+			<PageBody padded={false}>
+				{message && <p className="border-b px-3 py-2 text-sm text-destructive">{message}</p>}
+				{loading ? (
+					<div className="flex h-32 items-center justify-center">
+						<Loader2 className="size-5 animate-spin text-muted-foreground" />
+					</div>
+				) : items.length === 0 ? (
+					<EmptyState icon={<Trash2 />} title="Trash is empty">
+						Deleted files and folders wait here until you restore them or remove them for good.
+					</EmptyState>
+				) : (
+					<ul className="divide-y">
+						{items.map((item) => (
+							<li key={item.id} className="group flex items-center gap-3 px-3 py-2.5">
+								{item.isDir ? <Folder className="size-4 shrink-0 text-warning" /> : <FileText className="size-4 shrink-0 text-info" />}
+								<div className="min-w-0 flex-1">
+									<p className="truncate font-mono text-sm">{item.relPath}</p>
+									<p className="text-sm text-muted-foreground">
+										{formatBytes(item.size)} · deleted {new Date(item.deletedAt).toLocaleString()}
+									</p>
 								</div>
-							)}
-						</li>
-					))}
-				</ul>
-			)}
+								{!isViewer && (
+									<div className="flex shrink-0 items-center gap-2">
+										<Button variant="outline" size="sm" onPress={() => run(() => restoreTrashItem(path, item.id))}>
+											<RotateCcw className="size-3.5" />
+											Restore
+										</Button>
+										<Button variant="ghost" size="icon-xs" onPress={() => setConfirm(item)} aria-label={`Delete ${item.relPath} permanently`}>
+											<Trash2 className="size-3.5 text-destructive" />
+										</Button>
+									</div>
+								)}
+							</li>
+						))}
+					</ul>
+				)}
+			</PageBody>
 
 			{confirm && (
 				<Dialog
@@ -169,6 +154,6 @@ export default function WorkspaceTrash() {
 					</div>
 				</Dialog>
 			)}
-		</div>
+		</Page>
 	);
 }

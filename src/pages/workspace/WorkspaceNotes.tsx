@@ -562,7 +562,7 @@ export default function WorkspaceNotes() {
 						<div className="flex h-full overflow-auto">
 							<div className="m-auto w-full max-w-md space-y-6 p-8">
 								<div>
-									<h2 className="text-xl font-semibold">{notes.length === 0 ? "Start your first note" : "Pick up where you left off"}</h2>
+									<h2 className="font-mono text-sm">{notes.length === 0 ? "Start your first note" : "Pick up where you left off"}</h2>
 									<p className="mt-1 text-sm text-muted-foreground">
 										Notes save themselves. Link one to another with <code className="font-mono">[[Note name]]</code>.
 									</p>
@@ -624,7 +624,7 @@ export default function WorkspaceNotes() {
 					const text = liveTexts[item.id] ?? texts[item.id] ?? "";
 					return (
 						<div className="h-full overflow-hidden p-4">
-							<h3 className="text-base font-semibold">{item.label}</h3>
+							<h3 className="font-mono text-sm">{item.label}</h3>
 							<p className="mt-3 text-sm whitespace-pre-wrap text-muted-foreground">{text.slice(0, 700) || "This note is empty."}</p>
 						</div>
 					);

@@ -22,7 +22,7 @@ interface NoteSidePanelProps {
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
 	return (
 		<section className="space-y-1.5">
-			<h3 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+			<h3 className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
 				{icon}
 				{title}
 			</h3>

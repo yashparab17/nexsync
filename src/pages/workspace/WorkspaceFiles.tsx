@@ -1,13 +1,14 @@
 // React
 import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
 import { dropSummary, importDropped } from "@/lib/dropImport";
-import Toolbar from "@/components/layout/Toolbar";
+import { EmptyState } from "@/components/layout/Page";
+import Toolbar, { ToolbarSearch, ToolbarSwitch } from "@/components/layout/Toolbar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
 import { Loader2 } from "lucide-react";
-import { ChevronRight, ChevronUp, ExternalLink, FilePlus, FolderPlus, History, LayoutGrid, ListFilter, Pencil, Plus, RefreshCw, Search, Trash2, X } from "@/components/animate-icons";
+import { ChevronRight, ChevronUp, ExternalLink, FilePlus, FolderPlus, History, LayoutGrid, ListFilter, Pencil, Plus, RefreshCw, Trash2 } from "@/components/animate-icons";
 
 // Components
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
@@ -496,7 +497,7 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 				<Button variant="ghost" size="icon-xs" aria-label="Up one folder" isDisabled={atRoot} onPress={() => navigateToDir(parentDir)}>
 					<ChevronUp className="size-4 -rotate-90" />
 				</Button>
-				<nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden text-sm" aria-label="Breadcrumb">
+				<nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden font-mono text-sm" aria-label="Breadcrumb">
 					{crumbs.map((crumb, i) => (
 						<div key={crumb.dir} className="flex min-w-0 items-center gap-0.5">
 							{i > 0 && <ChevronRight className="size-3.5 text-muted-foreground" />}
@@ -504,7 +505,7 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 								type="button"
 								aria-current={i === crumbs.length - 1 ? "page" : undefined}
 								className={cn(
-									"max-w-[16rem] truncate px-1.5 py-0.5 outline-none transition-colors focus-visible:bg-muted",
+									"max-w-[16rem] truncate px-1.5 py-0.5 font-mono outline-none transition-colors focus-visible:bg-muted",
 									i === crumbs.length - 1 ? "font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
 								)}
 								onClick={() => navigateToDir(crumb.dir)}
@@ -514,29 +515,16 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 						</div>
 					))}
 				</nav>
-				<div className="relative w-56">
-					<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-					<Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter this folder" aria-label="Filter this folder" className="h-8 border bg-background pl-8 text-sm" />
-					{filter && (
-						<button type="button" aria-label="Clear filter" onClick={() => setFilter("")} className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-							<X className="size-3.5" />
-						</button>
-					)}
-				</div>
-				<div className="flex items-stretch border" role="group" aria-label="View">
-					{(["list", "grid"] as const).map((mode) => (
-						<button
-							key={mode}
-							type="button"
-							aria-pressed={view === mode}
-							aria-label={mode === "list" ? "List view" : "Tile view"}
-							onClick={() => setView(mode)}
-							className={cn("flex size-8 items-center justify-center outline-none focus-visible:bg-muted", view === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
-						>
-							{mode === "list" ? <ListFilter className="size-4" /> : <LayoutGrid className="size-4" />}
-						</button>
-					))}
-				</div>
+				<ToolbarSearch label="Filter this folder" value={filter} onChange={setFilter} />
+				<ToolbarSwitch
+					label="View"
+					value={view}
+					onChange={setView}
+					options={[
+						{ value: "list", label: <ListFilter className="size-4" />, title: "List view" },
+						{ value: "grid", label: <LayoutGrid className="size-4" />, title: "Tile view" },
+					]}
+				/>
 				<Button variant="ghost" size="icon-xs" onPress={() => void loadEntries()} aria-label="Refresh files" isDisabled={isLoading}>
 					<RefreshCw className={cn("size-4", isLoading && "animate-spin")} />
 				</Button>
@@ -559,22 +547,27 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 				{isLoading && entries.length === 0 ? (
 					<Loading className="py-16" />
 				) : shown.length === 0 ? (
-					<div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center" onContextMenu={(e) => entryMenu(e, null)}>
-						<p className="text-sm text-muted-foreground">
+					<div className="h-full" onContextMenu={(e) => entryMenu(e, null)}>
+						<EmptyState
+							icon={<FolderPlus />}
+							title={filter ? "No matches" : !atRoot ? "Empty folder" : "No files yet"}
+							action={
+								!filter && !isViewer && (
+									<div className="flex gap-2">
+										<Button size="sm" onPress={() => openCreateDialog("file")}>
+											<FilePlus data-icon="inline-start" className="size-4" />
+											New file
+										</Button>
+										<Button size="sm" variant="outline" onPress={() => openCreateDialog("folder")}>
+											<FolderPlus data-icon="inline-start" className="size-4" />
+											New folder
+										</Button>
+									</div>
+								)
+							}
+						>
 							{filter ? `Nothing here matches “${filter}”.` : !atRoot ? "This folder is empty." : mode === "files" ? "No files here yet. Documents and anything else that is not a note, code or an asset go in this folder." : "No files yet."}
-						</p>
-						{!filter && !isViewer && (
-							<div className="flex gap-2">
-								<Button size="sm" onPress={() => openCreateDialog("file")}>
-									<FilePlus data-icon="inline-start" className="size-4" />
-									New file
-								</Button>
-								<Button size="sm" variant="outline" onPress={() => openCreateDialog("folder")}>
-									<FolderPlus data-icon="inline-start" className="size-4" />
-									New folder
-								</Button>
-							</div>
-						)}
+						</EmptyState>
 					</div>
 				) : (
 					<>

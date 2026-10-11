@@ -2,15 +2,9 @@ import { MAX_WORKSPACE_NAME } from "@/lib/validation";
 import { useState } from "react";
 import { Activity, Trash2, Crown, KeyRound, Pencil, Shield, ShieldCheck, UserCheck, UserPlus, Plus } from "@/components/animate-icons";
 
-import PageHeader from "@/components/layout/PageHeader";
+import { Page, PageBody, Panel } from "@/components/layout/Page";
+import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import Avatar from "@/components/elements/Avatar";
 import { Input } from "@/components/ui/input";
@@ -253,51 +247,34 @@ export default function WorkspaceMembers() {
 		.filter((g) => g.list.length > 0);
 
 	return (
-		<div className="flex flex-col">
-			<PageHeader
-				title="Members"
-				description="Who is in this workspace, who is online, and what each role can do."
-				actions={
-					<>
-					<Button
-						variant="outline"
-						onPress={() => setIsInviteOpen(true)}
-						className="gap-1.5"
-					>
-						<KeyRound className="size-4 text-info" />
-						Sharing & Invites
-						{peers.length > 0 && (
-							<span className="flex h-2 w-2 rounded-none bg-success animate-ping ml-1" />
-						)}
-					</Button>
-					<Button
-						isDisabled={isJoinedCopy}
-						onPress={() => {
-							setNewMemberName("");
-							setNewMemberRole("Editor");
-							setIsAddMemberOpen(true);
-						}}
-						className="gap-1.5"
-					>
-						<UserPlus className="size-4" />
-						Add member
-					</Button>
-					</>
-				}
-			/>
+		<Page>
+			<Toolbar>
+				<ToolbarTitle name="members" meta={members.length || undefined} />
+				<span className="ml-1 hidden min-w-0 flex-1 truncate border-l pl-3 text-sm text-muted-foreground md:block">Who is here, who is online, and what each role can do</span>
+				<span className="flex-1 md:hidden" />
+				<Button variant="outline" size="sm" onPress={() => setIsInviteOpen(true)}>
+					<KeyRound className="size-4 text-info" />
+					Sharing & Invites
+					{peers.length > 0 && <span className="ml-1 flex size-2 animate-ping rounded-none bg-success" />}
+				</Button>
+				<Button
+					size="sm"
+					isDisabled={isJoinedCopy}
+					onPress={() => {
+						setNewMemberName("");
+						setNewMemberRole("Editor");
+						setIsAddMemberOpen(true);
+					}}
+				>
+					<UserPlus className="size-4" />
+					Add member
+				</Button>
+			</Toolbar>
 
 			{/* Members Grid & Roles Overview */}
-			<div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-				{/* Left 2 Cols: Member Directory */}
-				<div className="space-y-3 lg:col-span-2">
-					<Card>
-						<CardHeader>
-							<CardTitle className="text-base">People</CardTitle>
-							<CardDescription>
-								Grouped by role. Offline people are dimmed.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-3">
+			<PageBody className="grid content-start grid-cols-1 gap-3 lg:grid-cols-3">
+				<Panel title="people" hint="Grouped by role. Offline people are dimmed." className="lg:col-span-2">
+					<div className="space-y-3">
 							{isJoinedCopy && (
 								<p className="text-xs text-muted-foreground">
 									{selfRole === "Admin"
@@ -312,7 +289,7 @@ export default function WorkspaceMembers() {
 							) : (
 								roleGroups.map(({ role, list }) => (
 									<div key={role} className="flex flex-col gap-1">
-										<h3 className="px-3 pb-1 font-mono text-xs text-muted-foreground">{role.toLowerCase()} / {list.length}</h3>
+										<h3 className="px-3 pb-1 font-mono text-[13px] text-muted-foreground">{role.toLowerCase()} / {list.length}</h3>
 										{list.map((member) => {
 									const isOwner = member.role.toLowerCase() === "owner";
 									const isYou = isJoinedCopy
@@ -445,23 +422,11 @@ export default function WorkspaceMembers() {
 									</div>
 								))
 							)}
-						</CardContent>
-					</Card>
-				</div>
+					</div>
+				</Panel>
 
-				{/* Right 1 Col: Permissions Summary */}
-				<div>
-					<Card>
-						<CardHeader>
-							<CardTitle className="text-base flex items-center gap-2">
-								<Shield className="size-4 text-primary" />
-								Role Permissions
-							</CardTitle>
-							<CardDescription>
-								Access levels configured for this workspace.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-4 text-xs">
+				<Panel title="roles" hint="What each role can do here" className="self-start">
+					<div className="space-y-4 text-sm">
 							<div className="border-l-2 border-border py-1 pl-4">
 								<div className="flex items-center gap-1.5 font-semibold text-warning">
 									<Crown className="size-3.5" />
@@ -502,10 +467,9 @@ export default function WorkspaceMembers() {
 									Read-only access to files, assets, tasks, and kanban boards.
 								</p>
 							</div>
-						</CardContent>
-					</Card>
-				</div>
-			</div>
+					</div>
+				</Panel>
+			</PageBody>
 
 			{/* Real P2P WebRTC Connection & E2EE Handshake Dialog */}
 			<P2PConnectDialog
@@ -726,6 +690,6 @@ export default function WorkspaceMembers() {
 					</div>
 				</Dialog>
 			)}
-		</div>
+		</Page>
 	);
 }

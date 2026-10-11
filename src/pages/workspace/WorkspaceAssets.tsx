@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { EmptyState } from "@/components/layout/Page";
 import Toolbar, { ToolbarSearch, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
 import { Copy, Check, Play, Trash2, FileText, Film, Headphones, Image as ImageIcon, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
 import { displaySize } from "@/lib/assets/displaySize";
@@ -442,19 +443,20 @@ export default function WorkspaceAssets() {
 				{loading ? (
 					<Loading className="py-24" />
 				) : filteredAssets.length === 0 ? (
-					<div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
-						<ImageIcon className="size-10 text-muted-foreground" />
-						<h3 className="text-base font-semibold">{searchQuery ? "No matching assets" : "Nothing here yet"}</h3>
-						<p className="max-w-sm text-sm text-muted-foreground">
-							{searchQuery ? "Try a different search, or another kind of asset." : "Drop pictures, audio, video or documents anywhere on this page, or press Upload."}
-						</p>
-						{!searchQuery && !isViewer && (
-							<Button size="sm" onPress={() => setIsUploadOpen(true)} className="mt-2">
-								<UploadCloud data-icon="inline-start" className="size-4" />
-								Upload assets
-							</Button>
-						)}
-					</div>
+					<EmptyState
+						icon={<ImageIcon />}
+						title={searchQuery ? "No matching assets" : "Nothing here yet"}
+						action={
+							!searchQuery && !isViewer && (
+								<Button size="sm" onPress={() => setIsUploadOpen(true)}>
+									<UploadCloud data-icon="inline-start" className="size-4" />
+									Upload assets
+								</Button>
+							)
+						}
+					>
+						{searchQuery ? "Try a different search, or another kind of asset." : "Drop pictures, audio, video or documents anywhere on this page, or press Upload."}
+					</EmptyState>
 				) : (
 					/* Mosaic: columns that each fill from the top, so tiles of different heights pack together */
 					<ul ref={gridRef} className="relative" style={{ height: (Number.isFinite(layout.height) ? layout.height : 0) + PAD * 2 }}>

@@ -24,7 +24,6 @@ export default function Workspace() {
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
 	// The Editor, Notes, Files and Assets are full-bleed workspaces: no page padding, and they fill the window
-	const flush = pathname.startsWith("/workspace/editor") || pathname.startsWith("/workspace/notes") || pathname.startsWith("/workspace/explorer") || pathname.startsWith("/workspace/files") || pathname.startsWith("/workspace/assets") || pathname.startsWith("/workspace/tasks") || pathname.startsWith("/workspace/kanban") || pathname.startsWith("/workspace/insights");
 	// Below the medium breakpoint the sidebar is a drawer
 	const [navOpen, setNavOpen] = useState(false);
 
@@ -82,8 +81,8 @@ export default function Workspace() {
 				<WorkspaceHeader onOpenMenu={() => setNavOpen(true)} menuOpen={navOpen} />
 
 				{/* Page content */}
-				<div className={flush ? "min-h-0 flex-1 overflow-hidden" : "flex-1 overflow-auto p-4 md:p-6"}>
-					<div key={pathname} className={`relative flex w-full flex-col animate-in fade-in duration-200 motion-reduce:animate-none ${flush ? "h-full" : "min-h-full slide-in-from-bottom-1"}`}>
+				<div className="min-h-0 flex-1 overflow-hidden">
+					<div key={pathname} className="relative flex h-full w-full flex-col animate-in fade-in duration-200 motion-reduce:animate-none">
 						<Outlet />
 					</div>
 				</div>

@@ -3,7 +3,7 @@
 
 import type { ComponentProps, ReactNode } from "react";
 
-import { Search } from "@/components/animate-icons";
+import { Search, X } from "@/components/animate-icons";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +51,12 @@ export function ToolbarSearch({ label, value, onChange, placeholder }: { label: 
 	return (
 		<div className="relative w-44">
 			<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-			<Input aria-label={label} placeholder={placeholder ?? label} value={value} onChange={(e) => onChange(e.target.value)} className="h-8 border bg-background pl-8 text-sm" />
+			<Input aria-label={label} placeholder={placeholder ?? label} value={value} onChange={(e) => onChange(e.target.value)} className="h-8 border bg-background pr-7 pl-8 text-sm" />
+			{value && (
+				<button type="button" aria-label={`Clear ${label.toLowerCase()}`} onClick={() => onChange("")} className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground">
+					<X className="size-3.5" />
+				</button>
+			)}
 		</div>
 	);
 }
@@ -74,5 +79,15 @@ export function ToolbarSwitch<T extends string>({ label, value, onChange, option
 				</button>
 			))}
 		</div>
+	);
+}
+
+// The page name at the left of a toolbar, in the mono the workspace uses for every heading, with what it holds after a dot
+export function ToolbarTitle({ name, meta }: { name: string; meta?: ReactNode }) {
+	return (
+		<h1 className="min-w-0 truncate font-mono text-sm">
+			{name}
+			{meta !== undefined && meta !== "" && <span className="text-muted-foreground"> · {meta}</span>}
+		</h1>
 	);
 }

@@ -2,6 +2,7 @@ import { MAX_TITLE } from "@/lib/validation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, AlertTriangle, ArrowRight, CheckSquare, Columns3, Pencil } from "@/components/animate-icons";
 
+import { EmptyState } from "@/components/layout/Page";
 import Toolbar from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import EraseOption from "@/components/elements/EraseOption";
@@ -513,25 +514,20 @@ export default function WorkspaceKanban() {
 			{loading ? (
 				<Loading fill className="flex-1" />
 			) : columns.length === 0 ? (
-				<div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-					<Columns3 className="size-10 text-muted-foreground" />
-					<h3 className="text-base font-semibold">No columns yet</h3>
-					<p className="max-w-sm text-sm text-muted-foreground">
-						Your Kanban board is currently empty. Create a column to get started.
-					</p>
-					{canChange && (
-						<div className="mt-4 flex gap-3">
-							<Button
-								size="sm"
-								onPress={() => setIsCreateColOpen(true)}
-								className="gap-1"
-							>
+				<EmptyState
+					icon={<Columns3 />}
+					title="No columns yet"
+					action={
+						canChange && (
+							<Button size="sm" onPress={() => setIsCreateColOpen(true)}>
 								<Plus className="size-4" />
 								New column
 							</Button>
-						</div>
-					)}
-				</div>
+						)
+					}
+				>
+					Your board is empty. Add a column to get started.
+				</EmptyState>
 			) : (
 				<div className="flex min-h-0 flex-1 overflow-x-auto">
 					{columns.map((col, colIndex) => {

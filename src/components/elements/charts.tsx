@@ -16,22 +16,6 @@ export const SERIES = [
 	{ bg: "bg-muted-foreground", stroke: "stroke-muted-foreground" },
 ] as const;
 
-// A titled block of a dashboard
-export function Panel({ title, hint, children, className, right }: { title: string; hint?: string; children: ReactNode; className?: string; right?: ReactNode }) {
-	return (
-		<section className={cn("flex min-w-0 flex-col border bg-card/40", className)}>
-			<header className="flex items-baseline justify-between gap-3 border-b px-4 py-2.5">
-				<div className="min-w-0">
-					<h2 className="font-mono text-sm text-foreground">{title}</h2>
-					{hint && <p className="truncate text-sm text-muted-foreground">{hint}</p>}
-				</div>
-				{right}
-			</header>
-			<div className="min-h-0 flex-1 p-4">{children}</div>
-		</section>
-	);
-}
-
 export const Empty = ({ children }: { children: ReactNode }) => <p className="py-6 text-center text-sm text-muted-foreground">{children}</p>;
 
 // A ring split into parts, with a number in the middle

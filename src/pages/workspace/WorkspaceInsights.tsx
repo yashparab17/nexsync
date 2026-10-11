@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { History, X } from "@/components/animate-icons";
 
 import Avatar from "@/components/elements/Avatar";
-import { BarRows, DayColumns, Donut, Empty, Heatmap, Panel, SERIES, Stat, StackBar } from "@/components/elements/charts";
+import { BarRows, DayColumns, Donut, Empty, Heatmap, SERIES, Stat, StackBar } from "@/components/elements/charts";
+import { Page, PageBody, Panel } from "@/components/layout/Page";
 import Toolbar, { ToolbarSearch, ToolbarTabs } from "@/components/layout/Toolbar";
 import {
 	authorOf,
@@ -64,7 +65,7 @@ export default function WorkspaceInsights() {
 	const cards = columns.reduce((n, c) => n + c.cards.length, 0);
 
 	return (
-		<div className="flex h-full min-h-0 flex-col bg-background">
+		<Page>
 			<Toolbar>
 				<ToolbarTabs
 					label="Insights"
@@ -109,7 +110,7 @@ export default function WorkspaceInsights() {
 				)}
 			</Toolbar>
 
-			<div className="min-h-0 flex-1 overflow-auto">
+			<PageBody padded={false}>
 				{tab === "overview" ? (
 					<div className="grid gap-3 p-3 lg:grid-cols-6">
 						<div className="grid grid-cols-2 gap-3 lg:col-span-6 lg:grid-cols-4">
@@ -218,7 +219,7 @@ export default function WorkspaceInsights() {
 						)}
 					</>
 				)}
-			</div>
-		</div>
+			</PageBody>
+		</Page>
 	);
 }
