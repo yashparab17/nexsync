@@ -3,8 +3,7 @@
 // side changed is kept, and what both changed is kept as a conflict for a person to choose.
 
 import { useCallback, useEffect, useState } from "react";
-import { FilePen, GitMerge } from "lucide-react";
-import { Trash2 } from "@/components/animate-icons";
+import { Trash2, FilePen, GitMerge } from "@/components/animate-icons";
 
 import { fieldName } from "@/components/elements/ConflictPanel";
 import { Button } from "@/components/ui/button";

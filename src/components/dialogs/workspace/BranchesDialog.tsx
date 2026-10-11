@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as Y from "yjs";
-import { GitBranch, GitMerge } from "lucide-react";
+import { GitBranch, GitMerge } from "@/components/animate-icons";
 
 import { DiffView } from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";

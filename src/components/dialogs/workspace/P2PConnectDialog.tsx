@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Globe, KeyRound, Lock, Sparkles, Unplug, Users, Wifi } from "lucide-react";
-import { Check, Copy, Radio, RefreshCw } from "@/components/animate-icons";
+import { Check, Copy, Radio, RefreshCw, AlertTriangle, Globe, KeyRound, Lock, Sparkles, Unplug, Users, Wifi } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import {

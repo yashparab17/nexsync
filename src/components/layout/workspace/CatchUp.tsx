@@ -1,7 +1,7 @@
 // Header button for the catch-up review: how many changes by other people have not been reviewed, and the review itself
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { History } from "lucide-react";
+import { History } from "@/components/animate-icons";
 
 import CatchUpDialog from "@/components/dialogs/workspace/CatchUpDialog";
 import { Button } from "@/components/ui/button";

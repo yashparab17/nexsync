@@ -2,7 +2,7 @@
 // are kept and anyone can choose), or the merged record breaks a rule the workspace turned on (nothing to choose between;
 // someone has to fix the record)
 
-import { AlertTriangle, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ShieldAlert } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import type { Conflict, Violation } from "@/types/workspace";

@@ -3,8 +3,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 // Icons
-import { Menu } from "lucide-react";
-import { Radio, Settings } from "@/components/animate-icons";
+import { Radio, Settings, Menu } from "@/components/animate-icons";
 
 // Components
 import { Button } from "@/components/ui/button";

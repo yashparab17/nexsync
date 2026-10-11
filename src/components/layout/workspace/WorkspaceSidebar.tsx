@@ -1,12 +1,11 @@
 // React
-import { AnimateIcon } from "@/components/animate-icons";
+import { AnimateIcon, Code2, Files, FolderOpen, ListTodo, StickyNote } from "@/components/animate-icons";
 import { useState, type ElementType } from "react";
 
 // React Router
 import { NavLink, useNavigate } from "react-router-dom";
 
 // Icons
-import { Code2, Files, FolderOpen, ListTodo, StickyNote } from "lucide-react";
 import { ArrowLeft, ChartColumn as BarChart3, SquareKanban as KanbanSquare, LayoutDashboard, ChevronLeft, ChevronRight, Trash2, UsersRound } from "@/components/animate-icons";
 
 // Components

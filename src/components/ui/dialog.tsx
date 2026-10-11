@@ -14,7 +14,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { XIcon } from "lucide-react";
+import { X as XIcon } from "@/components/animate-icons";
 
 // Trigger element that opens the dialog modal
 function DialogTrigger({ ...props }: DialogTriggerPrimitiveProps) {

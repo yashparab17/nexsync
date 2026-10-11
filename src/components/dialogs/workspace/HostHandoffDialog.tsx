@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Crown } from "lucide-react";
+import { Crown } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import {

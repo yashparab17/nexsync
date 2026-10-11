@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { GitBranch } from "lucide-react";
+import { GitBranch } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";

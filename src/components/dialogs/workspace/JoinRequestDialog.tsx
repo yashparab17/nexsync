@@ -1,4 +1,4 @@
-import { UserPlus } from "lucide-react";
+import { UserPlus } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import {

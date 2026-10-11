@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Square } from "lucide-react";
-import { Trash2 } from "@/components/animate-icons";
+import { Trash2, Play, Square } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import {

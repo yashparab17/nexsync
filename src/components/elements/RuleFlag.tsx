@@ -1,6 +1,6 @@
 // A small marker on a task or card that breaks a rule the workspace turned on
 
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert } from "@/components/animate-icons";
 
 import type { Violation } from "@/types/workspace";
 

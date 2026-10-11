@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, CheckSquare, Columns3, Pencil } from "lucide-react";
-import { ArrowLeft, Plus, Trash2 } from "@/components/animate-icons";
+import { ArrowLeft, Plus, Trash2, AlertTriangle, ArrowRight, CheckSquare, Columns3, Pencil } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import EraseOption from "@/components/elements/EraseOption";

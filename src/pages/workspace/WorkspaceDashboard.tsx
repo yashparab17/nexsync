@@ -2,8 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { FilePlus, FolderOpen, ListTodo, StickyNote, Upload } from "lucide-react";
-import { Activity, UsersRound } from "@/components/animate-icons";
+import { Activity, UsersRound, FilePlus, FolderOpen, ListTodo, StickyNote, Upload } from "@/components/animate-icons";
 
 // Components
 import { Button } from "@/components/ui/button";

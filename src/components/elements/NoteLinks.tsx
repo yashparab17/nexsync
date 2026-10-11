@@ -1,7 +1,7 @@
 // Notes a task or card points at by writing [[Note name]] in its description
 
 import { useEffect, useState } from "react";
-import { FileText } from "lucide-react";
+import { FileText } from "@/components/animate-icons";
 import { useNavigate } from "react-router-dom";
 
 import { extractLinks, noteTitle, resolveLink } from "@/lib/notes/links";

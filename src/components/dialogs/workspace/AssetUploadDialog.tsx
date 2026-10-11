@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
-import { FileUp, Loader2, UploadCloud, X } from "lucide-react";
-import { Check } from "@/components/animate-icons";
+import { Loader2 } from "lucide-react";
+import { Check, FileUp, UploadCloud, X } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import {

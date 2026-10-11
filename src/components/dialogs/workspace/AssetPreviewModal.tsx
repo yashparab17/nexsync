@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Download, FileText, Film, Headphones, Image as ImageIcon, Loader2, Maximize2, Minimize2, Sparkles, Volume2, X } from "lucide-react";
-import { Check, Copy, RefreshCw } from "@/components/animate-icons";
+import { Loader2 } from "lucide-react";
+import { Check, Copy, RefreshCw, Download, FileText, Film, Headphones, Image as ImageIcon, Maximize2, Minimize2, Sparkles, Volume2, X } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import {

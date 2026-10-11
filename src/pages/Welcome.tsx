@@ -5,8 +5,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { FolderOpen, FolderPlus, HardDrive, Lock, UserX } from "lucide-react";
-import { Settings as SettingsIcon, UsersRound } from "@/components/animate-icons";
+import { Settings as SettingsIcon, UsersRound, FolderOpen, FolderPlus, HardDrive, Lock, UserX } from "@/components/animate-icons";
 
 // Hooks
 import { useThemeContext } from "@/store/ThemeContext";
