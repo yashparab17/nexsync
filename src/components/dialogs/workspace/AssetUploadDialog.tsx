@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 
 import { writeWorkspaceBinaryFile } from "@/lib/tauri";
+import { canDownscale, fileToBase64, useUploadScale } from "@/lib/assets/uploadScale";
+import { cn } from "@/lib/utils";
 
 interface AssetUploadDialogProps {
 	workspacePath: string;
@@ -26,6 +28,8 @@ export default function AssetUploadDialog({
 	const [uploading, setUploading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [successCount, setSuccessCount] = useState<number | null>(null);
+	const [scale, setScale] = useUploadScale();
+	const resizing = scale === 0.5 && selectedFiles.filter((f) => canDownscale(f.name)).length;
 
 	const handleFileSelect = (files: FileList | null) => {
 		if (!files || files.length === 0) return;
@@ -53,17 +57,7 @@ export default function AssetUploadDialog({
 		try {
 			let uploaded = 0;
 			for (const file of selectedFiles) {
-				const base64Data = await new Promise<string>((resolve, reject) => {
-					const reader = new FileReader();
-					reader.onload = () => {
-						const result = reader.result as string;
-						// Strip prefix like data:image/png;base64,
-						const base64 = result.includes(",") ? result.split(",")[1] : result;
-						resolve(base64);
-					};
-					reader.onerror = (err) => reject(err);
-					reader.readAsDataURL(file);
-				});
+				const base64Data = await fileToBase64(file, scale);
 
 				// Clean filename
 				const sanitizedName = file.name.replace(/[^\w.-]/g, "_");
@@ -177,6 +171,28 @@ export default function AssetUploadDialog({
 							))}
 						</div>
 					)}
+
+					{/* Pictures can be stored at half their width and height */}
+					<fieldset className="space-y-2">
+						<legend className="text-xs font-semibold text-muted-foreground">Image size</legend>
+						<div className="flex items-stretch border" role="radiogroup" aria-label="Image size">
+							{([1, 0.5] as const).map((value) => (
+								<button
+									key={value}
+									type="button"
+									role="radio"
+									aria-checked={scale === value}
+									onClick={() => setScale(value)}
+									className={cn("flex-1 px-3 py-1.5 text-sm outline-none focus-visible:bg-muted", scale === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
+								>
+									{value === 1 ? "Original size" : "Half size (50%)"}
+								</button>
+							))}
+						</div>
+						<p className="text-xs text-muted-foreground">
+							{resizing ? `${resizing} ${resizing === 1 ? "picture" : "pictures"} will be saved at half the width and height.` : "PNG, JPG and WebP pictures can be saved smaller. GIFs, SVGs and other files are never resized."}
+						</p>
+					</fieldset>
 
 					{error && (
 						<div className="p-3 rounded-none bg-destructive/10 border border-destructive/20 text-destructive text-xs font-mono">

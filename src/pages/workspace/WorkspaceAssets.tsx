@@ -1,9 +1,9 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { Copy, Check, Search, Trash2, FileText, Film, Headphones, Image as ImageIcon, LayoutGrid, List, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
+import { fileToBase64, useUploadScale } from "@/lib/assets/uploadScale";
+import { cn } from "@/lib/utils";
 
-import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +62,11 @@ export default function WorkspaceAssets() {
 	const [selectedCategory, setSelectedCategory] =
 		useState<AssetCategory>("all");
 	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+	// How wide the tiles are, and the size pictures are saved at when dropped on the page
+	const [tile, setTile] = useState<"s" | "m" | "l">("m");
+	const [uploadScale, setUploadScale] = useUploadScale();
+	// A picture's own size, once it has loaded, for the hover details
+	const [dims, setDims] = useState<Record<string, string>>({});
 
 	// Thumbnails cache for images (base64 URLs)
 	const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
@@ -291,15 +296,7 @@ export default function WorkspaceAssets() {
 
 		for (const file of Array.from(e.dataTransfer.files)) {
 			try {
-				const base64Data = await new Promise<string>((resolve, reject) => {
-					const reader = new FileReader();
-					reader.onload = () => {
-						const result = reader.result as string;
-						resolve(result.includes(",") ? result.split(",")[1] : result);
-					};
-					reader.onerror = reject;
-					reader.readAsDataURL(file);
-				});
+				const base64Data = await fileToBase64(file, uploadScale);
 				const sanitizedName = file.name.replace(/[^\w.-]/g, "_");
 				await writeWorkspaceBinaryFile(
 					workspace.path,
@@ -314,302 +311,215 @@ export default function WorkspaceAssets() {
 		await refreshStats();
 	};
 
+	const kindIcon = (category: AssetItem["category"], className: string) =>
+		category === "video" ? <Film className={className} /> : category === "audio" ? <Headphones className={className} /> : category === "image" ? <ImageIcon className={className} /> : <FileText className={className} />;
+
+	// Tiles that are not pictures get a shape that depends on what they are, so the mosaic has rhythm
+	const shapeOf = (asset: AssetItem): string =>
+		asset.category === "video" ? "aspect-video" : asset.category === "audio" ? "aspect-[4/3]" : asset.category === "document" ? "aspect-[3/4]" : "aspect-square";
+
+	const tabs = [
+		{ key: "all", label: "All", count: categoryCounts.all },
+		{ key: "image", label: "Photos", count: categoryCounts.image },
+		{ key: "video", label: "Video", count: categoryCounts.video },
+		{ key: "audio", label: "Audio", count: categoryCounts.audio },
+		{ key: "document", label: "Documents", count: categoryCounts.document },
+		{ key: "other", label: "Other", count: categoryCounts.other },
+	];
+
+	const actionButton = "flex size-8 cursor-pointer items-center justify-center bg-background/90 text-foreground outline-none backdrop-blur hover:bg-background focus-visible:ring-2 focus-visible:ring-ring";
+
 	return (
 		<div
 			onDragOver={(e) => {
 				e.preventDefault();
 				setIsDraggingOver(true);
 			}}
-			onDragLeave={() => setIsDraggingOver(false)}
+			onDragLeave={(e) => e.currentTarget.contains(e.relatedTarget as Node) || setIsDraggingOver(false)}
 			onDrop={handlePageDrop}
-			className="space-y-6 relative min-h-[calc(100vh-10rem)]"
+			className="relative flex h-full min-h-0 flex-col bg-background"
 		>
 			{/* Drag & Drop Window Overlay */}
 			{isDraggingOver && (
-				<div className="absolute inset-0 z-50 bg-primary/20 backdrop-blur-sm border-2 border-dashed border-primary rounded-none flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-150">
-					<UploadCloud className="size-16 text-primary animate-pulse mb-3" />
-					<h3 className="text-xl font-bold text-foreground">
-						Drop files to upload directly to assets/
-					</h3>
-					<p className="text-sm text-muted-foreground mt-1">
-						Images, audio, video, and documents will be saved in your workspace
-					</p>
+				<div className="pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center border-2 border-dashed border-primary bg-primary/15 backdrop-blur-sm animate-in fade-in duration-150 motion-reduce:animate-none">
+					<UploadCloud className="mb-3 size-16 text-primary" />
+					<h3 className="text-xl font-bold text-foreground">Drop to add to assets</h3>
+					<p className="mt-1 text-sm text-muted-foreground">{uploadScale === 0.5 ? "Pictures will be saved at half size." : "Pictures keep their original size."}</p>
 				</div>
 			)}
 
-			{/* Page Header */}
-			<PageHeader
-				title="Assets"
-				description={<>Store and manage images, media, and binary files in your local{" "}
-						<code className="bg-muted px-1.5 py-0.5 rounded-none text-xs font-mono text-foreground">
-							assets/
-						</code>{" "}
-						folder.</>}
-				actions={
-					<>
-<div className="flex items-center gap-2">
-					{!isViewer && (
-						<Button
-							onPress={() => setIsUploadOpen(true)}
-							className="gap-2 text-xs"
-						>
-							<Upload className="size-4" />
-							Upload asset
-						</Button>
-					)}
-				</div>
-					</>
-				}
-			/>
-
-			{/* Toolbar: Search, Categories, View Toggle */}
-			<div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2 border-b border-border/60">
-				{/* Category Filter Tabs */}
-				<div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-					{[
-						{ key: "all", label: "All", count: categoryCounts.all },
-						{ key: "image", label: "Images", count: categoryCounts.image },
-						{ key: "video", label: "Video", count: categoryCounts.video },
-						{ key: "audio", label: "Audio", count: categoryCounts.audio },
-						{
-							key: "document",
-							label: "Documents",
-							count: categoryCounts.document,
-						},
-						{ key: "other", label: "Other", count: categoryCounts.other },
-					].map((tab) => (
+			{/* Toolbar */}
+			<div className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b bg-card/40 px-3 py-1.5">
+				<div role="tablist" aria-label="Kind of asset" className="flex items-center gap-1 overflow-x-auto">
+					{tabs.map((tab) => (
 						<button
 							key={tab.key}
+							type="button"
+							role="tab"
+							aria-selected={selectedCategory === tab.key}
 							onClick={() => setSelectedCategory(tab.key as AssetCategory)}
-							className={`px-3 py-1.5 text-xs font-medium rounded-none transition-colors flex items-center gap-1.5 cursor-pointer ${
-								selectedCategory === tab.key ?
-									"bg-primary text-primary-foreground font-semibold shadow-sm"
-								:	"bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
-							}`}
+							className={cn(
+								"flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-sm outline-none transition-colors focus-visible:bg-muted",
+								selectedCategory === tab.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+							)}
 						>
 							{tab.label}
-							<span
-								className={`text-xs px-1.5 py-0.2 rounded-none ${
-									selectedCategory === tab.key ?
-										"bg-primary-foreground/20 text-primary-foreground"
-									:	"bg-background/80 text-muted-foreground"
-								}`}
-							>
-								{tab.count}
-							</span>
+							<span className="font-mono text-xs tabular-nums opacity-70">{tab.count}</span>
 						</button>
 					))}
 				</div>
-
-				{/* Search & View Switcher */}
-				<div className="flex items-center gap-3">
-					<div className="relative w-full md:w-64">
-						<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-						<Input
-							aria-label="Search assets"
-							placeholder="Search assets…"
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							className="pl-8 h-8 text-xs bg-muted/40"
-						/>
-					</div>
-
-					<div className="flex items-center border border-border rounded-none p-0.5 bg-muted/30">
-						<button
-							onClick={() => setViewMode("grid")}
-							title="Grid View"
-							className={`p-1.5 rounded-none transition-colors cursor-pointer ${
-								viewMode === "grid" ?
-									"bg-background text-foreground shadow-sm"
-								:	"text-muted-foreground hover:text-foreground"
-							}`}
-						>
-							<LayoutGrid className="size-4" />
-						</button>
-						<button
-							onClick={() => setViewMode("list")}
-							title="List View"
-							className={`p-1.5 rounded-none transition-colors cursor-pointer ${
-								viewMode === "list" ?
-									"bg-background text-foreground shadow-sm"
-								:	"text-muted-foreground hover:text-foreground"
-							}`}
-						>
-							<List className="size-4" />
-						</button>
-					</div>
+				<span className="flex-1" />
+				<div className="relative w-44">
+					<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+					<Input aria-label="Search assets" placeholder="Search assets" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-8 border bg-background pl-8 text-sm" />
 				</div>
+				{viewMode === "grid" && (
+					<div className="flex items-stretch border" role="group" aria-label="Tile size">
+						{(["s", "m", "l"] as const).map((size) => (
+							<button
+								key={size}
+								type="button"
+								aria-pressed={tile === size}
+								aria-label={size === "s" ? "Small tiles" : size === "m" ? "Medium tiles" : "Large tiles"}
+								onClick={() => setTile(size)}
+								className={cn("flex h-8 w-8 items-center justify-center font-mono text-xs outline-none focus-visible:bg-muted", tile === size ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
+							>
+								{size.toUpperCase()}
+							</button>
+						))}
+					</div>
+				)}
+				<div className="flex items-stretch border" role="group" aria-label="View">
+					{(["grid", "list"] as const).map((mode) => (
+						<button
+							key={mode}
+							type="button"
+							aria-pressed={viewMode === mode}
+							aria-label={mode === "grid" ? "Mosaic view" : "List view"}
+							onClick={() => setViewMode(mode)}
+							className={cn("flex size-8 cursor-pointer items-center justify-center outline-none focus-visible:bg-muted", viewMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
+						>
+							{mode === "grid" ? <LayoutGrid className="size-4" /> : <List className="size-4" />}
+						</button>
+					))}
+				</div>
+				{!isViewer && (
+					<>
+						<span className="hidden font-mono text-xs text-muted-foreground 2xl:inline">Save as</span>
+						<div className="flex items-stretch border" role="radiogroup" aria-label="Size pictures are saved at">
+							{([1, 0.5] as const).map((value) => (
+								<button
+									key={value}
+									type="button"
+									role="radio"
+									aria-checked={uploadScale === value}
+									title={value === 1 ? "Save pictures at their original size" : "Save pictures at half width and height"}
+									onClick={() => setUploadScale(value)}
+									className={cn("h-8 px-2.5 text-xs outline-none focus-visible:bg-muted", uploadScale === value ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground")}
+								>
+									{value === 1 ? "Original" : "50%"}
+								</button>
+							))}
+						</div>
+						<Button size="sm" onPress={() => setIsUploadOpen(true)}>
+							<Upload data-icon="inline-start" className="size-4" />
+							Upload
+						</Button>
+					</>
+				)}
 			</div>
 
-			{/* Asset Content List / Grid */}
-			{loading ?
-				<Loading className="py-24" />
-			: filteredAssets.length === 0 ?
-				<div className="flex flex-col items-center justify-center py-20 border border-dashed border-border rounded-none text-center p-8 bg-card/20">
-					<div className="p-4 rounded-none bg-muted/60 text-muted-foreground mb-3">
-						<ImageIcon className="size-8" />
+			{/* Assets */}
+			<div className="min-h-0 flex-1 overflow-auto">
+				{loading ? (
+					<Loading className="py-24" />
+				) : filteredAssets.length === 0 ? (
+					<div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
+						<ImageIcon className="size-10 text-muted-foreground" />
+						<h3 className="text-base font-semibold">{searchQuery ? "No matching assets" : "Nothing here yet"}</h3>
+						<p className="max-w-sm text-sm text-muted-foreground">
+							{searchQuery ? "Try a different search, or another kind of asset." : "Drop pictures, audio, video or documents anywhere on this page, or press Upload."}
+						</p>
+						{!searchQuery && !isViewer && (
+							<Button size="sm" onPress={() => setIsUploadOpen(true)} className="mt-2">
+								<UploadCloud data-icon="inline-start" className="size-4" />
+								Upload assets
+							</Button>
+						)}
 					</div>
-					<h3 className="font-semibold text-base text-foreground">
-						{searchQuery ?
-							"No matching assets found"
-						:	"No assets in this category"}
-					</h3>
-					<p className="text-xs text-muted-foreground max-w-sm mt-1">
-						{searchQuery ?
-							"Try refining your search query or switching categories."
-						:	"Upload images, media, or documents to link them directly into your notes and code files."}
-					</p>
-					{!searchQuery && !isViewer && (
-						<Button
-							size="sm"
-							onPress={() => setIsUploadOpen(true)}
-							className="mt-4 gap-2 text-xs"
-						>
-							<UploadCloud className="size-4" />
-							Upload First Asset
-						</Button>
-					)}
-				</div>
-			: viewMode === "grid" ?
-				/* Grid View */
-				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-					{filteredAssets.map((asset) => {
-						const isImage = asset.category === "image";
-						const isVideo = asset.category === "video";
-						const isAudio = asset.category === "audio";
-						const thumbnail = thumbnails[asset.name];
-						const isRemote = asset.syncStatus === "remote_placeholder";
-
-						return (
-							<Card
-								key={asset.name}
-								onClick={() => setPreviewAsset(asset)}
-								className="group relative flex cursor-pointer flex-col gap-0 overflow-hidden border-border bg-card py-0 transition-colors hover:border-primary"
-							>
-								{/* Thumbnail Header Area */}
-								<div className="relative h-36 bg-muted flex items-center justify-center overflow-hidden border-b border-border/40">
-									{isRemote ?
-										<div className="flex flex-col items-center gap-2 text-warning/80 p-4 text-center">
-											<Sparkles className="size-7" />
-											<span className="text-xs font-medium ">
-												Not downloaded
+				) : viewMode === "grid" ? (
+					/* Mosaic: columns that each fill from the top, so tiles of different heights pack together */
+					<ul className={cn("gap-2 p-3 [&>li]:mb-2", tile === "s" ? "columns-[9rem]" : tile === "m" ? "columns-[14rem]" : "columns-[22rem]")}>
+						{filteredAssets.map((asset) => {
+							const thumbnail = thumbnails[asset.name];
+							const isRemote = asset.syncStatus === "remote_placeholder";
+							const ext = asset.name.split(".").pop()?.toUpperCase() ?? "";
+							const details = [dims[asset.name], formatBytes(asset.size), new Date(asset.modified_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })].filter(Boolean).join(" · ");
+							return (
+								<li key={asset.name} className="group relative break-inside-avoid">
+									<button
+										type="button"
+										onClick={() => setPreviewAsset(asset)}
+										aria-label={`${asset.name}, ${asset.category}, ${formatBytes(asset.size)}${isRemote ? ", not downloaded" : ""}`}
+										className="relative block w-full cursor-pointer overflow-hidden bg-card text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									>
+										{asset.category === "image" && thumbnail && !isRemote ? (
+											<img
+												src={thumbnail}
+												alt=""
+												onLoad={(e) => {
+													const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+													setDims((prev) => (prev[asset.name] ? prev : { ...prev, [asset.name]: `${w}×${h}` }));
+												}}
+												className="block h-auto w-full transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none"
+											/>
+										) : (
+											<div className={cn("flex w-full flex-col items-center justify-center gap-2 bg-muted/60", asset.category === "image" ? "aspect-[4/3]" : shapeOf(asset), isRemote && "border border-dashed border-warning/60 bg-transparent")}>
+												{isRemote ? <Sparkles className="size-8 text-warning" /> : kindIcon(asset.category, "size-9 text-muted-foreground")}
+												<span className="font-mono text-xs text-muted-foreground">{isRemote ? "Remote" : ext}</span>
+											</div>
+										)}
+										{/* The name and details appear only on hover or keyboard focus */}
+										<span className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-gradient-to-t from-black/75 via-black/40 to-transparent p-3 pt-10 text-white opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none">
+											<span className="truncate text-sm font-medium">{asset.name}</span>
+											<span className="truncate font-mono text-xs opacity-85">
+												{ext} · {details}
+												{isRemote && " · not downloaded"}
 											</span>
-										</div>
-									: isImage && thumbnail ?
-										<img
-											src={thumbnail}
-											alt={asset.name}
-											className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-										/>
-									: isImage ?
-										<ImageIcon className="size-10 text-muted-foreground group-hover:text-primary transition-colors" />
-									: isVideo ?
-										<div className="flex flex-col items-center gap-1.5 text-muted-foreground group-hover:text-primary transition-colors">
-											<Film className="size-10" />
-											<span className="text-xs font-mono">VIDEO</span>
-										</div>
-									: isAudio ?
-										<div className="flex flex-col items-center gap-1.5 text-muted-foreground group-hover:text-primary transition-colors">
-											<Headphones className="size-10" />
-											<span className="text-xs font-mono">AUDIO</span>
-										</div>
-									:	<FileText className="size-10 text-muted-foreground group-hover:text-primary transition-colors" />}
-
-									{/* Status Badge */}
-									<div className="absolute top-2 left-2">
-										{isRemote ?
-											<span className="bg-warning text-background text-xs font-bold px-2 py-0.5 rounded-none shadow-sm">
-												Remote
-											</span>
-										:	<span className="bg-background/85 backdrop-blur text-foreground text-xs font-mono px-2 py-0.5 rounded-none border border-border">
-												{asset.name.split(".").pop()?.toUpperCase()}
-											</span>
-										}
-									</div>
-
-									{/* Quick Action Overlay on Hover */}
-									<div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-										<button
-											onClick={(e) => handleCopyMarkdown(e, asset)}
-											title="Copy Markdown Embed Link"
-											className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-colors"
-										>
-											{copiedKey === asset.name ?
-												<Check className="size-3.5 text-success" />
-											:	<Copy className="size-3.5" />}
+										</span>
+									</button>
+									<div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none">
+										<button type="button" aria-label={`Copy a Markdown link to ${asset.name}`} onClick={(e) => handleCopyMarkdown(e, asset)} className={actionButton}>
+											{copiedKey === asset.name ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
 										</button>
-										<button
-											onClick={(e) => {
-												e.stopPropagation();
-												setHistoryAsset(asset);
-											}}
-											title="History"
-											className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-colors"
-										>
-											<History className="size-3.5" />
+										<button type="button" aria-label={`History of ${asset.name}`} onClick={() => setHistoryAsset(asset)} className={actionButton}>
+											<History className="size-4" />
 										</button>
 										{!isViewer && (
 											<>
 												<button
-													onClick={(e) => {
-														e.stopPropagation();
+													type="button"
+													aria-label={`Rename ${asset.name}`}
+													onClick={() => {
 														setAssetToRename(asset);
 														setNewName(asset.name);
 													}}
-													title="Rename"
-													className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-colors"
+													className={actionButton}
 												>
-													<Pencil className="size-3.5" />
+													<Pencil className="size-4" />
 												</button>
-												<button
-													onClick={(e) => {
-														e.stopPropagation();
-														setAssetToDelete(asset);
-													}}
-													title="Delete"
-													className="p-1.5 rounded-none bg-background/80 hover:bg-destructive text-foreground hover:text-destructive-foreground border border-border/60 shadow-sm cursor-pointer transition-colors"
-												>
-													<Trash2 className="size-3.5" />
+												<button type="button" aria-label={`Delete ${asset.name}`} onClick={() => setAssetToDelete(asset)} className={cn(actionButton, "hover:bg-destructive hover:text-white")}>
+													<Trash2 className="size-4" />
 												</button>
 											</>
 										)}
 									</div>
-								</div>
-
-								{/* Info Area */}
-								<CardContent className="p-3 flex-1 flex flex-col justify-between">
-									<div>
-										<p
-											className="font-medium text-xs text-foreground truncate"
-											title={asset.name}
-										>
-											{asset.name}
-										</p>
-										<p className="text-xs text-muted-foreground mt-0.5">
-											{formatBytes(asset.size)}
-										</p>
-									</div>
-
-									<div className="flex items-center justify-between pt-2 mt-2 border-t border-border/40 text-xs text-muted-foreground">
-										<span>
-											{new Date(asset.modified_at).toLocaleDateString(
-												undefined,
-												{
-													month: "short",
-													day: "numeric",
-												},
-											)}
-										</span>
-										<span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-none text-foreground/80">
-											{asset.category}
-										</span>
-									</div>
-								</CardContent>
-							</Card>
-						);
-					})}
-				</div>
-			:	/* List View */
+								</li>
+							);
+						})}
+					</ul>
+				) : (
+				<div className="p-3">
 				<div className="border border-border rounded-none overflow-hidden bg-card/60">
 					<table className="w-full text-left text-xs">
 						<thead className="bg-muted/50 border-b border-border text-muted-foreground text-xs">
@@ -725,7 +635,9 @@ export default function WorkspaceAssets() {
 						</tbody>
 					</table>
 				</div>
-			}
+				</div>
+				)}
+			</div>
 
 			{/* Asset Upload Modal */}
 			{isUploadOpen && workspace?.path && (
