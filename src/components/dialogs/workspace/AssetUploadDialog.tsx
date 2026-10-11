@@ -78,8 +78,8 @@ export default function AssetUploadDialog({ workspacePath, isOpen, onClose, onUp
 	};
 
 	return (
-		<Dialog isOpen={isOpen} onOpenChange={(open) => !open && onClose()} className="max-w-xl p-6">
-			<div className="space-y-5">
+		<Dialog isOpen={isOpen} onOpenChange={(open) => !open && onClose()} className="max-w-xl overflow-x-hidden p-6">
+			<div className="min-w-0 space-y-5">
 				<DialogHeading
 					icon={<UploadCloud className="size-6" />}
 					title="Upload assets"
@@ -122,14 +122,14 @@ export default function AssetUploadDialog({ workspacePath, isOpen, onClose, onUp
 
 				{/* Chosen files */}
 				{picked.length > 0 && (
-					<ul className="max-h-48 space-y-1 overflow-y-auto" aria-label="Files to upload">
+					<ul className="max-h-48 min-w-0 space-y-1 overflow-x-hidden overflow-y-auto" aria-label="Files to upload">
 						{picked.map((p, i) => {
 							const after = p.size ? scaledSize(p.size.width, p.size.height, percent) : null;
 							return (
-								<li key={`${p.file.name}-${i}`} className="flex items-center gap-3 border bg-muted/30 p-2 text-sm">
+								<li key={`${p.file.name}-${i}`} className="flex min-w-0 items-center gap-3 border bg-muted/30 p-2 text-sm">
 									{p.preview ? <img src={p.preview} alt="" className="size-10 shrink-0 bg-muted object-cover" /> : <span className="flex size-10 shrink-0 items-center justify-center bg-muted font-mono text-xs text-muted-foreground">{p.file.name.split(".").pop()?.toUpperCase()}</span>}
 									<span className="min-w-0 flex-1">
-										<span className="block truncate font-medium">{p.file.name}</span>
+										<span className="block truncate font-medium" title={p.file.name}>{p.file.name}</span>
 										<span className="block truncate font-mono text-xs text-muted-foreground">
 											{formatBytes(p.file.size)}
 											{p.size && ` · ${p.size.width}×${p.size.height}`}

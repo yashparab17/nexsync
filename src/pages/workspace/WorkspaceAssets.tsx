@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { Copy, Check, Search, Trash2, FileText, Film, Headphones, Image as ImageIcon, LayoutGrid, List, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
+import { Copy, Check, Play, Search, Trash2, FileText, Film, Headphones, Image as ImageIcon, LayoutGrid, List, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
 import { displaySize } from "@/lib/assets/displaySize";
 import { justify } from "@/lib/assets/justify";
+import { MAX_PREVIEW_BYTES, pdfFirstPage, previewKind, textSnippet, videoFrame, type TilePreview } from "@/lib/assets/previews";
 import { fileToBase64 } from "@/lib/assets/uploadScale";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +17,7 @@ import AssetUploadDialog from "@/components/dialogs/workspace/AssetUploadDialog"
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
-import { formatBytes } from "@/lib/utils";
+import { formatBytes, getMimeType } from "@/lib/utils";
 import {
 	deleteWorkspaceItem,
 	listWorkspaceFiles,
@@ -67,6 +68,8 @@ export default function WorkspaceAssets() {
 	// How big the tiles are drawn, and each picture's own size once it is known
 	const [tile, setTile] = useState<"s" | "m" | "l">("m");
 	const [sizes, setSizes] = useState<Record<string, { w: number; h: number }>>({});
+	// Small pictures of PDFs, videos and text files, made in the background
+	const [previews, setPreviews] = useState<Record<string, TilePreview>>({});
 	const gridRef = useRef<HTMLUListElement>(null);
 	const [gridWidth, setGridWidth] = useState(1200);
 	useEffect(() => {
@@ -180,6 +183,33 @@ export default function WorkspaceAssets() {
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [thumbnails]);
+
+	// PDFs, videos and text files get a preview tile, made one at a time so a big folder does not stall the page
+	useEffect(() => {
+		const root = workspace?.path;
+		if (!root) return;
+		let live = true;
+		void (async () => {
+			for (const asset of assets) {
+				if (!live) return;
+				const kind = previewKind(asset.name);
+				if (!kind || previews[asset.name] || asset.syncStatus !== "synced" || asset.size > MAX_PREVIEW_BYTES[kind]) continue;
+				try {
+					const base64 = await readWorkspaceBinaryFile(root, asset.path.replace(/^\/+/, ""));
+					const made: TilePreview = kind === "pdf" ? await pdfFirstPage(base64) : kind === "video" ? await videoFrame(`data:${getMimeType(asset.name)};base64,${base64}`) : { kind: "text", text: textSnippet(base64) };
+					if (!live) return;
+					setPreviews((prev) => ({ ...prev, [asset.name]: made }));
+					if (made.kind === "image") setSizes((prev) => ({ ...prev, [asset.name]: { w: made.width, h: made.height } }));
+				} catch (err) {
+					console.debug("Preview skipped for", asset.name, err);
+				}
+			}
+		})();
+		return () => {
+			live = false;
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [assets, workspace?.path]);
 
 	// Filtered assets
 	const filteredAssets = useMemo(() => {
@@ -345,7 +375,7 @@ export default function WorkspaceAssets() {
 		let w: number;
 		let h: number;
 		if (asset.syncStatus === "remote_placeholder") [w, h] = [150, 150];
-		else if (asset.category === "image" && natural) {
+		else if (natural) {
 			const d = displaySize(natural.w, natural.h);
 			[w, h] = [d.width, d.height];
 		} else if (asset.category === "image") [w, h] = [200, 200];
@@ -479,6 +509,7 @@ export default function WorkspaceAssets() {
 					<ul ref={gridRef} className="relative" style={{ height: layout.height + PAD * 2 }}>
 						{filteredAssets.map((asset) => {
 							const thumbnail = thumbnails[asset.name];
+							const preview = previews[asset.name];
 							const isRemote = asset.syncStatus === "remote_placeholder";
 							const ext = asset.name.split(".").pop()?.toUpperCase() ?? "";
 							const natural = sizes[asset.name];
@@ -504,6 +535,20 @@ export default function WorkspaceAssets() {
 												alt=""
 												className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none"
 											/>
+										) : preview?.kind === "image" && !isRemote ? (
+											<>
+												<img src={preview.src} alt="" className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none" />
+												{asset.category === "video" && (
+													<span aria-hidden="true" className="absolute top-1/2 left-1/2 flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center bg-black/55 text-white">
+														<Play className="size-5" />
+													</span>
+												)}
+											</>
+										) : preview?.kind === "text" && !isRemote ? (
+											<div className="flex h-full w-full flex-col gap-2 overflow-hidden border bg-card p-3">
+												<pre className="min-h-0 flex-1 overflow-hidden font-mono text-xs leading-snug break-words whitespace-pre-wrap text-muted-foreground">{preview.text}</pre>
+												<span className="font-mono text-xs text-muted-foreground/70">{ext}</span>
+											</div>
 										) : (
 											<div className={cn("flex h-full w-full flex-col items-center justify-center gap-2 border bg-card", isRemote && "border border-dashed border-warning/60 bg-transparent")}>
 												{isRemote ? <Sparkles className="size-8 text-warning" /> : kindIcon(asset.category, "size-9 text-muted-foreground")}
