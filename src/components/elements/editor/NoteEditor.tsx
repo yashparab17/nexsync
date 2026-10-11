@@ -189,7 +189,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 					<span className="truncate font-medium">{fileName}</span>
 					{dirty || saving ? (
 						<span className="flex shrink-0 items-center gap-1.5 text-xs text-warning" role="status">
-							<span className="size-1.5 animate-pulse bg-warning" />
+							<span className="size-1.5 animate-pulse bg-warning motion-reduce:animate-none" />
 							{saving ? "Saving…" : "Unsaved"}
 						</span>
 					) : (
@@ -207,7 +207,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 							Live
 						</span>
 					)}
-					<div className="mr-2 hidden items-center gap-2 font-mono text-xs text-muted-foreground sm:flex" aria-label="Note statistics">
+					<div className="mr-2 hidden items-center gap-2 font-mono text-xs text-muted-foreground sm:flex" role="group" aria-label="Note statistics">
 						<span>
 							{stats.lines} {stats.lines === 1 ? "line" : "lines"}
 						</span>

@@ -410,11 +410,11 @@ export default function WorkspaceNotes() {
 						<span className="min-w-0 flex-1 truncate text-sm font-medium">{noteTitle(n.name)}</span>
 						<PresenceDots names={people} doing="reading" />
 						{pins.includes(n.path) && <Pin className="size-3.5 shrink-0 text-primary" aria-label="Pinned" />}
-						<span className="shrink-0 font-mono text-xs text-muted-foreground">{ago(modified.get(n.path) ?? "")}</span>
+						<span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{ago(modified.get(n.path) ?? "")}</span>
 					</span>
 					<span className="flex items-center gap-2 text-xs text-muted-foreground">
 						<span className="min-w-0 flex-1 truncate">{snippet || "No additional text"}</span>
-						{links > 0 && <span className="shrink-0 font-mono" title={`${links} links`}>{links} ↔</span>}
+						{links > 0 && <span className="shrink-0 font-mono tabular-nums" title={`${links} links`}>{links} ↔</span>}
 					</span>
 				</button>
 			</li>

@@ -147,7 +147,7 @@ export default function Finder({ open, onClose, query, onQueryChange, filterText
 					placeholder={placeholder}
 					spellCheck={false}
 					autoComplete="off"
-					className="h-12 border-0 border-b bg-transparent px-4 font-mono text-sm outline-none placeholder:text-muted-foreground"
+					className="h-12 border-0 border-b bg-transparent px-4 font-mono text-sm outline-none transition-shadow placeholder:text-muted-foreground focus-visible:shadow-[inset_0_-2px_0_var(--primary)]"
 				/>
 				<div className={cn("grid min-h-0", renderPreview ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "grid-cols-1")} style={{ height: "min(26rem, 60vh)" }}>
 					{message ? (

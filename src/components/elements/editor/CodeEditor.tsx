@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { lintGutter } from "@codemirror/lint";
-import { EditorState, type Extension } from "@codemirror/state";
+import { EditorState, Prec, type Extension } from "@codemirror/state";
 import { EditorView, GutterMarker, gutter, keymap, lineNumbers } from "@codemirror/view";
 import { catppuccinLatte, catppuccinMocha } from "@catppuccin/codemirror";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
@@ -14,7 +14,7 @@ import { useEditorPrefs } from "@/lib/editorPrefs";
 import { useSeedOnce } from "@/hooks/useSeedOnce";
 import { seedText } from "@/lib/yjs/seed";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
-import { vimCommands, type VimCommand } from "@/lib/editor/vimSetup";
+import { leaderKeys, vimCommands, type VimCommand } from "@/lib/editor/vimSetup";
 
 // Where the cursor is, for the status line
 export interface CursorInfo {
@@ -111,6 +111,9 @@ export default function CodeEditor({
 	modeRef.current = onVimMode;
 	const commandRef = useRef(onVimCommand);
 	commandRef.current = onVimCommand;
+	// Whether Vim is in normal mode, for the Space-prefixed commands
+	const normalRef = useRef(false);
+	const leader = useMemo(() => leaderKeys(() => normalRef.current, (command) => commandRef.current?.(command)), []);
 
 	// A live document that already exists when the editor is created must be its starting text: the sync
 	// layer applies only later changes, so an editor started empty would stay blank.
@@ -192,10 +195,17 @@ export default function CodeEditor({
 			const cm = mod.getCM(view);
 			if (!cm) return;
 			vimCommands(mod, cm, (command) => commandRef.current?.(command));
-			const listener = (event: { mode: string; subMode?: string }) => modeRef.current?.(event.subMode ? `${event.mode}:${event.subMode}` : event.mode);
+			const listener = (event: { mode: string; subMode?: string }) => {
+				normalRef.current = event.mode === "normal";
+				modeRef.current?.(event.subMode ? `${event.mode}:${event.subMode}` : event.mode);
+			};
 			cm.on("vim-mode-change", listener);
+			normalRef.current = true;
 			modeRef.current?.("normal");
-			off = () => cm.off("vim-mode-change", listener);
+			off = () => {
+				normalRef.current = false;
+				cm.off("vim-mode-change", listener);
+			};
 		});
 		return () => off?.();
 	}, [vimExtension, viewReady]);
@@ -218,11 +228,11 @@ export default function CodeEditor({
 			EditorState.tabSize.of(tabSize),
 			relativeNumbers ? relativeLineNumbers : lineNumbers(),
 			cursorExtension,
-			...(vimExtension ? [vimExtension] : []),
+			...(vimExtension ? [Prec.highest(EditorView.domEventHandlers({ keydown: (e) => leader(e) && (e.preventDefault(), e.stopPropagation(), true) })), vimExtension] : []),
 			...(minimapExtension ? [minimapExtension] : []),
 			...(wrap || language.name === "Markdown" ? [EditorView.lineWrapping] : []),
 		],
-		[fontSize, tabSize, wrap, language.name, relativeNumbers, cursorExtension, vimExtension, minimapExtension],
+		[fontSize, tabSize, wrap, language.name, relativeNumbers, cursorExtension, vimExtension, minimapExtension, leader],
 	);
 
 	// Seed the shared text from on-disk content the first time it's ever opened

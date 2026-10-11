@@ -28,13 +28,36 @@ export function vimCommands(mod: VimModule, cm: object, run: (command: VimComman
 	ex("vsplit", "vs", "split");
 	ex("Terminal", "Te", "panel");
 	ex("Preview", "Pr", "preview");
-	Vim.map("<Space>ff", ":Files<CR>", "normal");
-	Vim.map("<Space>fc", ":Commands<CR>", "normal");
-	Vim.map("<Space>e", ":Explorer<CR>", "normal");
-	Vim.map("<Space>x", ":bdelete<CR>", "normal");
-	Vim.map("<Space>v", ":vsplit<CR>", "normal");
-	Vim.map("<Space>t", ":Terminal<CR>", "normal");
-	Vim.map("<Space>p", ":Preview<CR>", "normal");
 	Vim.map("<Tab>", ":bnext<CR>", "normal");
 	Vim.map("<S-Tab>", ":bprevious<CR>", "normal");
+}
+
+// Space-prefixed commands, as with NvChad's leader key. Vim's own Space motion would win over a mapped sequence, so the
+// sequences are read here instead, only while the editor is in normal mode.
+const LEADER: Record<string, VimCommand> = { ff: "files", fc: "commands", e: "explorer", x: "closeTab", v: "split", t: "panel", p: "preview" };
+
+export function leaderKeys(isNormal: () => boolean, run: (command: VimCommand) => void) {
+	let typed: string | null = null;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const reset = () => {
+		typed = null;
+		clearTimeout(timer);
+	};
+	return (e: KeyboardEvent): boolean => {
+		if (e.ctrlKey || e.metaKey || e.altKey || !isNormal()) return false;
+		if (typed === null) {
+			if (e.key !== " ") return false;
+			typed = "";
+			timer = setTimeout(reset, 1500);
+			return true;
+		}
+		if (e.key.length !== 1) return e.key === "Shift";
+		typed += e.key;
+		const hit = LEADER[typed];
+		if (hit) {
+			reset();
+			run(hit);
+		} else if (!Object.keys(LEADER).some((k) => k.startsWith(typed!))) reset();
+		return true;
+	};
 }
