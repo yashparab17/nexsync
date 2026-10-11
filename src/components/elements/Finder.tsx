@@ -38,6 +38,8 @@ interface FinderProps {
 	// Replaces the list entirely, for a mode with its own meaning such as "go to line"
 	message?: ReactNode;
 	footer?: ReactNode;
+	// Ctrl or Cmd+Enter when nothing matches, for "make one from what I typed"
+	onSubmitEmpty?: () => void;
 }
 
 // The label with the letters that matched in bold
@@ -58,7 +60,7 @@ function Highlighted({ text, indexes }: { text: string; indexes: Set<number> }) 
 	);
 }
 
-export default function Finder({ open, onClose, query, onQueryChange, filterText, placeholder, label, items, onChoose, renderPreview, empty, message, footer }: FinderProps) {
+export default function Finder({ open, onClose, query, onQueryChange, filterText, placeholder, label, items, onChoose, renderPreview, empty, message, footer, onSubmitEmpty }: FinderProps) {
 	const listId = useId();
 	const [index, setIndex] = useState(0);
 	const listRef = useRef<HTMLUListElement>(null);
@@ -88,6 +90,9 @@ export default function Finder({ open, onClose, query, onQueryChange, filterText
 		} else if (e.key === "Enter" && current && !message) {
 			e.preventDefault();
 			onChoose(current, ctrl);
+		} else if (e.key === "Enter" && ctrl && !current && !message) {
+			e.preventDefault();
+			onSubmitEmpty?.();
 		}
 	};
 

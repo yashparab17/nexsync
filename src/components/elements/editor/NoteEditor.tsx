@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
-import { Loader2 } from "lucide-react";
-import { Check, Download, FileText, GitBranch, History, MessageSquareDiff, PanelRight, Save, Type, Users, X } from "@/components/animate-icons";
+import { Check, Download, FileText, GitBranch, History, MessageSquareDiff, PanelRight, Type, Users } from "@/components/animate-icons";
 
 import CodeEditor from "./CodeEditor";
 import RichTextEditor from "./RichTextEditor";
@@ -30,7 +29,7 @@ interface NoteEditorProps {
 	// The note as it is on disk
 	initialContent: string;
 	onSave: (content: string) => Promise<void>;
-	onClose: () => void;
+	onClose?: () => void;
 	readOnly?: boolean;
 	// Workspace-relative path, which is also the id of the shared document
 	workspacePath?: string;
@@ -47,7 +46,7 @@ const sameNote = (a: string, b: string) => a.replace(/\s+$/, "") === b.replace(/
 
 // Editor for one note. Markdown files (.md) are edited as Markdown source; text files (.txt) get a rich-text
 // editor and are saved as plain text.
-export default function NoteEditor({ fileName, initialContent, onSave, onClose, readOnly = false, workspacePath, docId, notes, onOpenNote, onTextChange }: NoteEditorProps) {
+export default function NoteEditor({ fileName, initialContent, onSave, readOnly = false, workspacePath, docId, notes, onOpenNote, onTextChange }: NoteEditorProps) {
 	const isMarkdown = isMarkdownFile(fileName);
 	const { peers, selfName, shareNamedVersion } = useP2P();
 	const { metadata } = useWorkspace();
@@ -73,7 +72,6 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 		textChangeRef.current?.(content);
 	}, [content]);
 	const [saving, setSaving] = useState(false);
-	const [justSaved, setJustSaved] = useState(false);
 	const [historyOpen, setHistoryOpen] = useState(false);
 	const [exportMenu, setExportMenu] = useState(false);
 	const [exportNotice, setExportNotice] = useState<{ ok: boolean; text: string } | null>(null);
@@ -83,7 +81,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 		replaceRef.current = replace;
 	}, []);
 
-	const [panelOpen, setPanelOpen] = useState(false);
+	const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= 1280);
 	const current = useMemo<NoteRef>(() => ({ path: `/${docId ?? fileName}`, name: fileName }), [docId, fileName]);
 	// Ctrl or Cmd+click on a [[link]] opens that note; read through a ref so the editor is not rebuilt
 	const openLinkRef = useRef<(target: string) => void>(() => {});
@@ -125,8 +123,6 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 			await onSave(text);
 			setSaved(text);
 			setContent(text);
-			setJustSaved(true);
-			setTimeout(() => setJustSaved(false), 2000);
 		} catch (err) {
 			console.error("Save failed:", err);
 		} finally {
@@ -163,7 +159,17 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 		return () => clearTimeout(timer);
 	}, [exportNotice]);
 
-	// Ctrl+S / Cmd+S saves
+	// Notes save themselves a moment after the last keystroke, and when they are closed, so there is no Save button to forget
+	const saveRef = useRef(save);
+	saveRef.current = save;
+	useEffect(() => {
+		if (!dirty || readOnly || branch) return;
+		const timer = setTimeout(() => void saveRef.current(), 1200);
+		return () => clearTimeout(timer);
+	}, [dirty, content, readOnly, branch]);
+	useEffect(() => () => void saveRef.current(), []);
+
+	// Ctrl+S / Cmd+S saves now
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -177,40 +183,31 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 
 	return (
 		<div className="flex h-full w-full flex-col bg-background">
-			<div className="flex min-h-11 flex-wrap items-center justify-between gap-3 border-b px-3 py-1.5">
-				<div className="flex min-w-0 items-center gap-2">
-					<Button variant="ghost" size="icon-xs" onPress={onClose} aria-label="Close note">
-						<X className="size-4" />
-					</Button>
+			<div className="flex min-h-11 flex-wrap items-center justify-between gap-3 border-b px-4 py-1.5">
+				<div className="flex min-w-0 items-center gap-2 text-sm">
 					{isMarkdown ? <FileText className="size-4 shrink-0 text-info" /> : <Type className="size-4 shrink-0 text-warning" />}
-					<span className="truncate text-sm font-semibold">{fileName}</span>
-					<span className="hidden shrink-0 border px-1.5 py-0.5 text-xs text-muted-foreground sm:inline">
-						{isMarkdown ? "Markdown" : "Rich text · saved as plain text"}
-					</span>
-					{dirty ? (
-						<span className="flex shrink-0 items-center gap-1 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+					<span className="truncate font-medium">{fileName}</span>
+					{dirty || saving ? (
+						<span className="flex shrink-0 items-center gap-1.5 text-xs text-warning" role="status">
 							<span className="size-1.5 animate-pulse bg-warning" />
-							Unsaved changes
+							{saving ? "Saving…" : "Unsaved"}
 						</span>
 					) : (
-						<span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+						<span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground" role="status">
 							<Check className="size-3 text-success" />
-							Saved to disk
+							Saved
 						</span>
 					)}
 				</div>
 
-				<div className="flex items-center gap-2">
+				<div className="flex items-center gap-1">
 					{collab && peers.length > 0 && (
-						<span className="flex items-center gap-1 py-0.5 text-xs font-medium text-success">
+						<span className="mr-1 flex items-center gap-1 text-xs font-medium text-success">
 							<Users className="size-3" />
 							Live
 						</span>
 					)}
-					<div
-						className="hidden items-center gap-2 border bg-muted/20 px-2.5 py-1 font-mono text-xs text-muted-foreground sm:flex"
-						aria-label="Note statistics"
-					>
+					<div className="mr-2 hidden items-center gap-2 font-mono text-xs text-muted-foreground sm:flex" aria-label="Note statistics">
 						<span>
 							{stats.lines} {stats.lines === 1 ? "line" : "lines"}
 						</span>
@@ -225,40 +222,30 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 					</div>
 					{workspacePath && docId && (
 						<>
-							{notes && onOpenNote && (
-								<Button variant="ghost" size="sm" onPress={() => setPanelOpen((open) => !open)} className="gap-1.5" aria-pressed={panelOpen}>
-									<PanelRight className="size-3.5" />
-									Outline
-								</Button>
-							)}
 							{isMarkdown && collab && !readOnly && !branch && (
 								<Button
 									variant="ghost"
-									size="sm"
+									size="icon-xs"
+									aria-label="Suggest edit"
 									onPress={() => {
 										const { from, to } = viewRef.current?.state.selection.main ?? { from: 0, to: 0 };
 										setSuggesting({ from, to });
 									}}
-									className="gap-1.5"
 								>
-									<MessageSquareDiff className="size-3.5" />
-									Suggest edit
+									<MessageSquareDiff className="size-4" />
 								</Button>
 							)}
 							{isMarkdown && mainCollab && (
-								<Button variant="ghost" size="sm" onPress={() => setBranchesOpen(true)} className="gap-1.5">
-									<GitBranch className="size-3.5" />
-									Branches
+								<Button variant="ghost" size="icon-xs" aria-label="Branches" onPress={() => setBranchesOpen(true)}>
+									<GitBranch className="size-4" />
 								</Button>
 							)}
-							<Button variant="ghost" size="sm" onPress={() => setHistoryOpen(true)} className="gap-1.5">
-								<History className="size-3.5" />
-								History
+							<Button variant="ghost" size="icon-xs" aria-label="History" onPress={() => setHistoryOpen(true)}>
+								<History className="size-4" />
 							</Button>
 							<div className="relative">
-								<Button variant="ghost" size="sm" onPress={() => setExportMenu((open) => !open)} className="gap-1.5" aria-expanded={exportMenu}>
-									<Download className="size-3.5" />
-									Export
+								<Button variant="ghost" size="icon-xs" aria-label="Export" onPress={() => setExportMenu((open) => !open)} aria-expanded={exportMenu}>
+									<Download className="size-4" />
 								</Button>
 								{exportMenu && (
 									<>
@@ -274,13 +261,12 @@ export default function NoteEditor({ fileName, initialContent, onSave, onClose, 
 									</>
 								)}
 							</div>
+							{notes && onOpenNote && (
+								<Button variant="ghost" size="icon-xs" aria-label="Outline and links" aria-pressed={panelOpen} onPress={() => setPanelOpen((open) => !open)}>
+									<PanelRight className="size-4" />
+								</Button>
+							)}
 						</>
-					)}
-					{!readOnly && !branch && (
-						<Button size="sm" onPress={() => void save()} isDisabled={saving || !dirty} className="gap-1.5">
-							{saving ? <Loader2 className="size-3.5 animate-spin" /> : justSaved ? <Check className="size-3.5 text-success" /> : <Save className="size-3.5" />}
-							{saving ? "Saving…" : justSaved ? "Saved!" : "Save"}
-						</Button>
 					)}
 				</div>
 			</div>
