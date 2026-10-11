@@ -80,12 +80,6 @@ const navigation: NavigationItem[] = [
 		path: "/workspace/kanban",
 		icon: KanbanSquare,
 	},
-	{
-		name: "Insights",
-		label: "nav.insights",
-		path: "/workspace/insights",
-		icon: BarChart3,
-	},
 ];
 
 // The main list in Discord-style categories: the first group has no label
@@ -96,7 +90,7 @@ const navGroups: { id: string; label?: MessageKey; items: NavigationItem[] }[] =
 	{ id: "top", items: [byPath("/workspace"), byPath("/workspace/explorer")] },
 	{ id: "write", label: "nav.groupWrite", items: [byPath("/workspace/notes"), byPath("/workspace/editor")] },
 	{ id: "storage", label: "nav.groupStorage", items: [byPath("/workspace/files"), byPath("/workspace/assets")] },
-	{ id: "plan", label: "nav.groupPlan", items: [byPath("/workspace/tasks"), byPath("/workspace/kanban"), byPath("/workspace/insights")] },
+	{ id: "plan", label: "nav.groupPlan", items: [byPath("/workspace/tasks"), byPath("/workspace/kanban")] },
 ];
 
 // Bottom workspace navigation links
@@ -106,6 +100,12 @@ const bottomNavigation: NavigationItem[] = [
 		label: "nav.members",
 		path: "/workspace/members",
 		icon: UsersRound,
+	},
+	{
+		name: "Insights",
+		label: "nav.insights",
+		path: "/workspace/insights",
+		icon: BarChart3,
 	},
 	{
 		name: "Trash",

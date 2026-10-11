@@ -1,9 +1,9 @@
-import PageHeader from "@/components/layout/PageHeader";
 import { useEffect, useMemo, useState } from "react";
 import { History, X } from "@/components/animate-icons";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import Avatar from "@/components/elements/Avatar";
+import { BarRows, DayColumns, Donut, Empty, Heatmap, Panel, SERIES, Stat, StackBar } from "@/components/elements/charts";
+import Toolbar, { ToolbarSearch, ToolbarTabs } from "@/components/layout/Toolbar";
 import {
 	authorOf,
 	countBy,
@@ -21,41 +21,12 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { KanbanColumn, Task } from "@/types/workspace";
 
 const DAYS = 14;
+const WEEKS = 16;
 const FEED_LIMIT = 100;
 
-// A horizontal bar per row, scaled to the biggest
-function Bars({ rows, empty }: { rows: [string, number][]; empty: string }) {
-	const max = Math.max(1, ...rows.map(([, n]) => n));
-	if (rows.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
-	return (
-		<ul className="space-y-2">
-			{rows.map(([label, n]) => (
-				<li key={label} className="grid grid-cols-[9rem_1fr_2.5rem] items-center gap-2 text-sm">
-					<span className="truncate" title={label}>
-						{label}
-					</span>
-					<span className="h-3 bg-muted">
-						<span className="block h-full bg-primary transition-[width] duration-500" style={{ width: `${(n / max) * 100}%` }} />
-					</span>
-					<span className="text-right tabular-nums text-muted-foreground">{n}</span>
-				</li>
-			))}
-		</ul>
-	);
-}
+const select = "h-8 border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-function Stat({ label, value }: { label: string; value: number }) {
-	return (
-		<Card>
-			<CardContent className="p-4">
-				<p className="text-2xl font-bold tabular-nums">{value}</p>
-				<p className="text-xs text-muted-foreground">{label}</p>
-			</CardContent>
-		</Card>
-	);
-}
-
-// Who did what and when, worked out from the workspace activity log, with a filterable feed and per-item history
+// Who did what and when, worked out from the workspace activity log: charts on one tab, a filterable feed on the other
 export default function WorkspaceInsights() {
 	const { workspace, metadata } = useWorkspace();
 	const { dataVersion } = useP2P();
@@ -64,6 +35,7 @@ export default function WorkspaceInsights() {
 
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [columns, setColumns] = useState<KanbanColumn[]>([]);
+	const [tab, setTab] = useState<"overview" | "activity">("overview");
 	const [filter, setFilter] = useState<ActivityFilter>({});
 	const set = (patch: ActivityFilter) => setFilter((f) => ({ ...f, ...patch }));
 
@@ -79,171 +51,174 @@ export default function WorkspaceInsights() {
 	const byKind = useMemo(() => countBy(events, kindOf), [events]);
 	const finished = useMemo(() => countBy(events.filter(isCompletion), authorOf), [events]);
 	const days = useMemo(() => perDay(events, DAYS), [events]);
+	const weeks = useMemo(() => perDay(events, WEEKS * 7), [events]);
 	const load = useMemo(() => workload(tasks, columns, members), [tasks, columns, members]);
 	const feed = useMemo(() => filterEvents(events, filter), [events, filter]);
-	const peak = Math.max(1, ...days.map((d) => d.count));
-	const openTasks = tasks.filter((t) => t.status !== "done").length;
 	const filtered = Object.values(filter).some(Boolean);
 
+	const count = (f: (t: Task) => boolean) => tasks.filter(f).length;
+	const done = count((t) => t.status === "done");
+	const openTasks = tasks.length - done;
+	const people = byPerson.filter(([n]) => n !== "Unknown").length;
+	const finishedTotal = finished.reduce((n, [, c]) => n + c, 0);
+	const cards = columns.reduce((n, c) => n + c.cards.length, 0);
+
 	return (
-		<div className="flex flex-col gap-6">
-			<PageHeader
-				title="Insights"
-				description={`Who has been doing what in this workspace. Based on the latest ${events.length} recorded actions${events.some((e) => !e.author) ? "; older ones have no name attached" : ""}.`}
-			/>
-
-			<div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-				<Stat label="Actions recorded" value={events.length} />
-				<Stat label="People active" value={byPerson.filter(([n]) => n !== "Unknown").length} />
-				<Stat label="Tasks finished" value={finished.reduce((n, [, c]) => n + c, 0)} />
-				<Stat label="Tasks still open" value={openTasks} />
-			</div>
-
-			<div className="grid gap-4 lg:grid-cols-2">
-				<Card>
-					<CardHeader>
-						<CardTitle>Actions by person</CardTitle>
-						<CardDescription>Everything recorded in the activity log, by who did it.</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<Bars rows={byPerson} empty="Nothing recorded yet." />
-					</CardContent>
-				</Card>
-				<Card>
-					<CardHeader>
-						<CardTitle>Tasks finished</CardTitle>
-						<CardDescription>Tasks moved to Done, by the person who moved them.</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<Bars rows={finished} empty="No task has been finished yet." />
-					</CardContent>
-				</Card>
-				<Card>
-					<CardHeader>
-						<CardTitle>Open work by person</CardTitle>
-						<CardDescription>Tasks and cards not yet done, by who they are assigned to.</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<Bars rows={load.map((w) => [`${w.name} (${w.tasks} tasks, ${w.cards} cards)`, w.tasks + w.cards])} empty="Nothing is open." />
-					</CardContent>
-				</Card>
-				<Card>
-					<CardHeader>
-						<CardTitle>Where the work happens</CardTitle>
-						<CardDescription>Actions by part of the app.</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<Bars rows={byKind} empty="Nothing recorded yet." />
-					</CardContent>
-				</Card>
-			</div>
-
-			<Card>
-				<CardHeader>
-					<CardTitle>Last {DAYS} days</CardTitle>
-					<CardDescription>Actions per day, today on the right.</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<div className="flex h-32 items-end gap-1" role="img" aria-label={`Actions per day over the last ${DAYS} days`}>
-						{days.map((d) => (
-							<div key={d.day} className="flex h-full flex-1 flex-col justify-end" title={`${d.day}: ${d.count}`}>
-								<div className="bg-primary transition-[height] duration-500" style={{ height: `${(d.count / peak) * 100}%`, minHeight: d.count ? 2 : 0 }} />
-							</div>
-						))}
-					</div>
-					<div className="mt-1 flex justify-between text-xs text-muted-foreground">
-						<span>{days[0]?.day.slice(5)}</span>
-						<span>{days[days.length - 1]?.day.slice(5)}</span>
-					</div>
-				</CardContent>
-			</Card>
-
-			<Card>
-				<CardHeader>
-					<CardTitle>Activity feed</CardTitle>
-					<CardDescription>Filter by person, part of the app or text. Press History on a task or card event to follow just that item.</CardDescription>
-				</CardHeader>
-				<CardContent className="space-y-3">
-					<div className="flex flex-wrap items-center gap-2">
-						<Input
-							aria-label="Search activity"
-							placeholder="Search activity"
-							value={filter.query ?? ""}
-							onChange={(e) => set({ query: e.target.value })}
-							className="h-9 w-56"
-						/>
-						<select
-							aria-label="Person"
-							value={filter.author ?? ""}
-							onChange={(e) => set({ author: e.target.value || undefined })}
-							className="h-9 border border-input bg-background px-2 text-sm"
-						>
+		<div className="flex h-full min-h-0 flex-col bg-background">
+			<Toolbar>
+				<ToolbarTabs
+					label="Insights"
+					value={tab}
+					onChange={setTab}
+					tabs={[
+						{ key: "overview", label: "Overview" },
+						{ key: "activity", label: "Activity", count: events.length },
+					]}
+				/>
+				<span className="flex-1" />
+				{tab === "overview" ? (
+					<span className="font-mono text-sm text-muted-foreground">latest {events.length} actions{events.some((e) => !e.author) ? " · some older ones have no name" : ""}</span>
+				) : (
+					<>
+						<ToolbarSearch label="Search activity" placeholder="Search activity" value={filter.query ?? ""} onChange={(query) => set({ query })} />
+						<select aria-label="Person" value={filter.author ?? ""} onChange={(e) => set({ author: e.target.value || undefined })} className={select}>
 							<option value="">Everyone</option>
 							{byPerson.map(([name]) => (
 								<option key={name}>{name}</option>
 							))}
 						</select>
-						<select
-							aria-label="Part of the app"
-							value={filter.kind ?? ""}
-							onChange={(e) => set({ kind: (e.target.value || undefined) as ActivityFilter["kind"] })}
-							className="h-9 border border-input bg-background px-2 text-sm"
-						>
+						<select aria-label="Part of the app" value={filter.kind ?? ""} onChange={(e) => set({ kind: (e.target.value || undefined) as ActivityFilter["kind"] })} className={select}>
 							<option value="">Everything</option>
 							{KINDS.map((k) => (
 								<option key={k}>{k}</option>
 							))}
 						</select>
 						{filter.target && (
-							<span className="inline-flex items-center gap-1 border border-primary/40 bg-primary/10 px-2 py-1 text-xs">
-								<History className="size-3" />
+							<span className="inline-flex h-8 items-center gap-1 border border-primary/40 bg-primary/10 px-2 text-sm">
+								<History className="size-3.5" />
 								History of one item
 							</span>
 						)}
 						{filtered && (
-							<button type="button" onClick={() => setFilter({})} className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-								<X className="size-3" />
+							<button type="button" onClick={() => setFilter({})} className="inline-flex h-8 cursor-pointer items-center gap-1 px-2 text-sm text-muted-foreground hover:text-foreground">
+								<X className="size-3.5" />
 								Clear filters
 							</button>
 						)}
-					</div>
+					</>
+				)}
+			</Toolbar>
 
-					{feed.length === 0 ? (
-						<p className="text-sm text-muted-foreground">{events.length === 0 ? "No activity yet." : "Nothing matches these filters."}</p>
-					) : (
-						<ul className="divide-y divide-border/60">
+			<div className="min-h-0 flex-1 overflow-auto">
+				{tab === "overview" ? (
+					<div className="grid gap-3 p-3 lg:grid-cols-6">
+						<div className="grid grid-cols-2 gap-3 lg:col-span-6 lg:grid-cols-4">
+							<Stat label="Actions recorded" value={events.length} trend={days.map((d) => d.count)} />
+							<Stat label="People active" value={people} />
+							<Stat label="Tasks finished" value={finishedTotal} />
+							<Stat label="Tasks still open" value={openTasks} />
+						</div>
+
+						<Panel title="last 14 days" hint="Actions per day, today on the right" className="lg:col-span-4">
+							<DayColumns days={days} label={`Actions per day over the last ${DAYS} days`} />
+						</Panel>
+						<Panel title="task progress" hint={`${tasks.length} tasks, ${cards} cards`} className="lg:col-span-2">
+							{tasks.length === 0 ? (
+								<Empty>No tasks yet.</Empty>
+							) : (
+								<div className="space-y-5">
+									<Donut
+										label="Tasks by status"
+										parts={[
+											{ label: "To do", value: count((t) => t.status === "todo") },
+											{ label: "In progress", value: count((t) => t.status === "in_progress") },
+											{ label: "Done", value: done },
+										]}
+										center={
+											<>
+												<span className="font-mono text-2xl font-semibold tabular-nums">{Math.round((done / tasks.length) * 100)}%</span>
+												<span className="text-sm text-muted-foreground">done</span>
+											</>
+										}
+									/>
+									<StackBar
+										label="Tasks by priority"
+										parts={[
+											{ label: "High", value: count((t) => t.priority === "high"), bg: "bg-destructive" },
+											{ label: "Medium", value: count((t) => t.priority === "medium"), bg: "bg-warning" },
+											{ label: "Low", value: count((t) => t.priority === "low"), bg: "bg-info" },
+										]}
+									/>
+								</div>
+							)}
+						</Panel>
+
+						<Panel title="activity calendar" hint={`The last ${WEEKS} weeks, a square per day`} className="lg:col-span-6">
+							<Heatmap days={weeks} label={`Actions per day over the last ${WEEKS} weeks`} />
+						</Panel>
+
+						<Panel title="actions by person" hint="Everything in the activity log, by who did it" className="lg:col-span-3">
+							<BarRows rows={byPerson.map(([label, n]) => ({ label, parts: [{ value: n, bg: "bg-primary", title: "Actions" }] }))} lead={(l) => <Avatar name={l} className="size-6 text-xs" />} empty="Nothing recorded yet." />
+						</Panel>
+						<Panel title="tasks finished" hint="Moved to Done, by who moved them" className="lg:col-span-3">
+							<BarRows rows={finished.map(([label, n]) => ({ label, parts: [{ value: n, bg: "bg-success", title: "Finished" }] }))} lead={(l) => <Avatar name={l} className="size-6 text-xs" />} empty="No task has been finished yet." />
+						</Panel>
+						<Panel title="open work by person" hint="Tasks and cards not yet done, by who they are assigned to" className="lg:col-span-3">
+							<BarRows
+								rows={load.map((w) => ({
+									label: w.name,
+									parts: [
+										{ value: w.tasks, bg: "bg-primary", title: "Tasks" },
+										{ value: w.cards, bg: "bg-info", title: "Cards" },
+									],
+								}))}
+								lead={(l) => <Avatar name={l} className="size-6 text-xs" />}
+								empty="Nothing is open."
+							/>
+							{load.length > 0 && (
+								<p className="mt-3 flex gap-4 text-sm text-muted-foreground">
+									<span className="flex items-center gap-1.5"><span className="size-3 bg-primary" aria-hidden />Tasks</span>
+									<span className="flex items-center gap-1.5"><span className="size-3 bg-info" aria-hidden />Cards</span>
+								</p>
+							)}
+						</Panel>
+						<Panel title="where the work happens" hint="Actions by part of the app" className="lg:col-span-3">
+							{byKind.length === 0 ? <Empty>Nothing recorded yet.</Empty> : <Donut label="Actions by part of the app" parts={byKind.slice(0, SERIES.length).map(([label, value]) => ({ label, value }))} center={<><span className="font-mono text-2xl font-semibold tabular-nums">{events.length}</span><span className="text-sm text-muted-foreground">actions</span></>} />}
+						</Panel>
+					</div>
+				) : feed.length === 0 ? (
+					<Empty>{events.length === 0 ? "No activity yet." : "Nothing matches these filters."}</Empty>
+				) : (
+					<>
+						<ul className="divide-y">
 							{feed.slice(0, FEED_LIMIT).map((e) => (
-								<li key={e.id} className="flex items-start justify-between gap-3 py-2 text-sm">
-									<div className="min-w-0">
+								<li key={e.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+									<Avatar name={authorOf(e)} className="size-6 text-xs" />
+									<div className="min-w-0 flex-1">
 										<p className="truncate font-medium">{e.action}</p>
-										<p className="truncate text-xs text-muted-foreground">{e.detail}</p>
+										<p className="truncate text-muted-foreground">{e.detail}</p>
 									</div>
-									<div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
+									<div className="flex shrink-0 items-center gap-3 text-muted-foreground">
 										{e.target && /^(task|card):/.test(e.target) && (
-											<button
-												type="button"
-												onClick={() => set({ target: e.target })}
-												aria-label={`History of this ${e.target.split(":")[0]}`}
-												className="inline-flex cursor-pointer items-center gap-1 hover:text-foreground"
-											>
-												<History className="size-3" />
+											<button type="button" onClick={() => set({ target: e.target })} aria-label={`History of this ${e.target.split(":")[0]}`} className="inline-flex cursor-pointer items-center gap-1 hover:text-foreground">
+												<History className="size-3.5" />
 												History
 											</button>
 										)}
-										<span>{authorOf(e)}</span>
-										<span title={e.timestamp}>{new Date(e.timestamp).toLocaleString()}</span>
+										<span className="hidden sm:inline">{authorOf(e)}</span>
+										<span className="font-mono text-[13px]" title={e.timestamp}>{new Date(e.timestamp).toLocaleString()}</span>
 									</div>
 								</li>
 							))}
 						</ul>
-					)}
-					{feed.length > FEED_LIMIT && (
-						<p className="text-xs text-muted-foreground">
-							Showing the latest {FEED_LIMIT} of {feed.length}. Narrow the filters to see the rest.
-						</p>
-					)}
-				</CardContent>
-			</Card>
+						{feed.length > FEED_LIMIT && (
+							<p className="p-3 text-sm text-muted-foreground">
+								Showing the latest {FEED_LIMIT} of {feed.length}. Narrow the filters to see the rest.
+							</p>
+						)}
+					</>
+				)}
+			</div>
 		</div>
 	);
 }
