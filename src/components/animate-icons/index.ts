@@ -112,7 +112,8 @@ export { MessageSquareDiff } from './message-square-diff';
 export { Moon } from './moon';
 export { PanelRight } from './panel-right';
 export { Play } from './play';
-export { Plus } from './plus';
+// A plain, still plus: the animated one spun
+export { Plus } from 'lucide-react';
 export { Radio } from './radio';
 export { RefreshCw } from './refresh-cw';
 export { RotateCcw } from './rotate-ccw';

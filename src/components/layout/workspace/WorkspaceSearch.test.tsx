@@ -42,7 +42,7 @@ describe("workspace search and command palette", () => {
 		const box = screen.getByLabelText("Search workspace");
 		fireEvent.focus(box);
 		fireEvent.change(box, { target: { value: "kanban" } });
-		fireEvent.click(screen.getByText("Kanban board"));
+		fireEvent.click(screen.getByRole("option", { name: /Kanban board/ }));
 		expect(screen.getByTestId("where").textContent).toBe("/workspace/kanban");
 	});
 
@@ -51,10 +51,10 @@ describe("workspace search and command palette", () => {
 		const box = screen.getByLabelText("Search workspace");
 		fireEvent.focus(box);
 		fireEvent.change(box, { target: { value: "t" } });
-		await screen.findByText("Write report");
-		expect(screen.getByText("Tasks")).toBeTruthy(); // the page
+		await screen.findByRole("option", { name: /Write report/ });
+		expect(screen.getByRole("option", { name: /Tasks/ })).toBeTruthy(); // the page
 		fireEvent.click(screen.getByRole("button", { name: "Task" }));
-		expect(screen.getByText("Write report")).toBeTruthy();
+		expect(screen.getByRole("option", { name: /Write report/ })).toBeTruthy();
 		expect(screen.queryByText("Open page")).toBeNull();
 	});
 
@@ -63,11 +63,11 @@ describe("workspace search and command palette", () => {
 		const box = screen.getByLabelText("Search workspace");
 		fireEvent.focus(box);
 		fireEvent.change(box, { target: { value: "trash" } });
-		fireEvent.click(screen.getByText("Trash"));
+		fireEvent.click(screen.getByRole("option", { name: /Trash/ }));
 		fireEvent.blur(box);
 		fireEvent.change(box, { target: { value: "" } });
 		fireEvent.focus(box);
 		await waitFor(() => expect(screen.getByText("Recent")).toBeTruthy());
-		expect(screen.getByText("Trash")).toBeTruthy();
+		expect(screen.getByRole("option", { name: /Trash/ })).toBeTruthy();
 	});
 });

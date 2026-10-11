@@ -1,10 +1,12 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import Toolbar from "@/components/layout/Toolbar";
 import { Copy, Check, Play, Search, Trash2, FileText, Film, Headphones, Image as ImageIcon, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
 import { displaySize } from "@/lib/assets/displaySize";
 import { justify } from "@/lib/assets/justify";
-import { safeUploadName, validateFileName } from "@/lib/validation";
+import { validateFileName } from "@/lib/validation";
 import { MAX_PREVIEW_BYTES, pdfFirstPage, previewKind, textSnippet, videoFrame, type TilePreview } from "@/lib/assets/previews";
-import { fileToBase64 } from "@/lib/assets/uploadScale";
+import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
+import { dropSummary, importDropped } from "@/lib/dropImport";
 import { Ellipsis } from "lucide-react";
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
 import { cn } from "@/lib/utils";
@@ -26,7 +28,6 @@ import {
 	listWorkspaceFiles,
 	readWorkspaceBinaryFile,
 	renameWorkspaceItem,
-	writeWorkspaceBinaryFile,
 } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
@@ -103,7 +104,6 @@ export default function WorkspaceAssets() {
 	const [isDeleting, setIsDeleting] = useState(false);
 
 	// Drag and drop overlay
-	const [isDraggingOver, setIsDraggingOver] = useState(false);
 	const { copiedKey, copy } = useCopyToClipboard(1800);
 
 	// Fetch assets from workspace/assets directory and merge remote placeholders (>10MB)
@@ -335,34 +335,15 @@ export default function WorkspaceAssets() {
 		}
 	};
 
-	// Drop handler for page-level drop
-	const handlePageDrop = async (e: React.DragEvent) => {
-		e.preventDefault();
-		setIsDraggingOver(false);
-		if (
-			isViewer ||
-			!workspace?.path ||
-			!e.dataTransfer.files ||
-			e.dataTransfer.files.length === 0
-		)
-			return;
-
-		for (const file of Array.from(e.dataTransfer.files)) {
-			try {
-				const base64Data = await fileToBase64(file, 100);
-				const sanitizedName = safeUploadName(file.name);
-				await writeWorkspaceBinaryFile(
-					workspace.path,
-					`assets/${sanitizedName}`,
-					base64Data,
-				);
-			} catch (err) {
-				console.error("Drop upload failed for file:", file.name, err);
-			}
-		}
+	// Files dropped anywhere on the page are added to assets, saved as they are; a dropped folder adds the files in it
+	const notice = useDropNotice();
+	const { dragging, bind: dropProps } = useFileDrop(async (items) => {
+		if (!workspace?.path) return;
+		const result = await importDropped(workspace.path, "assets", items.map((i) => ({ ...i, rel: i.file.name })));
+		notice.show(dropSummary(result));
 		await loadAssets();
 		await refreshStats();
-	};
+	}, isViewer || !workspace?.path);
 
 	const kindIcon = (category: AssetItem["category"], className: string) =>
 		category === "video" ? <Film className={className} /> : category === "audio" ? <Headphones className={className} /> : category === "image" ? <ImageIcon className={className} /> : <FileText className={className} />;
@@ -427,26 +408,12 @@ export default function WorkspaceAssets() {
 	const actionButton = "flex size-8 cursor-pointer items-center justify-center bg-background/90 text-foreground outline-none backdrop-blur hover:bg-background focus-visible:ring-2 focus-visible:ring-ring";
 
 	return (
-		<div
-			onDragOver={(e) => {
-				e.preventDefault();
-				setIsDraggingOver(true);
-			}}
-			onDragLeave={(e) => e.currentTarget.contains(e.relatedTarget as Node) || setIsDraggingOver(false)}
-			onDrop={handlePageDrop}
-			className="relative flex h-full min-h-0 flex-col bg-background"
-		>
-			{/* Drag & Drop Window Overlay */}
-			{isDraggingOver && (
-				<div className="pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center border-2 border-dashed border-primary bg-primary/15 backdrop-blur-sm animate-in fade-in duration-150 motion-reduce:animate-none">
-					<UploadCloud className="mb-3 size-16 text-primary" />
-					<h3 className="text-xl font-bold text-foreground">Drop to add to assets</h3>
-					<p className="mt-1 text-sm text-muted-foreground">Pictures keep their original size. Use Upload to save them smaller.</p>
-				</div>
-			)}
+		<div {...dropProps} className="relative flex h-full min-h-0 flex-col bg-background">
+			<DropOverlay show={dragging} title="Drop to add to assets" hint="Pictures keep their original size. Use Upload to save them smaller." />
+			{notice.node}
 
 			{/* Toolbar */}
-			<div className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b bg-card/40 px-3 py-1.5">
+			<Toolbar>
 				<div role="tablist" aria-label="Kind of asset" className="flex items-center gap-1 overflow-x-auto">
 					{tabs.map((tab) => (
 						<button
@@ -494,7 +461,7 @@ export default function WorkspaceAssets() {
 						</Button>
 					</>
 				)}
-			</div>
+			</Toolbar>
 
 			{/* Assets */}
 			<div className="min-h-0 flex-1 overflow-auto">

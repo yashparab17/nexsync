@@ -1,3 +1,5 @@
+import { dropSummary, importDropped } from "@/lib/dropImport";
+import Toolbar from "@/components/layout/Toolbar";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Columns3, Command, Eye, FilePlus, FileSearch, FolderPlus, Pencil, Plus, Save, Search, Sparkles, StickyNote, Terminal, Trash2, UsersRound, X, GitBranch, History, MessageSquareDiff, Keyboard } from "@/components/animate-icons";
@@ -571,6 +573,12 @@ export default function WorkspaceEditor() {
 									setTargetDir("editor");
 								}}
 								onFilterStart={() => void loadTree()}
+								onDropFiles={async (items, dir) => {
+									const result = await importDropped(workspacePath, dir, items);
+									setExportNotice({ ok: result.failed.length === 0, text: dropSummary(result) });
+									setExpanded((prev) => new Set(prev).add(dir));
+									await loadDir(dir);
+								}}
 								notice={exportNotice}
 								onExport={async () => {
 									setExportNotice(null);
@@ -589,7 +597,7 @@ export default function WorkspaceEditor() {
 				)}
 
 				<div className="flex min-w-0 flex-1 flex-col">
-					<div className="flex h-12 shrink-0 items-stretch border-b bg-card/40">
+					<Toolbar variant="tabs">
 						<EditorTabs
 							tabs={tabs}
 							active={active}
@@ -604,7 +612,7 @@ export default function WorkspaceEditor() {
 							onReorder={reorder}
 							onContextMenu={tabMenu}
 						/>
-					</div>
+					</Toolbar>
 					<EditorToolbar
 						path={current}
 						status={currentStatus}

@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
+import { dropSummary, importDropped } from "@/lib/dropImport";
+import Toolbar from "@/components/layout/Toolbar";
 import { useNavigate } from "react-router-dom";
 import { CalendarPlus, FileText, LayoutGrid, Network, PanelLeftClose, PanelLeftOpen, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "@/components/animate-icons";
 
@@ -303,6 +306,16 @@ export default function WorkspaceNotes() {
 	};
 
 	// One note a day, named by its date, opened if it already exists
+	// Note files dropped on the page are added to the notes folder; other kinds belong in Files or Assets
+	const dropNotice = useDropNotice();
+	const { dragging, bind: dropProps } = useFileDrop(async (items) => {
+		const notesOnly = items.filter((i) => isNoteFile(i.file.name)).map((i) => ({ ...i, rel: i.file.name }));
+		if (notesOnly.length === 0) return dropNotice.show("Only note files (.md, .txt) can be dropped here. Use Files or Assets for the rest.");
+		const result = await importDropped(workspacePath!, "notes", notesOnly);
+		dropNotice.show(dropSummary(result) + (notesOnly.length < items.length ? " Other kinds were skipped." : ""));
+		await loadNotes();
+	}, isViewer || !workspacePath);
+
 	const openToday = () => void createNote(today());
 
 	const handleDelete = async () => {
@@ -433,12 +446,14 @@ export default function WorkspaceNotes() {
 	const kbd = (k: string) => <kbd className="border bg-card px-1.5 py-0.5 font-mono text-xs text-muted-foreground">{k}</kbd>;
 
 	return (
-		<div className="flex h-full min-h-0 bg-background">
+		<div {...dropProps} className="relative flex h-full min-h-0 bg-background">
+			<DropOverlay show={dragging} title="Drop to add to notes" hint="Markdown and text files" />
+			{dropNotice.node}
 			{/* Notes list */}
 			{listOpen && (
 				<>
 					<aside aria-label="Notes list" style={{ width: listWidth }} className="flex shrink-0 flex-col bg-sidebar">
-						<div className="flex h-12 shrink-0 items-center gap-1 border-b pr-2 pl-3">
+						<Toolbar variant="header">
 							<h2 className="flex-1 font-mono text-sm text-muted-foreground">notes · {notes.length}</h2>
 							{!isViewer && (
 								<>
@@ -461,13 +476,13 @@ export default function WorkspaceNotes() {
 							<Button variant="ghost" size="icon-xs" aria-label="Hide notes list" onPress={() => setListOpen(false)}>
 								<PanelLeftClose className="size-4" />
 							</Button>
-						</div>
-						<div className="flex shrink-0 items-center gap-2 border-b px-3 h-10">
+						</Toolbar>
+						<Toolbar variant="sub" className="gap-2">
 							<div className="relative min-w-0 flex-1">
 								<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 								<Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search notes" aria-label="Search notes" className="h-8 border bg-background pl-8 text-sm" />
 							</div>
-						</div>
+						</Toolbar>
 						<div className="min-h-0 flex-1 overflow-y-auto">
 							{loading ? (
 								<Loading fill />
@@ -495,7 +510,7 @@ export default function WorkspaceNotes() {
 
 			{/* Tabs and the open note */}
 			<section className="flex min-w-0 flex-1 flex-col" aria-label="Note">
-				<div className="flex h-12 shrink-0 items-stretch border-b bg-card/40">
+				<Toolbar variant="tabs">
 					{!listOpen && (
 						<Button variant="ghost" size="icon-xs" aria-label="Show notes list" onPress={() => setListOpen(true)} className="m-2">
 							<PanelLeftOpen className="size-4" />
@@ -507,7 +522,7 @@ export default function WorkspaceNotes() {
 						{segment("board", "Board", <LayoutGrid className="size-3.5" />)}
 						{segment("graph", "Graph", <Network className="size-3.5" />)}
 					</div>
-				</div>
+				</Toolbar>
 
 				<div className="min-h-0 flex-1">
 					{view === "board" ? (

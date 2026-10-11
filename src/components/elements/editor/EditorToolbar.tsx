@@ -1,5 +1,6 @@
 // The strip above the editor: the path of the file as a breadcrumb on the left, and what can be done with it on the right.
 
+import Toolbar from "@/components/layout/Toolbar";
 import { ChevronRight, Columns3, Eye, FolderClose, GitBranch, History, MessageSquareDiff, Save, Search, Sparkles, Terminal, UsersRound, Check } from "@/components/animate-icons";
 
 import type { CodeTabHandle, CodeTabStatus } from "./codeTabTypes";
@@ -36,7 +37,7 @@ function Tool({ label, shortcut, pressed, onPress, disabled, children }: { label
 export default function EditorToolbar({ path, status, handle, explorerOpen, onToggleExplorer, showBlame, onToggleBlame, split, onToggleSplit, canPreview, preview, onTogglePreview, panelOpen, onTogglePanel }: EditorToolbarProps) {
 	const segments = path ? path.split("/") : [];
 	return (
-		<div className="flex h-10 shrink-0 items-center gap-1 border-b px-3">
+		<Toolbar variant="sub">
 			<Tool label={explorerOpen ? "Hide explorer" : "Show explorer"} shortcut="Ctrl+B" pressed={explorerOpen} onPress={onToggleExplorer}>
 				<FolderClose className="size-4" />
 			</Tool>
@@ -97,6 +98,6 @@ export default function EditorToolbar({ path, status, handle, explorerOpen, onTo
 					{status.saving ? "Saving…" : status.dirty ? "Save" : "Saved"}
 				</Button>
 			)}
-		</div>
+		</Toolbar>
 	);
 }

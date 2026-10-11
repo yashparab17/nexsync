@@ -24,6 +24,9 @@ const readAsBase64 = (blob: Blob) =>
 		reader.readAsDataURL(blob);
 	});
 
+// Any file as base64, untouched
+export const readFileBase64 = readAsBase64;
+
 // How big a picture is, or null when it cannot be read
 export async function readImageSize(file: Blob): Promise<{ width: number; height: number } | null> {
 	try {

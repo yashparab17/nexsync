@@ -1,4 +1,7 @@
 // React
+import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
+import { dropSummary, importDropped } from "@/lib/dropImport";
+import Toolbar from "@/components/layout/Toolbar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -194,6 +197,16 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 	useEffect(() => {
 		if (lastSyncedFile) void loadEntries();
 	}, [lastSyncedFile]);
+
+	// Files dropped on the page are added to the folder being shown. The top of the Explorer is the workspace itself,
+	// which holds no files of its own.
+	const notice = useDropNotice();
+	const { dragging, bind: dropProps } = useFileDrop(async (items) => {
+		if (!currentDir) return notice.show("Open a folder first, then drop the files into it.");
+		const result = await importDropped(workspacePath, currentDir, items);
+		notice.show(dropSummary(result));
+		await loadEntries();
+	}, isViewer || !workspacePath);
 
 	// Navigate into a sub-directory
 	// The files page cannot go above its own folder
@@ -475,9 +488,11 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 	const folderCount = entries.filter((e) => e.is_dir).length;
 
 	return (
-		<div className="flex h-full min-h-0 flex-col bg-background">
+		<div {...dropProps} className="relative flex h-full min-h-0 flex-col bg-background">
+			<DropOverlay show={dragging} title={currentDir ? `Drop to add to ${currentDir}` : "Drop into a folder"} hint={currentDir ? undefined : "Open a folder first; the top level holds only folders."} />
+			{notice.node}
 			{/* Toolbar */}
-			<div className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b bg-card/40 px-3 py-1.5">
+			<Toolbar>
 				<Button variant="ghost" size="icon-xs" aria-label="Up one folder" isDisabled={atRoot} onPress={() => navigateToDir(parentDir)}>
 					<ChevronUp className="size-4 -rotate-90" />
 				</Button>
@@ -537,7 +552,7 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 						</Button>
 					</>
 				)}
-			</div>
+			</Toolbar>
 
 			{/* Listing */}
 			<div className="min-h-0 flex-1 overflow-auto" onContextMenu={(e) => e.target === e.currentTarget && entryMenu(e, null)} onClick={(e) => e.target === e.currentTarget && setSelected(null)}>

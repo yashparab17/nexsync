@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import Toolbar from "@/components/layout/Toolbar";
 import { ChevronRight, Columns3, Copy, RefreshCw, Search, Trash2, ChevronDown, ChevronsDownUp, Download, FilePlus, FolderPlus, Pencil, X } from "@/components/animate-icons";
 
 import FileKindIcon, { FolderKindIcon } from "./FileKindIcon";
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
 import { Button } from "@/components/ui/button";
+import { useFileDrop } from "@/hooks/useFileDrop";
+import type { DroppedFile } from "@/lib/dropImport";
 import PresenceDots from "@/components/elements/PresenceDots";
 import { cn } from "@/lib/utils";
 import type { WorkspaceFile } from "@/types/workspace";
@@ -40,6 +43,8 @@ interface FileExplorerProps {
 	// Open a file in the pane beside the current one, and copy a path; the right-click menu offers both
 	onOpenSide?: (rel: string) => void;
 	onCopyPath?: (rel: string) => void;
+	// Files dragged in from the desktop, with the folder they were dropped on (the target folder when none)
+	onDropFiles?: (items: DroppedFile[], dir: string) => void;
 }
 
 // The Editor tab's file browser: a tree with folder actions, rename, delete, a filter and keyboard control
@@ -65,10 +70,18 @@ export default function FileExplorer({
 	notice,
 	onOpenSide,
 	onCopyPath,
+	onDropFiles,
 }: FileExplorerProps) {
 	const { open: openMenu, menu } = useContextMenu();
 	const [query, setQuery] = useState("");
 	const treeRef = useRef<HTMLDivElement>(null);
+	// Dropped files go to the folder under the pointer: a folder row is itself, a file row its folder
+	const dirAt = (target: EventTarget | null) => (target as Element | null)?.closest?.("[data-drop-dir]")?.getAttribute("data-drop-dir") ?? targetDir;
+	const [dropDir, setDropDir] = useState<string | null>(null);
+	const { dragging, bind } = useFileDrop((items, target) => {
+		setDropDir(null);
+		onDropFiles?.(items, dirAt(target));
+	}, readOnly || !onDropFiles);
 	const needle = query.trim().toLowerCase();
 	const filtering = needle !== "";
 
@@ -143,9 +156,11 @@ export default function FileExplorer({
 				return (
 					<div key={entry.path}>
 						<div
+							data-drop-dir={entry.is_dir ? rel : rel.split("/").slice(0, -1).join("/") || targetDir}
 							onContextMenu={(e) => openMenu(e, entryMenu(entry, rel))}
 							className={cn(
 								"group flex items-center pr-1 text-sm hover:bg-muted/50",
+								dragging && dropDir === (entry.is_dir ? rel : rel.split("/").slice(0, -1).join("/")) && "bg-primary/15",
 								isActive && "bg-primary/10 shadow-[inset_2px_0_0_var(--color-primary)]",
 								entry.is_dir && targetDir === rel && !filtering && "bg-muted/60",
 							)}
@@ -213,8 +228,15 @@ export default function FileExplorer({
 			});
 
 	return (
-		<div className="flex h-full min-w-0 flex-col bg-sidebar">
-			<div className="flex h-12 shrink-0 items-center justify-between border-b pr-2 pl-3">
+		<div
+			{...bind}
+			onDragOver={(e) => {
+				bind.onDragOver(e);
+				if (dragging) setDropDir(dirAt(e.target));
+			}}
+			className={cn("flex h-full min-w-0 flex-col bg-sidebar", dragging && "ring-2 ring-primary ring-inset")}
+		>
+			<Toolbar variant="header" className="justify-between">
 				<h2 className="font-mono text-sm text-muted-foreground">explorer</h2>
 				<div className="flex">
 					{!readOnly && (
@@ -237,10 +259,10 @@ export default function FileExplorer({
 						<ChevronsDownUp className="size-3.5" />
 					</Button>
 				</div>
-			</div>
+			</Toolbar>
 
 			{/* The filter sits in the same row as the search in Notes */}
-			<div className="flex h-10 shrink-0 items-center border-b px-3">
+			<Toolbar variant="sub">
 				<div className="relative w-full">
 					<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 					<input
@@ -262,7 +284,7 @@ export default function FileExplorer({
 						{notice.text}
 					</p>
 				)}
-			</div>
+			</Toolbar>
 
 			<div ref={treeRef} className="flex-1 overflow-y-auto pb-3" role="tree" aria-label="Files">
 				{roots.map((root) => {
@@ -270,7 +292,7 @@ export default function FileExplorer({
 					if (filtering && !isOpen) return null;
 					return (
 						<div key={root}>
-							<div onContextMenu={(e) => openMenu(e, entryMenu(null, root))} className={cn("group flex items-center pr-1 hover:bg-muted/50", targetDir === root && !filtering && "bg-muted/60")}>
+							<div data-drop-dir={root} onContextMenu={(e) => openMenu(e, entryMenu(null, root))} className={cn("group flex items-center pr-1 hover:bg-muted/50", targetDir === root && !filtering && "bg-muted/60", dragging && dropDir === root && "bg-primary/15")}>
 								<button
 									type="button"
 									data-explorer-row
@@ -307,10 +329,17 @@ export default function FileExplorer({
 					<p className="px-3 py-2 text-xs text-muted-foreground">No files match “{query.trim()}”.</p>
 				)}
 			</div>
-			{!readOnly && !filtering && (
-				<p className="shrink-0 truncate border-t px-3 py-2 text-xs text-muted-foreground" title={`New files go in ${targetDir}`}>
-					New items go in <span className="font-mono text-foreground">{targetDir}</span>
+			{dragging ? (
+				<p className="shrink-0 truncate border-t bg-primary/10 px-3 py-2 text-sm">
+					Drop to add to <span className="font-mono">{dropDir ?? targetDir}</span>
 				</p>
+			) : (
+				!readOnly &&
+				!filtering && (
+					<p className="shrink-0 truncate border-t px-3 py-2 text-sm text-muted-foreground" title={`New files go in ${targetDir}`}>
+						New items go in <span className="font-mono text-foreground">{targetDir}</span>
+					</p>
+				)
 			)}
 			{menu}
 		</div>
