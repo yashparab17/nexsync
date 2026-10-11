@@ -221,10 +221,10 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 
 				<SectionCard id="preferences" title="Preferences" description="Autosave, live sharing and the color scheme of this workspace." icon={<SlidersHorizontal className="size-5" />}>
 					<Row title="Autosave files" hint="Save your changes to files automatically.">
-						<input type="checkbox" aria-label="Autosave files" checked={autosave} disabled={isJoinedCopy} onChange={(e) => setAutosave(e.target.checked)} className="size-4 cursor-pointer rounded-none accent-primary" />
+						<input type="checkbox" aria-label="Autosave files" checked={autosave} disabled={isJoinedCopy} onChange={(e) => setAutosave(e.target.checked)} />
 					</Row>
 					<Row title="Share changes live" hint="Let collaborators connect and see each other's changes as they happen.">
-						<input type="checkbox" aria-label="Share changes live" checked={sync} disabled={isJoinedCopy} onChange={(e) => setSync(e.target.checked)} className="size-4 cursor-pointer rounded-none accent-primary" />
+						<input type="checkbox" aria-label="Share changes live" checked={sync} disabled={isJoinedCopy} onChange={(e) => setSync(e.target.checked)} />
 					</Row>
 					<Row title="Workspace theme" hint="Color scheme preference for this workspace.">
 						<Segmented

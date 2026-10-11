@@ -46,7 +46,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 	return (
 		<div className="flex items-baseline justify-between gap-4 border-b py-2 last:border-b-0">
 			<dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
-			<dd className="min-w-0 truncate text-right font-mono text-sm" title={typeof children === "string" ? children : undefined}>
+			<dd className="min-w-0 truncate text-right font-mono text-xs" title={typeof children === "string" ? children : undefined}>
 				{children}
 			</dd>
 		</div>

@@ -136,7 +136,7 @@ export default function CreateWorkspaceDialog({
 
 					{/* The card as it will appear on the Welcome screen */}
 					<div className="flex flex-col gap-3">
-						<span className="font-mono text-sm text-muted-foreground">preview</span>
+						<span className="font-mono text-xs text-muted-foreground">preview</span>
 						<div className="flex min-h-44 flex-col gap-3 border border-primary bg-card p-6">
 							<span className="text-xl font-semibold">{workspaceName.trim() || "Workspace name"}</span>
 							<span className="line-clamp-2 text-muted-foreground">{description.trim() || "No description yet."}</span>

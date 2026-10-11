@@ -498,7 +498,7 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 				<Button variant="ghost" size="icon-xs" aria-label="Up one folder" className="ml-1" isDisabled={atRoot} onPress={() => navigateToDir(parentDir)}>
 					<ChevronUp className="size-4 -rotate-90" />
 				</Button>
-				<nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden font-mono text-sm" aria-label="Breadcrumb">
+				<nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden font-mono text-xs" aria-label="Breadcrumb">
 					{crumbs.map((crumb, i) => (
 						<div key={crumb.dir} className="flex min-w-0 items-center gap-0.5">
 							{i > 0 && <ChevronRight className="size-3.5 text-muted-foreground" />}

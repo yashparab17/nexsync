@@ -153,7 +153,7 @@ export default function AssetUploadDialog({ workspacePath, isOpen, onClose, onUp
 							<label htmlFor="upload-size" className="text-sm font-medium">
 								Picture size
 							</label>
-							<output htmlFor="upload-size" className="font-mono text-sm tabular-nums">
+							<output htmlFor="upload-size" className="font-mono text-xs tabular-nums">
 								{percent}%
 							</output>
 						</div>

@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { Check, Moon, Plus, Sun, Trash2, Bug, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, Undo2, User, AlertTriangle } from "@/components/animate-icons";
 
 import { Row, Segmented, SectionCard, SettingsShell } from "@/components/elements/SettingsParts";
+import ThemePicker from "@/components/elements/ThemePicker";
 import Avatar from "@/components/elements/Avatar";
 import ErrorLogCard from "@/components/elements/ErrorLogCard";
 import { Button } from "@/components/ui/button";
@@ -297,6 +298,9 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								]}
 							/>
 						</Row>
+						<div className="border-t pt-4">
+							<ThemePicker />
+						</div>
 					</SectionCard>
 
 					<SectionCard
@@ -340,7 +344,6 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 							<input
 								type="checkbox"
 								aria-label="Wrap long lines"
-								className="size-4 accent-primary"
 								checked={editorPrefs.wrap}
 								onChange={(e) => setEditorPrefs({ wrap: e.target.checked })}
 							/>
@@ -349,7 +352,6 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 							<input
 								type="checkbox"
 								aria-label="Vim keys"
-								className="size-4 accent-primary"
 								checked={editorPrefs.vim}
 								onChange={(e) => setEditorPrefs({ vim: e.target.checked })}
 							/>
@@ -358,7 +360,6 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 							<input
 								type="checkbox"
 								aria-label="Relative line numbers"
-								className="size-4 accent-primary"
 								checked={editorPrefs.relativeNumbers}
 								onChange={(e) => setEditorPrefs({ relativeNumbers: e.target.checked })}
 							/>
@@ -367,7 +368,6 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 							<input
 								type="checkbox"
 								aria-label="Minimap"
-								className="size-4 accent-primary"
 								checked={editorPrefs.minimap}
 								onChange={(e) => setEditorPrefs({ minimap: e.target.checked })}
 							/>

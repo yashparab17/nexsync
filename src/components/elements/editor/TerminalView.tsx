@@ -76,7 +76,7 @@ const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function Term
 	const failedRef = useRef(onFailed);
 	failedRef.current = onFailed;
 	const { fontSize } = useEditorPrefs();
-	const { isDark } = useThemeContext();
+	const { themeId, isDark } = useThemeContext();
 	const [searching, setSearching] = useState(false);
 	const [query, setQuery] = useState("");
 
@@ -189,7 +189,7 @@ const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function Term
 	useEffect(() => {
 		// The theme class is applied before this runs, so the tokens already hold the new colours
 		if (term.current) term.current.options.theme = themeFromTokens();
-	}, [isDark]);
+	}, [isDark, themeId]);
 
 	// A terminal that comes back on screen measures its letters again and sets its own font size again, so it never keeps a
 	// size worked out while it was hidden
@@ -234,7 +234,7 @@ const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function Term
 								term.current?.focus();
 							}
 						}}
-						className="h-7 w-44 bg-transparent px-2 font-mono text-sm outline-none focus-visible:shadow-[inset_0_-2px_0_var(--primary)]"
+						className="h-7 w-44 bg-transparent px-2 font-mono text-xs outline-none focus-visible:shadow-[inset_0_-2px_0_var(--primary)]"
 					/>
 					<Button
 						variant="ghost"

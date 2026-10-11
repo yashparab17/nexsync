@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
 import { dropSummary, importDropped } from "@/lib/dropImport";
 import Welcome from "@/components/elements/Welcome";
-import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarSearch, ToolbarTitle } from "@/components/layout/Toolbar";
 import { useNavigate } from "react-router-dom";
 import { CalendarPlus, FilePlus, FileText, LayoutGrid, Network, PanelLeftClose, PanelLeftOpen, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "@/components/animate-icons";
 
@@ -478,10 +478,7 @@ export default function WorkspaceNotes() {
 							</Button>
 						</Toolbar>
 						<Toolbar variant="sub" className="gap-2">
-							<div className="relative min-w-0 flex-1">
-								<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-								<Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search notes" aria-label="Search notes" className="h-8 border bg-background pl-8 text-sm" />
-							</div>
+							<ToolbarSearch label="Search notes" placeholder="Search notes" value={query} onChange={setQuery} className="w-full" />
 						</Toolbar>
 						<div className="min-h-0 flex-1 overflow-y-auto">
 							{loading ? (

@@ -21,7 +21,7 @@ export function Panel({ title, hint, children, className, right, flush, icon, id
 				{icon && <span className={cn("shrink-0 [&>svg]:size-5", titleClassName?.includes("destructive") ? "text-destructive" : "text-primary")}>{icon}</span>}
 				<div className="min-w-0 flex-1">
 					<h2 className={cn("text-sm font-semibold text-foreground", titleClassName)}>{title}</h2>
-					{hint && <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{hint}</p>}
+					{hint && <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{hint}</p>}
 				</div>
 				{right}
 			</header>

@@ -58,10 +58,92 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Catppuccin Latte (light) and Mocha (dark). Page background is always the darkest tone of each (crust);
-   mantle and base step up from it for panels and raised surfaces. Latte's teal, red, green, yellow and blue are
-   deepened from the stock values so they hold 4.5:1 as text on crust. */
+/* The four themes. The original light and dark are the plain :root and .dark; Catppuccin Latte and Mocha switch on with
+   data-theme on <html>, which ThemeContext sets, and only ever on the matching mode (Latte on light, Mocha on dark). */
 :root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.141 0.005 285.823);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.141 0.005 285.823);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.141 0.005 285.823);
+    --primary: oklch(0.511 0.096 186.391);
+    --primary-foreground: oklch(0.984 0.014 180.72);
+    --secondary: oklch(0.967 0.001 286.375);
+    --secondary-foreground: oklch(0.21 0.006 285.885);
+    --muted: oklch(0.967 0.001 286.375);
+    --muted-foreground: oklch(0.52 0.016 285.938);
+    --accent: oklch(0.967 0.001 286.375);
+    --accent-foreground: oklch(0.21 0.006 285.885);
+    --destructive: oklch(0.577 0.245 27.325);
+    --success: oklch(0.52 0.13 150);
+    --warning: oklch(0.55 0.13 70);
+    --info: oklch(0.5 0.18 260);
+    --border: oklch(0.92 0.004 286.32);
+    --input: oklch(0.92 0.004 286.32);
+    --ring: oklch(0.705 0.015 286.067);
+    --scrim: color-mix(in srgb, black 45%, transparent);
+    --edge: oklch(0.82 0.006 286);    /* the lip under a keycap button */
+    --chart-1: oklch(0.855 0.138 181.071);
+    --chart-2: oklch(0.704 0.14 182.503);
+    --chart-3: oklch(0.6 0.118 184.704);
+    --chart-4: oklch(0.511 0.096 186.391);
+    --chart-5: oklch(0.437 0.078 188.216);
+    --radius: 0;
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.141 0.005 285.823);
+    --sidebar-primary: oklch(0.6 0.118 184.704);
+    --sidebar-primary-foreground: oklch(0.984 0.014 180.72);
+    --sidebar-accent: oklch(0.967 0.001 286.375);
+    --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
+    --sidebar-border: oklch(0.92 0.004 286.32);
+    --sidebar-ring: oklch(0.705 0.015 286.067);
+}
+
+.dark {
+    --background: oklch(0.141 0.005 285.823);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.21 0.006 285.885);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.21 0.006 285.885);
+    --popover-foreground: oklch(0.985 0 0);
+    /* The lighter teal the original used for the sidebar's active item, so text and buttons in the accent colour are legible */
+    --primary: oklch(0.704 0.14 182.503);
+    --primary-foreground: oklch(0.277 0.046 192.524);
+    --secondary: oklch(0.274 0.006 286.033);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.274 0.006 286.033);
+    --muted-foreground: oklch(0.705 0.015 286.067);
+    --accent: oklch(0.274 0.006 286.033);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --success: oklch(0.8 0.16 150);
+    --warning: oklch(0.84 0.15 85);
+    --info: oklch(0.75 0.12 250);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.552 0.016 285.938);
+    --scrim: color-mix(in srgb, black 70%, transparent);
+    --edge: oklch(0.08 0.004 286);
+    --chart-1: oklch(0.855 0.138 181.071);
+    --chart-2: oklch(0.704 0.14 182.503);
+    --chart-3: oklch(0.6 0.118 184.704);
+    --chart-4: oklch(0.511 0.096 186.391);
+    --chart-5: oklch(0.437 0.078 188.216);
+    --sidebar: oklch(0.21 0.006 285.885);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.704 0.14 182.503);
+    --sidebar-primary-foreground: oklch(0.277 0.046 192.524);
+    --sidebar-accent: oklch(0.274 0.006 286.033);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.552 0.016 285.938);
+}
+
+/* Catppuccin Latte (light) and Mocha (dark). Page background is the darkest tone of each (crust); mantle and base step up
+   from it for panels and raised surfaces. Latte's teal, red, green, yellow and blue are deepened from the stock values so
+   they hold 4.5:1 as text on crust. */
+:root[data-theme="latte"] {
     --background: #dce0e8;            /* crust */
     --foreground: #4c4f69;            /* text */
     --card: #eff1f5;                  /* base */
@@ -101,7 +183,7 @@
     --sidebar-ring: #0e6269;
 }
 
-.dark {
+.dark[data-theme="mocha"] {
     --background: #11111b;            /* crust */
     --foreground: #cdd6f4;            /* text */
     --card: #181825;                  /* mantle */
@@ -246,13 +328,51 @@
   --bn-font-family: var(--font-sans);
 }
 
-/* Native checkboxes and radios take the app accent in both themes */
+/* Checkboxes and radios drawn from the theme: a square (or round) box with the keycap lip, filled with the accent and a tick
+   when on. Square corners are the rule everywhere, so only radios are round. */
 input[type="checkbox"], input[type="radio"] {
-  accent-color: var(--primary);
+  appearance: none;
+  display: inline-grid;
+  flex-shrink: 0;
+  place-content: center;
   width: 1.125rem;
   height: 1.125rem;
+  margin: 0;
   cursor: pointer;
+  border: 1px solid color-mix(in oklch, var(--muted-foreground) 55%, transparent);
+  background: var(--background);
+  box-shadow: 0 2px 0 var(--edge);
+  transition: background-color 120ms, border-color 120ms;
 }
+input[type="checkbox"]:hover:not(:disabled), input[type="radio"]:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+input[type="checkbox"]:checked, input[type="radio"]:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+input[type="checkbox"]::after {
+  content: "";
+  width: 0.7rem;
+  height: 0.7rem;
+  background: var(--primary-foreground);
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  transform: scale(0);
+  transition: transform 120ms;
+}
+input[type="checkbox"]:checked::after { transform: scale(1); }
+input[type="radio"] { border-radius: 9999px !important; }
+input[type="radio"]::after {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 9999px;
+  background: var(--primary-foreground);
+  transform: scale(0);
+  transition: transform 120ms;
+}
+input[type="radio"]:checked::after { transform: scale(1); }
+input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allowed; opacity: 0.5; }
 
 /* Native selects match the text fields */
 select {

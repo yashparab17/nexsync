@@ -4,7 +4,6 @@
 import type { ComponentProps, ReactNode } from "react";
 
 import { Search, X } from "@/components/animate-icons";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const VARIANTS = {
@@ -46,12 +45,20 @@ export function ToolbarTabs<T extends string>({ label, value, onChange, tabs }: 
 	);
 }
 
-// The small search box at the right of a toolbar
-export function ToolbarSearch({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
+// The one search box every list uses: the same height, colours and clear button wherever it sits. Escape clears it.
+export function ToolbarSearch({ label, value, onChange, placeholder, className }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; className?: string }) {
 	return (
-		<div className="relative w-44">
+		<div className={cn("relative w-44", className)}>
 			<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-			<Input aria-label={label} placeholder={placeholder ?? label} value={value} onChange={(e) => onChange(e.target.value)} className="h-8 border bg-background pr-7 pl-8 text-sm" />
+			<input
+				type="search"
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				onKeyDown={(e) => e.key === "Escape" && value && (e.stopPropagation(), onChange(""))}
+				aria-label={label}
+				placeholder={placeholder ?? label}
+				className="h-8 w-full border bg-background pr-8 pl-8 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring [&::-webkit-search-cancel-button]:hidden"
+			/>
 			{value && (
 				<button type="button" aria-label={`Clear ${label.toLowerCase()}`} onClick={() => onChange("")} className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground">
 					<X className="size-3.5" />

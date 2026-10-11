@@ -47,7 +47,7 @@ export default function RulesCard({ workspacePath }: { workspacePath: string }) 
 				)}
 				{rules.map((rule) => (
 					<label key={rule.id} className="flex cursor-pointer items-start gap-3 text-sm">
-						<input type="checkbox" checked={rule.enabled} disabled={guest} onChange={(e) => void toggle(rule, e.target.checked)} className="mt-1 size-4 accent-primary" />
+						<input type="checkbox" checked={rule.enabled} disabled={guest} onChange={(e) => void toggle(rule, e.target.checked)} />
 						<span>
 							{rule.text}
 							<span className="block text-xs text-muted-foreground">Applies to {rule.applies_to}</span>

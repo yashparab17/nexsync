@@ -33,7 +33,7 @@ export default function HostRequiredCard() {
 					</p>
 				)}
 				<label className="flex cursor-pointer items-start gap-3 text-sm">
-					<input type="checkbox" checked={requireHost} disabled={!canChange} onChange={(e) => void change(e.target.checked)} className="mt-1 size-4 accent-primary" />
+					<input type="checkbox" checked={requireHost} disabled={!canChange} onChange={(e) => void change(e.target.checked)} />
 					<span>
 						Only allow work while the host is online
 						<span className="block text-xs text-muted-foreground">

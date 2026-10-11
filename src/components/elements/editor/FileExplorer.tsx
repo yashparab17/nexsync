@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
-import { ChevronRight, Columns3, Copy, RefreshCw, Search, Trash2, ChevronDown, ChevronsDownUp, Download, FilePlus, FolderPlus, Pencil, X } from "@/components/animate-icons";
+import Toolbar, { ToolbarSearch, ToolbarTitle } from "@/components/layout/Toolbar";
+import { ChevronRight, Columns3, Copy, RefreshCw, Trash2, ChevronDown, ChevronsDownUp, Download, FilePlus, FolderPlus, Pencil } from "@/components/animate-icons";
 
 import FileKindIcon, { FolderKindIcon } from "./FileKindIcon";
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
@@ -263,22 +263,7 @@ export default function FileExplorer({
 
 			{/* The filter sits in the same row as the search in Notes */}
 			<Toolbar variant="sub">
-				<div className="relative w-full">
-					<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-					<input
-						value={query}
-						onChange={(e) => setQuery(e.target.value)}
-						onKeyDown={(e) => e.key === "Escape" && setQuery("")}
-						placeholder="Filter files"
-						aria-label="Filter files"
-						className="h-8 w-full border bg-background pr-8 pl-8 text-sm outline-none focus-visible:border-ring"
-					/>
-					{filtering && (
-						<button type="button" aria-label="Clear filter" className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setQuery("")}>
-							<X className="size-3.5" />
-						</button>
-					)}
-				</div>
+				<ToolbarSearch label="Filter files" placeholder="Filter files" value={query} onChange={setQuery} className="w-full" />
 				{notice && (
 					<p role={notice.ok ? "status" : "alert"} className={cn("mt-1.5 break-words text-xs", notice.ok ? "text-success" : "text-destructive")}>
 						{notice.text}

@@ -99,7 +99,7 @@ export default function WorkspaceTrash() {
 							<li key={item.id} className="group flex items-center gap-3 px-3 py-2.5">
 								{item.isDir ? <Folder className="size-4 shrink-0 text-warning" /> : <FileText className="size-4 shrink-0 text-info" />}
 								<div className="min-w-0 flex-1">
-									<p className="truncate font-mono text-sm">{item.relPath}</p>
+									<p className="truncate font-mono text-xs">{item.relPath}</p>
 									<p className="text-sm text-muted-foreground">
 										{formatBytes(item.size)} · deleted {new Date(item.deletedAt).toLocaleString()}
 									</p>

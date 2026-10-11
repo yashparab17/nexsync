@@ -192,7 +192,7 @@ export default function P2PConnectDialog({
 			<div className="min-w-0 space-y-5">
 				<DialogHeading icon={<Radio className="size-6" />} title="Collaborate" description="Work on this workspace together, from any network. Everything is encrypted between your devices." />
 
-				<div className="flex items-center gap-2 font-mono text-sm" role="status">
+				<div className="flex items-center gap-2 font-mono text-xs" role="status">
 					<span className={cn("size-2.5 shrink-0", statusDot)} aria-hidden />
 					<span className="min-w-0 truncate">{statusLabel}</span>
 				</div>
@@ -318,7 +318,7 @@ export default function P2PConnectDialog({
 												</select>
 											</label>
 											<label className="flex items-center gap-2">
-												<input type="checkbox" checked={singleUse} onChange={(e) => setSingleUse(e.target.checked)} className="size-4 accent-primary" />
+												<input type="checkbox" checked={singleUse} onChange={(e) => setSingleUse(e.target.checked)} />
 												Only one person can use it
 											</label>
 										</div>
@@ -404,7 +404,7 @@ export default function P2PConnectDialog({
 								value={ticketInput}
 								onChange={(e) => setTicketInput(e.target.value)}
 								rows={4}
-								className="rounded-none border border-input px-3 py-2 font-mono text-sm break-all"
+								className="rounded-none border border-input px-3 py-2 font-mono text-xs break-all"
 								autoFocus
 							/>
 							<p className="text-sm text-muted-foreground">Their workspace is copied into the one you have open, and kept up to date.</p>
