@@ -159,7 +159,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 	};
 
 	return (
-		<div className={onClose ? "h-[85vh] overflow-y-auto" : undefined}>
+		<div className={onClose ? "h-[85vh] overflow-y-auto overscroll-contain" : undefined}>
 		<div className={onClose ? "flex gap-8 p-6" : "mx-auto flex max-w-5xl gap-8"}>
 			{/* Section list */}
 			<aside className="hidden w-44 shrink-0 md:block">
@@ -203,11 +203,11 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					</div>
 					<div>
 						<Label htmlFor="ws-desc">Description</Label>
-						<Textarea id="ws-desc" value={description} disabled={isJoinedCopy} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description..." rows={3} className="mt-1" />
+						<Textarea id="ws-desc" value={description} disabled={isJoinedCopy} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description…" rows={3} className="mt-1" />
 					</div>
 					<div>
-						<Label>Local path</Label>
-						<Input readOnly value={workspace?.path || ""} className="mt-1 bg-muted/40 font-mono text-xs text-muted-foreground" />
+						<Label htmlFor="workspace-path">Local path</Label>
+						<Input id="workspace-path" readOnly value={workspace?.path || ""} className="mt-1 bg-muted/40 font-mono text-xs text-muted-foreground" />
 						<p className="mt-1 text-xs text-muted-foreground">Your files are saved in this folder on your computer.</p>
 					</div>
 				</SectionCard>

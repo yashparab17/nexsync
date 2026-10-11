@@ -24,7 +24,8 @@ export function motionIcon(Icon: LucideIcon, preset: Preset = 'pop') {
   const variants: Variants = { initial: { scale: 1, rotate: 0, x: 0, y: 0 }, animate: presets[preset] as TargetAndTransition };
   return function AnimatedIcon(props: React.ComponentProps<LucideIcon>) {
     const { controls } = useAnimateIconContext();
-    return <Motion initial="initial" animate={controls} variants={variants} {...(props as object)} />;
+    const decorative = !props['aria-label'] && !props['aria-labelledby'];
+    return <Motion initial="initial" animate={controls} variants={variants} aria-hidden={decorative || undefined} {...(props as object)} />;
   };
 }
 
@@ -50,6 +51,7 @@ export function fromHandle(Icon: ComponentType<any>) {
         ref.current?.stopAnimation();
       }
     }, [active]);
-    return <Icon ref={ref} size={24} className={cn('lucide [&>svg]:size-full!', className)} {...props} />;
+    const decorative = !props['aria-label'] && !props['aria-labelledby'];
+    return <Icon ref={ref} size={24} aria-hidden={decorative || undefined} className={cn('lucide [&>svg]:size-full!', className)} {...props} />;
   };
 }

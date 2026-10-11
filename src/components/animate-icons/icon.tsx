@@ -469,6 +469,8 @@ function IconWrapper<T extends string>({
   ...props
 }: IconWrapperProps<T>) {
   const className = cn('lucide', classNameProp);
+  // Icons are decoration unless they carry their own label
+  const a11y = props['aria-label'] || props['aria-labelledby'] ? {} : { 'aria-hidden': true as const };
   const context = React.useContext(AnimateIconContext);
 
   if (context) {
@@ -524,6 +526,7 @@ function IconWrapper<T extends string>({
           asChild
         >
           <IconComponent
+          {...a11y}
             size={size}
             className={cn(
               className,
@@ -556,6 +559,7 @@ function IconWrapper<T extends string>({
         }}
       >
         <IconComponent
+          {...a11y}
           size={size}
           className={cn(
             className,
@@ -591,6 +595,7 @@ function IconWrapper<T extends string>({
         asChild
       >
         <IconComponent
+          {...a11y}
           size={size}
           className={cn(
             className,
@@ -605,6 +610,7 @@ function IconWrapper<T extends string>({
 
   return (
     <IconComponent
+          {...a11y}
       size={size}
       className={cn(
         className,

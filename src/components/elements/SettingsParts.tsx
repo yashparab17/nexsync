@@ -99,7 +99,7 @@ export function SectionNav({ label, sections }: { label: string; sections: { id:
 				const current = sections.filter((s) => seen.has(s.id)).pop();
 				if (current) setActive(current.id);
 			},
-			{ rootMargin: "-10% 0px -65% 0px" },
+			{ rootMargin: "-10% 0px -45% 0px" },
 		);
 		for (const { id } of sections) {
 			const el = document.getElementById(id);

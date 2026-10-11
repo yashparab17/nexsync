@@ -244,3 +244,11 @@ select:focus-visible {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 30%, transparent);
 }
+
+/* Native controls (scrollbars, form widgets) follow the theme; headings do not leave a single word on the last line */
+:root { color-scheme: light; }
+.dark { color-scheme: dark; }
+h1, h2, h3 { text-wrap: balance; }
+/* No double-tap zoom delay on controls; no rubber-band scrolling of the whole window with a mouse */
+button, a, select, summary, label, [role="button"] { touch-action: manipulation; }
+@media (pointer: fine) { html { overscroll-behavior: none; } }

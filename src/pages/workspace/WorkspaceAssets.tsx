@@ -406,6 +406,7 @@ export default function WorkspaceAssets() {
 					<div className="relative w-full md:w-64">
 						<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
 						<Input
+							aria-label="Search assets"
 							placeholder="Search assets…"
 							value={searchQuery}
 							onChange={(e) => setSearchQuery(e.target.value)}
@@ -417,7 +418,7 @@ export default function WorkspaceAssets() {
 						<button
 							onClick={() => setViewMode("grid")}
 							title="Grid View"
-							className={`p-1.5 rounded-none transition-all cursor-pointer ${
+							className={`p-1.5 rounded-none transition-colors cursor-pointer ${
 								viewMode === "grid" ?
 									"bg-background text-foreground shadow-sm"
 								:	"text-muted-foreground hover:text-foreground"
@@ -428,7 +429,7 @@ export default function WorkspaceAssets() {
 						<button
 							onClick={() => setViewMode("list")}
 							title="List View"
-							className={`p-1.5 rounded-none transition-all cursor-pointer ${
+							className={`p-1.5 rounded-none transition-colors cursor-pointer ${
 								viewMode === "list" ?
 									"bg-background text-foreground shadow-sm"
 								:	"text-muted-foreground hover:text-foreground"
@@ -531,7 +532,7 @@ export default function WorkspaceAssets() {
 										<button
 											onClick={(e) => handleCopyMarkdown(e, asset)}
 											title="Copy Markdown Embed Link"
-											className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
+											className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-colors"
 										>
 											{copiedKey === asset.name ?
 												<Check className="size-3.5 text-success" />
@@ -543,7 +544,7 @@ export default function WorkspaceAssets() {
 												setHistoryAsset(asset);
 											}}
 											title="History"
-											className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
+											className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-colors"
 										>
 											<History className="size-3.5" />
 										</button>
@@ -556,7 +557,7 @@ export default function WorkspaceAssets() {
 														setNewName(asset.name);
 													}}
 													title="Rename"
-													className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
+													className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-colors"
 												>
 													<Pencil className="size-3.5" />
 												</button>
@@ -566,7 +567,7 @@ export default function WorkspaceAssets() {
 														setAssetToDelete(asset);
 													}}
 													title="Delete"
-													className="p-1.5 rounded-none bg-background/80 hover:bg-destructive text-foreground hover:text-destructive-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
+													className="p-1.5 rounded-none bg-background/80 hover:bg-destructive text-foreground hover:text-destructive-foreground border border-border/60 shadow-sm cursor-pointer transition-colors"
 												>
 													<Trash2 className="size-3.5" />
 												</button>
@@ -676,7 +677,7 @@ export default function WorkspaceAssets() {
 											<div className="flex items-center justify-end gap-1.5">
 												<button
 													onClick={(e) => handleCopyMarkdown(e, asset)}
-													className="h-7 px-2 text-xs rounded-none bg-muted/60 hover:bg-muted text-foreground flex items-center gap-1 cursor-pointer transition-all border border-border/40"
+													className="h-7 px-2 text-xs rounded-none bg-muted/60 hover:bg-muted text-foreground flex items-center gap-1 cursor-pointer transition-colors border border-border/40"
 												>
 													{copiedKey === asset.name ?
 														<Check className="size-3 text-success" />
@@ -689,7 +690,7 @@ export default function WorkspaceAssets() {
 														setHistoryAsset(asset);
 													}}
 													title="History"
-													className="p-1.5 rounded-none hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-all"
+													className="p-1.5 rounded-none hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
 												>
 													<History className="size-3.5" />
 												</button>
@@ -701,7 +702,7 @@ export default function WorkspaceAssets() {
 																setAssetToRename(asset);
 																setNewName(asset.name);
 															}}
-															className="p-1.5 rounded-none hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-all"
+															className="p-1.5 rounded-none hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
 														>
 															<Pencil className="size-3.5" />
 														</button>
@@ -710,7 +711,7 @@ export default function WorkspaceAssets() {
 																e.stopPropagation();
 																setAssetToDelete(asset);
 															}}
-															className="p-1.5 rounded-none hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer transition-all"
+															className="p-1.5 rounded-none hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer transition-colors"
 														>
 															<Trash2 className="size-3.5" />
 														</button>

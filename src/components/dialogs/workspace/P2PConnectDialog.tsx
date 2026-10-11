@@ -264,14 +264,15 @@ export default function P2PConnectDialog({
 				{activeTab === "invite" && (
 					<div className="space-y-4 pt-1">
 						<div className="space-y-2">
-							<Label className="text-xs">What the person you invite can do</Label>
-							<div className="flex gap-2">
+							<span id="invite-role-label" className="text-sm font-medium">What the person you invite can do</span>
+							<div role="group" aria-labelledby="invite-role-label" className="flex gap-2">
 								{["Editor", "Viewer"].map((r) => (
 									<Button
 										key={r}
 										variant={hostRole === r ? "default" : "outline"}
 										size="sm"
 										onPress={() => setHostRole(r)}
+										aria-pressed={hostRole === r}
 										className="h-8 text-xs"
 									>
 										{r}
@@ -282,9 +283,9 @@ export default function P2PConnectDialog({
 
 						{shortCode ? (
 							<div className="space-y-3 rounded-none border bg-muted/30 p-4 text-center">
-								<Label className="text-xs text-muted-foreground font-medium">
+								<span className="text-sm font-medium text-muted-foreground">
 									Tell your collaborator this code:
-								</Label>
+								</span>
 								<div className="font-mono text-4xl font-bold tracking-[0.3em] text-primary select-all">
 									{shortCode.code.slice(0, 3)} {shortCode.code.slice(3)}
 								</div>
@@ -357,9 +358,9 @@ export default function P2PConnectDialog({
 						) : (
 							<div className="space-y-3 rounded-none border bg-muted/30 p-4">
 								<div className="flex items-center justify-between">
-									<Label className="text-xs text-muted-foreground font-medium">
+									<span className="text-sm font-medium text-muted-foreground">
 										Send this invite to your collaborator:
-									</Label>
+									</span>
 									<Button
 										size="sm"
 										variant="secondary"
@@ -442,8 +443,9 @@ export default function P2PConnectDialog({
 				{activeTab === "join" && (
 					<div className="space-y-4 pt-1">
 						<div className="space-y-2">
-							<Label className="text-xs">Paste the invite or type the 6-digit code</Label>
+							<Label htmlFor="invite-ticket" className="text-xs">Paste the invite or type the 6-digit code</Label>
 							<Textarea
+								id="invite-ticket"
 								placeholder="Paste the invite, or type the 6-digit code"
 								value={ticketInput}
 								onChange={(e) => setTicketInput(e.target.value)}

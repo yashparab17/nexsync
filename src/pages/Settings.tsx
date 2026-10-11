@@ -175,7 +175,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 	const back = () => (dirty ? setLeaving(true) : close());
 
 	return (
-		<div className={cn("bg-background", onClose ? "h-[85vh] overflow-y-auto" : "min-h-full")}>
+		<div className={cn("bg-background", onClose ? "h-[85vh] overflow-y-auto overscroll-contain" : "min-h-full")}>
 			<div className="mx-auto flex max-w-5xl gap-8 p-8">
 				{/* Section list */}
 				<aside className="hidden w-44 shrink-0 md:block">
@@ -481,9 +481,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						{updater.status === "error" && <p className="text-xs text-destructive">{updater.error}</p>}
 					</SectionCard>
 
-					<div id="diagnostics" className="scroll-mt-8">
-						<ErrorLogCard />
-					</div>
+					<ErrorLogCard />
 				</div>
 			</div>
 

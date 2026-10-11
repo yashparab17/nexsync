@@ -1,3 +1,4 @@
+import { MotionConfig } from "motion/react";
 import { Outlet, useLocation } from "react-router-dom";
 
 // Components
@@ -11,6 +12,7 @@ export default function App() {
 	// Fade between top-level screens; moving between workspace tabs is handled in the workspace layout
 	const screen = useLocation().pathname.split("/")[1] ?? "";
 	return (
+		<MotionConfig reducedMotion="user">
 		<div className="flex h-screen flex-col">
 			<TitleBar />
 
@@ -34,5 +36,6 @@ export default function App() {
 			{/* Pop-ups for background events */}
 			<Toaster />
 		</div>
+		</MotionConfig>
 	);
 }

@@ -526,8 +526,8 @@ export default function WorkspaceFiles() {
 				{nameDialog && (
 					<>
 						<DialogHeading icon={nameDialog.mode === "create" ? <Plus className="size-6" /> : <Pencil className="size-6" />} title={nameDialog.mode === "create" ?
-									`New ${nameDialog.kind === "file" ? "File" : "Folder"}`
-								:	`Rename ${nameDialog.item?.is_dir ? "Folder" : "File"}`} description={<>{nameDialog.mode === "create" ?
+									`New ${nameDialog.kind === "file" ? "file" : "folder"}`
+								:	`Rename ${nameDialog.item?.is_dir ? "folder" : "file"}`} description={<>{nameDialog.mode === "create" ?
 									`Create a new ${
 										nameDialog.kind === "file" ?
 											"file"
@@ -614,7 +614,7 @@ export default function WorkspaceFiles() {
 			>
 				{deleteItem && (
 					<>
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title={`Delete ${deleteItem.is_dir ? "Folder" : "File"}`} description={<>Move{" "}
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title={`Delete ${deleteItem.is_dir ? "folder" : "file"}`} description={<>Move{" "}
 								<span className="font-semibold text-foreground">
 									{deleteItem.name}
 									{deleteItem.is_dir && "/"}

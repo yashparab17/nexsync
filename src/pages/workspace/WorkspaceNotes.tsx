@@ -349,7 +349,7 @@ export default function WorkspaceNotes() {
 				<Dialog isOpen={isNewOpen} onOpenChange={setIsNewOpen} className="max-w-md">
 					<form onSubmit={handleCreate} className="space-y-4">
 						<DialogHeading icon={<Plus className="size-6" />} title="New note" description={<>A rich-text note with headings and lists. For a Markdown file, make it in the Editor.</>} />
-						<Input required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Architecture Overview, Meeting Notes" autoFocus />
+						<Input aria-label="Note title" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Architecture Overview, Meeting Notes" autoFocus />
 						<DialogFooter>
 							<Button type="button" variant="outline" onPress={() => setIsNewOpen(false)} isDisabled={submitting}>
 								Cancel

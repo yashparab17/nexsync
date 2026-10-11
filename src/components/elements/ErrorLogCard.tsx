@@ -1,15 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, RefreshCw, Trash2 } from "@/components/animate-icons";
+import { Check, Copy, RefreshCw, Trash2, Bug } from "@/components/animate-icons";
 import { APP_VERSION } from "@/lib/version";
 
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { SectionCard } from "@/components/elements/SettingsParts";
 
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { clearErrorLog, getErrorLog } from "@/lib/tauri";
@@ -54,14 +48,7 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 			.join("\n\n");
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle className="text-base">Error Log</CardTitle>
-				<CardDescription>
-					Recent errors recorded on this device. Nothing is sent anywhere; copy it when reporting a bug.
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-3">
+		<SectionCard id="diagnostics" title="Error log" icon={<Bug className="size-5" />} description={<>Recent errors recorded on this device. Nothing is sent anywhere; copy it when reporting a bug.</>}>
 				<div className="flex flex-wrap gap-2">
 					<Button variant="outline" size="sm" onPress={refresh} className="gap-1.5">
 						<RefreshCw className="size-3.5" />
@@ -118,7 +105,6 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 						))}
 					</ul>
 				)}
-			</CardContent>
-		</Card>
+			</SectionCard>
 	);
 }

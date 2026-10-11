@@ -332,8 +332,9 @@ export default function WorkspaceEditor() {
 							void createItem();
 						}}
 					>
-						<DialogHeading icon={<Plus className="size-6" />} title={`New ${newItem.kind === "file" ? "File" : "Folder"}`} description={<>Created in /{newItem.dir}/</>} />
+						<DialogHeading icon={<Plus className="size-6" />} title={`New ${newItem.kind === "file" ? "file" : "folder"}`} description={<>Created in /{newItem.dir}/</>} />
 						<Input
+							aria-label={newItem.kind === "file" ? "File name" : "Folder name"}
 							value={newItem.value}
 							onChange={(e) => setNewItem({ ...newItem, value: e.target.value })}
 							placeholder={newItem.kind === "file" ? "e.g. main.py" : "e.g. src"}
@@ -359,7 +360,7 @@ export default function WorkspaceEditor() {
 							void renameItem();
 						}}
 					>
-						<DialogHeading icon={<Pencil className="size-6" />} title={`Rename ${renaming.entry.is_dir ? "Folder" : "File"}`} description={<>{toRel(renaming.entry.path)}</>} />
+						<DialogHeading icon={<Pencil className="size-6" />} title={`Rename ${renaming.entry.is_dir ? "folder" : "file"}`} description={<>{toRel(renaming.entry.path)}</>} />
 						<Input
 							value={renaming.value}
 							onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
@@ -397,7 +398,7 @@ export default function WorkspaceEditor() {
 			{deleting && (
 				<Dialog isOpen onOpenChange={(open) => !open && setDeleting(null)}>
 					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title={`Delete ${deleting.is_dir ? "Folder" : "File"}`} description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title={`Delete ${deleting.is_dir ? "folder" : "file"}`} description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can
 								restore it from there.</>} />
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setDeleting(null)}>

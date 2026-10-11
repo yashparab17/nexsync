@@ -190,14 +190,14 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 					<ArrowLeft className="size-5" />
 				</Button>
 
-				<h2 className={cn("truncate font-semibold whitespace-nowrap", showLabels ? "block" : "hidden")}>{workspace?.name}</h2>
+				<p className={cn("truncate font-semibold whitespace-nowrap", showLabels ? "block" : "hidden")}>{workspace?.name}</p>
 			</div>
 
 			{/* Main Navigation */}
 			<nav aria-label={t("nav.main")} className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden", showLabels ? "gap-4 p-3" : "gap-2 p-2")}>
 				{navGroups.map((group, i) => (
 					<div key={i} className={cn("flex flex-col gap-0.5", !showLabels && i > 0 && "border-t pt-2")}>
-						{group.label && showLabels && <h3 className="px-3 pb-1 font-mono text-xs text-muted-foreground">{t(group.label)}</h3>}
+						{group.label && showLabels && <p className="px-3 pb-1 font-mono text-xs text-muted-foreground">{t(group.label)}</p>}
 						{group.items.map((item) => (
 							<NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />
 						))}

@@ -117,7 +117,7 @@ export default function AssetUploadDialog({
 						onDragLeave={() => setDragOver(false)}
 						onDrop={handleDrop}
 						onClick={() => fileInputRef.current?.click()}
-						className={`border-2 border-dashed rounded-none p-8 flex flex-col items-center justify-center gap-3 text-center cursor-pointer transition-all ${
+						className={`border-2 border-dashed rounded-none p-8 flex flex-col items-center justify-center gap-3 text-center cursor-pointer transition-colors ${
 							dragOver ?
 								"border-primary bg-primary/10 scale-[0.99]"
 							:	"border-border hover:border-primary/60 hover:bg-muted/30"
@@ -125,6 +125,7 @@ export default function AssetUploadDialog({
 					>
 						<input
 							type="file"
+							aria-label="Choose files to upload"
 							ref={fileInputRef}
 							multiple
 							onChange={(e) => handleFileSelect(e.target.files)}

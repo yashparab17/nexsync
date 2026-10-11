@@ -477,7 +477,7 @@ export default function WorkspaceKanban() {
 				<TagInput id={`${prefix}-tags`} value={cardTags} onChange={setCardTags} suggestions={allTags} />
 			</div>
 			<div>
-				<Label>Checklist</Label>
+				<span className="text-sm font-medium">Checklist</span>
 				<ChecklistEditor value={cardChecklist} onChange={setCardChecklist} />
 			</div>
 		</>
@@ -848,7 +848,7 @@ export default function WorkspaceKanban() {
 									id="card-desc"
 									value={cardDesc}
 									onChange={(e) => setCardDesc(e.target.value)}
-									placeholder="Add context or notes..."
+									placeholder="Add context or notes…"
 									rows={3}
 									className="mt-1"
 								/>

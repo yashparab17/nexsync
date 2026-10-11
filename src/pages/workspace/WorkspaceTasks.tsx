@@ -428,7 +428,7 @@ export default function WorkspaceTasks() {
 			<div className="flex flex-wrap items-center gap-x-4 gap-y-3">
 				<div className="relative min-w-56 flex-1">
 					<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-					<Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search tasks" className="pl-9" />
+					<Input aria-label="Search tasks" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search tasks…" className="pl-9" />
 				</div>
 
 				<Segmented
@@ -665,7 +665,7 @@ export default function WorkspaceTasks() {
 									id="create-desc"
 									value={formDescription}
 									onChange={(e) => setFormDescription(e.target.value)}
-									placeholder="Provide extra details, acceptance criteria, or context..."
+									placeholder="Provide extra details, acceptance criteria, or context…"
 									rows={3}
 									className="mt-1"
 								/>

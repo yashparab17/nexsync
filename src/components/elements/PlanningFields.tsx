@@ -47,7 +47,7 @@ export function TagInput({
 		setDraft("");
 	};
 	return (
-		<div className="mt-1 flex min-h-10 flex-wrap items-center gap-1.5 rounded-none border border-input bg-background px-2 py-1.5">
+		<div className="mt-1 flex min-h-10 flex-wrap items-center gap-1.5 rounded-none border border-input bg-card px-2 py-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30">
 			{value.map((tag) => (
 				<span key={tag} className="inline-flex items-center gap-1">
 					<TagChip tag={tag} />
