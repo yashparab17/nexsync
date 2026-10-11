@@ -21,3 +21,16 @@ export function pushRecent(workspacePath: string, path: string): string[] {
 	}
 	return next;
 }
+
+// Keeps only the files `keep` allows, so a deleted or renamed file leaves the list
+export function filterRecent(workspacePath: string, keep: (path: string) => boolean): string[] {
+	const current = readRecent(workspacePath);
+	const next = current.filter(keep);
+	if (next.length === current.length) return current;
+	try {
+		localStorage.setItem(keyFor(workspacePath), JSON.stringify(next));
+	} catch {
+		// Not remembered this time
+	}
+	return next;
+}

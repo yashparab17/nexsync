@@ -28,7 +28,7 @@ import { isBinaryFile, isDocumentFile, isMarkdownFile } from "@/lib/editor/langu
 import { baseName } from "@/lib/editor/fileKinds";
 import type { VimCommand } from "@/lib/editor/vimSetup";
 import { DEFAULT_EDITOR_PREFS, FONT_SIZE_RANGE, setEditorPrefs, useEditorPrefs } from "@/lib/editorPrefs";
-import { pushRecent, readRecent } from "@/lib/recentFiles";
+import { filterRecent, pushRecent, readRecent } from "@/lib/recentFiles";
 import {
 	createWorkspaceFile,
 	createWorkspaceFolder,
@@ -144,6 +144,11 @@ export default function WorkspaceEditor() {
 			for (const entry of found[dir]) if (entry.is_dir) queue.push(toRel(entry.path));
 		}
 		setEntries((prev) => ({ ...prev, ...found }));
+		// Once the whole tree is known, files that no longer exist (deleted or renamed, here or elsewhere) leave the recent list
+		if (queue.length === 0) {
+			const exists = new Set(Object.values(found).flat().filter((e) => !e.is_dir).map((e) => toRel(e.path)));
+			setRecent(filterRecent(workspacePath, (p) => exists.has(p)));
+		}
 	}, [workspacePath]);
 
 	const refresh = () => {
@@ -269,6 +274,7 @@ export default function WorkspaceEditor() {
 		const rel = toRel(deleting.path);
 		try {
 			await deleteWorkspaceItem(workspacePath, rel);
+			setRecent(filterRecent(workspacePath, (p) => p !== rel && !p.startsWith(`${rel}/`)));
 			setTabs((prev) => prev.filter((p) => p !== rel && !p.startsWith(`${rel}/`)));
 			setActive((current) => (current && (current === rel || current.startsWith(`${rel}/`)) ? null : current));
 			await loadDir(rel.split("/").slice(0, -1).join("/"));

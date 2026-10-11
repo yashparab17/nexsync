@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { ChevronRight, Columns3, Copy, RefreshCw, Search, Trash2, ChevronDown, ChevronsDownUp, Download, FilePlus, Folder, FolderOpen, FolderPlus, Pencil, X } from "@/components/animate-icons";
+import { ChevronRight, Columns3, Copy, RefreshCw, Search, Trash2, ChevronDown, ChevronsDownUp, Download, FilePlus, FolderPlus, Pencil, X } from "@/components/animate-icons";
 
-import FileKindIcon from "./FileKindIcon";
+import FileKindIcon, { FolderKindIcon } from "./FileKindIcon";
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
 import { Button } from "@/components/ui/button";
 import PresenceDots from "@/components/elements/PresenceDots";
@@ -161,16 +161,12 @@ export default function FileExplorer({
 								{entry.is_dir ? (
 									<>
 										{isOpen ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
-										{isOpen ? (
-											<FolderOpen className="size-3.5 shrink-0 text-primary/80" />
-										) : (
-											<Folder className="size-3.5 shrink-0 text-primary/80" />
-										)}
+										<FolderKindIcon name={entry.name} open={isOpen} className="size-4" />
 									</>
 								) : (
 									<>
 										<span className="w-3 shrink-0" />
-										<FileKindIcon name={entry.name} className="size-3.5" />
+										<FileKindIcon name={entry.name} />
 									</>
 								)}
 								<span className={cn("truncate", isActive && "font-medium")}>{entry.name}</span>
