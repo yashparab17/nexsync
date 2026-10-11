@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, Link2, ListTree } from "@/components/animate-icons";
 
-import { extractHeadings, extractLinks, findBacklinks, resolveLink, type NoteRef } from "@/lib/notes/links";
+import { extractHeadings, extractLinks, findBacklinks, noteTitle, resolveLink, type NoteRef } from "@/lib/notes/links";
 import { readWorkspaceFile } from "@/lib/tauri";
 
 // Backlinks read every other note, so a very large workspace is only partly searched
@@ -98,7 +98,7 @@ export default function NoteSidePanel({ workspacePath, current, notes, text, onO
 					? empty("No other note links here yet.")
 					: backlinks.map((note) => (
 							<button key={note.path} type="button" onClick={() => onOpenNote(note.path)} className={rowClass}>
-								<span className="truncate">{note.name}</span>
+								<span className="truncate">{noteTitle(note.name)}</span>
 							</button>
 						))}
 			</Section>
