@@ -1,14 +1,18 @@
 // The panel under the editor: command output, and the problems found in the open file.
 
-import { AlertTriangle, Terminal, X } from "@/components/animate-icons";
+import { forwardRef } from "react";
+import { AlertTriangle, Play, Terminal, X } from "@/components/animate-icons";
 
 import RunPanel from "./RunPanel";
+import TerminalPanel, { type TerminalPanelHandle } from "./TerminalPanel";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type PanelTab = "output" | "problems";
+export type PanelTab = "terminal" | "output" | "problems";
 
 interface EditorPanelProps {
+	// Whether the panel is on screen; terminals keep running when it is not
+	open: boolean;
 	tab: PanelTab;
 	onTab: (tab: PanelTab) => void;
 	onClose: () => void;
@@ -18,9 +22,10 @@ interface EditorPanelProps {
 	onGoToLine: (line: number) => void;
 }
 
-export default function EditorPanel({ tab, onTab, onClose, workspacePath, activePath, problemLines, onGoToLine }: EditorPanelProps) {
+export default forwardRef<TerminalPanelHandle, EditorPanelProps>(function EditorPanel({ open, tab, onTab, onClose, workspacePath, activePath, problemLines, onGoToLine }, terminalRef) {
 	const tabs: { id: PanelTab; label: string; icon: React.ReactNode; count?: number }[] = [
-		{ id: "output", label: "Terminal", icon: <Terminal className="size-4" /> },
+		{ id: "terminal", label: "Terminal", icon: <Terminal className="size-4" /> },
+		{ id: "output", label: "Output", icon: <Play className="size-4" /> },
 		{ id: "problems", label: "Problems", icon: <AlertTriangle className="size-4" />, count: problemLines.length },
 	];
 	return (
@@ -48,9 +53,13 @@ export default function EditorPanel({ tab, onTab, onClose, workspacePath, active
 				</Button>
 			</div>
 			<div className="min-h-0 flex-1">
+				{/* Terminals stay mounted, so their shells survive switching tabs and hiding the panel */}
+				<div className={cn("h-full", tab !== "terminal" && "hidden")}>
+					<TerminalPanel ref={terminalRef} workspacePath={workspacePath} dir="editor" visible={open && tab === "terminal"} />
+				</div>
 				{tab === "output" ? (
 					<RunPanel workspacePath={workspacePath} activePath={activePath} />
-				) : problemLines.length === 0 ? (
+				) : tab === "terminal" ? null : problemLines.length === 0 ? (
 					<p className="p-4 text-sm text-muted-foreground">{activePath ? "No problems found in this file." : "Open a file to see its problems."}</p>
 				) : (
 					<ul className="h-full overflow-y-auto py-1">
@@ -70,4 +79,4 @@ export default function EditorPanel({ tab, onTab, onClose, workspacePath, active
 			</div>
 		</div>
 	);
-}
+});

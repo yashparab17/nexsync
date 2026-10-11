@@ -7,6 +7,7 @@ import type { CursorInfo } from "@/components/elements/editor/CodeEditor";
 import type { CodeTabHandle, CodeTabStatus } from "@/components/elements/editor/codeTabTypes";
 import EditorDashboard from "@/components/elements/editor/EditorDashboard";
 import EditorPanel, { type PanelTab } from "@/components/elements/editor/EditorPanel";
+import type { TerminalPanelHandle } from "@/components/elements/editor/TerminalPanel";
 import EditorStatusLine from "@/components/elements/editor/EditorStatusLine";
 import EditorTabs from "@/components/elements/editor/EditorTabs";
 import EditorToolbar from "@/components/elements/editor/EditorToolbar";
@@ -101,7 +102,7 @@ export default function WorkspaceEditor() {
 	const [preview, setPreview] = useState(false);
 	const [explorerOpen, setExplorerOpen] = useState(() => read("nexsync.editor.explorer", true));
 	const [showPanel, setShowPanel] = useState(() => read("nexsync.editor.panel", true));
-	const [panelTab, setPanelTab] = useState<PanelTab>("output");
+	const [panelTab, setPanelTab] = useState<PanelTab>("terminal");
 	const [explorerWidth, setExplorerWidth] = usePanelSize("editor.explorer", 288, 180, 560);
 	const [panelHeight, setPanelHeight] = usePanelSize("editor.panel", 208, 96, 640);
 	const [splitWidth, setSplitWidth] = usePanelSize("editor.split", 640, 240, 2400);
@@ -299,6 +300,11 @@ export default function WorkspaceEditor() {
 	const previewOpen = preview && canPreview && !sideOpen;
 
 	const toggleExplorer = () => setExplorerOpen((v) => (remember("nexsync.editor.explorer", !v), !v));
+	const terminalRef = useRef<TerminalPanelHandle>(null);
+	const newTerminal = () => {
+		togglePanel("terminal");
+		terminalRef.current?.newTerminal();
+	};
 	const togglePanel = (tab?: PanelTab) => {
 		if (tab && (!showPanel || panelTab !== tab)) {
 			setPanelTab(tab);
@@ -383,7 +389,9 @@ export default function WorkspaceEditor() {
 		{ id: "close-all", group: "File", label: "Close all tabs", run: () => tabs.filter((t) => !dirty.has(t)).forEach(discardTab) },
 		{ id: "copy-path", group: "File", label: "Copy path of this file", run: () => current && void navigator.clipboard?.writeText(current) },
 		{ id: "explorer", group: "View", label: "Toggle explorer", hint: "Ctrl B", icon: <FolderPlus className="size-4" />, run: toggleExplorer },
-		{ id: "terminal", group: "View", label: "Toggle terminal", hint: "Ctrl J", icon: <Terminal className="size-4" />, run: () => togglePanel("output") },
+		{ id: "terminal", group: "View", label: "Toggle terminal", hint: "Ctrl J", icon: <Terminal className="size-4" />, run: () => togglePanel("terminal") },
+		{ id: "new-terminal", group: "View", label: "New terminal", hint: "Ctrl Shift `", icon: <Terminal className="size-4" />, run: newTerminal },
+		{ id: "output", group: "View", label: "Show run output", icon: <Terminal className="size-4" />, run: () => togglePanel("output") },
 		{ id: "problems", group: "View", label: "Show problems", icon: <AlertTriangle className="size-4" />, run: () => togglePanel("problems") },
 		{ id: "split", group: "View", label: sideOpen ? "Close the split" : "Open to the side", hint: "Ctrl \\", icon: <Columns3 className="size-4" />, run: toggleSide },
 		{ id: "preview", group: "View", label: previewOpen ? "Hide Markdown preview" : "Show Markdown preview", hint: "Ctrl Shift V", icon: <Eye className="size-4" />, run: () => canPreview && setPreview((v) => !v) },
@@ -441,6 +449,10 @@ export default function WorkspaceEditor() {
 		if (key === "b" && !e.shiftKey) {
 			e.preventDefault();
 			return toggleExplorer();
+		}
+		if (e.shiftKey && (e.key === "`" || e.key === "~")) {
+			e.preventDefault();
+			return newTerminal();
 		}
 		if ((key === "j" || e.key === "`") && !e.shiftKey) {
 			e.preventDefault();
@@ -649,22 +661,23 @@ export default function WorkspaceEditor() {
 						</div>
 					</div>
 
-					{showPanel && (
-						<>
-							<Splitter orientation="horizontal" grows="up" size={panelHeight} onResize={setPanelHeight} label="Resize the panel" />
-							<div style={{ height: panelHeight }} className="shrink-0">
-								<EditorPanel
-									tab={panelTab}
-									onTab={setPanelTab}
-									onClose={() => togglePanel()}
-									workspacePath={workspacePath}
-									activePath={current}
-									problemLines={current ? statuses[current]?.problemLines ?? problemLines : []}
-									onGoToLine={(line) => handleOf(current)?.goToLine(line)}
-								/>
-							</div>
-						</>
-					)}
+					{/* Always mounted, so the shells in the terminal keep running while the panel is hidden */}
+					<div className={showPanel ? "contents" : "hidden"}>
+						<Splitter orientation="horizontal" grows="up" size={panelHeight} onResize={setPanelHeight} label="Resize the panel" />
+						<div style={{ height: panelHeight }} className="shrink-0">
+							<EditorPanel
+								ref={terminalRef}
+								open={showPanel}
+								tab={panelTab}
+								onTab={setPanelTab}
+								onClose={() => togglePanel()}
+								workspacePath={workspacePath}
+								activePath={current}
+								problemLines={current ? statuses[current]?.problemLines ?? problemLines : []}
+								onGoToLine={(line) => handleOf(current)?.goToLine(line)}
+							/>
+						</div>
+					</div>
 				</div>
 			</div>
 

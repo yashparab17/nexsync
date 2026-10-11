@@ -7,6 +7,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(commands::p2p::P2pState::default())
         .manage(commands::editor_run::RunState::default())
+        .manage(commands::terminal::TerminalState::default())
         .setup(|app| {
             // A crash leaves a record in the local error log
             commands::workspace::install_panic_hook(app.handle().clone());
@@ -147,6 +148,10 @@ pub fn run() {
             commands::workspace::list_yjs_docs,
             commands::editor_run::run_command,
             commands::editor_run::kill_run,
+            commands::terminal::terminal_open,
+            commands::terminal::terminal_write,
+            commands::terminal::terminal_resize,
+            commands::terminal::terminal_close,
             commands::system_open::open_workspace_file,
             commands::p2p::p2p_self_id,
             commands::p2p::p2p_cancel_transfers,

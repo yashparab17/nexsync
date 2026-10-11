@@ -627,6 +627,44 @@ export const onRunOutput = (handler: (event: RunOutput) => void) =>
 export const onRunExit = (handler: (event: RunExit) => void) =>
 	listen<RunExit>("editor://run-exit", (e) => handler(e.payload));
 
+// ────────────────────────────
+// Terminals: real shells in the Editor's bottom panel
+// ────────────────────────────
+
+export interface TerminalData {
+	id: string;
+	// Base64 of the raw bytes the shell printed
+	data: string;
+}
+
+export interface TerminalExit {
+	id: string;
+	code: number | null;
+}
+
+// Open a shell in a folder of the editor area; what it prints arrives through onTerminalData
+export function openTerminal(workspacePath: string, dir: string, cols: number, rows: number): Promise<string> {
+	return invoke("terminal_open", { workspacePath, dir, cols, rows });
+}
+
+export function writeTerminal(id: string, data: string): Promise<void> {
+	return invoke("terminal_write", { id, data });
+}
+
+export function resizeTerminal(id: string, cols: number, rows: number): Promise<void> {
+	return invoke("terminal_resize", { id, cols, rows });
+}
+
+export function closeTerminal(id: string): Promise<void> {
+	return invoke("terminal_close", { id });
+}
+
+export const onTerminalData = (handler: (event: TerminalData) => void) =>
+	listen<TerminalData>("terminal://data", (e) => handler(e.payload));
+
+export const onTerminalExit = (handler: (event: TerminalExit) => void) =>
+	listen<TerminalExit>("terminal://exit", (e) => handler(e.payload));
+
 // Open a workspace file, such as a Word document, in the default app for its type
 export function openWorkspaceFile(workspacePath: string, relPath: string): Promise<void> {
 	return invoke("open_workspace_file", { workspacePath, relPath });
