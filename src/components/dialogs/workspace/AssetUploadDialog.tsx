@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Check, FileUp, UploadCloud, X } from "@/components/animate-icons";
 
@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 
 import { writeWorkspaceBinaryFile } from "@/lib/tauri";
-import { canDownscale, fileToBase64, useUploadScale } from "@/lib/assets/uploadScale";
-import { cn } from "@/lib/utils";
+import { canDownscale, fileToBase64, MIN_SCALE, readImageSize, scaledSize } from "@/lib/assets/uploadScale";
+import { formatBytes } from "@/lib/utils";
 
 interface AssetUploadDialogProps {
 	workspacePath: string;
@@ -16,66 +16,59 @@ interface AssetUploadDialogProps {
 	onUploaded: () => void;
 }
 
-export default function AssetUploadDialog({
-	workspacePath,
-	isOpen,
-	onClose,
-	onUploaded,
-}: AssetUploadDialogProps) {
+interface Picked {
+	file: File;
+	// Where the file's picture preview comes from, and how big the picture is, for pictures that can be resized
+	preview: string | null;
+	size: { width: number; height: number } | null;
+}
+
+export default function AssetUploadDialog({ workspacePath, isOpen, onClose, onUploaded }: AssetUploadDialogProps) {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [dragOver, setDragOver] = useState(false);
-	const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+	const [picked, setPicked] = useState<Picked[]>([]);
+	const [percent, setPercent] = useState(100);
 	const [uploading, setUploading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [successCount, setSuccessCount] = useState<number | null>(null);
-	const [scale, setScale] = useUploadScale();
-	const resizing = scale === 0.5 && selectedFiles.filter((f) => canDownscale(f.name)).length;
 
-	const handleFileSelect = (files: FileList | null) => {
-		if (!files || files.length === 0) return;
-		setSelectedFiles(Array.from(files));
+	// Previews are object URLs, which are released when the files change or the dialog closes
+	useEffect(() => () => picked.forEach((p) => p.preview && URL.revokeObjectURL(p.preview)), [picked]);
+
+	const choose = async (files: File[]) => {
+		if (files.length === 0) return;
 		setError(null);
 		setSuccessCount(null);
+		const next = await Promise.all(
+			files.map(async (file): Promise<Picked> => {
+				const isPicture = file.type.startsWith("image/");
+				return { file, preview: isPicture ? URL.createObjectURL(file) : null, size: canDownscale(file.name) ? await readImageSize(file) : null };
+			}),
+		);
+		setPicked(next);
 	};
 
-	const handleDrop = (e: React.DragEvent) => {
-		e.preventDefault();
-		setDragOver(false);
-		if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-			setSelectedFiles(Array.from(e.dataTransfer.files));
-			setError(null);
-			setSuccessCount(null);
-		}
-	};
+	const resizable = picked.filter((p) => canDownscale(p.file.name));
 
 	const handleUpload = async () => {
-		if (selectedFiles.length === 0 || !workspacePath) return;
-
+		if (picked.length === 0 || !workspacePath) return;
 		setUploading(true);
 		setError(null);
-
 		try {
 			let uploaded = 0;
-			for (const file of selectedFiles) {
-				const base64Data = await fileToBase64(file, scale);
-
-				// Clean filename
+			for (const { file } of picked) {
+				const base64Data = await fileToBase64(file, percent);
 				const sanitizedName = file.name.replace(/[^\w.-]/g, "_");
-				await writeWorkspaceBinaryFile(
-					workspacePath,
-					`assets/${sanitizedName}`,
-					base64Data,
-				);
+				await writeWorkspaceBinaryFile(workspacePath, `assets/${sanitizedName}`, base64Data);
 				uploaded++;
 			}
-
 			setSuccessCount(uploaded);
 			setTimeout(() => {
 				onUploaded();
 				onClose();
-				setSelectedFiles([]);
+				setPicked([]);
 				setSuccessCount(null);
-			}, 1200);
+			}, 1000);
 		} catch (err) {
 			console.error("Failed to upload asset:", err);
 			setError(String(err));
@@ -84,144 +77,122 @@ export default function AssetUploadDialog({
 		}
 	};
 
-	const removeFile = (index: number) => {
-		setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
-	};
-
 	return (
-		<Dialog
-			isOpen={isOpen}
-			onOpenChange={(open) => !open && onClose()}
-			className="max-w-lg p-6 bg-card border-border"
-		>
-			<div className="space-y-4">
-				<DialogHeading icon={<UploadCloud className="size-6" />} title="Upload assets" description={<>Import images, media, or documents directly into your local{" "}
-						<code className="bg-muted px-1.5 py-0.5 rounded-none text-xs font-mono text-foreground">
-							assets/
-						</code>{" "}
-						directory.</>} />
+		<Dialog isOpen={isOpen} onOpenChange={(open) => !open && onClose()} className="max-w-xl p-6">
+			<div className="space-y-5">
+				<DialogHeading
+					icon={<UploadCloud className="size-6" />}
+					title="Upload assets"
+					description={
+						<>
+							Add pictures, audio, video or documents to the workspace{" "}
+							<code className="bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">assets/</code> folder.
+						</>
+					}
+				/>
 
-				<div className="space-y-4 my-2">
-					{/* Drop Zone */}
-					<div
-						onDragOver={(e) => {
-							e.preventDefault();
-							setDragOver(true);
-						}}
-						onDragLeave={() => setDragOver(false)}
-						onDrop={handleDrop}
-						onClick={() => fileInputRef.current?.click()}
-						className={`border-2 border-dashed rounded-none p-8 flex flex-col items-center justify-center gap-3 text-center cursor-pointer transition-colors ${
-							dragOver ?
-								"border-primary bg-primary/10 scale-[0.99]"
-							:	"border-border hover:border-primary/60 hover:bg-muted/30"
-						}`}
-					>
-						<input
-							type="file"
-							aria-label="Choose files to upload"
-							ref={fileInputRef}
-							multiple
-							onChange={(e) => handleFileSelect(e.target.files)}
-							className="hidden"
-						/>
-						<div className="p-3 rounded-none bg-primary/10 text-primary">
-							<FileUp className="size-6" />
-						</div>
-						<div>
-							<p className="text-sm font-semibold text-foreground">
-								Click to browse or drag and drop files here
-							</p>
-							<p className="text-xs text-muted-foreground mt-1">
-								Images (PNG, JPG, WebP, SVG), Audio, Video, PDFs up to 50MB
-							</p>
-						</div>
-					</div>
-
-					{/* Selected Files List */}
-					{selectedFiles.length > 0 && (
-						<div className="space-y-2 max-h-40 overflow-y-auto">
-							<p className="text-xs font-semibold text-muted-foreground">
-								Selected Files ({selectedFiles.length}):
-							</p>
-							{selectedFiles.map((f, idx) => (
-								<div
-									key={idx}
-									className="flex items-center justify-between px-3 py-1.5 rounded-none bg-muted/40 text-xs border border-border/50"
-								>
-									<span className="truncate max-w-[280px] font-medium text-foreground">
-										{f.name}
-									</span>
-									<div className="flex items-center gap-2">
-										<span className="text-muted-foreground font-mono">
-											{(f.size / 1024).toFixed(1)} KB
-										</span>
-										<button
-											type="button"
-											onClick={(e) => {
-												e.stopPropagation();
-												removeFile(idx);
-											}}
-											className="text-muted-foreground hover:text-destructive p-0.5 rounded-none cursor-pointer"
-										>
-											<X className="size-3.5" />
-										</button>
-									</div>
-								</div>
-							))}
-						</div>
-					)}
-
-					{/* Pictures can be stored at half their width and height */}
-					<fieldset className="space-y-2">
-						<legend className="text-xs font-semibold text-muted-foreground">Image size</legend>
-						<div className="flex items-stretch border" role="radiogroup" aria-label="Image size">
-							{([1, 0.5] as const).map((value) => (
-								<button
-									key={value}
-									type="button"
-									role="radio"
-									aria-checked={scale === value}
-									onClick={() => setScale(value)}
-									className={cn("flex-1 px-3 py-1.5 text-sm outline-none focus-visible:bg-muted", scale === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
-								>
-									{value === 1 ? "Original size" : "Half size (50%)"}
-								</button>
-							))}
-						</div>
-						<p className="text-xs text-muted-foreground">
-							{resizing ? `${resizing} ${resizing === 1 ? "picture" : "pictures"} will be saved at half the width and height.` : "PNG, JPG and WebP pictures can be saved smaller. GIFs, SVGs and other files are never resized."}
-						</p>
-					</fieldset>
-
-					{error && (
-						<div className="p-3 rounded-none bg-destructive/10 border border-destructive/20 text-destructive text-xs font-mono">
-							{error}
-						</div>
-					)}
-
-					{successCount !== null && (
-						<div className="p-3 text-success text-xs flex items-center gap-2">
-							<Check className="size-4" />
-							Successfully uploaded {successCount} asset
-							{successCount > 1 ? "s" : ""}!
-						</div>
-					)}
+				{/* Drop zone */}
+				<div
+					onDragOver={(e) => {
+						e.preventDefault();
+						setDragOver(true);
+					}}
+					onDragLeave={() => setDragOver(false)}
+					onDrop={(e) => {
+						e.preventDefault();
+						setDragOver(false);
+						void choose(Array.from(e.dataTransfer.files));
+					}}
+					className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed p-6 text-center transition-colors ${dragOver ? "border-primary bg-primary/10" : "border-border hover:border-primary/60 hover:bg-muted/30"}`}
+				>
+					<input
+						type="file"
+						aria-label="Choose files to upload"
+						ref={fileInputRef}
+						multiple
+						onChange={(e) => void choose(Array.from(e.target.files ?? []))}
+						className="sr-only"
+					/>
+					<FileUp className="size-7 text-primary" />
+					<p className="text-sm font-medium">Drop files here, or</p>
+					<Button variant="outline" size="sm" onPress={() => fileInputRef.current?.click()}>
+						Choose files
+					</Button>
 				</div>
 
-				<DialogFooter className="flex items-center justify-between gap-2">
+				{/* Chosen files */}
+				{picked.length > 0 && (
+					<ul className="max-h-48 space-y-1 overflow-y-auto" aria-label="Files to upload">
+						{picked.map((p, i) => {
+							const after = p.size ? scaledSize(p.size.width, p.size.height, percent) : null;
+							return (
+								<li key={`${p.file.name}-${i}`} className="flex items-center gap-3 border bg-muted/30 p-2 text-sm">
+									{p.preview ? <img src={p.preview} alt="" className="size-10 shrink-0 bg-muted object-cover" /> : <span className="flex size-10 shrink-0 items-center justify-center bg-muted font-mono text-xs text-muted-foreground">{p.file.name.split(".").pop()?.toUpperCase()}</span>}
+									<span className="min-w-0 flex-1">
+										<span className="block truncate font-medium">{p.file.name}</span>
+										<span className="block truncate font-mono text-xs text-muted-foreground">
+											{formatBytes(p.file.size)}
+											{p.size && ` · ${p.size.width}×${p.size.height}`}
+											{p.size && after && percent < 100 && ` → ${after.width}×${after.height}`}
+										</span>
+									</span>
+									<button type="button" aria-label={`Remove ${p.file.name}`} onClick={() => setPicked((prev) => prev.filter((_, j) => j !== i))} className="flex size-7 shrink-0 items-center justify-center text-muted-foreground outline-none hover:bg-muted hover:text-destructive focus-visible:bg-muted">
+										<X className="size-4" />
+									</button>
+								</li>
+							);
+						})}
+					</ul>
+				)}
+
+				{/* Picture size: the file is saved at this share of its width and height */}
+				<div className="space-y-2">
+					<div className="flex items-baseline justify-between">
+						<label htmlFor="upload-size" className="text-sm font-medium">
+							Picture size
+						</label>
+						<output htmlFor="upload-size" className="font-mono text-sm tabular-nums">
+							{percent}%
+						</output>
+					</div>
+					<input
+						id="upload-size"
+						type="range"
+						min={MIN_SCALE}
+						max={100}
+						step={5}
+						value={percent}
+						onChange={(e) => setPercent(Number(e.target.value))}
+						className="h-2 w-full cursor-pointer accent-primary"
+					/>
+					<div className="flex justify-between font-mono text-xs text-muted-foreground">
+						<span>{MIN_SCALE}%</span>
+						<span>Original</span>
+					</div>
+					<p className="text-xs text-muted-foreground">
+						{resizable.length === 0
+							? "PNG, JPG and WebP pictures can be saved smaller. GIFs, SVGs and other files are never resized."
+							: percent === 100
+								? "Pictures are saved at their original size."
+								: `${resizable.length} ${resizable.length === 1 ? "picture is" : "pictures are"} saved at ${percent}% of the width and height. This changes the file. Larger pictures are drawn at half size in Assets anyway, without being changed.`}
+					</p>
+				</div>
+
+				{error && <div className="border border-destructive/30 bg-destructive/10 p-3 font-mono text-xs text-destructive">{error}</div>}
+				{successCount !== null && (
+					<div role="status" className="flex items-center gap-2 text-sm text-success">
+						<Check className="size-4" />
+						Uploaded {successCount} {successCount === 1 ? "asset" : "assets"}.
+					</div>
+				)}
+
+				<DialogFooter>
 					<Button variant="outline" onPress={onClose} isDisabled={uploading}>
 						Cancel
 					</Button>
-					<Button
-						onPress={handleUpload}
-						isDisabled={selectedFiles.length === 0 || uploading}
-						className="gap-2"
-					>
-						{uploading ?
-							<Loader2 className="size-4 animate-spin" />
-						:	<UploadCloud className="size-4" />}
-						{uploading ? "Uploading…" : `Upload (${selectedFiles.length})`}
+					<Button onPress={handleUpload} isDisabled={picked.length === 0 || uploading}>
+						{uploading ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud data-icon="inline-start" className="size-4" />}
+						{uploading ? "Uploading…" : picked.length ? `Upload ${picked.length}` : "Upload"}
 					</Button>
 				</DialogFooter>
 			</div>

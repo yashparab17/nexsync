@@ -1,33 +1,16 @@
-// Uploading an image at its original size or at half the width and height. Only pictures made of pixels are resized;
-// animated GIFs, vector SVGs and every other kind of file are stored as they are.
-
-import { useCallback, useState } from "react";
-
-export type UploadScale = 1 | 0.5;
+// Saving a picture smaller when it is uploaded. Only pictures made of pixels are resized; animated GIFs, vector SVGs
+// and every other kind of file are stored as they are.
 
 const RESIZABLE: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", bmp: "image/png" };
-const KEY = "nexsync.assets.uploadScale";
+
+export const MIN_SCALE = 10;
 
 export const canDownscale = (fileName: string): boolean => (fileName.split(".").pop()?.toLowerCase() ?? "") in RESIZABLE;
 
-// The size chosen last time, kept on this device
-export function useUploadScale() {
-	const [scale, setState] = useState<UploadScale>(() => {
-		try {
-			return localStorage.getItem(KEY) === "0.5" ? 0.5 : 1;
-		} catch {
-			return 1;
-		}
-	});
-	const setScale = useCallback((next: UploadScale) => {
-		setState(next);
-		try {
-			localStorage.setItem(KEY, String(next));
-		} catch {
-			// Not remembered this time
-		}
-	}, []);
-	return [scale, setScale] as const;
+// The size a picture ends up at for a scale of 10 to 100 percent
+export function scaledSize(width: number, height: number, percent: number): { width: number; height: number } {
+	const p = Math.min(100, Math.max(MIN_SCALE, percent)) / 100;
+	return { width: Math.max(1, Math.round(width * p)), height: Math.max(1, Math.round(height * p)) };
 }
 
 const readAsBase64 = (blob: Blob) =>
@@ -41,14 +24,25 @@ const readAsBase64 = (blob: Blob) =>
 		reader.readAsDataURL(blob);
 	});
 
-// The file as base64, resized first when asked and possible. A picture that cannot be decoded is stored as it is.
-export async function fileToBase64(file: File, scale: UploadScale): Promise<string> {
-	const type = RESIZABLE[file.name.split(".").pop()?.toLowerCase() ?? ""];
-	if (scale === 1 || !type) return readAsBase64(file);
+// How big a picture is, or null when it cannot be read
+export async function readImageSize(file: Blob): Promise<{ width: number; height: number } | null> {
 	try {
 		const bitmap = await createImageBitmap(file);
-		const width = Math.max(1, Math.round(bitmap.width * scale));
-		const height = Math.max(1, Math.round(bitmap.height * scale));
+		const size = { width: bitmap.width, height: bitmap.height };
+		bitmap.close();
+		return size;
+	} catch {
+		return null;
+	}
+}
+
+// The file as base64, resized first when asked and possible. A picture that cannot be decoded is stored as it is.
+export async function fileToBase64(file: File, percent: number): Promise<string> {
+	const type = RESIZABLE[file.name.split(".").pop()?.toLowerCase() ?? ""];
+	if (percent >= 100 || !type) return readAsBase64(file);
+	try {
+		const bitmap = await createImageBitmap(file);
+		const { width, height } = scaledSize(bitmap.width, bitmap.height, percent);
 		const canvas = document.createElement("canvas");
 		canvas.width = width;
 		canvas.height = height;

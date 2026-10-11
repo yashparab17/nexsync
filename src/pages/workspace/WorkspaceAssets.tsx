@@ -1,6 +1,7 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { Copy, Check, Search, Trash2, FileText, Film, Headphones, Image as ImageIcon, LayoutGrid, List, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
-import { fileToBase64, useUploadScale } from "@/lib/assets/uploadScale";
+import { displaySize } from "@/lib/assets/displaySize";
+import { fileToBase64 } from "@/lib/assets/uploadScale";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -62,11 +63,19 @@ export default function WorkspaceAssets() {
 	const [selectedCategory, setSelectedCategory] =
 		useState<AssetCategory>("all");
 	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-	// How wide the tiles are, and the size pictures are saved at when dropped on the page
+	// How big the tiles are drawn, and each picture's own size once it is known
 	const [tile, setTile] = useState<"s" | "m" | "l">("m");
-	const [uploadScale, setUploadScale] = useUploadScale();
-	// A picture's own size, once it has loaded, for the hover details
-	const [dims, setDims] = useState<Record<string, string>>({});
+	const [sizes, setSizes] = useState<Record<string, { w: number; h: number }>>({});
+	const gridRef = useRef<HTMLUListElement>(null);
+	const [gridWidth, setGridWidth] = useState(1200);
+	useEffect(() => {
+		const el = gridRef.current;
+		if (!el) return;
+		const observer = new ResizeObserver(() => setGridWidth(el.clientWidth));
+		observer.observe(el);
+		setGridWidth(el.clientWidth);
+		return () => observer.disconnect();
+	}, [viewMode, loading]);
 
 	// Thumbnails cache for images (base64 URLs)
 	const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
@@ -159,6 +168,17 @@ export default function WorkspaceAssets() {
 	useEffect(() => {
 		if (lastSyncedFile) void loadAssets();
 	}, [lastSyncedFile]);
+
+	// A picture's own size, read once its thumbnail has arrived, decides how big its tile is
+	useEffect(() => {
+		for (const [name, src] of Object.entries(thumbnails)) {
+			if (sizes[name]) continue;
+			const img = new Image();
+			img.onload = () => setSizes((prev) => (prev[name] ? prev : { ...prev, [name]: { w: img.naturalWidth, h: img.naturalHeight } }));
+			img.src = src;
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [thumbnails]);
 
 	// Filtered assets
 	const filteredAssets = useMemo(() => {
@@ -296,7 +316,7 @@ export default function WorkspaceAssets() {
 
 		for (const file of Array.from(e.dataTransfer.files)) {
 			try {
-				const base64Data = await fileToBase64(file, uploadScale);
+				const base64Data = await fileToBase64(file, 100);
 				const sanitizedName = file.name.replace(/[^\w.-]/g, "_");
 				await writeWorkspaceBinaryFile(
 					workspace.path,
@@ -314,9 +334,31 @@ export default function WorkspaceAssets() {
 	const kindIcon = (category: AssetItem["category"], className: string) =>
 		category === "video" ? <Film className={className} /> : category === "audio" ? <Headphones className={className} /> : category === "image" ? <ImageIcon className={className} /> : <FileText className={className} />;
 
-	// Tiles that are not pictures get a shape that depends on what they are, so the mosaic has rhythm
-	const shapeOf = (asset: AssetItem): string =>
-		asset.category === "video" ? "aspect-video" : asset.category === "audio" ? "aspect-[4/3]" : asset.category === "document" ? "aspect-[3/4]" : "aspect-square";
+	// The grid is made of narrow columns and short rows; a tile spans as many as its picture needs, so tiles of every
+	// shape pack together without gaps. Pictures bigger than 500 pixels are drawn at half size, smaller ones at their own.
+	const UNIT = 40;
+	const GAP = 8;
+	const ROW = 4;
+	const mul = tile === "s" ? 0.7 : tile === "l" ? 1.4 : 1;
+	const columns = Math.max(1, Math.floor((gridWidth - 24 + GAP) / (UNIT + GAP)));
+	const tileGeometry = (asset: AssetItem) => {
+		const natural = sizes[asset.name];
+		let w: number;
+		let h: number;
+		if (asset.syncStatus === "remote_placeholder") [w, h] = [150, 150];
+		else if (asset.category === "image" && natural) {
+			const d = displaySize(natural.w, natural.h);
+			[w, h] = [d.width, d.height];
+		} else if (asset.category === "image") [w, h] = [200, 200];
+		else if (asset.category === "video") [w, h] = [240, 135];
+		else if (asset.category === "audio") [w, h] = [180, 135];
+		else if (asset.category === "document") [w, h] = [150, 200];
+		else [w, h] = [120, 120];
+		const span = Math.min(columns, Math.max(1, Math.round((w * mul + GAP) / (UNIT + GAP))));
+		const width = span * UNIT + (span - 1) * GAP;
+		const rows = Math.ceil(((width * h) / w + GAP) / ROW);
+		return { span, rows };
+	};
 
 	const tabs = [
 		{ key: "all", label: "All", count: categoryCounts.all },
@@ -344,7 +386,7 @@ export default function WorkspaceAssets() {
 				<div className="pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center border-2 border-dashed border-primary bg-primary/15 backdrop-blur-sm animate-in fade-in duration-150 motion-reduce:animate-none">
 					<UploadCloud className="mb-3 size-16 text-primary" />
 					<h3 className="text-xl font-bold text-foreground">Drop to add to assets</h3>
-					<p className="mt-1 text-sm text-muted-foreground">{uploadScale === 0.5 ? "Pictures will be saved at half size." : "Pictures keep their original size."}</p>
+					<p className="mt-1 text-sm text-muted-foreground">Pictures keep their original size. Use Upload to save them smaller.</p>
 				</div>
 			)}
 
@@ -405,22 +447,6 @@ export default function WorkspaceAssets() {
 				</div>
 				{!isViewer && (
 					<>
-						<span className="hidden font-mono text-xs text-muted-foreground 2xl:inline">Save as</span>
-						<div className="flex items-stretch border" role="radiogroup" aria-label="Size pictures are saved at">
-							{([1, 0.5] as const).map((value) => (
-								<button
-									key={value}
-									type="button"
-									role="radio"
-									aria-checked={uploadScale === value}
-									title={value === 1 ? "Save pictures at their original size" : "Save pictures at half width and height"}
-									onClick={() => setUploadScale(value)}
-									className={cn("h-8 px-2.5 text-xs outline-none focus-visible:bg-muted", uploadScale === value ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground")}
-								>
-									{value === 1 ? "Original" : "50%"}
-								</button>
-							))}
-						</div>
 						<Button size="sm" onPress={() => setIsUploadOpen(true)}>
 							<Upload data-icon="inline-start" className="size-4" />
 							Upload
@@ -449,32 +475,35 @@ export default function WorkspaceAssets() {
 					</div>
 				) : viewMode === "grid" ? (
 					/* Mosaic: columns that each fill from the top, so tiles of different heights pack together */
-					<ul className={cn("gap-2 p-3 [&>li]:mb-2", tile === "s" ? "columns-[9rem]" : tile === "m" ? "columns-[14rem]" : "columns-[22rem]")}>
+					<ul
+						ref={gridRef}
+						className="grid p-3"
+						style={{ gridTemplateColumns: `repeat(auto-fill, ${UNIT}px)`, gridAutoRows: `${ROW}px`, columnGap: GAP, gridAutoFlow: "dense" }}
+					>
 						{filteredAssets.map((asset) => {
 							const thumbnail = thumbnails[asset.name];
 							const isRemote = asset.syncStatus === "remote_placeholder";
 							const ext = asset.name.split(".").pop()?.toUpperCase() ?? "";
-							const details = [dims[asset.name], formatBytes(asset.size), new Date(asset.modified_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })].filter(Boolean).join(" · ");
+							const natural = sizes[asset.name];
+							const shown = natural ? displaySize(natural.w, natural.h) : null;
+							const { span, rows } = tileGeometry(asset);
+							const details = [natural && `${natural.w}×${natural.h}${shown?.halved ? " (shown at 50%)" : ""}`, formatBytes(asset.size), new Date(asset.modified_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })].filter(Boolean).join(" · ");
 							return (
-								<li key={asset.name} className="group relative break-inside-avoid">
+								<li key={asset.name} className="group relative" style={{ gridColumn: `span ${span}`, gridRow: `span ${rows}`, paddingBottom: GAP }}>
 									<button
 										type="button"
 										onClick={() => setPreviewAsset(asset)}
 										aria-label={`${asset.name}, ${asset.category}, ${formatBytes(asset.size)}${isRemote ? ", not downloaded" : ""}`}
-										className="relative block w-full cursor-pointer overflow-hidden bg-card text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+										className="relative block h-full w-full cursor-pointer overflow-hidden bg-card text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
 									>
 										{asset.category === "image" && thumbnail && !isRemote ? (
 											<img
 												src={thumbnail}
 												alt=""
-												onLoad={(e) => {
-													const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
-													setDims((prev) => (prev[asset.name] ? prev : { ...prev, [asset.name]: `${w}×${h}` }));
-												}}
-												className="block h-auto w-full transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none"
+												className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none"
 											/>
 										) : (
-											<div className={cn("flex w-full flex-col items-center justify-center gap-2 bg-muted/60", asset.category === "image" ? "aspect-[4/3]" : shapeOf(asset), isRemote && "border border-dashed border-warning/60 bg-transparent")}>
+											<div className={cn("flex h-full w-full flex-col items-center justify-center gap-2 bg-muted/60", isRemote && "border border-dashed border-warning/60 bg-transparent")}>
 												{isRemote ? <Sparkles className="size-8 text-warning" /> : kindIcon(asset.category, "size-9 text-muted-foreground")}
 												<span className="font-mono text-xs text-muted-foreground">{isRemote ? "Remote" : ext}</span>
 											</div>
@@ -666,6 +695,25 @@ export default function WorkspaceAssets() {
 					isOpen={!!previewAsset}
 					onClose={() => setPreviewAsset(null)}
 					onDownloadLazy={handleLazyDownload}
+					position={{ index: Math.max(0, filteredAssets.findIndex((a) => a.name === previewAsset.name)), total: filteredAssets.length }}
+					onStep={(direction) => {
+						const at = filteredAssets.findIndex((a) => a.name === previewAsset.name);
+						const next = filteredAssets[(at + direction + filteredAssets.length) % filteredAssets.length];
+						if (next) setPreviewAsset(next);
+					}}
+					onHistory={(a) => {
+						setPreviewAsset(null);
+						setHistoryAsset(a);
+					}}
+					onRename={isViewer ? undefined : (a) => {
+						setPreviewAsset(null);
+						setAssetToRename(a);
+						setNewName(a.name);
+					}}
+					onDelete={isViewer ? undefined : (a) => {
+						setPreviewAsset(null);
+						setAssetToDelete(a);
+					}}
 				/>
 			)}
 
