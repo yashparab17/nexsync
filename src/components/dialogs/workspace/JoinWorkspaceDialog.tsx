@@ -1,6 +1,6 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Radio, RefreshCw, FolderOpen, Globe, Lock, ShieldCheck, Sparkles } from "@/components/animate-icons";
+import { Check, RefreshCw, FolderOpen, Globe, Lock, Sparkles, UsersRound } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
 	Dialog,
 	DialogTrigger,
-	DialogHeader,
-	DialogTitle,
-	DialogDescription,
+	DialogHeading,
 	DialogFooter,
 } from "@/components/ui/dialog";
 
@@ -141,121 +139,57 @@ export default function JoinWorkspaceDialog({
 			{children}
 
 			<Dialog className="sm:max-w-xl">
-				<DialogHeader>
-					<div className="flex items-center gap-2">
-						<div className="flex h-9 w-9 items-center justify-center rounded-none bg-info/10 text-info border border-info/20">
-							<Radio className="h-5 w-5 animate-pulse" />
-						</div>
-						<div>
-							<DialogTitle className="text-lg">Join a Workspace</DialogTitle>
-							<DialogDescription className="text-xs">
-								Paste the invite or code your collaborator shared to get a copy of their workspace that stays up to date.
-							</DialogDescription>
-						</div>
-					</div>
-				</DialogHeader>
+				<DialogHeading icon={<UsersRound className="size-6" />} title="Join with a ticket" description="Paste the invite or 6-digit code a teammate sent you. You get your own copy of their workspace, and it stays in sync." />
 
-				{/* Security banner */}
-				<div className="flex items-center justify-between px-3 py-2 text-xs text-success">
-					<div className="flex items-center gap-2">
-						<ShieldCheck className="h-4 w-4" />
-						<span>Private: only you and your collaborators can read your files</span>
-					</div>
-					<div className="flex items-center gap-1 font-mono text-xs">
-						<Lock className="h-3 w-3" />
-						<span>No cloud</span>
-					</div>
-				</div>
+				<p className="flex items-center gap-2 text-sm text-muted-foreground">
+					<Lock className="size-4 shrink-0 text-primary" />
+					The connection is end-to-end encrypted. No server sees your files.
+				</p>
 
-				{error && (
-					<div className="rounded-none border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-						{error}
-					</div>
-				)}
+				{error && <p className="border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
 
-				<div className="space-y-4 pt-1">
-					{/* Invite ticket input */}
-					<div className="space-y-1.5">
-						<Label className="text-xs">Invite or 6-digit code *</Label>
-						<Textarea
-							placeholder="Paste the invite, or type the 6-digit code"
-							value={ticket}
-							onChange={(e) => setTicket(e.target.value)}
-							rows={3}
-							className="font-mono text-xs break-all rounded-none border border-input px-3 py-2"
-							autoFocus
-						/>
+				<div className="flex flex-col gap-5">
+					<div className="flex flex-col gap-2">
+						<Label htmlFor="join-ticket">Invite or 6-digit code</Label>
+						<Textarea id="join-ticket" placeholder="Paste the invite, or type the 6-digit code" value={ticket} onChange={(e) => setTicket(e.target.value)} rows={3} className="font-mono text-xs break-all" autoFocus />
 					</div>
 
-					{/* Local Destination folder */}
-					<div className="space-y-1.5">
-						<Label className="text-xs">Save to folder</Label>
-						<div className="flex items-center gap-2">
-							<Input
-								value={workspaceParentPath}
-								onChange={(e) => setWorkspaceParentPath(e.target.value)}
-								placeholder="Choose a folder to save the workspace in"
-								className="text-xs h-9"
-							/>
-							<Button
-								variant="outline"
-								size="icon"
-								onPress={pickDestinationFolder}
-								aria-label="Pick location"
-								className="h-9 w-9 shrink-0"
-							>
+					<div className="flex flex-col gap-2">
+						<Label htmlFor="join-folder">Save in</Label>
+						<div className="flex gap-2">
+							<Input id="join-folder" value={workspaceParentPath} onChange={(e) => setWorkspaceParentPath(e.target.value)} placeholder="Choose a folder" className="font-mono text-xs" />
+							<Button variant="outline" onPress={pickDestinationFolder}>
 								<FolderOpen className="size-4" />
+								Browse
 							</Button>
 						</div>
 					</div>
 
-					{/* Your Name */}
-					<div className="space-y-1.5">
-						<Label className="text-xs">Your Display Name</Label>
-						<Input
-							value={userName}
-							onChange={(e) => setUserName(e.target.value)}
-							placeholder="e.g. Alice"
-							className="text-xs h-9"
-						/>
+					<div className="flex flex-col gap-2">
+						<Label htmlFor="join-name">Your name</Label>
+						<Input id="join-name" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Alice" />
 					</div>
-
-					{statusMessage && (
-						<div className="flex items-center gap-2 rounded-none border border-info/20 bg-info/10 p-2.5 text-xs text-info">
-							{isSuccess ? (
-								<Sparkles className="h-4 w-4 text-success" />
-							) : (
-								<RefreshCw className="h-4 w-4 animate-spin text-info" />
-							)}
-							<span>{statusMessage}</span>
-						</div>
-					)}
-
-					<DialogFooter>
-						<Button
-							onPress={handleJoinWorkspace}
-							isDisabled={!ticket.trim() || !workspaceParentPath.trim() || isProcessing || isSuccess}
-							className="w-full h-10 text-xs gap-2"
-						>
-							{isProcessing ? (
-								<>
-									<RefreshCw className="h-3.5 w-3.5 animate-spin" />
-									Connecting…
-								</>
-							) : isSuccess ? (
-								<>
-									<Check className="h-3.5 w-3.5 text-success" />
-									Connected!
-								</>
-							) : (
-								<>
-									<Globe className="h-3.5 w-3.5" />
-									Connect & Join Workspace
-								</>
-							)}
-						</Button>
-					</DialogFooter>
 				</div>
+
+				{statusMessage && (
+					<div className="flex items-center gap-2 border border-info/30 bg-info/10 p-3 text-sm text-info">
+						{isSuccess ? <Sparkles className="size-4 text-success" /> : <RefreshCw className="size-4 animate-spin" />}
+						<span>{statusMessage}</span>
+					</div>
+				)}
+
+				<DialogFooter>
+					<Button variant="outline" slot="close">Cancel</Button>
+					<Button onPress={handleJoinWorkspace} isDisabled={!ticket.trim() || !workspaceParentPath.trim() || isProcessing || isSuccess}>
+						{isProcessing ? (
+							<><RefreshCw className="size-4 animate-spin" />Connecting…</>
+						) : isSuccess ? (
+							<><Check className="size-4" />Connected</>
+						) : (
+							<><Globe className="size-4" />Join workspace</>
+						)}
+					</Button>
+				</DialogFooter>
 			</Dialog>
 		</DialogTrigger>
 	);

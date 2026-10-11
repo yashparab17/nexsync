@@ -254,7 +254,7 @@ export default function WorkspaceNotes() {
 			{/* Header */}
 			<PageHeader
 				title="Notes"
-				description="Notes float on a shared board and link to each other with [[Note name]]. Markdown files live in the Editor."
+				description={<>A shared board of notes. Link them with <code className="font-mono text-sm">[[Note name]]</code>.</>}
 				actions={
 					<>
 {!isViewer && (

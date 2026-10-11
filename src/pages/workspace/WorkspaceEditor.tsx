@@ -224,7 +224,7 @@ export default function WorkspaceEditor() {
 	return (
 		<div className="flex h-[calc(100vh-10rem)] flex-col">
 			{/* Header */}
-			<PageHeader title="Editor" description="Edit code and text files. Several can stay open as tabs, and everyone in the workspace edits the same file live." />
+			<PageHeader title="Editor" description="Code and text files, edited live with everyone in the workspace." />
 
 			<div className="flex min-h-0 flex-1 border">
 			<FileExplorer
@@ -275,8 +275,8 @@ export default function WorkspaceEditor() {
 							<div
 								key={path}
 								className={cn(
-									"group flex shrink-0 items-center gap-1.5 border-r px-3 text-xs",
-									active === path ? "bg-background font-medium" : "bg-muted/30 text-muted-foreground hover:text-foreground",
+									"group flex shrink-0 items-center gap-2 border-r border-t-2 px-4 text-sm",
+									active === path ? "border-t-primary bg-background font-medium text-foreground" : "border-t-transparent bg-card/50 text-muted-foreground hover:text-foreground",
 								)}
 							>
 								<button type="button" onClick={() => setActive(path)} title={path} className="flex items-center gap-1.5">

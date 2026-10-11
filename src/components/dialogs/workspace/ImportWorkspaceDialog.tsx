@@ -15,9 +15,7 @@ import { Label } from "@/components/ui/label";
 import {
 	Dialog,
 	DialogTrigger,
-	DialogHeader,
-	DialogTitle,
-	DialogDescription,
+	DialogHeading,
 	DialogFooter,
 } from "@/components/ui/dialog";
 
@@ -80,50 +78,25 @@ export default function ImportWorkspaceDialog({
 			{children}
 
 			<Dialog className="sm:max-w-xl">
-				<DialogHeader>
-					<DialogTitle>Import Workspace</DialogTitle>
+				<DialogHeading icon={<FolderUp className="size-6" />} title="Import a folder" description="Open a Nexsync workspace that is already on this computer, for example one you copied from another device." />
 
-					<DialogDescription>
-						Open an existing Nexsync workspace from your computer.
-					</DialogDescription>
-				</DialogHeader>
-
-				<div className="space-y-6 py-4">
-					<div className="space-y-2">
-						<Label htmlFor="workspace-path">Workspace Folder</Label>
-
-						<div className="flex gap-2 border">
-							<Input
-								id="workspace-path"
-								readOnly
-								placeholder="Choose a Nexsync workspace..."
-								value={workspacePath}
-								className="border-0 pl-2"
-							/>
-
-							<Button variant="outline" onPress={pickWorkspace}>
-								<FolderOpen className="size-4" />
-								Browse
-							</Button>
-						</div>
+				<div className="flex flex-col gap-2">
+					<Label htmlFor="workspace-path">Workspace folder</Label>
+					<div className="flex gap-2">
+						<Input id="workspace-path" readOnly placeholder="Choose a folder" value={workspacePath} className="font-mono text-xs" />
+						<Button variant="outline" onPress={pickWorkspace}>
+							<FolderOpen className="size-4" />
+							Browse
+						</Button>
 					</div>
-
-					{error && (
-						<p className="text-sm text-destructive">{error}</p>
-					)}
+					{error && <p className="text-sm text-destructive">{error}</p>}
 				</div>
 
 				<DialogFooter>
-					<Button variant="outline" slot="close">
-						Cancel
-					</Button>
-
-					<Button
-						onPress={handleImportWorkspace}
-						isDisabled={!workspacePath}
-					>
-						<FolderUp className="mr-2 size-4" />
-						Import Workspace
+					<Button variant="outline" slot="close">Cancel</Button>
+					<Button onPress={handleImportWorkspace} isDisabled={!workspacePath}>
+						<FolderUp className="size-4" />
+						Import workspace
 					</Button>
 				</DialogFooter>
 			</Dialog>

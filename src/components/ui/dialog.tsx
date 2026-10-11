@@ -81,7 +81,7 @@ function Dialog({
 			<ModalPrimitive
 				data-slot="dialog-content"
 				className={cn(
-					"fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-none bg-popover p-6 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 outline-none data-entering:animate-in data-entering:fade-in-0 data-entering:zoom-in-95 data-exiting:animate-out data-exiting:fade-out-0 data-exiting:zoom-out-95 sm:max-w-md",
+					"fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-none bg-popover p-6 text-sm text-popover-foreground border shadow-lg duration-100 outline-none data-entering:animate-in data-entering:fade-in-0 data-entering:zoom-in-95 data-exiting:animate-out data-exiting:fade-out-0 data-exiting:zoom-out-95 sm:max-w-md",
 					className,
 				)}
 			>
@@ -153,7 +153,7 @@ function DialogTitle({
 			slot="title"
 			data-slot="dialog-title"
 			className={cn(
-				"font-heading text-lg leading-none font-semibold",
+				"font-heading text-xl leading-none font-semibold",
 				className,
 			)}
 			{...props}
@@ -178,7 +178,23 @@ function DialogDescription({
 	);
 }
 
+// The top of a dialog: an icon tile, the title and one line saying what the dialog does
+function DialogHeading({ icon, title, description }: { icon: React.ReactNode; title: string; description: React.ReactNode }) {
+	return (
+		<DialogHeader>
+			<div className="flex items-start gap-4">
+				<span className="flex size-11 shrink-0 items-center justify-center bg-primary/10 text-primary">{icon}</span>
+				<div className="min-w-0">
+					<DialogTitle>{title}</DialogTitle>
+					<DialogDescription className="mt-1.5">{description}</DialogDescription>
+				</div>
+			</div>
+		</DialogHeader>
+	);
+}
+
 export {
+	DialogHeading,
 	type DialogPrimitiveProps,
 	type DialogTriggerPrimitiveProps,
 	Dialog,

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { Folder, FolderOpen, FolderPlus } from "@/components/animate-icons";
+import { FolderOpen, FolderPlus } from "@/components/animate-icons";
 
 // Components
 import { Button } from "@/components/ui/button";
@@ -15,9 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
 	Dialog,
 	DialogTrigger,
-	DialogHeader,
-	DialogTitle,
-	DialogDescription,
+	DialogHeading,
 	DialogFooter,
 } from "@/components/ui/dialog";
 
@@ -51,7 +49,7 @@ export default function CreateWorkspaceDialog({
 	// Default storage location to user Documents directory
 	useEffect(() => {
 		documentDir()
-			.then((dir) => setWorkspacePath(dir))
+			.then((dir) => setWorkspacePath(dir ?? ""))
 			.catch((err) => {
 				console.error("Failed to resolve Documents directory:", err);
 				setError(
@@ -107,115 +105,51 @@ export default function CreateWorkspaceDialog({
 			{children}
 
 			{/* Dialog */}
-			<Dialog className="sm:max-w-2xl">
-				{/* Header */}
-				<DialogHeader>
-					<DialogTitle>Create Workspace</DialogTitle>
+			<Dialog className="sm:max-w-3xl">
+				<DialogHeading icon={<FolderPlus className="size-6" />} title="Create a workspace" description="A workspace is a folder on this computer. Notes, tasks and code live in it as plain files." />
 
-					<DialogDescription>
-						Create a new workspace for your projects. Everything is saved on your computer.
-					</DialogDescription>
-				</DialogHeader>
-
-				{/* Body */}
-				<div className="grid gap-8 py-4 md:grid-cols-[2fr_1fr]">
-					{/* Left Column */}
-					<div className="space-y-6">
-						<div className="space-y-2">
-							<Label htmlFor="workspace-name">
-								Workspace Name
-							</Label>
-
-							<div className="border">
-								<Input
-									id="workspace-name"
-									autoComplete="off"
-									placeholder="e.g. MSc Research"
-									className="pl-2"
-									value={workspaceName}
-									onChange={(e) =>
-										setWorkspaceName(e.target.value)
-									}
-								/>
-							</div>
+				<div className="grid gap-8 md:grid-cols-[3fr_2fr]">
+					<div className="flex flex-col gap-5">
+						<div className="flex flex-col gap-2">
+							<Label htmlFor="workspace-name">Name</Label>
+							<Input id="workspace-name" autoComplete="off" autoFocus placeholder="MSc research" value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} />
 						</div>
 
-						<div className="space-y-2">
-							<Label htmlFor="description">Description</Label>
-
-							<div className="border">
-								<Textarea
-									id="description"
-									autoComplete="off"
-									placeholder="Optional description..."
-									className="pl-2"
-									value={description}
-									onChange={(e) =>
-										setDescription(e.target.value)
-									}
-								/>
-							</div>
+						<div className="flex flex-col gap-2">
+							<Label htmlFor="description">Description <span className="font-normal text-muted-foreground">(optional)</span></Label>
+							<Textarea id="description" autoComplete="off" placeholder="What is this workspace for?" value={description} onChange={(e) => setDescription(e.target.value)} />
 						</div>
 
-						<div className="space-y-2">
-							<Label>Storage Location</Label>
-
-							<div className="flex gap-2 border">
-								<Input
-									readOnly
-									value={workspacePath}
-									className="border-0 pl-2"
-								/>
-								<Button variant="outline" onPress={pickFolder}>
+						<div className="flex flex-col gap-2">
+							<Label htmlFor="workspace-location">Save in</Label>
+							<div className="flex gap-2">
+								<Input id="workspace-location" readOnly value={workspacePath} className="font-mono text-xs" />
+								<Button variant="outline" onPress={pickFolder} aria-label="Choose a folder">
 									<FolderOpen className="size-4" />
+									Browse
 								</Button>
 							</div>
 						</div>
 					</div>
 
-					{/* Right Column */}
-					<div className="border bg-muted/40 p-4">
-						<h3 className="mb-4 font-semibold">
-							Workspace Preview
-						</h3>
-
-						<div className="flex flex-col items-center gap-4">
-							<div className="grid h-20 w-20 place-items-center rounded-none bg-primary">
-								<Folder className="size-8" />
-							</div>
-
-							<div className="text-center">
-								<p className="font-medium">
-									{workspaceName || "Workspace Name"}
-								</p>
-
-								<p className="text-sm text-muted-foreground">
-									{description || "Local Workspace"}
-								</p>
-							</div>
+					{/* The card as it will appear on the Welcome screen */}
+					<div className="flex flex-col gap-3">
+						<span className="font-mono text-sm text-muted-foreground">preview</span>
+						<div className="flex min-h-44 flex-col gap-3 border border-primary bg-card p-6">
+							<span className="text-xl font-semibold">{workspaceName.trim() || "Workspace name"}</span>
+							<span className="line-clamp-2 text-muted-foreground">{description.trim() || "No description yet."}</span>
+							<span className="mt-auto truncate font-mono text-xs text-muted-foreground">{workspacePath.replace(/[\\/]+$/, "")}/{workspaceName.trim() || "…"}</span>
 						</div>
 					</div>
 				</div>
 
 				{error && <p className="text-sm text-destructive">{error}</p>}
 
-				{/* Footer */}
 				<DialogFooter>
-					<Button
-						variant="outline"
-						slot="close"
-						className="cursor-pointer hover:scale-[1.02] hover:border-primary"
-					>
-						Cancel
-					</Button>
-
-					<Button
-						onPress={handleCreateWorkspace}
-						isDisabled={!canCreate}
-						className="cursor-pointer hover:scale-[1.02] hover:border-primary"
-					>
-						<FolderPlus className="mr-2 size-4" />
-						Create Workspace
+					<Button variant="outline" slot="close">Cancel</Button>
+					<Button onPress={handleCreateWorkspace} isDisabled={!canCreate}>
+						<FolderPlus className="size-4" />
+						Create workspace
 					</Button>
 				</DialogFooter>
 			</Dialog>
