@@ -4,13 +4,13 @@ import { useNavigate } from "react-router-dom";
 
 // Icons
 import { Loader2 } from "lucide-react";
-import { ChevronRight, RefreshCw, Trash2, File, FilePlus, FolderInput, FolderOpen, History, Pencil } from "@/components/animate-icons";
+import { ChevronRight, RefreshCw, Trash2, File, FilePlus, FolderInput, FolderOpen, History, Pencil, Plus } from "@/components/animate-icons";
 
 // Components
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -525,15 +525,9 @@ export default function WorkspaceFiles() {
 			>
 				{nameDialog && (
 					<>
-						<DialogHeader>
-							<DialogTitle>
-								{nameDialog.mode === "create" ?
+						<DialogHeading icon={nameDialog.mode === "create" ? <Plus className="size-6" /> : <Pencil className="size-6" />} title={nameDialog.mode === "create" ?
 									`New ${nameDialog.kind === "file" ? "File" : "Folder"}`
-								:	`Rename ${nameDialog.item?.is_dir ? "Folder" : "File"}`
-								}
-							</DialogTitle>
-							<DialogDescription>
-								{nameDialog.mode === "create" ?
+								:	`Rename ${nameDialog.item?.is_dir ? "Folder" : "File"}`} description={<>{nameDialog.mode === "create" ?
 									`Create a new ${
 										nameDialog.kind === "file" ?
 											"file"
@@ -544,9 +538,7 @@ export default function WorkspaceFiles() {
 										:	"/"
 									}.`
 								:	`Enter a new name for ${nameDialog.item?.name}.`
-								}
-							</DialogDescription>
-						</DialogHeader>
+								}</>} />
 
 						<form
 							onSubmit={(e) => {
@@ -622,21 +614,14 @@ export default function WorkspaceFiles() {
 			>
 				{deleteItem && (
 					<>
-						<DialogHeader>
-							<DialogTitle>
-								Delete {deleteItem.is_dir ? "Folder" : "File"}
-							</DialogTitle>
-							<DialogDescription>
-								Move{" "}
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title={`Delete ${deleteItem.is_dir ? "Folder" : "File"}`} description={<>Move{" "}
 								<span className="font-semibold text-foreground">
 									{deleteItem.name}
 									{deleteItem.is_dir && "/"}
 								</span>
 								{" "}to the Trash?
 								{deleteItem.is_dir && " Everything inside it moves too."} You can
-								restore it from there.
-							</DialogDescription>
-						</DialogHeader>
+								restore it from there.</>} />
 
 						<DialogFooter>
 							<DialogClose variant="outline">Cancel</DialogClose>

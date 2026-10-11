@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Crown } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { errorText } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
 
@@ -28,17 +28,9 @@ export default function HostHandoffDialog() {
 	return (
 		<Dialog isOpen isDismissable={false} showCloseButton={false} onOpenChange={() => {}}>
 			<div className="space-y-4">
-				<DialogHeader>
-					<div className="flex items-center gap-2">
-						<Crown className="size-5 text-warning" />
-						<DialogTitle>Become the Host?</DialogTitle>
-					</div>
-					<DialogDescription>
-						{handoffOffer.hostName} wants to make you the Owner and host of this workspace. Collaborators will
+				<DialogHeading icon={<Crown className="size-6" />} tone="warning" title="Become the Host?" description={<>{handoffOffer.hostName} wants to make you the Owner and host of this workspace. Collaborators will
 						reconnect to this device, so keep Nexsync open while they work. {handoffOffer.hostName} stays on as an
-						Admin.
-					</DialogDescription>
-				</DialogHeader>
+						Admin.</>} />
 				{error && <p className="text-xs text-destructive">{error}</p>}
 				<DialogFooter>
 					<Button variant="outline" isDisabled={busy} onPress={declineHandoff}>

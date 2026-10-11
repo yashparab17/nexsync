@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Trash2, Play, Square } from "@/components/animate-icons";
+import { Trash2, Play, Square, AlertTriangle } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { extensionOf } from "@/lib/editor/languages";
 import { killRun, onRunExit, onRunOutput, runCommand } from "@/lib/tauri";
@@ -173,13 +173,8 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 			{confirming && (
 				<Dialog isOpen onOpenChange={setConfirming}>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Run a command on this device?</DialogTitle>
-							<DialogDescription>
-								The command runs with your permissions and can change files on this computer. Files from
-								collaborators can contain code too, so run only what you trust.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Run a command on this device?" description={<>The command runs with your permissions and can change files on this computer. Files from
+								collaborators can contain code too, so run only what you trust.</>} />
 						<p className="break-all border bg-muted/30 p-2 font-mono text-xs">{command}</p>
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setConfirming(false)}>

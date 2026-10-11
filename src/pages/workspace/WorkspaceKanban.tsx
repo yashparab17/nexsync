@@ -4,7 +4,7 @@ import { ArrowLeft, Plus, Trash2, AlertTriangle, ArrowRight, CheckSquare, Column
 import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import EraseOption from "@/components/elements/EraseOption";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -783,12 +783,7 @@ export default function WorkspaceKanban() {
 					className="max-w-md"
 				>
 					<form onSubmit={handleCreateColumnSubmit} className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Add a column</DialogTitle>
-							<DialogDescription>
-								Create a new status column for organizing workspace cards.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Plus className="size-6" />} title="Add a column" description={<>Create a new status column for organizing workspace cards.</>} />
 
 						<div>
 							<Label htmlFor="col-title">Column Title *</Label>
@@ -831,12 +826,7 @@ export default function WorkspaceKanban() {
 					className="max-h-[90vh] max-w-md overflow-y-auto"
 				>
 					<form onSubmit={handleCreateCardSubmit} className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Add a card</DialogTitle>
-							<DialogDescription>
-								Add a card to this column.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Plus className="size-6" />} title="Add a card" description={<>Add a card to this column.</>} />
 
 						<div className="space-y-3">
 							<div>
@@ -891,12 +881,7 @@ export default function WorkspaceKanban() {
 					className="max-h-[90vh] max-w-md overflow-y-auto"
 				>
 					<form onSubmit={handleEditCardSubmit} className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Edit card</DialogTitle>
-							<DialogDescription>
-								Update this card's details.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Pencil className="size-6" />} title="Edit card" description={<>Update this card's details.</>} />
 
 						<div className="space-y-3">
 							<div>
@@ -960,13 +945,8 @@ export default function WorkspaceKanban() {
 					onOpenChange={(open) => !open && setDeletingColId(null)}
 				>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Delete column</DialogTitle>
-							<DialogDescription>
-								Are you sure you want to delete this column and all of its
-								cards? This action cannot be undone.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete column" description={<>Are you sure you want to delete this column and all of its
+								cards? This action cannot be undone.</>} />
 
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setDeletingColId(null)}>
@@ -992,12 +972,7 @@ export default function WorkspaceKanban() {
 					}}
 				>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Delete card</DialogTitle>
-							<DialogDescription>
-								Are you sure you want to delete this card?
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete card" description={<>Are you sure you want to delete this card?</>} />
 						<EraseOption checked={eraseCard} onChange={setEraseCard} what="the card" />
 
 						<DialogFooter>

@@ -1,12 +1,12 @@
 import PageHeader from "@/components/layout/PageHeader";
 import { useCallback, useEffect, useState } from "react";
-import { UsersRound, Code2, Terminal, X } from "@/components/animate-icons";
+import { UsersRound, Code2, Terminal, X, AlertTriangle, Pencil, Plus, Trash2 } from "@/components/animate-icons";
 
 import CodeTab from "@/components/elements/editor/CodeTab";
 import FileExplorer from "@/components/elements/editor/FileExplorer";
 import RunPanel from "@/components/elements/editor/RunPanel";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { exportFolders } from "@/lib/export";
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -332,10 +332,7 @@ export default function WorkspaceEditor() {
 							void createItem();
 						}}
 					>
-						<DialogHeader>
-							<DialogTitle>New {newItem.kind === "file" ? "File" : "Folder"}</DialogTitle>
-							<DialogDescription>Created in /{newItem.dir}/</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Plus className="size-6" />} title={`New ${newItem.kind === "file" ? "File" : "Folder"}`} description={<>Created in /{newItem.dir}/</>} />
 						<Input
 							value={newItem.value}
 							onChange={(e) => setNewItem({ ...newItem, value: e.target.value })}
@@ -362,10 +359,7 @@ export default function WorkspaceEditor() {
 							void renameItem();
 						}}
 					>
-						<DialogHeader>
-							<DialogTitle>Rename {renaming.entry.is_dir ? "Folder" : "File"}</DialogTitle>
-							<DialogDescription>{toRel(renaming.entry.path)}</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Pencil className="size-6" />} title={`Rename ${renaming.entry.is_dir ? "Folder" : "File"}`} description={<>{toRel(renaming.entry.path)}</>} />
 						<Input
 							value={renaming.value}
 							onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
@@ -386,13 +380,8 @@ export default function WorkspaceEditor() {
 			{closing && (
 				<Dialog isOpen onOpenChange={(open) => !open && setClosing(null)}>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Unsaved changes</DialogTitle>
-							<DialogDescription>
-								<span className="font-semibold text-foreground">{closing.split("/").pop()}</span> has changes that are
-								not saved to the file. Close it anyway?
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Unsaved changes" description={<><span className="font-semibold text-foreground">{closing.split("/").pop()}</span> has changes that are
+								not saved to the file. Close it anyway?</>} />
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setClosing(null)}>
 								Keep open
@@ -408,13 +397,8 @@ export default function WorkspaceEditor() {
 			{deleting && (
 				<Dialog isOpen onOpenChange={(open) => !open && setDeleting(null)}>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Delete {deleting.is_dir ? "Folder" : "File"}</DialogTitle>
-							<DialogDescription>
-								Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can
-								restore it from there.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title={`Delete ${deleting.is_dir ? "Folder" : "File"}`} description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can
+								restore it from there.</>} />
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setDeleting(null)}>
 								Cancel

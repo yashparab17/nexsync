@@ -4,7 +4,7 @@ import { Trash2, FileText, Folder, RotateCcw } from "@/components/animate-icons"
 
 import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { emptyTrash, eraseFileForGood, listTrash, purgeTrashItem, restoreTrashItem } from "@/lib/tauri";
@@ -147,15 +147,10 @@ export default function WorkspaceTrash() {
 					}}
 				>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Delete permanently</DialogTitle>
-							<DialogDescription>
-								{confirm === "all"
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete permanently" description={<>{confirm === "all"
 									? "Everything in the trash will be removed for good."
 									: `${confirm.relPath} will be removed for good.`}{" "}
-								This cannot be undone.
-							</DialogDescription>
-						</DialogHeader>
+								This cannot be undone.</>} />
 						{confirm !== "all" && <EraseOption checked={erase} onChange={setErase} what={confirm.relPath} />}
 						<DialogFooter>
 							<Button

@@ -64,7 +64,7 @@ export function SectionCard({
 }: {
 	id: string;
 	title: string;
-	description: string;
+	description: ReactNode;
 	icon: ReactNode;
 	children: ReactNode;
 	className?: string;
@@ -96,8 +96,8 @@ export function SectionNav({ label, sections }: { label: string; sections: { id:
 		const observer = new IntersectionObserver(
 			(entries) => {
 				for (const e of entries) (e.isIntersecting ? seen.add(e.target.id) : seen.delete(e.target.id));
-				const first = sections.find((s) => seen.has(s.id));
-				if (first) setActive(first.id);
+				const current = sections.filter((s) => seen.has(s.id)).pop();
+				if (current) setActive(current.id);
 			},
 			{ rootMargin: "-10% 0px -65% 0px" },
 		);

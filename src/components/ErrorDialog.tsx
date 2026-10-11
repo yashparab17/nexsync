@@ -1,4 +1,5 @@
 // React
+import { AlertTriangle } from "@/components/animate-icons";
 import { useEffect } from "react";
 
 // React Router
@@ -6,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 
 // Components
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -55,10 +56,7 @@ export default function ErrorDialog() {
 				if (!open) handleDismiss();
 			}}
 		>
-			<DialogHeader>
-				<DialogTitle>{title}</DialogTitle>
-				<DialogDescription>{message}</DialogDescription>
-			</DialogHeader>
+			<DialogHeading icon={<AlertTriangle className="size-6" />} tone="danger" title={title} description={<>{message}</>} />
 
 			<DialogFooter>
 				<Button variant="outline" onPress={handleDismiss}>

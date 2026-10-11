@@ -4,7 +4,7 @@ import { Copy, Check, Search, Trash2, FileText, Film, Headphones, Image as Image
 import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -764,15 +764,10 @@ export default function WorkspaceAssets() {
 					className="max-w-sm p-5 bg-card border-border"
 				>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Rename asset</DialogTitle>
-							<DialogDescription>
-								Provide a new name for{" "}
+						<DialogHeading icon={<Pencil className="size-6" />} title="Rename asset" description={<>Provide a new name for{" "}
 								<span className="font-semibold text-foreground">
 									{assetToRename.name}
-								</span>
-							</DialogDescription>
-						</DialogHeader>
+								</span></>} />
 
 						<div className="space-y-3 my-2">
 							<Label htmlFor="rename-input">New file Name</Label>
@@ -811,16 +806,11 @@ export default function WorkspaceAssets() {
 					className="max-w-sm p-5 bg-card border-border"
 				>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Delete asset</DialogTitle>
-							<DialogDescription>
-								Move{" "}
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete asset" description={<>Move{" "}
 								<span className="font-semibold text-foreground">
 									{assetToDelete.name}
 								</span>{" "}
-								to the Trash? You can restore it from there.
-							</DialogDescription>
-						</DialogHeader>
+								to the Trash? You can restore it from there.</>} />
 
 						<DialogFooter className="gap-2">
 							<Button

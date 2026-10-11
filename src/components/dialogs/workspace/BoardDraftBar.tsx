@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { GitBranch } from "@/components/animate-icons";
+import { GitBranch, GitMerge } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { discardBoardDraft, getKanban, listBoardDrafts, mergeBoardDraft, previewBoardDraft, startBoardDraft } from "@/lib/tauri";
 import { errorText } from "@/lib/utils";
@@ -120,13 +120,8 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 			{choosing && (
 				<Dialog isOpen onOpenChange={(open) => !open && setChoosing(false)} className="sm:max-w-lg">
 					<div className="flex flex-col gap-4">
-						<DialogHeader>
-							<DialogTitle>Try a reorganisation</DialogTitle>
-							<DialogDescription>
-								Move cards between lists and reorder them without changing the real board. When it looks right, review what it would change and merge it. Nothing reaches your collaborators until then,
-								and anything they change meanwhile is kept.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<GitBranch className="size-6" />} title="Try a reorganisation" description={<>Move cards between lists and reorder them without changing the real board. When it looks right, review what it would change and merge it. Nothing reaches your collaborators until then,
+								and anything they change meanwhile is kept.</>} />
 						{error && (
 							<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
 								{error}
@@ -178,10 +173,7 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 			{reviewing && board && (
 				<Dialog isOpen onOpenChange={(open) => !open && setReviewing(null)} className="sm:max-w-xl">
 					<div className="flex max-h-[75vh] min-h-0 flex-col gap-4">
-						<DialogHeader>
-							<DialogTitle>Merge {board.name}?</DialogTitle>
-							<DialogDescription>This is what merging would change on the real board. All of it is merged together, or none of it.</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<GitMerge className="size-6" />} title={`Merge ${board.name}?`} description={<>This is what merging would change on the real board. All of it is merged together, or none of it.</>} />
 						{error && (
 							<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
 								{error}

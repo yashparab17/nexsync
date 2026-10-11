@@ -4,13 +4,13 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { APP_VERSION } from "@/lib/version";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Loader2 } from "lucide-react";
-import { Check, Moon, Plus, Sun, Trash2, Bug, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, ShieldCheck, Undo2, User, X } from "@/components/animate-icons";
+import { Check, Moon, Plus, Sun, Trash2, Bug, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, Undo2, User, X, AlertTriangle } from "@/components/animate-icons";
 
 import { Row, Segmented, SectionCard, SectionNav } from "@/components/elements/SettingsParts";
 import Avatar from "@/components/elements/Avatar";
 import ErrorLogCard from "@/components/elements/ErrorLogCard";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAppUpdater } from "@/hooks/useAppUpdater";
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -205,7 +205,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						id="profile"
 						title="Profile"
 						description="How collaborators see you when you join a workspace."
-						icon={<User className="size-4 text-primary" />}
+						icon={<User className="size-5" />}
 					>
 						<div className="flex items-center gap-4">
 							<Avatar name={name} className="size-12 text-lg" />
@@ -232,7 +232,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						id="network"
 						title="Network"
 						description="Only needed if your network allows web traffic through a proxy and nothing else."
-						icon={<Globe className="size-4 text-primary" />}
+						icon={<Globe className="size-5" />}
 					>
 						<div className="space-y-1">
 							<Input
@@ -261,7 +261,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						id="appearance"
 						title="Appearance"
 						description="The theme is applied at once and remembered on this device."
-						icon={<Palette className="size-4 text-primary" />}
+						icon={<Palette className="size-5" />}
 					>
 						<Row title="Theme" hint="System follows your operating system, including when it switches at night.">
 							<Segmented<ThemePreference>
@@ -281,7 +281,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						id="editor"
 						title="Editor"
 						description="How code and Markdown look in the Editor and Notes tabs. Applied at once to open files."
-						icon={<Code2 className="size-4 text-primary" />}
+						icon={<Code2 className="size-5" />}
 					>
 						<Row title="Font size" hint={`${FONT_SIZE_RANGE.min} to ${FONT_SIZE_RANGE.max} px`}>
 							<Button
@@ -349,7 +349,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						id="storage"
 						title="Storage"
 						description="Workspaces can only be created or imported inside these folders. This keeps Nexsync away from the rest of your disk."
-						icon={<ShieldCheck className="size-4 text-success" />}
+						icon={<HardDrive className="size-5" />}
 					>
 						{saved === null && !loadError ? (
 							<Loading />
@@ -419,7 +419,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						id="updates"
 						title="Updates & About"
 						description="Nexsync keeps your work on your own computer: no account, no cloud, and no server holding your data."
-						icon={<DownloadCloud className="size-4 text-primary" />}
+						icon={<DownloadCloud className="size-5" />}
 					>
 						<Row title="Version" hint="Notes, tasks and code, shared directly between your devices.">
 							<span className="text-sm font-semibold tabular-nums">{version ? `v${version}` : "…"}</span>
@@ -522,10 +522,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 			{leaving && (
 				<Dialog isOpen onOpenChange={(isOpen) => !isOpen && setLeaving(false)}>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Leave without saving?</DialogTitle>
-							<DialogDescription>Your changes to the profile or storage folders will be lost.</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Leave without saving?" description={<>Your changes to the profile or storage folders will be lost.</>} />
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setLeaving(false)}>
 								Keep editing

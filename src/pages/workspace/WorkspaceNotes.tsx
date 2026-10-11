@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, LayoutGrid, Network } from "@/components/animate-icons";
+import { Plus, Search, LayoutGrid, Network, Trash2 } from "@/components/animate-icons";
 
 import NoteEditor from "@/components/elements/editor/NoteEditor";
 import NoteBoard from "@/components/elements/notes/NoteBoard";
 import NoteGraph from "@/components/elements/notes/NoteGraph";
 import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
 import { useCollabDoc } from "@/hooks/useCollabDoc";
@@ -348,10 +348,7 @@ export default function WorkspaceNotes() {
 			{isNewOpen && (
 				<Dialog isOpen={isNewOpen} onOpenChange={setIsNewOpen} className="max-w-md">
 					<form onSubmit={handleCreate} className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>New note</DialogTitle>
-							<DialogDescription>A rich-text note with headings and lists. For a Markdown file, make it in the Editor.</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Plus className="size-6" />} title="New note" description={<>A rich-text note with headings and lists. For a Markdown file, make it in the Editor.</>} />
 						<Input required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Architecture Overview, Meeting Notes" autoFocus />
 						<DialogFooter>
 							<Button type="button" variant="outline" onPress={() => setIsNewOpen(false)} isDisabled={submitting}>
@@ -368,12 +365,7 @@ export default function WorkspaceNotes() {
 			{deleting && (
 				<Dialog isOpen onOpenChange={(open) => !open && setDeleting(null)}>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Delete note</DialogTitle>
-							<DialogDescription>
-								Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can restore it from there.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete note" description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can restore it from there.</>} />
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setDeleting(null)}>
 								Cancel

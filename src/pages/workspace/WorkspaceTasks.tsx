@@ -4,7 +4,7 @@ import { Plus, Search, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleC
 import PageHeader from "@/components/layout/PageHeader";
 import { Segmented } from "@/components/elements/SettingsParts";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -643,12 +643,7 @@ export default function WorkspaceTasks() {
 					className="max-w-lg"
 				>
 					<form onSubmit={handleCreateSubmit} className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>New task</DialogTitle>
-							<DialogDescription>
-								Add a task to this workspace.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Plus className="size-6" />} title="New task" description={<>Add a task to this workspace.</>} />
 
 						<div className="space-y-3">
 							<div>
@@ -745,12 +740,7 @@ export default function WorkspaceTasks() {
 					className="max-w-lg"
 				>
 					<form onSubmit={handleEditSubmit} className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Edit task</DialogTitle>
-							<DialogDescription>
-								Update this task's details.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Pencil className="size-6" />} title="Edit task" description={<>Update this task's details.</>} />
 
 						<div className="space-y-3">
 							<div>
@@ -861,13 +851,8 @@ export default function WorkspaceTasks() {
 					}}
 				>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Delete task</DialogTitle>
-							<DialogDescription>
-								Are you sure you want to delete this task? This action cannot be
-								undone.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete task" description={<>Are you sure you want to delete this task? This action cannot be
+								undone.</>} />
 						<EraseOption checked={eraseTask} onChange={setEraseTask} what="the task" />
 
 						<DialogFooter>

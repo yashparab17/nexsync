@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, Trash2, Crown, KeyRound, Pencil, Shield, ShieldCheck, UserCheck, UserPlus } from "@/components/animate-icons";
+import { Activity, Trash2, Crown, KeyRound, Pencil, Shield, ShieldCheck, UserCheck, UserPlus, Plus } from "@/components/animate-icons";
 
 import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import Avatar from "@/components/elements/Avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -520,12 +520,7 @@ export default function WorkspaceMembers() {
 					className="max-w-md"
 				>
 					<form onSubmit={handleAddMemberSubmit} className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Add member</DialogTitle>
-							<DialogDescription>
-								Add a collaborator to this workspace.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Plus className="size-6" />} title="Add member" description={<>Add a collaborator to this workspace.</>} />
 
 						<div className="space-y-3">
 							<div>
@@ -584,16 +579,11 @@ export default function WorkspaceMembers() {
 					className="max-w-md"
 				>
 					<form onSubmit={handleEditRoleSubmit} className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Edit member</DialogTitle>
-							<DialogDescription>
-								Update the name and permissions for{" "}
+						<DialogHeading icon={<Pencil className="size-6" />} title="Edit member" description={<>Update the name and permissions for{" "}
 								<span className="font-semibold text-foreground">
 									{editingMember.name}
 								</span>
-								.
-							</DialogDescription>
-						</DialogHeader>
+								.</>} />
 
 						{!isJoinedCopy && (
 						<div>
@@ -659,12 +649,7 @@ export default function WorkspaceMembers() {
 						}}
 						className="space-y-4"
 					>
-						<DialogHeader>
-							<DialogTitle>Change my name here</DialogTitle>
-							<DialogDescription>
-								This is the name others see in this workspace. It does not change the name you use elsewhere, and nobody else here can have the same one.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Pencil className="size-6" />} title="Change my name here" description={<>This is the name others see in this workspace. It does not change the name you use elsewhere, and nobody else here can have the same one.</>} />
 						<div>
 							<Label htmlFor="my-workspace-name">Name in this workspace</Label>
 							<Input
@@ -695,13 +680,8 @@ export default function WorkspaceMembers() {
 {hostTarget && (
 	<Dialog isOpen onOpenChange={(open) => !open && !handoffBusy && setHostTarget(null)}>
 		<div className="space-y-4">
-			<DialogHeader>
-				<DialogTitle>Make {hostTarget.name} the Host</DialogTitle>
-				<DialogDescription>
-					{hostTarget.name} becomes the Owner and hosts this workspace from their device. You stay as an
-					Admin, and everyone reconnects to them automatically. They have to accept first.
-				</DialogDescription>
-			</DialogHeader>
+			<DialogHeading icon={<Crown className="size-6" />} tone="warning" title={`Make ${hostTarget.name} the Host`} description={<>{hostTarget.name} becomes the Owner and hosts this workspace from their device. You stay as an
+					Admin, and everyone reconnects to them automatically. They have to accept first.</>} />
 			{handoffError && <p className="text-xs text-destructive">{handoffError}</p>}
 			<DialogFooter>
 				<Button variant="outline" isDisabled={handoffBusy} onPress={() => setHostTarget(null)}>
@@ -722,16 +702,11 @@ export default function WorkspaceMembers() {
 					onOpenChange={(open) => !open && setDeletingMember(null)}
 				>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Remove collaborator</DialogTitle>
-							<DialogDescription>
-								Are you sure you want to remove{" "}
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Remove collaborator" description={<>Are you sure you want to remove{" "}
 								<span className="font-semibold text-foreground">
 									{deletingMember.name}
 								</span>{" "}
-								from this workspace? They will be disconnected and cannot rejoin with an earlier invite or code.
-							</DialogDescription>
-						</DialogHeader>
+								from this workspace? They will be disconnected and cannot rejoin with an earlier invite or code.</>} />
 
 						<DialogFooter>
 							<Button
