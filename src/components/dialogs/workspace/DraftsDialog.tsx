@@ -7,7 +7,7 @@ import { Trash2, FilePen, GitMerge } from "@/components/animate-icons";
 
 import { fieldName } from "@/components/elements/ConflictPanel";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -148,16 +148,8 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 	return (
 		<Dialog isOpen onOpenChange={(isOpen) => !isOpen && onClose()} className="sm:max-w-2xl">
 			<div className="flex max-h-[75vh] min-h-0 flex-col gap-4 overflow-y-auto">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<FilePen className="size-4" />
-						Drafts of "{record.title}"
-					</DialogTitle>
-					<DialogDescription>
-						A draft is a private copy to change without touching the real {entity}. When it is ready, review what merging it would do, then merge it. Anything somebody else changed in the meantime is kept,
-						and a field you both changed is left for you to choose.
-					</DialogDescription>
-				</DialogHeader>
+				<DialogHeading icon={<FilePen className="size-6" />} title={`Drafts of "${record.title}"`} description={<>A draft is a private copy to change without touching the real {entity}. When it is ready, review what merging it would do, then merge it. Anything somebody else changed in the meantime is kept,
+						and a field you both changed is left for you to choose.</>} />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">

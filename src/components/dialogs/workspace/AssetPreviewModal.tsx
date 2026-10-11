@@ -3,12 +3,7 @@ import { Loader2 } from "lucide-react";
 import { Check, Copy, RefreshCw, Download, FileText, Film, Headphones, Image as ImageIcon, Maximize2, Minimize2, Sparkles, Volume2, X } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { readWorkspaceBinaryFile } from "@/lib/tauri";
 import { getMimeType, formatBytes } from "@/lib/utils";

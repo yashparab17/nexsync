@@ -2,13 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Trash2, Play, Square } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { extensionOf } from "@/lib/editor/languages";
 import { killRun, onRunExit, onRunOutput, runCommand } from "@/lib/tauri";

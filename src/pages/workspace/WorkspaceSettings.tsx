@@ -4,13 +4,7 @@ import { Loader2 } from "lucide-react";
 import { Moon, Radio, Sun, Trash2, AlertTriangle, Download, FolderOpen, Save, SlidersHorizontal, ShieldCheck, Undo2, User, X } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -165,7 +159,8 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 	};
 
 	return (
-		<div className={onClose ? "flex h-[85vh] gap-8 overflow-y-auto p-6" : "mx-auto flex max-w-5xl gap-8"}>
+		<div className={onClose ? "h-[85vh] overflow-y-auto" : undefined}>
+		<div className={onClose ? "flex gap-8 p-6" : "mx-auto flex max-w-5xl gap-8"}>
 			{/* Section list */}
 			<aside className="hidden w-44 shrink-0 md:block">
 				<SectionNav label="Workspace settings sections" sections={SECTIONS} />
@@ -348,7 +343,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 				</Dialog>
 			)}
 
-			{/* Remove Workspace Modal */}
+			{/* Remove workspace Modal */}
 			{isRemoveConfirmOpen && (
 				<Dialog
 					isOpen={isRemoveConfirmOpen}
@@ -356,7 +351,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 				>
 					<div className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Remove Workspace</DialogTitle>
+							<DialogTitle>Remove workspace</DialogTitle>
 							<DialogDescription>
 								Are you sure you want to remove{" "}
 								<span className="font-semibold text-foreground">
@@ -381,12 +376,12 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 				</Dialog>
 			)}
 
-			{/* Leave Workspace (guests) */}
+			{/* Leave workspace (guests) */}
 			{isLeaveOpen && (
 				<Dialog className="sm:max-w-xl" isOpen={isLeaveOpen} onOpenChange={(o) => !busy && setIsLeaveOpen(o)}>
 					<div className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Leave Workspace</DialogTitle>
+							<DialogTitle>Leave workspace</DialogTitle>
 							<DialogDescription>
 								You will disconnect from the host and this workspace will disappear from the app.
 								Choose what happens to your copy of the files.
@@ -408,12 +403,12 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 				</Dialog>
 			)}
 
-			{/* Delete Workspace (owner) */}
+			{/* Delete workspace (owner) */}
 			{isDeleteOpen && (
 				<Dialog isOpen={isDeleteOpen} onOpenChange={(o) => !busy && setIsDeleteOpen(o)}>
 					<div className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Delete Workspace</DialogTitle>
+							<DialogTitle>Delete workspace</DialogTitle>
 							<DialogDescription>
 								<span className="font-semibold text-foreground">{workspace?.name}</span> will be moved to
 								the recycle bin, so you can still restore it from there.
@@ -444,13 +439,14 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 								isDisabled={busy || confirmName.trim() !== workspace?.name}
 								onPress={() => runAction(true, true)}
 							>
-								{busy ? "Deleting…" : "Delete Workspace"}
+								{busy ? "Deleting…" : "Delete workspace"}
 							</Button>
 						</DialogFooter>
 					</div>
 				</Dialog>
 			)}
 			</div>
+		</div>
 		</div>
 	);
 }

@@ -3,13 +3,7 @@ import { Loader2 } from "lucide-react";
 import { Check, FileUp, UploadCloud, X } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 
 import { writeWorkspaceBinaryFile } from "@/lib/tauri";
 
@@ -107,19 +101,11 @@ export default function AssetUploadDialog({
 			className="max-w-lg p-6 bg-card border-border"
 		>
 			<div className="space-y-4">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<UploadCloud className="size-5 text-primary" />
-						Upload Workspace Assets
-					</DialogTitle>
-					<DialogDescription>
-						Import images, media, or documents directly into your local{" "}
+				<DialogHeading icon={<UploadCloud className="size-6" />} title="Upload assets" description={<>Import images, media, or documents directly into your local{" "}
 						<code className="bg-muted px-1.5 py-0.5 rounded-none text-xs font-mono text-foreground">
 							assets/
 						</code>{" "}
-						directory.
-					</DialogDescription>
-				</DialogHeader>
+						directory.</>} />
 
 				<div className="space-y-4 my-2">
 					{/* Drop Zone */}

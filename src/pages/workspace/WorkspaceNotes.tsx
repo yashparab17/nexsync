@@ -349,7 +349,7 @@ export default function WorkspaceNotes() {
 				<Dialog isOpen={isNewOpen} onOpenChange={setIsNewOpen} className="max-w-md">
 					<form onSubmit={handleCreate} className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>New Note</DialogTitle>
+							<DialogTitle>New note</DialogTitle>
 							<DialogDescription>A rich-text note with headings and lists. For a Markdown file, make it in the Editor.</DialogDescription>
 						</DialogHeader>
 						<Input required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Architecture Overview, Meeting Notes" autoFocus />
@@ -369,7 +369,7 @@ export default function WorkspaceNotes() {
 				<Dialog isOpen onOpenChange={(open) => !open && setDeleting(null)}>
 					<div className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Delete Note</DialogTitle>
+							<DialogTitle>Delete note</DialogTitle>
 							<DialogDescription>
 								Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can restore it from there.
 							</DialogDescription>

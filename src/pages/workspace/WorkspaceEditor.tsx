@@ -6,13 +6,7 @@ import CodeTab from "@/components/elements/editor/CodeTab";
 import FileExplorer from "@/components/elements/editor/FileExplorer";
 import RunPanel from "@/components/elements/editor/RunPanel";
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { exportFolders } from "@/lib/export";
 import { useErrorLog } from "@/hooks/useErrorLog";

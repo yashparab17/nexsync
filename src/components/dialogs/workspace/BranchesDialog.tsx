@@ -4,7 +4,7 @@ import { GitBranch, GitMerge } from "@/components/animate-icons";
 
 import { DiffView } from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { branchDocId, closeBranch, listBranches, mergeBranch, previewMerge, startBranch, MAX_BRANCH_NAME, type Branch } from "@/lib/branches";
 import { diffLines, type DiffResult } from "@/lib/diff";
@@ -105,16 +105,8 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 	return (
 		<Dialog isOpen onOpenChange={(open) => !open && onClose()} className="sm:max-w-3xl">
 			<div className="flex max-h-[75vh] min-h-0 flex-col gap-4">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<GitBranch className="size-4" />
-						Branches of {fileName}
-					</DialogTitle>
-					<DialogDescription>
-						A branch is a copy to work on without changing the file. When it is ready, review what it would change, then merge it in. Merging adds exactly what was written on the branch, so nothing a
-						collaborator wrote in the file meanwhile is lost.
-					</DialogDescription>
-				</DialogHeader>
+				<DialogHeading icon={<GitBranch className="size-6" />} title={`Branches of ${fileName}`} description={<>A branch is a copy to work on without changing the file. When it is ready, review what it would change, then merge it in. Merging adds exactly what was written on the branch, so nothing a
+						collaborator wrote in the file meanwhile is lost.</>} />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">

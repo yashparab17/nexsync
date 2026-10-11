@@ -2,12 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, Copy, Radio, RefreshCw, AlertTriangle, Globe, KeyRound, Lock, Sparkles, Unplug, Users, Wifi } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useP2P, describeSyncProgress } from "@/store/p2p/P2PContext";
@@ -182,21 +177,7 @@ export default function P2PConnectDialog({
 	return (
 		<Dialog isOpen={open} onOpenChange={onOpenChange} className="max-w-xl">
 			<div className="space-y-4">
-				<DialogHeader>
-					<div className="flex items-center gap-2">
-						<div className="flex h-9 w-9 items-center justify-center rounded-none bg-info/10 text-info border border-info/20">
-							<Radio className="h-5 w-5 animate-pulse" />
-						</div>
-						<div>
-							<DialogTitle className="text-lg">
-								Collaborate
-							</DialogTitle>
-							<DialogDescription className="text-xs">
-								Invite someone to work on this workspace with you, from any network.
-							</DialogDescription>
-						</div>
-					</div>
-				</DialogHeader>
+				<DialogHeading icon={<Radio className="size-6" />} title="Collaborate" description="Invite someone to work on this workspace with you, from any network." />
 
 					<div className="flex items-center gap-1.5 font-mono text-xs" role="status">
 						<span className={cn("h-2 w-2 rounded-none", statusDot)} />

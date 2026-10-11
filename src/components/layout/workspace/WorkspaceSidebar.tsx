@@ -1,5 +1,5 @@
 // React
-import { AnimateIcon, Code2, Files, FolderOpen, ListTodo, StickyNote } from "@/components/animate-icons";
+import { AnimateIcon, Code2, Files, FolderClose, ListTodo, StickyNote } from "@/components/animate-icons";
 import { useState, type ElementType } from "react";
 
 // React Router
@@ -58,7 +58,7 @@ const navigation: NavigationItem[] = [
 		name: "Assets",
 		label: "nav.assets",
 		path: "/workspace/assets",
-		icon: FolderOpen,
+		icon: FolderClose,
 	},
 	{
 		name: "Tasks",

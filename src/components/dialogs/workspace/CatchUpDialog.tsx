@@ -3,7 +3,7 @@ import { Check, ChevronRight, ChevronDown, History, ShieldCheck, Undo2 } from "@
 
 import { DiffView } from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { canRevertField, describe, groupByAuthor, previewText, revertValue, rowKey, rowsOf, textHunks, type Lookups } from "@/lib/catchup";
 import { diffLines } from "@/lib/diff";
 import { markCatchup, resolveCardConflict, resolveTaskConflict } from "@/lib/tauri";
@@ -123,16 +123,8 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 	return (
 		<Dialog isOpen onOpenChange={(open) => !open && onClose()} className="sm:max-w-3xl">
 			<div className="flex max-h-[75vh] min-h-0 flex-col gap-4">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<History className="size-4" />
-						Catch up
-					</DialogTitle>
-					<DialogDescription>
-						What other people changed, by who did it. Merging never loses anything, but it does not ask you either, so this is where you check it. Undoing a change is a new edit that reaches
-						everyone like any other.
-					</DialogDescription>
-				</DialogHeader>
+				<DialogHeading icon={<History className="size-6" />} title="Catch up" description={<>What other people changed, by who did it. Merging never loses anything, but it does not ask you either, so this is where you check it. Undoing a change is a new edit that reaches
+						everyone like any other.</>} />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">

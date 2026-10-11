@@ -1,13 +1,7 @@
 import { UserPlus } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useP2P } from "@/store/p2p/P2PContext";
 
 // Asks the host to allow or deny a guest who entered a 6-digit code

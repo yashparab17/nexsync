@@ -223,3 +223,24 @@
   --bn-colors-shadow: var(--border);
   --bn-font-family: var(--font-sans);
 }
+
+/* Native checkboxes and radios take the app accent in both themes */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: var(--primary);
+  width: 1.125rem;
+  height: 1.125rem;
+  cursor: pointer;
+}
+
+/* Native selects match the text fields */
+select {
+  background-color: var(--card);
+  color: inherit;
+  border: 1px solid var(--input);
+  padding-inline: 0.75rem;
+  outline: none;
+}
+select:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 30%, transparent);
+}

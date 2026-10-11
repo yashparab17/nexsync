@@ -10,13 +10,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Avatar from "@/components/elements/Avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -129,7 +123,7 @@ export default function WorkspaceMembers() {
 	const presenceOf = (m: Member) => (m.deviceId ? presence[m.deviceId] : isJoinedCopy && m.role === "Owner" && hostPeer ? presence[hostPeer.id] : undefined);
 
 
-	// Add Member directly
+	// Add member directly
 	const handleAddMemberSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!workspace?.path || !metadata || !newMemberName.trim()) return;
@@ -285,7 +279,7 @@ export default function WorkspaceMembers() {
 						className="gap-1.5"
 					>
 						<UserPlus className="size-4" />
-						Add Member
+						Add member
 					</Button>
 					</>
 				}
@@ -415,7 +409,7 @@ export default function WorkspaceMembers() {
 															setEditName(member.name);
 															setEditRole(member.role);
 														}}
-														aria-label="Edit Member"
+														aria-label="Edit member"
 													>
 														<Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
 													</Button>
@@ -518,7 +512,7 @@ export default function WorkspaceMembers() {
 				onOpenChange={setIsInviteOpen}
 			/>
 
-			{/* Add Member Dialog */}
+			{/* Add member Dialog */}
 			{isAddMemberOpen && (
 				<Dialog
 					isOpen={isAddMemberOpen}
@@ -527,7 +521,7 @@ export default function WorkspaceMembers() {
 				>
 					<form onSubmit={handleAddMemberSubmit} className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Add Member</DialogTitle>
+							<DialogTitle>Add member</DialogTitle>
 							<DialogDescription>
 								Add a collaborator to this workspace.
 							</DialogDescription>
@@ -575,7 +569,7 @@ export default function WorkspaceMembers() {
 								type="submit"
 								isDisabled={submitting || !newMemberName.trim()}
 							>
-								{submitting ? "Adding…" : "Add Member"}
+								{submitting ? "Adding…" : "Add member"}
 							</Button>
 						</DialogFooter>
 					</form>
@@ -591,7 +585,7 @@ export default function WorkspaceMembers() {
 				>
 					<form onSubmit={handleEditRoleSubmit} className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Edit Member</DialogTitle>
+							<DialogTitle>Edit member</DialogTitle>
 							<DialogDescription>
 								Update the name and permissions for{" "}
 								<span className="font-semibold text-foreground">
@@ -729,7 +723,7 @@ export default function WorkspaceMembers() {
 				>
 					<div className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Remove Collaborator</DialogTitle>
+							<DialogTitle>Remove collaborator</DialogTitle>
 							<DialogDescription>
 								Are you sure you want to remove{" "}
 								<span className="font-semibold text-foreground">

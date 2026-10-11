@@ -3,7 +3,7 @@ import { History, RotateCcw, Save } from "@/components/animate-icons";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { diffLines, type DiffResult, type DiffRow } from "@/lib/diff";
 import { isBinaryFile, isDocumentFile } from "@/lib/editor/languages";
@@ -202,15 +202,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 	return (
 		<Dialog isOpen onOpenChange={(open) => !open && onClose()} className="sm:max-w-5xl">
 			<div className="flex h-[70vh] min-h-0 flex-col gap-4">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<History className="size-4" />
-						History of {fileName}
-					</DialogTitle>
-					<DialogDescription>
-						Versions are kept on this device each time the file is saved, synced or imported{isText ? ", and automatically while you edit" : ""}.
-					</DialogDescription>
-				</DialogHeader>
+				<DialogHeading icon={<History className="size-6" />} title={`History of ${fileName}`} description={<>Versions are kept on this device each time the file is saved, synced or imported{isText ? ", and automatically while you edit" : ""}.</>} />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">

@@ -10,14 +10,7 @@ import { ChevronRight, RefreshCw, Trash2, File, FilePlus, FolderInput, FolderOpe
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogClose,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -373,7 +366,7 @@ export default function WorkspaceFiles() {
 								onPress={() => openCreateDialog("file")}
 							>
 								<FilePlus data-icon="inline-start" className="size-4" />
-								New File
+								New file
 							</Button>
 							<Button
 								variant="outline"
@@ -383,7 +376,7 @@ export default function WorkspaceFiles() {
 									data-icon="inline-start"
 									className="size-4"
 								/>
-								New Folder
+								New folder
 							</Button>
 						</>
 					)}

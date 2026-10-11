@@ -6,13 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 // Components
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";

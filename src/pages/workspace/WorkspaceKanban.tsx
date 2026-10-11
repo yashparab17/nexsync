@@ -4,13 +4,7 @@ import { ArrowLeft, Plus, Trash2, AlertTriangle, ArrowRight, CheckSquare, Column
 import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import EraseOption from "@/components/elements/EraseOption";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -162,7 +156,7 @@ export default function WorkspaceKanban() {
 		}
 	};
 
-	// Delete Column
+	// Delete column
 	const handleDeleteColumn = async () => {
 		if (isViewer || !workspace?.path || !deletingColId) return;
 		try {
@@ -371,7 +365,7 @@ export default function WorkspaceKanban() {
 		}
 	};
 
-	// Delete Card
+	// Delete card
 	const handleDeleteCard = async () => {
 		if (isViewer || !workspace?.path || !deletingCardId) return;
 		try {
@@ -505,7 +499,7 @@ export default function WorkspaceKanban() {
 							className="gap-1.5"
 						>
 							<Plus className="size-4" />
-							New Column
+							New column
 						</Button>
 					)}
 					</>
@@ -526,7 +520,7 @@ export default function WorkspaceKanban() {
 				</div>
 			)}
 
-			{/* Kanban Board Container */}
+			{/* Kanban Container */}
 			{loading ? (
 				<Loading fill className="flex-1" />
 			) : columns.length === 0 ? (
@@ -546,7 +540,7 @@ export default function WorkspaceKanban() {
 								className="gap-1"
 							>
 								<Plus className="size-4" />
-								New Column
+								New column
 							</Button>
 						</div>
 					)}
@@ -790,7 +784,7 @@ export default function WorkspaceKanban() {
 				>
 					<form onSubmit={handleCreateColumnSubmit} className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Add Kanban Column</DialogTitle>
+							<DialogTitle>Add a column</DialogTitle>
 							<DialogDescription>
 								Create a new status column for organizing workspace cards.
 							</DialogDescription>
@@ -838,7 +832,7 @@ export default function WorkspaceKanban() {
 				>
 					<form onSubmit={handleCreateCardSubmit} className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Add Kanban Card</DialogTitle>
+							<DialogTitle>Add a card</DialogTitle>
 							<DialogDescription>
 								Add a card to this column.
 							</DialogDescription>
@@ -898,7 +892,7 @@ export default function WorkspaceKanban() {
 				>
 					<form onSubmit={handleEditCardSubmit} className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Edit Kanban Card</DialogTitle>
+							<DialogTitle>Edit card</DialogTitle>
 							<DialogDescription>
 								Update this card's details.
 							</DialogDescription>
@@ -959,7 +953,7 @@ export default function WorkspaceKanban() {
 				</Dialog>
 			)}
 
-			{/* Delete Column Confirmation Modal */}
+			{/* Delete column Confirmation Modal */}
 			{deletingColId && (
 				<Dialog
 					isOpen={!!deletingColId}
@@ -967,7 +961,7 @@ export default function WorkspaceKanban() {
 				>
 					<div className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Delete Column</DialogTitle>
+							<DialogTitle>Delete column</DialogTitle>
 							<DialogDescription>
 								Are you sure you want to delete this column and all of its
 								cards? This action cannot be undone.
@@ -979,14 +973,14 @@ export default function WorkspaceKanban() {
 								Cancel
 							</Button>
 							<Button variant="destructive" onPress={handleDeleteColumn}>
-								Delete Column
+								Delete column
 							</Button>
 						</DialogFooter>
 					</div>
 				</Dialog>
 			)}
 
-			{/* Delete Card Confirmation Modal */}
+			{/* Delete card Confirmation Modal */}
 			{deletingCardId && (
 				<Dialog
 					isOpen={!!deletingCardId}
@@ -999,7 +993,7 @@ export default function WorkspaceKanban() {
 				>
 					<div className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Delete Card</DialogTitle>
+							<DialogTitle>Delete card</DialogTitle>
 							<DialogDescription>
 								Are you sure you want to delete this card?
 							</DialogDescription>
@@ -1017,7 +1011,7 @@ export default function WorkspaceKanban() {
 								Cancel
 							</Button>
 							<Button variant="destructive" onPress={handleDeleteCard}>
-								{eraseCard ? "Erase Card" : "Delete Card"}
+								{eraseCard ? "Erase Card" : "Delete card"}
 							</Button>
 						</DialogFooter>
 					</div>

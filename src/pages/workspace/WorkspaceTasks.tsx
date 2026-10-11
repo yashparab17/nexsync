@@ -4,13 +4,7 @@ import { Plus, Search, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleC
 import PageHeader from "@/components/layout/PageHeader";
 import { Segmented } from "@/components/elements/SettingsParts";
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -180,7 +174,7 @@ export default function WorkspaceTasks() {
 		if (task) handleOpenEdit(task);
 	}, !loading);
 
-	// Submit Create Task
+	// Submit Create task
 	const handleCreateSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (isViewer || !workspace?.path || !formTitle.trim()) return;
@@ -220,7 +214,7 @@ export default function WorkspaceTasks() {
 		}
 	};
 
-	// Submit Edit Task
+	// Submit Edit task
 	const handleEditSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (isViewer || !workspace?.path || !editingTask || !formTitle.trim()) return;
@@ -337,7 +331,7 @@ export default function WorkspaceTasks() {
 		}
 	};
 
-	// Delete Task
+	// Delete task
 	const handleDeleteTask = async () => {
 		if (isViewer || !workspace?.path || !deletingTaskId) return;
 		try {
@@ -506,7 +500,7 @@ export default function WorkspaceTasks() {
 								setTagFilter(null);
 							}}
 						>
-							Clear Filters
+							Clear filters
 						</Button>
 					) : (
 						!isViewer && (
@@ -516,7 +510,7 @@ export default function WorkspaceTasks() {
 								onPress={handleOpenCreate}
 							>
 								<Plus className="size-4" />
-								Create Task
+								Create task
 							</Button>
 						)
 					)}
@@ -621,7 +615,7 @@ export default function WorkspaceTasks() {
 											variant="ghost"
 											size="icon-xs"
 											onPress={() => handleOpenEdit(task)}
-											aria-label="Edit Task"
+											aria-label="Edit task"
 										>
 											<Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
 										</Button>
@@ -629,7 +623,7 @@ export default function WorkspaceTasks() {
 											variant="ghost"
 											size="icon-xs"
 											onPress={() => setDeletingTaskId(task.id)}
-											aria-label="Delete Task"
+											aria-label="Delete task"
 										>
 											<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
 										</Button>
@@ -641,7 +635,7 @@ export default function WorkspaceTasks() {
 				</div>
 			)}
 
-			{/* Create Task Modal */}
+			{/* Create task Modal */}
 			{isCreateOpen && (
 				<Dialog
 					isOpen={isCreateOpen}
@@ -650,7 +644,7 @@ export default function WorkspaceTasks() {
 				>
 					<form onSubmit={handleCreateSubmit} className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Create New Task</DialogTitle>
+							<DialogTitle>New task</DialogTitle>
 							<DialogDescription>
 								Add a task to this workspace.
 							</DialogDescription>
@@ -736,14 +730,14 @@ export default function WorkspaceTasks() {
 								type="submit"
 								isDisabled={formSubmitting || !formTitle.trim()}
 							>
-								{formSubmitting ? "Creating…" : "Create Task"}
+								{formSubmitting ? "Creating…" : "Create task"}
 							</Button>
 						</DialogFooter>
 					</form>
 				</Dialog>
 			)}
 
-			{/* Edit Task Modal */}
+			{/* Edit task Modal */}
 			{editingTask && (
 				<Dialog
 					isOpen={!!editingTask}
@@ -752,7 +746,7 @@ export default function WorkspaceTasks() {
 				>
 					<form onSubmit={handleEditSubmit} className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Edit Task</DialogTitle>
+							<DialogTitle>Edit task</DialogTitle>
 							<DialogDescription>
 								Update this task's details.
 							</DialogDescription>
@@ -868,7 +862,7 @@ export default function WorkspaceTasks() {
 				>
 					<div className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Delete Task</DialogTitle>
+							<DialogTitle>Delete task</DialogTitle>
 							<DialogDescription>
 								Are you sure you want to delete this task? This action cannot be
 								undone.
@@ -887,7 +881,7 @@ export default function WorkspaceTasks() {
 								Cancel
 							</Button>
 							<Button variant="destructive" onPress={handleDeleteTask}>
-								{eraseTask ? "Erase Task" : "Delete Task"}
+								{eraseTask ? "Erase Task" : "Delete task"}
 							</Button>
 						</DialogFooter>
 					</div>

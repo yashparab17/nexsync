@@ -2,13 +2,7 @@ import { useState } from "react";
 import { Trash2 } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLeaveWorkspace } from "@/hooks/useLeaveWorkspace";
 import { errorText } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";

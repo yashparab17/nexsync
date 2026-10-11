@@ -12,12 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import {
-	Dialog,
-	DialogTrigger,
-	DialogHeading,
-	DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogTrigger, DialogHeading, DialogFooter } from "@/components/ui/dialog";
 
 // Tauri API
 import { open } from "@tauri-apps/plugin-dialog";

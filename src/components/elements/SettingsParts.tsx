@@ -73,11 +73,13 @@ export function SectionCard({
 	return (
 		<Card id={id} className={cn("scroll-mt-8", className)}>
 			<CardHeader>
-				<CardTitle className={cn("flex items-center gap-2 text-base", titleClassName)}>
-					{icon}
-					{title}
-				</CardTitle>
-				<CardDescription>{description}</CardDescription>
+				<div className="flex items-start gap-4">
+					<span className={cn("flex size-10 shrink-0 items-center justify-center", titleClassName?.includes("destructive") ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary")}>{icon}</span>
+					<div className="min-w-0">
+						<CardTitle className={cn("text-lg", titleClassName)}>{title}</CardTitle>
+						<CardDescription className="mt-1">{description}</CardDescription>
+					</div>
+				</div>
 			</CardHeader>
 			<CardContent className="space-y-4">{children}</CardContent>
 		</Card>

@@ -4,13 +4,7 @@ import { Copy, Check, Search, Trash2, FileText, Film, Headphones, Image as Image
 import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -360,7 +354,7 @@ export default function WorkspaceAssets() {
 							className="gap-2 text-xs"
 						>
 							<Upload className="size-4" />
-							Upload Asset
+							Upload asset
 						</Button>
 					)}
 				</div>
@@ -771,7 +765,7 @@ export default function WorkspaceAssets() {
 				>
 					<div className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Rename Asset</DialogTitle>
+							<DialogTitle>Rename asset</DialogTitle>
 							<DialogDescription>
 								Provide a new name for{" "}
 								<span className="font-semibold text-foreground">
@@ -781,7 +775,7 @@ export default function WorkspaceAssets() {
 						</DialogHeader>
 
 						<div className="space-y-3 my-2">
-							<Label htmlFor="rename-input">New File Name</Label>
+							<Label htmlFor="rename-input">New file Name</Label>
 							<Input
 								id="rename-input"
 								value={newName}
@@ -818,7 +812,7 @@ export default function WorkspaceAssets() {
 				>
 					<div className="space-y-4">
 						<DialogHeader>
-							<DialogTitle>Delete Asset</DialogTitle>
+							<DialogTitle>Delete asset</DialogTitle>
 							<DialogDescription>
 								Move{" "}
 								<span className="font-semibold text-foreground">

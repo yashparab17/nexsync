@@ -55,6 +55,7 @@ import { UserXIcon as SrcUserXIcon } from './lu/user-x';
 import { WifiOffIcon as SrcWifiOffIcon } from './lu/wifi-off';
 import { Columns3 as LColumns3, Minimize2 as LMinimize2, Square as LSquare } from 'lucide-react';
 export { AnimateIcon } from './icon';
+export { FolderClose } from './folder-close';
 export { Activity } from './activity';
 export { ArrowLeft } from './arrow-left';
 export { ArrowRight } from './arrow-right';
