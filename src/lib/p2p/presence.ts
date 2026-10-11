@@ -3,7 +3,7 @@
 import type { ProbeResult } from "@/lib/p2p/transport";
 
 // Pages a person can be on; anything else a peer sends is ignored, since following sends this device there
-const PAGES = ["dashboard", "notes", "editor", "files", "assets", "tasks", "kanban", "insights", "members", "trash", "settings"] as const;
+const PAGES = ["dashboard", "notes", "editor", "explorer", "files", "assets", "tasks", "kanban", "insights", "members", "trash", "settings"] as const;
 
 export interface Presence {
 	page: string; // One of PAGES

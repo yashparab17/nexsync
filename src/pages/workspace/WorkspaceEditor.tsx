@@ -589,7 +589,7 @@ export default function WorkspaceEditor() {
 				)}
 
 				<div className="flex min-w-0 flex-1 flex-col">
-					<div className="flex shrink-0 items-stretch border-b bg-card/40">
+					<div className="flex h-10 shrink-0 items-stretch border-b bg-card/40">
 						<EditorTabs
 							tabs={tabs}
 							active={active}

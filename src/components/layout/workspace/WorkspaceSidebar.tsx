@@ -1,16 +1,18 @@
 // React
-import { AnimateIcon, Code2, Files, FolderClose, ListTodo, StickyNote } from "@/components/animate-icons";
-import { useState, type ElementType } from "react";
+import { AnimateIcon, Code2, Files, FolderClose, FolderTree, ListTodo, StickyNote } from "@/components/animate-icons";
+import { useCallback, useState, type ElementType } from "react";
 
 // React Router
 import { NavLink, useNavigate } from "react-router-dom";
 
 // Icons
-import { ArrowLeft, ChartColumn as BarChart3, SquareKanban as KanbanSquare, LayoutDashboard, ChevronLeft, ChevronRight, Trash2, UsersRound } from "@/components/animate-icons";
+import { ArrowLeft, ChartColumn as BarChart3, SquareKanban as KanbanSquare, LayoutDashboard, ChevronDown, ChevronLeft, ChevronRight, Trash2, UsersRound } from "@/components/animate-icons";
 
 // Components
 import { Button } from "@/components/ui/button";
 import { t, type MessageKey } from "@/i18n";
+import Splitter from "@/components/elements/Splitter";
+import { usePanelSize } from "@/hooks/usePanelSize";
 import { cn } from "@/lib/utils";
 import PresenceDots from "@/components/elements/PresenceDots";
 import { pageOf } from "@/lib/p2p/presence";
@@ -49,6 +51,12 @@ const navigation: NavigationItem[] = [
 		icon: Code2,
 	},
 	{
+		name: "Explorer",
+		label: "nav.explorer",
+		path: "/workspace/explorer",
+		icon: FolderTree,
+	},
+	{
 		name: "Files",
 		label: "nav.files",
 		path: "/workspace/files",
@@ -82,11 +90,13 @@ const navigation: NavigationItem[] = [
 
 // The main list in Discord-style categories: the first group has no label
 const byPath = (path: string) => navigation.find((item) => item.path === path)!;
-const navGroups: { label?: MessageKey; items: NavigationItem[] }[] = [
-	{ items: [byPath("/workspace")] },
-	{ label: "nav.groupWrite", items: [byPath("/workspace/notes"), byPath("/workspace/editor")] },
-	{ label: "nav.groupStorage", items: [byPath("/workspace/files"), byPath("/workspace/assets")] },
-	{ label: "nav.groupPlan", items: [byPath("/workspace/tasks"), byPath("/workspace/kanban"), byPath("/workspace/insights")] },
+// Where things are: the dashboard and the explorer for everything sit at the top, then the places to write, the stored
+// items, then planning
+const navGroups: { id: string; label?: MessageKey; items: NavigationItem[] }[] = [
+	{ id: "top", items: [byPath("/workspace"), byPath("/workspace/explorer")] },
+	{ id: "write", label: "nav.groupWrite", items: [byPath("/workspace/notes"), byPath("/workspace/editor")] },
+	{ id: "storage", label: "nav.groupStorage", items: [byPath("/workspace/files"), byPath("/workspace/assets")] },
+	{ id: "plan", label: "nav.groupPlan", items: [byPath("/workspace/tasks"), byPath("/workspace/kanban"), byPath("/workspace/insights")] },
 ];
 
 // Bottom workspace navigation links
@@ -104,6 +114,17 @@ const bottomNavigation: NavigationItem[] = [
 		icon: Trash2,
 	},
 ];
+
+const FOLDED_KEY = "nexsync.sidebar.folded";
+const DEFAULT_WIDTH = 256;
+const readFolded = (): string[] => {
+	try {
+		const list = JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]");
+		return Array.isArray(list) ? list.filter((x): x is string => typeof x === "string") : [];
+	} catch {
+		return [];
+	}
+};
 
 const COLLAPSED_KEY = "nexsync.sidebar.collapsed";
 const readCollapsed = () => {
@@ -159,6 +180,20 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 	const { workspace, clearWorkspace } = useWorkspace();
 	const navigate = useNavigate();
 	const [collapsed, setCollapsed] = useState(readCollapsed);
+	// How wide the sidebar is when open, remembered on this device; groups with a label can be folded away
+	const [width, setWidth] = usePanelSize("sidebar", DEFAULT_WIDTH, 200, 380);
+	const [folded, setFolded] = useState(readFolded);
+	const toggleGroup = useCallback((id: string) => {
+		setFolded((prev) => {
+			const next = prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id];
+			try {
+				localStorage.setItem(FOLDED_KEY, JSON.stringify(next));
+			} catch {
+				// Not remembered this time
+			}
+			return next;
+		});
+	}, []);
 	// The drawer on small windows always shows labels
 	const showLabels = expanded || !collapsed;
 	const toggle = () => {
@@ -178,7 +213,10 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 
 	return (
 		<div className="relative flex h-full shrink-0">
-		<aside className={cn("flex h-full shrink-0 flex-col overflow-hidden border-r bg-muted/20 transition-[width] duration-200 motion-reduce:transition-none", expanded ? "w-64 bg-background" : collapsed ? "w-[4.5rem]" : "w-64")}>
+		<aside
+			style={!expanded && !collapsed ? { width } : undefined}
+			className={cn("flex h-full shrink-0 flex-col overflow-hidden bg-muted/20 transition-[width] duration-200 motion-reduce:transition-none", expanded ? "w-64 border-r bg-background" : collapsed ? "w-[4.5rem]" : "")}
+		>
 			{/* Workspace identity */}
 			<div className={cn("flex h-16 shrink-0 items-center gap-2 border-b", showLabels ? "justify-start px-3" : "justify-center")}>
 				<Button
@@ -195,14 +233,25 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 
 			{/* Main Navigation */}
 			<nav aria-label={t("nav.main")} className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden", showLabels ? "gap-4 p-3" : "gap-2 p-2")}>
-				{navGroups.map((group, i) => (
-					<div key={i} className={cn("flex flex-col gap-0.5", !showLabels && i > 0 && "border-t pt-2")}>
-						{group.label && showLabels && <p className="px-3 pb-1 font-mono text-xs text-muted-foreground">{t(group.label)}</p>}
-						{group.items.map((item) => (
-							<NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />
-						))}
-					</div>
-				))}
+				{navGroups.map((group, i) => {
+					const open = !group.label || !showLabels || !folded.includes(group.id);
+					return (
+						<div key={group.id} className={cn("flex flex-col gap-0.5", !showLabels && i > 0 && "border-t pt-2")}>
+							{group.label && showLabels && (
+								<button
+									type="button"
+									aria-expanded={open}
+									onClick={() => toggleGroup(group.id)}
+									className="flex items-center gap-1.5 px-3 pb-1 text-left font-mono text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground"
+								>
+									<ChevronDown className={cn("size-3 transition-transform", !open && "-rotate-90")} aria-hidden />
+									{t(group.label)}
+								</button>
+							)}
+							{open && group.items.map((item) => <NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />)}
+						</div>
+					);
+				})}
 			</nav>
 
 			{/* Bottom Navigation */}
@@ -212,6 +261,9 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 				))}
 			</nav>
 		</aside>
+
+			{/* The sidebar edge: drag it to change the width, double-click to reset */}
+			{expanded ? null : collapsed ? <div className="w-px shrink-0 bg-border" /> : <Splitter orientation="vertical" grows="right" size={width} onResize={(next) => setWidth(next === 0 ? DEFAULT_WIDTH : next)} label="Resize the sidebar" />}
 
 			{/* The tab on the sidebar edge, level with the header */}
 			{!expanded && (

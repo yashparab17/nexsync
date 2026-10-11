@@ -6,6 +6,7 @@ const en = {
 	"nav.dashboard": "Dashboard",
 	"nav.notes": "Notes",
 	"nav.editor": "Editor",
+	"nav.explorer": "Explorer",
 	"nav.files": "Files",
 	"nav.assets": "Assets",
 	"nav.tasks": "Tasks",

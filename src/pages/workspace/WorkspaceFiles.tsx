@@ -124,7 +124,10 @@ interface NameDialogState {
 // ────────────────────────────
 
 // File manager page for browsing, creating, editing, and deleting files
-export default function WorkspaceFiles() {
+// "explorer" browses the whole workspace; "files" shows only what is in the files folder: documents and anything else that is
+// not a note, code, an asset, a task or a card
+export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer" | "files" }) {
+	const ROOT = mode === "files" ? "files" : "";
 	const { workspace, refreshStats, addActivityEvent } = useWorkspace();
 	const isViewer = useIsViewer();
 	const logError = useErrorLog();
@@ -132,7 +135,7 @@ export default function WorkspaceFiles() {
 	const workspacePath = workspace?.path ?? "";
 
 	// Navigation state
-	const [currentDir, setCurrentDir] = useState("");
+	const [currentDir, setCurrentDir] = useState(ROOT);
 	const [entries, setEntries] = useState<WorkspaceFile[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 
@@ -193,9 +196,13 @@ export default function WorkspaceFiles() {
 	}, [lastSyncedFile]);
 
 	// Navigate into a sub-directory
-	const navigateToDir = useCallback((dir: string) => {
-		setCurrentDir(dir);
-	}, []);
+	// The files page cannot go above its own folder
+	const navigateToDir = useCallback(
+		(dir: string) => {
+			setCurrentDir(ROOT && dir !== ROOT && !dir.startsWith(`${ROOT}/`) ? ROOT : dir);
+		},
+		[ROOT],
+	);
 
 	// Open a file where it belongs: text documents in Notes, code in the Editor tab, everything else in its own app
 	const handleOpenEntry = useCallback(
@@ -223,6 +230,8 @@ export default function WorkspaceFiles() {
 	// Deep link from workspace search: jump to the file's folder and open it
 	useOpenParam((path) => {
 		const rel = toRelPath(path);
+		// A file outside the files folder is found in the explorer
+		if (ROOT && !rel.startsWith(`${ROOT}/`)) return void navigate(`/workspace/explorer?open=${encodeURIComponent(path)}`, { replace: true });
 		setCurrentDir(rel.split("/").slice(0, -1).join("/"));
 		void handleOpenEntry({ name: rel.split("/").pop() ?? rel, path, is_dir: false, size: 0, modified_at: "" });
 	}, !!workspacePath);
@@ -371,12 +380,12 @@ export default function WorkspaceFiles() {
 	]);
 
 	// Construct breadcrumbs
-	const breadcrumbs = getBreadcrumbs(currentDir);
+	const breadcrumbs = getBreadcrumbs(currentDir).slice(ROOT ? 1 : 0);
 	const crumbs = [
-		{ label: workspace?.name || "Workspace", dir: "" },
+		{ label: ROOT ? "Files" : workspace?.name || "Workspace", dir: ROOT },
 		...breadcrumbs.map((part, i) => ({
 			label: part,
-			dir: breadcrumbs.slice(0, i + 1).join("/"),
+			dir: [ROOT, ...breadcrumbs.slice(0, i + 1)].filter(Boolean).join("/"),
 		})),
 	];
 
@@ -401,7 +410,8 @@ export default function WorkspaceFiles() {
 	}, [currentDir]);
 
 	const chosen = shown.find((e) => e.path === selected) ?? null;
-	const parentDir = getParentDir(currentDir);
+	const atRoot = currentDir === ROOT;
+	const parentDir = atRoot ? ROOT : getParentDir(currentDir);
 	const openEntry = (entry: WorkspaceFile) => (entry.is_dir ? navigateToDir(joinRelPath(currentDir, entry.name)) : void handleOpenEntry(entry));
 	const sortBy = (key: SortKey) => setSort((cur) => (cur.key === key ? { key, desc: !cur.desc } : { key, desc: key === "modified" }));
 
@@ -447,7 +457,7 @@ export default function WorkspaceFiles() {
 		else if (e.key === "Enter" && chosen) openEntry(chosen);
 		else if (e.key === "F2" && chosen && !isViewer) openRenameDialog(chosen);
 		else if ((e.key === "Delete" || (e.key === "Backspace" && e.metaKey)) && chosen && !isViewer) setDeleteItem(chosen);
-		else if (e.key === "Backspace" && currentDir) navigateToDir(parentDir);
+		else if (e.key === "Backspace" && !atRoot) navigateToDir(parentDir);
 	};
 
 	const header = (key: SortKey, label: string, className: string) => (
@@ -468,18 +478,18 @@ export default function WorkspaceFiles() {
 		<div className="flex h-full min-h-0 flex-col bg-background">
 			{/* Toolbar */}
 			<div className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b bg-card/40 px-3 py-1.5">
-				<Button variant="ghost" size="icon-xs" aria-label="Up one folder" isDisabled={!currentDir} onPress={() => navigateToDir(parentDir)}>
+				<Button variant="ghost" size="icon-xs" aria-label="Up one folder" isDisabled={atRoot} onPress={() => navigateToDir(parentDir)}>
 					<ChevronUp className="size-4 -rotate-90" />
 				</Button>
-				<nav className="flex min-w-0 flex-wrap items-center gap-0.5 text-sm" aria-label="Breadcrumb">
+				<nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden text-sm" aria-label="Breadcrumb">
 					{crumbs.map((crumb, i) => (
-						<div key={crumb.dir} className="flex items-center gap-0.5">
+						<div key={crumb.dir} className="flex min-w-0 items-center gap-0.5">
 							{i > 0 && <ChevronRight className="size-3.5 text-muted-foreground" />}
 							<button
 								type="button"
 								aria-current={i === crumbs.length - 1 ? "page" : undefined}
 								className={cn(
-									"px-1.5 py-0.5 outline-none transition-colors focus-visible:bg-muted",
+									"max-w-[16rem] truncate px-1.5 py-0.5 outline-none transition-colors focus-visible:bg-muted",
 									i === crumbs.length - 1 ? "font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
 								)}
 								onClick={() => navigateToDir(crumb.dir)}
@@ -489,7 +499,6 @@ export default function WorkspaceFiles() {
 						</div>
 					))}
 				</nav>
-				<span className="flex-1" />
 				<div className="relative w-56">
 					<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 					<Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter this folder" aria-label="Filter this folder" className="h-8 border bg-background pl-8 text-sm" />
@@ -537,7 +546,7 @@ export default function WorkspaceFiles() {
 				) : shown.length === 0 ? (
 					<div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center" onContextMenu={(e) => entryMenu(e, null)}>
 						<p className="text-sm text-muted-foreground">
-							{filter ? `Nothing here matches “${filter}”.` : currentDir ? "This folder is empty." : "No files yet."}
+							{filter ? `Nothing here matches “${filter}”.` : !atRoot ? "This folder is empty." : mode === "files" ? "No files here yet. Documents and anything else that is not a note, code or an asset go in this folder." : "No files yet."}
 						</p>
 						{!filter && !isViewer && (
 							<div className="flex gap-2">
@@ -584,15 +593,15 @@ export default function WorkspaceFiles() {
 										onDoubleClick={() => openEntry(entry)}
 										onContextMenu={(e) => entryMenu(e, entry)}
 										className={cn(
-											"group cursor-default select-none",
+											"group min-w-0 cursor-default select-none",
 											view === "grid"
 												? cn("flex flex-col items-center gap-2 border p-4 text-center", active ? "border-primary bg-primary/10" : "border-transparent hover:bg-muted/50")
 												: cn("grid grid-cols-[minmax(0,1fr)_7rem_6rem_11rem] items-center gap-4 border-b px-4 py-2", active ? "bg-primary/10 shadow-[inset_2px_0_0_var(--primary)]" : "hover:bg-muted/50"),
 										)}
 									>
-										<span className={cn("flex min-w-0 items-center gap-2.5", view === "grid" && "flex-col")}>
+										<span className={cn("flex min-w-0 items-center gap-2.5", view === "grid" && "w-full flex-col")}>
 											{entry.is_dir ? <FolderKindIcon name={entry.name} className={view === "grid" ? "size-10" : "size-5"} /> : <FileKindIcon name={entry.name} className={view === "grid" ? "size-10" : "size-5"} />}
-											<span className={cn("truncate text-sm", view === "grid" ? "w-full" : "font-medium")}>{entry.name}</span>
+											<span title={entry.name} className={cn("min-w-0 text-sm", view === "grid" ? "line-clamp-2 w-full text-center break-all" : "truncate font-medium")}>{entry.name}</span>
 										</span>
 										{view === "list" && (
 											<>

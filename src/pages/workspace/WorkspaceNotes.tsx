@@ -36,7 +36,6 @@ const BOARD_DOC = "board:notes";
 // The most of a note that is shared for the cards; longer notes show the start
 const MAX_LIVE_CHARS = 20000;
 type View = "note" | "board" | "graph";
-type Sort = "recent" | "name";
 
 const rel = (path: string) => path.replace(/^\/+/, "");
 const NO_DIRTY = new Set<string>();
@@ -78,7 +77,6 @@ export default function WorkspaceNotes() {
 	const [loading, setLoading] = useState(true);
 	const [view, setView] = useState<View>("note");
 	const [query, setQuery] = useState("");
-	const [sort, setSort] = useState<Sort>("recent");
 	const [listOpen, setListOpen] = useState(true);
 	const [listWidth, setListWidth] = usePanelSize("notes-list", 300, 220, 520);
 	const [pins, setPins] = useState<string[]>([]);
@@ -225,10 +223,11 @@ export default function WorkspaceNotes() {
 	const shown = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		const list = q ? infos.filter((n) => n.name.toLowerCase().includes(q) || n.text.toLowerCase().includes(q)) : infos.slice();
-		return list.sort((a, b) =>
-			sort === "name" ? a.name.localeCompare(b.name) : (modified.get(b.path) ?? "").localeCompare(modified.get(a.path) ?? ""),
-		);
-	}, [infos, query, sort, modified]);
+		// Searching puts a note whose name starts with the words first, then one that contains them, then the rest; with
+		// nothing typed, the newest edit is first
+		const rank = (name: string) => (!q ? 0 : name.toLowerCase().startsWith(q) ? 0 : name.toLowerCase().includes(q) ? 1 : 2);
+		return list.sort((a, b) => rank(a.name) - rank(b.name) || (modified.get(b.path) ?? "").localeCompare(modified.get(a.path) ?? ""));
+	}, [infos, query, modified]);
 	const pinned = shown.filter((n) => pins.includes(n.path));
 	const unpinned = shown.filter((n) => !pins.includes(n.path));
 
@@ -468,9 +467,6 @@ export default function WorkspaceNotes() {
 								<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 								<Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search notes" aria-label="Search notes" className="h-8 border bg-background pl-8 text-sm" />
 							</div>
-							<Button variant="ghost" size="xs" aria-label={`Sorted by ${sort === "recent" ? "last edited" : "name"}. Change sort`} onPress={() => setSort((s) => (s === "recent" ? "name" : "recent"))} className="font-mono">
-								{sort === "recent" ? "Recent" : "A–Z"}
-							</Button>
 						</div>
 						<div className="min-h-0 flex-1 overflow-y-auto">
 							{loading ? (

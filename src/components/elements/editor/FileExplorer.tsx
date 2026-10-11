@@ -239,36 +239,27 @@ export default function FileExplorer({
 				</div>
 			</div>
 
-			<div className="px-3 pb-2">
+			{/* The filter sits in the same row as the search in Notes */}
+			<div className="shrink-0 border-b p-2">
 				<div className="relative">
-					<Search className="pointer-events-none absolute top-1/2 left-2 size-3 -translate-y-1/2 text-muted-foreground" />
+					<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 					<input
 						value={query}
 						onChange={(e) => setQuery(e.target.value)}
 						onKeyDown={(e) => e.key === "Escape" && setQuery("")}
 						placeholder="Filter files"
 						aria-label="Filter files"
-						className="h-7 w-full border bg-background pr-6 pl-7 text-xs outline-none focus-visible:border-ring"
+						className="h-8 w-full border bg-background pr-8 pl-8 text-sm outline-none focus-visible:border-ring"
 					/>
 					{filtering && (
-						<button
-							type="button"
-							aria-label="Clear filter"
-							className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-							onClick={() => setQuery("")}
-						>
-							<X className="size-3" />
+						<button type="button" aria-label="Clear filter" className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setQuery("")}>
+							<X className="size-3.5" />
 						</button>
 					)}
 				</div>
 				{notice && (
 					<p role={notice.ok ? "status" : "alert"} className={cn("mt-1.5 break-words text-xs", notice.ok ? "text-success" : "text-destructive")}>
 						{notice.text}
-					</p>
-				)}
-				{!readOnly && !filtering && (
-					<p className="mt-1.5 truncate text-xs text-muted-foreground" title={`New files go in ${targetDir}`}>
-						New items go in <span className="font-mono text-foreground">{targetDir}</span>
 					</p>
 				)}
 			</div>
@@ -283,7 +274,7 @@ export default function FileExplorer({
 								<button
 									type="button"
 									data-explorer-row
-									className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1 text-left text-xs font-semibold text-muted-foreground outline-none focus-visible:bg-muted"
+									className="flex min-w-0 flex-1 items-center gap-1.5 px-3 py-1.5 text-left text-sm font-semibold text-muted-foreground outline-none focus-visible:bg-muted"
 									onClick={() => onToggleDir(root)}
 									onKeyDown={(e) => onRowKey(e, null, root, isOpen)}
 								>
@@ -316,6 +307,11 @@ export default function FileExplorer({
 					<p className="px-3 py-2 text-xs text-muted-foreground">No files match “{query.trim()}”.</p>
 				)}
 			</div>
+			{!readOnly && !filtering && (
+				<p className="shrink-0 truncate border-t px-3 py-2 text-xs text-muted-foreground" title={`New files go in ${targetDir}`}>
+					New items go in <span className="font-mono text-foreground">{targetDir}</span>
+				</p>
+			)}
 			{menu}
 		</div>
 	);
