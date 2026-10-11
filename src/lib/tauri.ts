@@ -363,17 +363,19 @@ export function searchWorkspaceFiles(path: string): Promise<{ name: string; path
 }
 
 // Create a new empty file in workspace
-export function createWorkspaceFile(
+export async function createWorkspaceFile(
 	path: string,
 	relPath: string,
 	name: string,
 ): Promise<void> {
-	return invoke("create_workspace_item", {
+	await invoke("create_workspace_item", {
 		path,
 		relPath,
 		name,
 		isDir: false,
 	});
+	// A new file starts empty, even if a file of the same name once had live editing state
+	await forgetYjsDocs(path, `${relPath.replace(/^\/+|\/+$/g, "")}/${name}`);
 }
 
 // Create a new folder in workspace
@@ -433,11 +435,23 @@ export function importAssetFromPath(
 }
 
 // Delete a workspace file or directory permanently
-export function deleteWorkspaceItem(
+export async function deleteWorkspaceItem(
 	path: string,
 	relPath: string,
 ): Promise<void> {
-	return invoke("delete_workspace_item", { path, relPath });
+	await invoke("delete_workspace_item", { path, relPath });
+	// The live editing state goes with the file, or a new file of the same name would open with the old text
+	await forgetYjsDocs(path, relPath.replace(/^\/+|\/+$/g, ""));
+}
+
+// Removes the stored editing state of a file, or of every file inside a folder
+async function forgetYjsDocs(workspacePath: string, rel: string): Promise<void> {
+	try {
+		const ids = (await listYjsDocs(workspacePath)) ?? [];
+		await Promise.all(ids.filter((id) => id === rel || id.startsWith(`${rel}/`)).map((id) => deleteYjsDoc(workspacePath, id)));
+	} catch {
+		// The file itself is already created or deleted; stale state is only a nuisance
+	}
 }
 
 // Rename a workspace file or directory

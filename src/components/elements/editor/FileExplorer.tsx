@@ -161,7 +161,7 @@ export default function FileExplorer({
 								{entry.is_dir ? (
 									<>
 										{isOpen ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
-										<FolderKindIcon name={entry.name} open={isOpen} className="size-4" />
+										<FolderKindIcon name={entry.name} open={isOpen} className="size-[18px]" />
 									</>
 								) : (
 									<>
