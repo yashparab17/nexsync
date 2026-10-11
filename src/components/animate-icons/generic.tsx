@@ -1,6 +1,8 @@
+import { useEffect, useRef, type ComponentType } from 'react';
 import { motion, type TargetAndTransition, type Variants } from 'motion/react';
 import type { LucideIcon } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { useAnimateIconContext } from './icon';
 
 // For lucide icons Animate UI has no hand-built version of: the whole glyph plays one small motion
@@ -23,5 +25,31 @@ export function motionIcon(Icon: LucideIcon, preset: Preset = 'pop') {
   return function AnimatedIcon(props: React.ComponentProps<LucideIcon>) {
     const { controls } = useAnimateIconContext();
     return <Motion initial="initial" animate={controls} variants={variants} {...(props as object)} />;
+  };
+}
+
+interface Handle {
+  startAnimation: () => void;
+  stopAnimation: () => void;
+}
+
+// Icons from AnimateIcons and lucide-animated animate themselves from a ref handle. This lets a surrounding AnimateIcon
+// (a Button, a nav link, a card) drive them the same way it drives the Animate UI ones, and sizes them from className.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function fromHandle(Icon: ComponentType<any>) {
+  return function DrivenIcon({ className, ...props }: { className?: string } & Record<string, unknown>) {
+    const { active } = useAnimateIconContext();
+    const ref = useRef<Handle>(null);
+    const playing = useRef(false);
+    useEffect(() => {
+      if (active) {
+        playing.current = true;
+        ref.current?.startAnimation();
+      } else if (playing.current) {
+        playing.current = false;
+        ref.current?.stopAnimation();
+      }
+    }, [active]);
+    return <Icon ref={ref} size={24} className={cn('lucide [&>svg]:size-full!', className)} {...props} />;
   };
 }
