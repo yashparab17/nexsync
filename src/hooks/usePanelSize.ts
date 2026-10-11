@@ -25,3 +25,11 @@ export function usePanelSize(key: string, initial: number, min: number, max: num
 	);
 	return [size, set] as const;
 }
+
+// The left panel of Notes and of the Editor (note list, file tree): one width for both, so moving between the two pages
+// never changes it. Double-clicking the edge puts it back to the usual width.
+const SIDE_PANEL = { initial: 300, min: 220, max: 520 };
+export function useSidePanelWidth() {
+	const [width, setWidth] = usePanelSize("side-panel", SIDE_PANEL.initial, SIDE_PANEL.min, SIDE_PANEL.max);
+	return [width, (next: number) => setWidth(next === 0 ? SIDE_PANEL.initial : next)] as const;
+}

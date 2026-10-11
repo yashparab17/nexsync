@@ -29,7 +29,7 @@ export default function Welcome({ logo, title, intro, actions, recentTitle, rece
 			<div className="mx-auto flex max-w-4xl flex-col gap-3 py-6">
 				<header className={logo ? "flex flex-col items-center gap-3 px-1 pb-4 text-center" : "px-1 pb-2"}>
 					{logo && (
-						<pre aria-label="Nexsync" className="font-mono text-[0.7rem] leading-[1.05] whitespace-pre text-primary select-none sm:text-sm">
+						<pre aria-label="Nexsync" className="font-mono text-[0.7rem] leading-none whitespace-pre text-primary select-none sm:text-sm [font-variant-ligatures:none]">
 							{logo}
 						</pre>
 					)}

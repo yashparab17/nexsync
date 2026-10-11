@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { useCollabDoc } from "@/hooks/useCollabDoc";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
-import { usePanelSize } from "@/hooks/usePanelSize";
+import { useSidePanelWidth } from "@/hooks/usePanelSize";
 import { useReportItem } from "@/hooks/usePresence";
 import { isNoteFile } from "@/lib/editor/languages";
 import { positionsFor, summarize } from "@/lib/notes/board";
@@ -82,7 +82,7 @@ export default function WorkspaceNotes() {
 	const [view, setView] = useState<View>("note");
 	const [query, setQuery] = useState("");
 	const [listOpen, setListOpen] = useState(true);
-	const [listWidth, setListWidth] = usePanelSize("notes-list", 300, 220, 520);
+	const [listWidth, setListWidth] = useSidePanelWidth();
 	const [pins, setPins] = useState<string[]>([]);
 	useEffect(() => {
 		if (workspacePath) setPins(readPins(workspacePath));

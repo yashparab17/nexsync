@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { exportFolders } from "@/lib/export";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
-import { usePanelSize } from "@/hooks/usePanelSize";
+import { usePanelSize, useSidePanelWidth } from "@/hooks/usePanelSize";
 import { useReportItem } from "@/hooks/usePresence";
 import { isBinaryFile, isDocumentFile, isMarkdownFile } from "@/lib/editor/languages";
 import { baseName } from "@/lib/editor/fileKinds";
@@ -106,7 +106,7 @@ export default function WorkspaceEditor() {
 	const [explorerOpen, setExplorerOpen] = useState(() => read("nexsync.editor.explorer", true));
 	const [showPanel, setShowPanel] = useState(() => read("nexsync.editor.panel", true));
 	const [panelTab, setPanelTab] = useState<PanelTab>("terminal");
-	const [explorerWidth, setExplorerWidth] = usePanelSize("editor.explorer", 288, 180, 560);
+	const [explorerWidth, setExplorerWidth] = useSidePanelWidth();
 	const [panelHeight, setPanelHeight] = usePanelSize("editor.panel", 208, 96, 640);
 	const [splitWidth, setSplitWidth] = usePanelSize("editor.split", 640, 240, 2400);
 	const [recent, setRecent] = useState<string[]>(() => readRecent(workspacePath));
