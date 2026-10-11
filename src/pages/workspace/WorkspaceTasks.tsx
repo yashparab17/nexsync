@@ -1,3 +1,4 @@
+import { MAX_TITLE } from "@/lib/validation";
 import { useCallback, useEffect, useMemo, useState, type ElementType } from "react";
 import { Plus, Search, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, Sparkles } from "@/components/animate-icons";
 
@@ -650,6 +651,7 @@ export default function WorkspaceTasks() {
 								<Label htmlFor="create-title">Title *</Label>
 								<Input
 									id="create-title"
+									maxLength={MAX_TITLE}
 									required
 									value={formTitle}
 									onChange={(e) => setFormTitle(e.target.value)}
@@ -747,6 +749,7 @@ export default function WorkspaceTasks() {
 								<Label htmlFor="edit-title">Title *</Label>
 								<Input
 									id="edit-title"
+									maxLength={MAX_TITLE}
 									required
 									value={formTitle}
 									onChange={(e) => setFormTitle(e.target.value)}

@@ -23,6 +23,7 @@ import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 // Hooks
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
+import { validateFileName } from "@/lib/validation";
 import { editorRouteFor } from "@/lib/editor/languages";
 
 // Tauri IPC
@@ -251,6 +252,11 @@ export default function WorkspaceFiles() {
 		const name = dialog.value.trim();
 		if (!name) {
 			setNameError("Name is required.");
+			return;
+		}
+		const problem = validateFileName(name);
+		if (problem) {
+			setNameError(problem);
 			return;
 		}
 
@@ -670,11 +676,12 @@ export default function WorkspaceFiles() {
 											"e.g. notes.md"
 										:	"e.g. docs"
 									}
+									aria-invalid={!!validateFileName(nameDialog.value)}
 									autoFocus
 								/>
-								{nameError && (
-									<p className="text-xs text-destructive">
-										{nameError}
+								{(validateFileName(nameDialog.value) ?? nameError) && (
+									<p role="alert" className="text-xs text-destructive">
+										{validateFileName(nameDialog.value) ?? nameError}
 									</p>
 								)}
 							</div>
@@ -685,7 +692,7 @@ export default function WorkspaceFiles() {
 								</DialogClose>
 								<Button
 									type="submit"
-									isDisabled={isNameSubmitting}
+									isDisabled={isNameSubmitting || !nameDialog.value.trim() || !!validateFileName(nameDialog.value)}
 								>
 									{isNameSubmitting ?
 										<Loader2 className="size-4 animate-spin" />

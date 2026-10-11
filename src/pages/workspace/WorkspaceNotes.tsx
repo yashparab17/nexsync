@@ -23,6 +23,7 @@ import { isNoteFile } from "@/lib/editor/languages";
 import { positionsFor, summarize } from "@/lib/notes/board";
 import { noteTitle } from "@/lib/notes/links";
 import { readPins, writePins } from "@/lib/notes/pins";
+import { validateFileName } from "@/lib/validation";
 import { buildEdges, type Point } from "@/lib/notes/graph";
 import { createWorkspaceFile, deleteWorkspaceItem, listWorkspaceFiles, readWorkspaceFile, renameWorkspaceItem, renameYjsDoc, writeWorkspaceFile } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
@@ -280,7 +281,7 @@ export default function WorkspaceNotes() {
 	};
 
 	const createNote = async (title: string) => {
-		if (isViewer || !workspacePath || !title.trim()) return;
+		if (isViewer || !workspacePath || !title.trim() || validateFileName(title.trim())) return;
 		// Notes are rich text; a name that ends in .md is made a .txt note, and Markdown files are made in the Editor
 		let filename = title.trim().replace(/[\\/]/g, "-").replace(/\.(md|markdown)$/i, "");
 		if (!isNoteFile(filename)) filename += ".txt";
@@ -327,6 +328,8 @@ export default function WorkspaceNotes() {
 		const { note } = renaming;
 		let name = renaming.value.trim().replace(/[\\/]/g, "-");
 		if (!name) return setRenameError("Name is required.");
+		const problem = validateFileName(name);
+		if (problem) return setRenameError(problem);
 		if (!isNoteFile(name)) name += note.name.slice(note.name.lastIndexOf(".")) || ".txt";
 		if (name === note.name) return setRenaming(null);
 		if (notes.some((n) => n.name === name && n.path.slice(0, n.path.lastIndexOf("/")) === note.path.slice(0, note.path.lastIndexOf("/")))) return setRenameError("A note with that name already exists.");
@@ -644,12 +647,13 @@ export default function WorkspaceNotes() {
 						className="space-y-4"
 					>
 						<DialogHeading icon={<Plus className="size-6" />} title="New note" description={<>A rich-text note with headings and lists. For a Markdown file, make it in the Editor.</>} />
-						<Input aria-label="Note title" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Architecture overview, Meeting notes" autoFocus />
+						<Input aria-label="Note title" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Architecture overview, Meeting notes" aria-invalid={!!validateFileName(newTitle)} autoFocus />
+						{validateFileName(newTitle) && <p role="alert" className="text-xs text-destructive">{validateFileName(newTitle)}</p>}
 						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setIsNewOpen(false)} isDisabled={submitting}>
 								Cancel
 							</Button>
-							<Button type="submit" isDisabled={submitting || !newTitle.trim()}>
+							<Button type="submit" isDisabled={submitting || !newTitle.trim() || !!validateFileName(newTitle)}>
 								{submitting ? "Creating…" : "Create note"}
 							</Button>
 						</DialogFooter>
@@ -667,13 +671,13 @@ export default function WorkspaceNotes() {
 						className="space-y-4"
 					>
 						<DialogHeading icon={<Pencil className="size-6" />} title="Rename note" description={<>{renaming.note.name}</>} />
-						<Input aria-label="New name" value={renaming.value} onChange={(e) => setRenaming({ ...renaming, value: e.target.value })} autoFocus />
-						{renameError && <p className="text-xs text-destructive">{renameError}</p>}
+						<Input aria-label="New name" value={renaming.value} onChange={(e) => setRenaming({ ...renaming, value: e.target.value })} aria-invalid={!!validateFileName(renaming.value)} autoFocus />
+						{(validateFileName(renaming.value) ?? renameError) && <p role="alert" className="text-xs text-destructive">{validateFileName(renaming.value) ?? renameError}</p>}
 						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setRenaming(null)}>
 								Cancel
 							</Button>
-							<Button type="submit">Rename</Button>
+							<Button type="submit" isDisabled={!renaming.value.trim() || !!validateFileName(renaming.value)}>Rename</Button>
 						</DialogFooter>
 					</form>
 				</Dialog>

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { Copy, Check, Play, Search, Trash2, FileText, Film, Headphones, Image as ImageIcon, LayoutGrid, List, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
 import { displaySize } from "@/lib/assets/displaySize";
 import { justify } from "@/lib/assets/justify";
+import { safeUploadName, validateFileName } from "@/lib/validation";
 import { MAX_PREVIEW_BYTES, pdfFirstPage, previewKind, textSnippet, videoFrame, type TilePreview } from "@/lib/assets/previews";
 import { fileToBase64 } from "@/lib/assets/uploadScale";
 import { Ellipsis } from "lucide-react";
@@ -350,7 +351,7 @@ export default function WorkspaceAssets() {
 		for (const file of Array.from(e.dataTransfer.files)) {
 			try {
 				const base64Data = await fileToBase64(file, 100);
-				const sanitizedName = file.name.replace(/[^\w.-]/g, "_");
+				const sanitizedName = safeUploadName(file.name);
 				await writeWorkspaceBinaryFile(
 					workspace.path,
 					`assets/${sanitizedName}`,
@@ -552,7 +553,7 @@ export default function WorkspaceAssets() {
 										type="button"
 										onClick={() => setPreviewAsset(asset)}
 										aria-label={`${asset.name}, ${asset.category}, ${formatBytes(asset.size)}${isRemote ? ", not downloaded" : ""}`}
-										className="relative block h-full w-full cursor-pointer overflow-hidden bg-card text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+										className="relative block h-full w-full cursor-pointer overflow-hidden bg-card text-left outline-none after:pointer-events-none after:absolute after:inset-0 after:ring-1 after:ring-inset after:ring-foreground/10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
 									>
 										{asset.category === "image" && thumbnail && !isRemote ? (
 											<img
@@ -820,8 +821,14 @@ export default function WorkspaceAssets() {
 								id="rename-input"
 								value={newName}
 								onChange={(e) => setNewName(e.target.value)}
+								aria-invalid={!!validateFileName(newName)}
 								autoFocus
 							/>
+							{validateFileName(newName) && (
+								<p role="alert" className="text-xs text-destructive">
+									{validateFileName(newName)}
+								</p>
+							)}
 						</div>
 
 						<DialogFooter className="mt-4 gap-2">
@@ -834,7 +841,7 @@ export default function WorkspaceAssets() {
 							</Button>
 							<Button
 								onPress={handleRenameConfirm}
-								isDisabled={!newName.trim() || isRenaming}
+								isDisabled={!newName.trim() || isRenaming || !!validateFileName(newName)}
 							>
 								{isRenaming ? "Renaming…" : "Rename"}
 							</Button>

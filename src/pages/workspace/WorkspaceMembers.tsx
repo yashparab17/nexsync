@@ -1,3 +1,4 @@
+import { MAX_WORKSPACE_NAME } from "@/lib/validation";
 import { useState } from "react";
 import { Activity, Trash2, Crown, KeyRound, Pencil, Shield, ShieldCheck, UserCheck, UserPlus, Plus } from "@/components/animate-icons";
 
@@ -527,6 +528,7 @@ export default function WorkspaceMembers() {
 								<Label htmlFor="mem-name">Member Name *</Label>
 								<Input
 									id="mem-name"
+									maxLength={80}
 									required
 									value={newMemberName}
 									onChange={(e) => setNewMemberName(e.target.value)}
@@ -590,6 +592,7 @@ export default function WorkspaceMembers() {
 							<Label htmlFor="edit-member-name">Name</Label>
 							<Input
 								id="edit-member-name"
+								maxLength={80}
 								required
 								value={editName}
 								onChange={(e) => setEditName(e.target.value)}
@@ -654,6 +657,7 @@ export default function WorkspaceMembers() {
 							<Label htmlFor="my-workspace-name">Name in this workspace</Label>
 							<Input
 								id="my-workspace-name"
+								maxLength={MAX_WORKSPACE_NAME}
 								value={renameValue}
 								onChange={(e) => {
 									setRenameValue(e.target.value);

@@ -1,4 +1,5 @@
 // React
+import { validateWorkspaceName } from "@/lib/validation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 // React Router
@@ -68,7 +69,7 @@ export default function CreateWorkspaceDialog({
 
 	// Create workspace on disk and load into context
 	const handleCreateWorkspace = async () => {
-		if (!workspaceName.trim() || isCreating.current) {
+		if (!workspaceName.trim() || validateWorkspaceName(workspaceName) || isCreating.current) {
 			return;
 		}
 
@@ -92,8 +93,9 @@ export default function CreateWorkspaceDialog({
 		}
 	};
 
+	const nameProblem = validateWorkspaceName(workspaceName);
 	const canCreate =
-		workspaceName.trim().length > 0 && workspacePath.length > 0;
+		workspaceName.trim().length > 0 && workspacePath.length > 0 && !nameProblem;
 
 	return (
 		<DialogTrigger>
@@ -107,7 +109,12 @@ export default function CreateWorkspaceDialog({
 					<div className="flex flex-col gap-5">
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="workspace-name">Name</Label>
-							<Input id="workspace-name" autoComplete="off" autoFocus placeholder="MSc research" value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} />
+							<Input id="workspace-name" autoComplete="off" autoFocus placeholder="MSc research" value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} aria-invalid={!!nameProblem} aria-describedby={nameProblem ? "workspace-name-problem" : undefined} />
+							{nameProblem && (
+								<p id="workspace-name-problem" role="alert" className="text-xs text-destructive">
+									{nameProblem}
+								</p>
+							)}
 						</div>
 
 						<div className="flex flex-col gap-2">

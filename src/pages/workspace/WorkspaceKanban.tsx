@@ -1,3 +1,4 @@
+import { MAX_TITLE } from "@/lib/validation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, AlertTriangle, ArrowRight, CheckSquare, Columns3, Pencil } from "@/components/animate-icons";
 
@@ -789,6 +790,7 @@ export default function WorkspaceKanban() {
 							<Label htmlFor="col-title">Column Title *</Label>
 							<Input
 								id="col-title"
+								maxLength={MAX_TITLE}
 								required
 								value={newColTitle}
 								onChange={(e) => setNewColTitle(e.target.value)}
@@ -833,6 +835,7 @@ export default function WorkspaceKanban() {
 								<Label htmlFor="card-title">Title *</Label>
 								<Input
 									id="card-title"
+									maxLength={MAX_TITLE}
 									required
 									value={cardTitle}
 									onChange={(e) => setCardTitle(e.target.value)}
@@ -888,6 +891,7 @@ export default function WorkspaceKanban() {
 								<Label htmlFor="edit-card-title">Title *</Label>
 								<Input
 									id="edit-card-title"
+									maxLength={MAX_TITLE}
 									required
 									value={cardTitle}
 									onChange={(e) => setCardTitle(e.target.value)}

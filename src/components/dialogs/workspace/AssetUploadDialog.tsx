@@ -7,6 +7,7 @@ import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 
 import { writeWorkspaceBinaryFile } from "@/lib/tauri";
 import { canDownscale, fileToBase64, MIN_SCALE, readImageSize, scaledSize } from "@/lib/assets/uploadScale";
+import { safeUploadName } from "@/lib/validation";
 import { formatBytes } from "@/lib/utils";
 
 interface AssetUploadDialogProps {
@@ -58,7 +59,7 @@ export default function AssetUploadDialog({ workspacePath, isOpen, onClose, onUp
 			let uploaded = 0;
 			for (const { file } of picked) {
 				const base64Data = await fileToBase64(file, percent);
-				const sanitizedName = file.name.replace(/[^\w.-]/g, "_");
+				const sanitizedName = safeUploadName(file.name);
 				await writeWorkspaceBinaryFile(workspacePath, `assets/${sanitizedName}`, base64Data);
 				uploaded++;
 			}

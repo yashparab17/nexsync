@@ -28,6 +28,7 @@ import { isBinaryFile, isDocumentFile, isMarkdownFile } from "@/lib/editor/langu
 import { baseName } from "@/lib/editor/fileKinds";
 import type { VimCommand } from "@/lib/editor/vimSetup";
 import { DEFAULT_EDITOR_PREFS, FONT_SIZE_RANGE, setEditorPrefs, useEditorPrefs } from "@/lib/editorPrefs";
+import { validateFileName } from "@/lib/validation";
 import { filterRecent, pushRecent, readRecent } from "@/lib/recentFiles";
 import {
 	createWorkspaceFile,
@@ -221,6 +222,8 @@ export default function WorkspaceEditor() {
 		if (!newItem || !workspacePath) return;
 		const name = newItem.value.trim();
 		if (!name) return setItemError("Name is required.");
+		const problem = validateFileName(name);
+		if (problem) return setItemError(problem);
 		try {
 			if (newItem.kind === "file") {
 				await createWorkspaceFile(workspacePath, newItem.dir, name);
@@ -242,6 +245,8 @@ export default function WorkspaceEditor() {
 		const { entry } = renaming;
 		const name = renaming.value.trim();
 		if (!name) return setItemError("Name is required.");
+		const problem = validateFileName(name);
+		if (problem) return setItemError(problem);
 		if (name === entry.name) return setRenaming(null);
 		const rel = toRel(entry.path);
 		const inside = (p: string) => p === rel || p.startsWith(`${rel}/`);
@@ -726,14 +731,15 @@ export default function WorkspaceEditor() {
 							value={newItem.value}
 							onChange={(e) => setNewItem({ ...newItem, value: e.target.value })}
 							placeholder={newItem.kind === "file" ? "e.g. main.py" : "e.g. src"}
+							aria-invalid={!!validateFileName(newItem.value)}
 							autoFocus
 						/>
-						{itemError && <p className="text-xs text-destructive">{itemError}</p>}
+						{(validateFileName(newItem.value) ?? itemError) && <p role="alert" className="text-xs text-destructive">{validateFileName(newItem.value) ?? itemError}</p>}
 						<DialogFooter>
 							<Button type="button" variant="outline" onPress={() => setNewItem(null)}>
 								Cancel
 							</Button>
-							<Button type="submit">Create</Button>
+							<Button type="submit" isDisabled={!newItem.value.trim() || !!validateFileName(newItem.value)}>Create</Button>
 						</DialogFooter>
 					</form>
 				</Dialog>
@@ -753,14 +759,15 @@ export default function WorkspaceEditor() {
 							value={renaming.value}
 							onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
 							aria-label="New name"
+							aria-invalid={!!validateFileName(renaming.value)}
 							autoFocus
 						/>
-						{itemError && <p className="text-xs text-destructive">{itemError}</p>}
+						{(validateFileName(renaming.value) ?? itemError) && <p role="alert" className="text-xs text-destructive">{validateFileName(renaming.value) ?? itemError}</p>}
 						<DialogFooter>
 							<Button type="button" variant="outline" onPress={() => setRenaming(null)}>
 								Cancel
 							</Button>
-							<Button type="submit">Rename</Button>
+							<Button type="submit" isDisabled={!renaming.value.trim() || !!validateFileName(renaming.value)}>Rename</Button>
 						</DialogFooter>
 					</form>
 				</Dialog>
