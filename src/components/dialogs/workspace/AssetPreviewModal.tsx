@@ -28,7 +28,7 @@ interface AssetPreviewModalProps {
 }
 
 // A checkerboard behind pictures, so transparent parts can be seen; it uses the theme's own colours
-const CHECKER = "bg-[length:20px_20px] bg-[position:0_0,10px_10px] [background-image:conic-gradient(var(--muted)_25%,transparent_0_50%,var(--muted)_0_75%,transparent_0)]";
+const CHECKER = "bg-[length:20px_20px] bg-[position:0_0,10px_10px] [background-image:conic-gradient(color-mix(in_srgb,var(--muted)_30%,transparent)_25%,transparent_0_50%,color-mix(in_srgb,var(--muted)_30%,transparent)_0_75%,transparent_0)]";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
 	return (

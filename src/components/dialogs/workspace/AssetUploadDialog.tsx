@@ -145,38 +145,38 @@ export default function AssetUploadDialog({ workspacePath, isOpen, onClose, onUp
 					</ul>
 				)}
 
-				{/* Picture size: the file is saved at this share of its width and height */}
-				<div className="space-y-2">
-					<div className="flex items-baseline justify-between">
-						<label htmlFor="upload-size" className="text-sm font-medium">
-							Picture size
-						</label>
-						<output htmlFor="upload-size" className="font-mono text-sm tabular-nums">
-							{percent}%
-						</output>
+				{/* Picture size: only offered when a picture that can be resized was chosen */}
+				{resizable.length > 0 && (
+					<div className="space-y-2">
+						<div className="flex items-baseline justify-between">
+							<label htmlFor="upload-size" className="text-sm font-medium">
+								Picture size
+							</label>
+							<output htmlFor="upload-size" className="font-mono text-sm tabular-nums">
+								{percent}%
+							</output>
+						</div>
+						<input
+							id="upload-size"
+							type="range"
+							min={MIN_SCALE}
+							max={100}
+							step={5}
+							value={percent}
+							onChange={(e) => setPercent(Number(e.target.value))}
+							className="h-2 w-full cursor-pointer accent-primary"
+						/>
+						<div className="flex justify-between font-mono text-xs text-muted-foreground">
+							<span>{MIN_SCALE}%</span>
+							<span>Original</span>
+						</div>
+						<p className="text-xs text-muted-foreground">
+							{percent === 100
+									? "Pictures are saved at their original size."
+									: `${resizable.length} ${resizable.length === 1 ? "picture is" : "pictures are"} saved at ${percent}% of the width and height. This changes the file. Larger pictures are drawn at half size in Assets anyway, without being changed.`}
+						</p>
 					</div>
-					<input
-						id="upload-size"
-						type="range"
-						min={MIN_SCALE}
-						max={100}
-						step={5}
-						value={percent}
-						onChange={(e) => setPercent(Number(e.target.value))}
-						className="h-2 w-full cursor-pointer accent-primary"
-					/>
-					<div className="flex justify-between font-mono text-xs text-muted-foreground">
-						<span>{MIN_SCALE}%</span>
-						<span>Original</span>
-					</div>
-					<p className="text-xs text-muted-foreground">
-						{resizable.length === 0
-							? "PNG, JPG and WebP pictures can be saved smaller. GIFs, SVGs and other files are never resized."
-							: percent === 100
-								? "Pictures are saved at their original size."
-								: `${resizable.length} ${resizable.length === 1 ? "picture is" : "pictures are"} saved at ${percent}% of the width and height. This changes the file. Larger pictures are drawn at half size in Assets anyway, without being changed.`}
-					</p>
-				</div>
+				)}
 
 				{error && <div className="border border-destructive/30 bg-destructive/10 p-3 font-mono text-xs text-destructive">{error}</div>}
 				{successCount !== null && (

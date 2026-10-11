@@ -503,7 +503,7 @@ export default function WorkspaceAssets() {
 												className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none"
 											/>
 										) : (
-											<div className={cn("flex h-full w-full flex-col items-center justify-center gap-2 bg-muted/60", isRemote && "border border-dashed border-warning/60 bg-transparent")}>
+											<div className={cn("flex h-full w-full flex-col items-center justify-center gap-2 border bg-card", isRemote && "border border-dashed border-warning/60 bg-transparent")}>
 												{isRemote ? <Sparkles className="size-8 text-warning" /> : kindIcon(asset.category, "size-9 text-muted-foreground")}
 												<span className="font-mono text-xs text-muted-foreground">{isRemote ? "Remote" : ext}</span>
 											</div>
@@ -730,8 +730,8 @@ export default function WorkspaceAssets() {
 									{assetToRename.name}
 								</span></>} />
 
-						<div className="space-y-3 my-2">
-							<Label htmlFor="rename-input">New file Name</Label>
+						<div className="space-y-2">
+							<Label htmlFor="rename-input">New name</Label>
 							<Input
 								id="rename-input"
 								value={newName}
@@ -740,7 +740,7 @@ export default function WorkspaceAssets() {
 							/>
 						</div>
 
-						<DialogFooter className="gap-2">
+						<DialogFooter className="mt-4 gap-2">
 							<Button
 								variant="outline"
 								onPress={() => setAssetToRename(null)}
@@ -773,7 +773,7 @@ export default function WorkspaceAssets() {
 								</span>{" "}
 								to the Trash? You can restore it from there.</>} />
 
-						<DialogFooter className="gap-2">
+						<DialogFooter className="mt-4 gap-2">
 							<Button
 								variant="outline"
 								onPress={() => setAssetToDelete(null)}
