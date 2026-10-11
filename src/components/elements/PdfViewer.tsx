@@ -68,7 +68,7 @@ export default function PdfViewer({ base64, name }: { base64: string; name: stri
 		void (async () => {
 			try {
 				const pdfjs = await loadPdfjs();
-				const task = pdfjs.getDocument({ data: base64Bytes(base64) });
+				const task = pdfjs.getDocument({ data: await base64Bytes(base64) });
 				destroy = () => void task.destroy();
 				const loaded = await task.promise;
 				if (cancelled) return;

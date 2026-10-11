@@ -44,6 +44,13 @@ describe("justify", () => {
 		for (const it of items) if (boxes[it.id].y !== ys[ys.length - 1]) expect(boxes[it.id].h).toBeLessThanOrEqual(it.height * MAX_STRETCH + 0.001);
 	});
 
+	it("lays out tiles whose size is unusable instead of breaking the whole set", () => {
+		const { boxes, height } = justify([item("a", NaN, 200), item("b", 0, 0), item("c", 1.2, Infinity), item("d", 1.5, 220)], 900, 8);
+		expect(Number.isFinite(height) && height > 0).toBe(true);
+		for (const b of Object.values(boxes)) for (const v of [b.x, b.y, b.w, b.h]) expect(Number.isFinite(v)).toBe(true);
+		expect(Object.keys(boxes)).toHaveLength(4);
+	});
+
 	it("handles nothing to lay out", () => {
 		expect(justify([], 800, 8)).toEqual({ boxes: {}, height: 0 });
 		expect(justify([item("a", 1)], 0, 8).height).toBe(0);

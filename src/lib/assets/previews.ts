@@ -6,7 +6,7 @@ export type TilePreview =
 	| { kind: "text"; text: string };
 
 // Files bigger than this are not read just to make a tile
-export const MAX_PREVIEW_BYTES: Record<"pdf" | "video" | "text", number> = { pdf: 20_000_000, video: 40_000_000, text: 2_000_000 };
+export const MAX_PREVIEW_BYTES: Record<"pdf" | "video" | "text", number> = { pdf: 12_000_000, video: 40_000_000, text: 2_000_000 };
 
 const TEXT_TYPES = new Set(["txt", "md", "csv", "json", "log", "xml", "yml", "yaml", "toml", "html", "css", "js", "ts"]);
 const THUMB_WIDTH = 480;
@@ -16,6 +16,15 @@ export function previewKind(name: string): "pdf" | "video" | "text" | null {
 	if (ext === "pdf") return "pdf";
 	if (["mp4", "webm", "mov", "mkv", "m4v", "ogv"].includes(ext)) return "video";
 	return TEXT_TYPES.has(ext) ? "text" : null;
+}
+
+// The browser decodes a data address natively, far faster than looping over a big file's characters
+export async function base64Bytes(base64: string): Promise<Uint8Array> {
+	try {
+		return new Uint8Array(await (await fetch(`data:application/octet-stream;base64,${base64}`)).arrayBuffer());
+	} catch {
+		return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+	}
 }
 
 const bytesOf = (base64: string) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
@@ -34,12 +43,10 @@ export async function loadPdfjs() {
 	return pdfjs;
 }
 
-export const base64Bytes = bytesOf;
-
 // The first page of a PDF, drawn small
 export async function pdfFirstPage(base64: string): Promise<TilePreview> {
 	const pdfjs = await loadPdfjs();
-	const task = pdfjs.getDocument({ data: bytesOf(base64) });
+	const task = pdfjs.getDocument({ data: await base64Bytes(base64) });
 	const doc = await task.promise;
 	try {
 		const page = await doc.getPage(1);

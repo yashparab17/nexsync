@@ -181,7 +181,7 @@ export default function WorkspaceAssets() {
 		for (const [name, src] of Object.entries(thumbnails)) {
 			if (sizes[name]) continue;
 			const img = new Image();
-			img.onload = () => setSizes((prev) => (prev[name] ? prev : { ...prev, [name]: { w: img.naturalWidth, h: img.naturalHeight } }));
+			img.onload = () => img.naturalWidth > 0 && img.naturalHeight > 0 && setSizes((prev) => (prev[name] ? prev : { ...prev, [name]: { w: img.naturalWidth, h: img.naturalHeight } }));
 			img.src = src;
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -202,7 +202,7 @@ export default function WorkspaceAssets() {
 					const made: TilePreview = kind === "pdf" ? await pdfFirstPage(base64) : kind === "video" ? await videoFrame(`data:${getMimeType(asset.name)};base64,${base64}`) : { kind: "text", text: textSnippet(base64) };
 					if (!live) return;
 					setPreviews((prev) => ({ ...prev, [asset.name]: made }));
-					if (made.kind === "image") setSizes((prev) => ({ ...prev, [asset.name]: { w: made.width, h: made.height } }));
+					if (made.kind === "image" && made.width > 0 && made.height > 0) setSizes((prev) => ({ ...prev, [asset.name]: { w: made.width, h: made.height } }));
 				} catch (err) {
 					console.debug("Preview skipped for", asset.name, err);
 				}
@@ -531,7 +531,7 @@ export default function WorkspaceAssets() {
 					</div>
 				) : viewMode === "grid" ? (
 					/* Mosaic: columns that each fill from the top, so tiles of different heights pack together */
-					<ul ref={gridRef} className="relative" style={{ height: layout.height + PAD * 2 }}>
+					<ul ref={gridRef} className="relative" style={{ height: (Number.isFinite(layout.height) ? layout.height : 0) + PAD * 2 }}>
 						{filteredAssets.map((asset) => {
 							const thumbnail = thumbnails[asset.name];
 							const preview = previews[asset.name];

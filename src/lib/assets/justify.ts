@@ -24,8 +24,10 @@ export const LAST_STRETCH = 1.7;
 const MIN_SHRINK = 0.6;
 const MAX_ROW = 12;
 
-export function justify(items: JustifyItem[], width: number, gap: number): { boxes: Record<string, Box>; height: number } {
+export function justify(input: JustifyItem[], width: number, gap: number): { boxes: Record<string, Box>; height: number } {
 	const boxes: Record<string, Box> = {};
+	// A tile with no usable size (a picture that reports 0 by 0, say) is laid out as a square rather than breaking every row
+	const items = input.map((i) => ({ ...i, aspect: Number.isFinite(i.aspect) && i.aspect > 0 ? i.aspect : 1, height: Number.isFinite(i.height) && i.height > 0 ? i.height : 200 }));
 	const n = items.length;
 	if (width <= 0 || n === 0) return { boxes, height: 0 };
 
