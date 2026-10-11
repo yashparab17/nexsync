@@ -49,18 +49,18 @@ export function DiffView({ diff }: { diff: DiffResult }) {
 	return (
 		<div className="font-mono text-xs" role="table" aria-label="Changes">
 			{diff.tooLarge && (
-				<p className="border-b bg-amber-500/10 p-2 text-amber-400">Too large to compare line by line, so everything in the middle is shown as changed.</p>
+				<p className="border-b bg-warning/10 p-2 text-warning">Too large to compare line by line, so everything in the middle is shown as changed.</p>
 			)}
 			{shown.map((row, index) =>
 				"gap" in row ? (
-					<div key={`gap-${index}`} className="bg-muted/30 px-3 py-0.5 text-center text-[11px] text-muted-foreground">
+					<div key={`gap-${index}`} className="bg-muted/30 px-3 py-0.5 text-center text-xs text-muted-foreground">
 						{row.gap} unchanged {row.gap === 1 ? "line" : "lines"}
 					</div>
 				) : (
 					<div
 						key={`${row.oldLine ?? ""}-${row.newLine ?? ""}-${row.kind}`}
 						role="row"
-						className={cn("flex", row.kind === "add" && "bg-emerald-500/10", row.kind === "del" && "bg-red-500/10")}
+						className={cn("flex", row.kind === "add" && "bg-success/10", row.kind === "del" && "bg-destructive/10")}
 					>
 						<span className="w-10 shrink-0 select-none px-1 text-right text-muted-foreground/60">{row.oldLine ?? ""}</span>
 						<span className="w-10 shrink-0 select-none px-1 text-right text-muted-foreground/60">{row.newLine ?? ""}</span>
@@ -68,7 +68,7 @@ export function DiffView({ diff }: { diff: DiffResult }) {
 						<span className="min-w-0 flex-1 whitespace-pre-wrap break-all pr-2">
 							{row.segments
 								? row.segments.map((s, i) => (
-										<span key={i} className={cn(s.changed && (row.kind === "add" ? "bg-emerald-500/30" : "bg-red-500/30"))}>
+										<span key={i} className={cn(s.changed && (row.kind === "add" ? "bg-success/30" : "bg-destructive/30"))}>
 											{s.text}
 										</span>
 									))
@@ -267,7 +267,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 										</label>
 										{diff && !diff.identical && (
 											<span className="ml-auto tabular-nums">
-												<span className="text-emerald-400">+{diff.added}</span> <span className="text-red-400">-{diff.removed}</span>
+												<span className="text-success">+{diff.added}</span> <span className="text-destructive">-{diff.removed}</span>
 											</span>
 										)}
 									</div>
@@ -309,7 +309,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 										<span className="text-xs text-muted-foreground">Open the file in Notes or Editor to restore a version.</span>
 									)}
 									{notice && <span role="status" className="text-xs text-muted-foreground">{notice}</span>}
-									{restored && <span className="text-xs text-emerald-400">Restored.</span>}
+									{restored && <span className="text-xs text-success">Restored.</span>}
 									{!isText && confirming ? (
 										<>
 											<span className="text-xs">Replace the current file?</span>

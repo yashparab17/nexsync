@@ -156,7 +156,7 @@ export default function WorkspaceInsights() {
 							</div>
 						))}
 					</div>
-					<div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+					<div className="mt-1 flex justify-between text-xs text-muted-foreground">
 						<span>{days[0]?.day.slice(5)}</span>
 						<span>{days[days.length - 1]?.day.slice(5)}</span>
 					</div>

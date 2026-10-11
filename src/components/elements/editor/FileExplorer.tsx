@@ -174,7 +174,7 @@ export default function FileExplorer({
 									{!entry.is_dir && viewers && <PresenceDots names={viewers(rel)} />}
 								{!entry.is_dir && openPaths.includes(rel) && (
 									<span
-										className={cn("ml-auto size-1.5 shrink-0", dirtyPaths.has(rel) ? "bg-amber-400" : "bg-muted-foreground/50")}
+										className={cn("ml-auto size-1.5 shrink-0", dirtyPaths.has(rel) ? "bg-warning" : "bg-muted-foreground/50")}
 										aria-label={dirtyPaths.has(rel) ? "Open, unsaved changes" : "Open"}
 									/>
 								)}
@@ -216,7 +216,7 @@ export default function FileExplorer({
 	return (
 		<div className="flex w-56 shrink-0 flex-col border-r bg-muted/20 lg:w-72">
 			<div className="flex items-center justify-between px-3 pt-3 pb-1">
-				<h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Explorer</h2>
+				<h2 className="text-xs font-semibold text-muted-foreground">Explorer</h2>
 				<div className="flex">
 					{!readOnly && (
 						<>
@@ -263,12 +263,12 @@ export default function FileExplorer({
 					)}
 				</div>
 				{notice && (
-					<p role={notice.ok ? "status" : "alert"} className={cn("mt-1.5 break-words text-[11px]", notice.ok ? "text-emerald-400" : "text-destructive")}>
+					<p role={notice.ok ? "status" : "alert"} className={cn("mt-1.5 break-words text-xs", notice.ok ? "text-success" : "text-destructive")}>
 						{notice.text}
 					</p>
 				)}
 				{!readOnly && !filtering && (
-					<p className="mt-1.5 truncate text-[11px] text-muted-foreground" title={`New files go in ${targetDir}`}>
+					<p className="mt-1.5 truncate text-xs text-muted-foreground" title={`New files go in ${targetDir}`}>
 						New items go in <span className="font-mono text-foreground">{targetDir}</span>
 					</p>
 				)}
@@ -284,7 +284,7 @@ export default function FileExplorer({
 								<button
 									type="button"
 									data-explorer-row
-									className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1 text-left text-[11px] font-semibold uppercase tracking-widest text-muted-foreground outline-none focus-visible:bg-muted"
+									className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1 text-left text-xs font-semibold text-muted-foreground outline-none focus-visible:bg-muted"
 									onClick={() => onToggleDir(root)}
 									onKeyDown={(e) => onRowKey(e, null, root, isOpen)}
 								>

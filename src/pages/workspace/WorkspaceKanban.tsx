@@ -577,10 +577,10 @@ export default function WorkspaceKanban() {
 								{/* Column Header */}
 								<div className="flex items-center justify-between pb-2">
 									<div className="flex items-center gap-2">
-										<h3 className="text-xs font-bold uppercase tracking-widest text-foreground">
+										<h3 className="text-xs font-bold text-foreground">
 											{col.title}
 										</h3>
-										<span className="flex h-5 min-w-5 items-center justify-center bg-primary/10 px-1 text-[11px] font-bold text-primary">
+										<span className="flex h-5 min-w-5 items-center justify-center bg-primary/10 px-1 text-xs font-bold text-primary">
 											{col.cards.length}
 										</span>
 									</div>
@@ -673,7 +673,7 @@ export default function WorkspaceKanban() {
 													<h4 className="text-sm font-medium leading-snug text-foreground">
 														{card.title}
 														{(card.conflicts?.length ?? 0) > 0 && (
-															<AlertTriangle className="ml-1 inline size-3.5 text-amber-500" aria-label="Has a change to sort out" />
+															<AlertTriangle className="ml-1 inline size-3.5 text-warning" aria-label="Has a change to sort out" />
 														)}
 													</h4>
 													<PresenceDots names={viewersAt("kanban", card.id)} doing="editing this card" />
@@ -710,7 +710,7 @@ export default function WorkspaceKanban() {
 													card.assignee_id ||
 													(card.checklist ?? []).length > 0 ||
 													(card.violations ?? []).length > 0) && (
-													<div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+													<div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
 														<RuleFlag violations={card.violations} />
 															<DueBadge due={card.due_date} done={colIndex === columns.length - 1} />
 														{(card.checklist ?? []).length > 0 && (
@@ -733,7 +733,7 @@ export default function WorkspaceKanban() {
 
 												{/* Quick Move Across Columns */}
 												{!isViewer && (
-												<div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2 text-[10px] text-muted-foreground">
+												<div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2 text-xs text-muted-foreground">
 													{prevCol ? (
 														<button
 															type="button"

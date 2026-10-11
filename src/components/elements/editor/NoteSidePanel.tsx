@@ -22,7 +22,7 @@ interface NoteSidePanelProps {
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
 	return (
 		<section className="space-y-1.5">
-			<h3 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+			<h3 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
 				{icon}
 				{title}
 			</h3>
@@ -82,12 +82,12 @@ export default function NoteSidePanel({ workspacePath, current, notes, text, onO
 							const note = resolveLink(target, notes);
 							return note ? (
 								<button key={target} type="button" onClick={() => onOpenNote(note.path)} className={rowClass}>
-									<ArrowUpRight className="size-3 shrink-0 text-sky-400" />
+									<ArrowUpRight className="size-3 shrink-0 text-info" />
 									<span className="truncate">{target}</span>
 								</button>
 							) : (
 								<p key={target} className="truncate px-1.5 py-1 text-xs text-muted-foreground">
-									{target} <span className="text-[10px]">(no such note)</span>
+									{target} <span className="text-xs">(no such note)</span>
 								</p>
 							);
 						})}

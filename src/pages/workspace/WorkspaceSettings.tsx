@@ -274,7 +274,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 							Export workspace as zip
 						</Button>
 						{exportResult && (
-							<span role={exportResult.ok ? "status" : "alert"} className={`text-xs ${exportResult.ok ? "text-emerald-400" : "text-destructive"}`}>
+							<span role={exportResult.ok ? "status" : "alert"} className={`text-xs ${exportResult.ok ? "text-success" : "text-destructive"}`}>
 								{exportResult.text}
 							</span>
 						)}
@@ -318,7 +318,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 				{(dirty || saving || savedSuccess) && !isJoinedCopy && (
 					<div role="region" aria-label="Unsaved changes" className="sticky bottom-0 -mx-1 border-t bg-background/95 backdrop-blur">
 						<div className="flex flex-wrap items-center gap-3 px-1 py-3">
-							<p role="status" className={`min-w-0 flex-1 text-xs ${savedSuccess && !dirty ? "text-emerald-400" : "text-muted-foreground"}`}>
+							<p role="status" className={`min-w-0 flex-1 text-xs ${savedSuccess && !dirty ? "text-success" : "text-muted-foreground"}`}>
 								{saving ? "Saving…" : savedSuccess && !dirty ? "Settings saved" : "You have unsaved changes."}
 							</p>
 							<Button variant="outline" size="sm" isDisabled={saving || !dirty} onPress={discard}>

@@ -22,12 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 
 const Settings = lazy(() => import("@/pages/Settings"));
-import {
-	Card,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 
 // Tauri IPC
 import { APP_VERSION } from "@/lib/version";
@@ -40,7 +34,6 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { WorkspaceInfo } from "@/types/workspace";
 
 // Assets
-import logo from "@/assets/logos/logo.svg";
 import logo_black from "@/assets/logos/logo-black.svg";
 import logo_white from "@/assets/logos/logo-white.svg";
 import Loading from "@/components/Loading";
@@ -76,10 +69,6 @@ export default function Welcome() {
 	const [tourOpen, setTourOpen] = useState(() => !tourSeen());
 	const [settingsOpen, setSettingsOpen] = useState(false);
 
-	// Shared button styling
-	const actionButtonClass =
-		"px-8 text-base cursor-pointer hover:scale-[1.02] hover:border-primary";
-
 	// Load recent workspaces on mount
 	useEffect(() => {
 		loadRecentWorkspaces();
@@ -92,9 +81,10 @@ export default function Welcome() {
 	const loadRecentWorkspaces = async () => {
 		try {
 			const workspaces = await getRecentWorkspaces();
-			setRecentWorkspaces(workspaces);
-			// Only used to mark the card; not knowing it must not hide the list
-			setLastId((await getLastWorkspace().catch(() => null))?.id ?? null);
+			// Only used to lead the list; not knowing it must not hide the list
+			const last = (await getLastWorkspace().catch(() => null))?.id ?? null;
+			setLastId(last);
+			setRecentWorkspaces([...workspaces].sort((x, y) => Number(y.id === last) - Number(x.id === last)));
 		} catch (err) {
 			console.error("Failed to load recent workspaces:", err);
 			logError(err, { source: "recent_load" });
@@ -116,128 +106,78 @@ export default function Welcome() {
 
 	return (
 		<div className="flex min-h-full flex-col p-8">
-			{/* Header */}
-			<header className="relative flex items-center justify-center">
-				<div className="flex items-center gap-3">
-					<img
-						src={isDark ? logo_white : logo_black}
-						alt="Nexsync"
-						className="h-12 w-12"
-					/>
+			<div className="mx-auto flex w-full max-w-3xl flex-1 flex-col">
+				<header className="flex items-center justify-between">
+					<div className="flex items-center gap-3">
+						<img src={isDark ? logo_white : logo_black} alt="" className="size-9" />
+						<span className="text-xl font-bold">Nexsync</span>
+					</div>
+					<div className="flex items-center gap-1">
+						<ThemeToggle />
+						<Button variant="ghost" size="icon" onPress={() => setSettingsOpen(true)} aria-label="Application Settings">
+							<SettingsIcon className="size-5" />
+						</Button>
+					</div>
+				</header>
 
-					<h1 className="text-5xl font-bold">Nexsync</h1>
-				</div>
-
-				<div className="absolute right-0 flex items-center gap-2">
-					<ThemeToggle />
-
-					<Button
-						variant="ghost"
-						size="icon"
-						onPress={() => setSettingsOpen(true)}
-						aria-label="Application Settings"
-					>
-						<SettingsIcon className="size-5" />
-					</Button>
-				</div>
-			</header>
-
-			{/* Tagline */}
-			<p className="mt-2 text-center text-lg text-muted-foreground">
-				Notes, tasks and code, shared with your team and kept on your own computer.
-			</p>
-
-			{/* Main Content */}
-			<section className="relative flex flex-1 flex-col items-center justify-center gap-6">
-				{/* Background Image */}
-				<div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-					<img src={logo} className="h-150 w-150 opacity-10" alt="" />
-				</div>
-
-				<div className="relative z-2 flex flex-col items-center gap-6">
-					<h2 className="text-center text-2xl font-semibold">{greeting}</h2>
-
-					<p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-						Quick Actions
-					</p>
-
-					{/* Action Buttons */}
-					<div className="flex flex-wrap justify-center gap-6">
-						<CreateWorkspaceDialog>
-							<Button className={actionButtonClass}>
-								<FolderPlus className="size-5" />
-								Create Workspace
-							</Button>
-						</CreateWorkspaceDialog>
-
-						<JoinWorkspaceDialog>
-							<Button className={actionButtonClass}>
-								<UsersRound className="size-5" />
-								Join Workspace
-							</Button>
-						</JoinWorkspaceDialog>
-
-						<ImportWorkspaceDialog>
-							<Button className={actionButtonClass}>
-								<FolderOpen className="size-5" />
-								Import Workspace
-							</Button>
-						</ImportWorkspaceDialog>
+				<main className="flex flex-1 flex-col gap-10 pt-16">
+					<div>
+						<h1 className="text-4xl font-bold tracking-tight">{greeting}</h1>
+						<p className="mt-2 max-w-prose text-muted-foreground">
+							Notes, tasks and code, shared with your team and kept on your own computer.
+						</p>
 					</div>
 
-
-					{/* Recent Workspaces */}
-					<section className="flex w-full flex-col items-center gap-4">
-						<h2 className="text-2xl font-semibold">
-							Recent Workspaces
-						</h2>
+					{/* Opening a workspace is the common case, so the list comes first and the last one used leads it */}
+					<section aria-labelledby="recent-heading" className="flex flex-col gap-3">
+						<h2 id="recent-heading" className="text-lg font-semibold">Your workspaces</h2>
 
 						{loading ?
 							<Loading />
 						: recentWorkspaces.length === 0 ?
-							<p className="text-sm text-muted-foreground">
-								No recent workspaces. Create or import one to
-								get started.
+							<p className="border border-dashed p-6 text-muted-foreground">
+								No workspaces yet. Create one below, or join a teammate with their ticket.
 							</p>
-						:	<div className="flex flex-wrap justify-center gap-6">
+						:	<ul className="divide-y border">
 								{recentWorkspaces.map((ws) => (
-									<Card
-										key={ws.id}
-										className="w-80 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg"
-										onClick={() => handleOpenWorkspace(ws)}
-									>
-										<CardHeader>
-											<CardTitle>{ws.name}</CardTitle>
-
-											<CardDescription>
-												{ws.description ||
-													"Local Workspace"}
-											</CardDescription>
-
-											{ws.id === lastId && (
-												<p className="pt-2 text-sm text-muted-foreground">
-													You visited this last time
-												</p>
-											)}
-										</CardHeader>
-									</Card>
+									<li key={ws.id}>
+										<button
+											type="button"
+											onClick={() => handleOpenWorkspace(ws)}
+											className={`flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted border-l-2 ${ws.id === lastId ? "border-primary bg-primary/5" : "border-transparent"}`}
+										>
+											<span className="min-w-0">
+												<span className="block font-semibold">{ws.name}</span>
+												<span className="block truncate font-mono text-xs text-muted-foreground">{ws.path}</span>
+											</span>
+											<span className="shrink-0 text-sm text-primary">
+												{ws.id === lastId ? "Continue" : "Open"}
+											</span>
+										</button>
+									</li>
 								))}
-							</div>
+							</ul>
 						}
 					</section>
-				</div>
-			</section>
 
-			{/* Footer */}
-			<footer className="mt-auto space-y-1 pb-4 text-center text-muted-foreground">
-				<p className="text-2xl">Nexsync {APP_VERSION}</p>
-				<p className="text-xs">
-					Local First • Open Source • Built with Tauri
-				</p>
-				<Button variant="link" size="sm" onPress={() => setTourOpen(true)}>
-					{t("welcome.tour")}
-				</Button>
-			</footer>
+					<div className="flex flex-wrap gap-3">
+						<CreateWorkspaceDialog>
+							<Button><FolderPlus className="size-5" />Create workspace</Button>
+						</CreateWorkspaceDialog>
+						<JoinWorkspaceDialog>
+							<Button variant="outline"><UsersRound className="size-5" />Join with a ticket</Button>
+						</JoinWorkspaceDialog>
+						<ImportWorkspaceDialog>
+							<Button variant="outline"><FolderOpen className="size-5" />Import a folder</Button>
+						</ImportWorkspaceDialog>
+					</div>
+				</main>
+
+				<footer className="mt-16 flex items-center justify-between text-sm text-muted-foreground">
+					<span>Nexsync {APP_VERSION} · Local first, open source</span>
+					<Button variant="link" size="sm" onPress={() => setTourOpen(true)}>{t("welcome.tour")}</Button>
+				</footer>
+			</div>
 
 			{/* Settings opens over the page; the page asks before closing with unsaved edits, so Escape and a click outside are off */}
 			<Dialog isOpen={settingsOpen} onOpenChange={setSettingsOpen} showCloseButton={false} isDismissable={false} isKeyboardDismissDisabled className="overflow-hidden p-0 sm:max-w-5xl">

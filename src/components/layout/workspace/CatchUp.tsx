@@ -86,7 +86,7 @@ export default function CatchUp() {
 			<Button variant="ghost" size="icon" onPress={() => setOpen(true)} aria-label={unread > 0 ? `Catch up, ${unread} to review` : "Catch up"} className="relative">
 				<History className="size-5" />
 				{unread > 0 && (
-					<span className="absolute right-1 top-1 flex min-w-4 items-center justify-center bg-primary px-1 text-[10px] font-bold text-primary-foreground">{unread > 9 ? "9+" : unread}</span>
+					<span className="absolute right-1 top-1 flex min-w-4 items-center justify-center bg-primary px-1 text-xs font-bold text-primary-foreground">{unread > 9 ? "9+" : unread}</span>
 				)}
 			</Button>
 			{open && <CatchUpDialog workspacePath={path} entries={entries} lookups={lookups} members={members ?? []} onChanged={refresh} onClose={() => setOpen(false)} />}

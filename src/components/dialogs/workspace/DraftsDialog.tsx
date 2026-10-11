@@ -213,7 +213,7 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 								<ul className="space-y-1.5">
 									{preview.changes.map((c) => (
 										<li key={c.path} className="border px-3 py-2 text-sm">
-											<span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label(c.path)}</span>
+											<span className="text-xs font-semibold text-muted-foreground">{label(c.path)}</span>
 											<p className="break-words">
 												<span className="text-muted-foreground line-through">{show(c.path, c.live)}</span> → {show(c.path, c.draft)}
 											</p>
@@ -221,8 +221,8 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 									))}
 								</ul>
 								{preview.collisions.length > 0 && (
-									<div className="space-y-2 border border-amber-500/40 bg-amber-500/10 p-3">
-										<p className="text-sm font-semibold text-amber-500">Somebody else changed these too</p>
+									<div className="space-y-2 border border-warning/40 bg-warning/10 p-3">
+										<p className="text-sm font-semibold text-warning">Somebody else changed these too</p>
 										<ul className="space-y-1 text-sm">
 											{preview.collisions.map((c) => (
 												<li key={c.field}>

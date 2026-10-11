@@ -278,7 +278,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								Leave it empty to connect directly. Addresses with a username or password are not accepted, since they would be stored as plain text.
 							</p>
 							{restartNeeded && (
-								<div className="flex items-center justify-between gap-2 border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-400">
+								<div className="flex items-center justify-between gap-2 border border-warning/30 bg-warning/10 p-2 text-xs text-warning">
 									<span>Restart Nexsync to use the new proxy.</span>
 									<Button size="sm" variant="outline" onPress={() => void relaunch()}>
 										Restart now
@@ -380,7 +380,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						id="storage"
 						title="Storage"
 						description="Workspaces can only be created or imported inside these folders. This keeps Nexsync away from the rest of your disk."
-						icon={<ShieldCheck className="size-4 text-emerald-400" />}
+						icon={<ShieldCheck className="size-4 text-success" />}
 					>
 						{saved === null && !loadError ? (
 							<Loading />
@@ -504,7 +504,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 							</div>
 						)}
 						{updater.status === "up-to-date" && (
-							<p role="status" className="flex items-center gap-1.5 text-xs text-emerald-400">
+							<p role="status" className="flex items-center gap-1.5 text-xs text-success">
 								<Check className="size-3.5" />
 								You are on the latest version.
 							</p>
@@ -530,7 +530,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 							role={saveError ? "alert" : "status"}
 							className={cn(
 								"min-w-0 flex-1 text-xs",
-								saveError ? "text-destructive" : justSaved ? "text-emerald-400" : "text-muted-foreground",
+								saveError ? "text-destructive" : justSaved ? "text-success" : "text-muted-foreground",
 							)}
 						>
 							{saveError

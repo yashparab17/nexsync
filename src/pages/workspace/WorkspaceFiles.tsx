@@ -438,7 +438,7 @@ export default function WorkspaceFiles() {
 				</div>
 			:	<div className="overflow-hidden border">
 					{/* Column headers */}
-					<div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b bg-muted/40 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+					<div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b bg-muted/40 px-4 py-2 text-xs font-semibold text-muted-foreground">
 						<span>Name</span>
 						<span className="w-24 text-right">Size</span>
 						<span className="w-44 text-right">Modified</span>

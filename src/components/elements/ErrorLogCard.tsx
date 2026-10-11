@@ -102,14 +102,14 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 						{records.map((r, i) => (
 							<li key={`${r.timestamp}-${i}`} className="space-y-1 p-3">
 								<div className="flex items-center justify-between gap-3 text-muted-foreground">
-									<span className="font-semibold uppercase tracking-widest">{r.source}</span>
+									<span className="font-semibold ">{r.source}</span>
 									<span>{new Date(r.timestamp).toLocaleString()}</span>
 								</div>
 								<p className="break-words text-foreground">{r.message}</p>
 								{r.detail && (
 									<details>
 										<summary className="cursor-pointer text-muted-foreground">Details</summary>
-										<pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-muted-foreground">
+										<pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground">
 											{r.detail}
 										</pre>
 									</details>

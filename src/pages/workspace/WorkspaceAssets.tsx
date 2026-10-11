@@ -411,7 +411,7 @@ export default function WorkspaceAssets() {
 						>
 							{tab.label}
 							<span
-								className={`text-[10px] px-1.5 py-0.2 rounded-none ${
+								className={`text-xs px-1.5 py-0.2 rounded-none ${
 									selectedCategory === tab.key ?
 										"bg-primary-foreground/20 text-primary-foreground"
 									:	"bg-background/80 text-muted-foreground"
@@ -510,9 +510,9 @@ export default function WorkspaceAssets() {
 								{/* Thumbnail Header Area */}
 								<div className="relative h-36 bg-black/40 flex items-center justify-center overflow-hidden border-b border-border/40">
 									{isRemote ?
-										<div className="flex flex-col items-center gap-2 text-amber-500/80 p-4 text-center">
+										<div className="flex flex-col items-center gap-2 text-warning/80 p-4 text-center">
 											<Sparkles className="size-7" />
-											<span className="text-[11px] font-medium uppercase tracking-wider">
+											<span className="text-xs font-medium ">
 												Not downloaded
 											</span>
 										</div>
@@ -527,22 +527,22 @@ export default function WorkspaceAssets() {
 									: isVideo ?
 										<div className="flex flex-col items-center gap-1.5 text-muted-foreground group-hover:text-primary transition-colors">
 											<Film className="size-10" />
-											<span className="text-[10px] font-mono">VIDEO</span>
+											<span className="text-xs font-mono">VIDEO</span>
 										</div>
 									: isAudio ?
 										<div className="flex flex-col items-center gap-1.5 text-muted-foreground group-hover:text-primary transition-colors">
 											<Headphones className="size-10" />
-											<span className="text-[10px] font-mono">AUDIO</span>
+											<span className="text-xs font-mono">AUDIO</span>
 										</div>
 									:	<FileText className="size-10 text-muted-foreground group-hover:text-primary transition-colors" />}
 
 									{/* Status Badge */}
 									<div className="absolute top-2 left-2">
 										{isRemote ?
-											<span className="bg-amber-500/90 text-black text-[10px] font-bold px-2 py-0.5 rounded-none shadow-sm">
+											<span className="bg-warning/90 text-black text-xs font-bold px-2 py-0.5 rounded-none shadow-sm">
 												Remote
 											</span>
-										:	<span className="bg-black/60 backdrop-blur text-white text-[10px] font-mono px-2 py-0.5 rounded-none border border-white/10">
+										:	<span className="bg-black/60 backdrop-blur text-white text-xs font-mono px-2 py-0.5 rounded-none border border-white/10">
 												{asset.name.split(".").pop()?.toUpperCase()}
 											</span>
 										}
@@ -556,7 +556,7 @@ export default function WorkspaceAssets() {
 											className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
 										>
 											{copiedKey === asset.name ?
-												<Check className="size-3.5 text-emerald-400" />
+												<Check className="size-3.5 text-success" />
 											:	<Copy className="size-3.5" />}
 										</button>
 										<button
@@ -606,12 +606,12 @@ export default function WorkspaceAssets() {
 										>
 											{asset.name}
 										</p>
-										<p className="text-[11px] text-muted-foreground mt-0.5">
+										<p className="text-xs text-muted-foreground mt-0.5">
 											{formatBytes(asset.size)}
 										</p>
 									</div>
 
-									<div className="flex items-center justify-between pt-2 mt-2 border-t border-border/40 text-[10px] text-muted-foreground">
+									<div className="flex items-center justify-between pt-2 mt-2 border-t border-border/40 text-xs text-muted-foreground">
 										<span>
 											{new Date(asset.modified_at).toLocaleDateString(
 												undefined,
@@ -621,7 +621,7 @@ export default function WorkspaceAssets() {
 												},
 											)}
 										</span>
-										<span className="font-mono uppercase text-[9px] bg-muted px-1.5 py-0.5 rounded-none text-foreground/80">
+										<span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-none text-foreground/80">
 											{asset.category}
 										</span>
 									</div>
@@ -633,7 +633,7 @@ export default function WorkspaceAssets() {
 			:	/* List View */
 				<div className="border border-border rounded-none overflow-hidden bg-card/60">
 					<table className="w-full text-left text-xs">
-						<thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase text-[10px] tracking-wider">
+						<thead className="bg-muted/50 border-b border-border text-muted-foreground text-xs">
 							<tr>
 								<th className="py-3 px-4">Name</th>
 								<th className="py-3 px-4">Category</th>
@@ -667,7 +667,7 @@ export default function WorkspaceAssets() {
 											<span className="truncate max-w-xs">{asset.name}</span>
 										</td>
 										<td className="py-3 px-4">
-											<span className="font-mono text-[11px] bg-muted px-2 py-0.5 rounded-none text-foreground/80 capitalize">
+											<span className="font-mono text-xs bg-muted px-2 py-0.5 rounded-none text-foreground/80 capitalize">
 												{asset.category}
 											</span>
 										</td>
@@ -676,10 +676,10 @@ export default function WorkspaceAssets() {
 										</td>
 										<td className="py-3 px-4">
 											{isRemote ?
-												<span className="text-amber-500 font-medium flex items-center gap-1">
+												<span className="text-warning font-medium flex items-center gap-1">
 													○ Not downloaded
 												</span>
-											:	<span className="text-emerald-500 font-medium flex items-center gap-1">
+											:	<span className="text-success font-medium flex items-center gap-1">
 													● Local
 												</span>
 											}
@@ -698,10 +698,10 @@ export default function WorkspaceAssets() {
 											<div className="flex items-center justify-end gap-1.5">
 												<button
 													onClick={(e) => handleCopyMarkdown(e, asset)}
-													className="h-7 px-2 text-[11px] rounded-none bg-muted/60 hover:bg-muted text-foreground flex items-center gap-1 cursor-pointer transition-all border border-border/40"
+													className="h-7 px-2 text-xs rounded-none bg-muted/60 hover:bg-muted text-foreground flex items-center gap-1 cursor-pointer transition-all border border-border/40"
 												>
 													{copiedKey === asset.name ?
-														<Check className="size-3 text-emerald-400" />
+														<Check className="size-3 text-success" />
 													:	<Copy className="size-3" />}
 													{copiedKey === asset.name ? "Copied" : "Copy"}
 												</button>

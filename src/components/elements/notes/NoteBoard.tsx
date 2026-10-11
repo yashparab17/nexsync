@@ -244,7 +244,7 @@ export default function NoteBoard({ notes, positions, edges, activePath, onMove,
 						<svg width="14" height="14" viewBox="0 0 14 14" style={{ color: colorForName(p.name) }}>
 							<path d="M1 1l11 5-4.5 1.5L6 12z" fill="currentColor" />
 						</svg>
-						<span className="ml-3 -mt-1 inline-block px-1 text-[11px] font-medium text-white" style={{ background: colorForName(p.name) }}>
+						<span className="ml-3 -mt-1 inline-block px-1 text-xs font-medium text-white" style={{ background: colorForName(p.name) }}>
 							{p.name}
 						</span>
 					</div>
