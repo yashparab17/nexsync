@@ -511,7 +511,7 @@ export default function WorkspaceNotes() {
 							<PanelLeftOpen className="size-4" />
 						</Button>
 					)}
-					{view === "note" ? <EditorTabs tabs={tabs} active={selectedPath} side={null} dirty={NO_DIRTY} onSelect={setSelectedPath} onClose={closeTab} onReorder={(from, to) => setTabs((prev) => { const next = [...prev]; next.splice(to, 0, next.splice(from, 1)[0]); return next; })} onContextMenu={noteMenu} /> : <div className="flex-1" />}
+					{view === "note" ? <EditorTabs tabs={tabs} active={selectedPath} side={null} dirty={NO_DIRTY} onSelect={setSelectedPath} onClose={closeTab} onReorder={(from, to) => setTabs((prev) => { const next = [...prev]; next.splice(to, 0, next.splice(from, 1)[0]); return next; })} onContextMenu={noteMenu} label={(path) => noteTitle(path.split("/").pop() ?? path)} /> : <div className="flex-1" />}
 					<div className="flex shrink-0 items-stretch border-l" role="group" aria-label="View">
 						{segment("note", "Note", <FileText className="size-3.5" />)}
 						{segment("board", "Board", <LayoutGrid className="size-3.5" />)}

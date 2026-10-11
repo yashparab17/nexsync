@@ -18,7 +18,7 @@ import { minimalChange } from "@/lib/editor/format";
 import { isMarkdownFile } from "@/lib/editor/languages";
 import { exportNote, type NoteFormat } from "@/lib/export";
 import { markdownStats, textStats } from "@/lib/notes/text";
-import { resolveLink, type NoteRef } from "@/lib/notes/links";
+import { noteTitle, resolveLink, type NoteRef } from "@/lib/notes/links";
 import { wikiLinks } from "@/lib/editor/wikiLinks";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -186,7 +186,8 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 			<div className="flex min-h-11 flex-wrap items-center justify-between gap-3 border-b px-4 py-1.5">
 				<div className="flex min-w-0 items-center gap-2 text-sm">
 					{isMarkdown ? <FileText className="size-4 shrink-0 text-info" /> : <Type className="size-4 shrink-0 text-warning" />}
-					<span className="truncate font-medium">{fileName}</span>
+					<span className="truncate font-medium">{noteTitle(fileName)}</span>
+					{isMarkdown && <span className="shrink-0 font-mono text-xs text-muted-foreground">.md</span>}
 					{dirty || saving ? (
 						<span className="flex shrink-0 items-center gap-1.5 text-xs text-warning" role="status">
 							<span className="size-1.5 animate-pulse bg-warning motion-reduce:animate-none" />

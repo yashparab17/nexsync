@@ -18,9 +18,11 @@ interface EditorTabsProps {
 	onClose: (path: string) => void;
 	onReorder: (from: number, to: number) => void;
 	onContextMenu: (e: React.MouseEvent, path: string) => void;
+	// What a tab says, when it is not the file name
+	label?: (path: string) => string;
 }
 
-export default function EditorTabs({ tabs, active, side, dirty, onSelect, onClose, onReorder, onContextMenu }: EditorTabsProps) {
+export default function EditorTabs({ tabs, active, side, dirty, onSelect, onClose, onReorder, onContextMenu, label }: EditorTabsProps) {
 	const [dragging, setDragging] = useState<number | null>(null);
 	const [over, setOver] = useState<number | null>(null);
 	const listRef = useRef<HTMLDivElement>(null);
@@ -41,6 +43,7 @@ export default function EditorTabs({ tabs, active, side, dirty, onSelect, onClos
 		<div ref={listRef} role="tablist" aria-label="Open files" onKeyDown={onKeyDown} className="flex min-w-0 flex-1 overflow-x-auto">
 			{tabs.map((path, i) => {
 				const name = baseName(path);
+					const shownName = label ? label(path) : name;
 				const isActive = active === path;
 				return (
 					<div
@@ -87,7 +90,7 @@ export default function EditorTabs({ tabs, active, side, dirty, onSelect, onClos
 							className="flex h-full items-center gap-2 pr-1 pl-3 outline-none focus-visible:bg-muted"
 						>
 							<FileKindIcon name={name} />
-							<span className={cn(isActive && "font-medium", side === path && "underline decoration-primary decoration-2 underline-offset-4")}>{name}</span>
+							<span className={cn(isActive && "font-medium", side === path && "underline decoration-primary decoration-2 underline-offset-4")}>{shownName}</span>
 							{duplicated.has(name) && <span className="font-mono text-xs text-muted-foreground">{folderOf(path).split("/").pop()}</span>}
 						</button>
 						<button

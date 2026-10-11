@@ -1,14 +1,16 @@
 // React
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
 import { Loader2 } from "lucide-react";
-import { ChevronRight, RefreshCw, Trash2, File, FilePlus, FolderInput, FolderOpen, History, Pencil, Plus } from "@/components/animate-icons";
+import { ChevronRight, ChevronUp, ExternalLink, FilePlus, FolderPlus, History, LayoutGrid, ListFilter, Pencil, Plus, RefreshCw, Search, Trash2, X } from "@/components/animate-icons";
 
 // Components
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
-import PageHeader from "@/components/layout/PageHeader";
+import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
+import FileKindIcon, { FolderKindIcon } from "@/components/elements/editor/FileKindIcon";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -87,6 +89,24 @@ function getParentDir(relPath: string): string {
 	return parts.join("/");
 }
 
+type SortKey = "name" | "modified" | "size" | "kind";
+type ViewMode = "list" | "grid";
+
+// What kind of thing an entry is, as a word: "Folder", "PY file"
+function kindOf(entry: WorkspaceFile): string {
+	if (entry.is_dir) return "Folder";
+	const dot = entry.name.lastIndexOf(".");
+	return dot > 0 ? `${entry.name.slice(dot + 1).toUpperCase()} file` : "File";
+}
+
+const readView = (): ViewMode => {
+	try {
+		return localStorage.getItem("nexsync.files.view") === "grid" ? "grid" : "list";
+	} catch {
+		return "list";
+	}
+};
+
 // ────────────────────────────
 // Name Dialog State
 // ────────────────────────────
@@ -124,6 +144,22 @@ export default function WorkspaceFiles() {
 	const [deleteItem, setDeleteItem] = useState<WorkspaceFile | null>(null);
 	const [historyItem, setHistoryItem] = useState<WorkspaceFile | null>(null);
 	const [isDeleting, setIsDeleting] = useState(false);
+
+	// How the listing looks: sorted, filtered, as a list or tiles, with one entry selected
+	const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "name", desc: false });
+	const [view, setViewState] = useState<ViewMode>(readView);
+	const [filter, setFilter] = useState("");
+	const [selected, setSelected] = useState<string | null>(null);
+	const menu = useContextMenu();
+	const listRef = useRef<HTMLUListElement>(null);
+	const setView = (next: ViewMode) => {
+		setViewState(next);
+		try {
+			localStorage.setItem("nexsync.files.view", next);
+		} catch {
+			// Not remembered this time
+		}
+	};
 
 	// Load directory entries from backend
 	const loadEntries = useCallback(async () => {
@@ -338,183 +374,251 @@ export default function WorkspaceFiles() {
 		})),
 	];
 
+	// Folders first, then the chosen order; a new folder or search starts with nothing selected
+	const shown = useMemo(() => {
+		const q = filter.trim().toLowerCase();
+		const list = q ? entries.filter((e) => e.name.toLowerCase().includes(q)) : entries.slice();
+		const dir = sort.desc ? -1 : 1;
+		return list.sort((a, b) => {
+			if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
+			const by =
+				sort.key === "modified" ? a.modified_at.localeCompare(b.modified_at)
+				: sort.key === "size" ? a.size - b.size
+				: sort.key === "kind" ? kindOf(a).localeCompare(kindOf(b))
+				: 0;
+			return (by || a.name.localeCompare(b.name, undefined, { numeric: true })) * dir;
+		});
+	}, [entries, filter, sort]);
+	useEffect(() => {
+		setSelected(null);
+		setFilter("");
+	}, [currentDir]);
+
+	const chosen = shown.find((e) => e.path === selected) ?? null;
+	const parentDir = getParentDir(currentDir);
+	const openEntry = (entry: WorkspaceFile) => (entry.is_dir ? navigateToDir(joinRelPath(currentDir, entry.name)) : void handleOpenEntry(entry));
+	const sortBy = (key: SortKey) => setSort((cur) => (cur.key === key ? { key, desc: !cur.desc } : { key, desc: key === "modified" }));
+
+	const entryMenu = (e: React.MouseEvent, entry: WorkspaceFile | null): void => {
+		const create: MenuEntry[] = isViewer
+			? []
+			: [
+					{ label: "New file", icon: <FilePlus className="size-4" />, onSelect: () => openCreateDialog("file") },
+					{ label: "New folder", icon: <FolderPlus className="size-4" />, onSelect: () => openCreateDialog("folder") },
+				];
+		if (!entry) return menu.open(e, [...create, ...(create.length ? (["separator"] as MenuEntry[]) : []), { label: "Refresh", icon: <RefreshCw className="size-4" />, onSelect: () => void loadEntries() }]);
+		setSelected(entry.path);
+		menu.open(e, [
+			{ label: entry.is_dir ? "Open folder" : "Open", icon: <ExternalLink className="size-4" />, shortcut: "Enter", onSelect: () => openEntry(entry) },
+			...(entry.is_dir ? [] : [{ label: "File history", icon: <History className="size-4" />, onSelect: () => setHistoryItem(entry) } as MenuEntry]),
+			"separator",
+			{ label: "Rename…", icon: <Pencil className="size-4" />, shortcut: "F2", disabled: isViewer, onSelect: () => openRenameDialog(entry) },
+			{ label: "Delete…", icon: <Trash2 className="size-4" />, shortcut: "Del", danger: true, disabled: isViewer, onSelect: () => setDeleteItem(entry) },
+			"separator",
+			...create,
+		]);
+	};
+
+	// Arrow keys move the selection, Enter opens, F2 renames, Delete deletes, Backspace goes up a folder
+	const onListKey = (e: React.KeyboardEvent) => {
+		if ((e.target as HTMLElement).closest("input")) return;
+		const at = shown.findIndex((x) => x.path === selected);
+		const cols = view === "grid" ? Math.max(1, Math.floor((listRef.current?.clientWidth ?? 0) / 168)) : 1;
+		const go = (i: number) => {
+			e.preventDefault();
+			const next = shown[Math.min(Math.max(i, 0), shown.length - 1)];
+			if (next) {
+				setSelected(next.path);
+				listRef.current?.querySelector<HTMLElement>(`[data-path="${CSS.escape(next.path)}"]`)?.scrollIntoView({ block: "nearest" });
+			}
+		};
+		if (e.key === "ArrowDown") go(at < 0 ? 0 : at + cols);
+		else if (e.key === "ArrowUp") go(at < 0 ? 0 : at - cols);
+		else if (e.key === "ArrowRight" && view === "grid") go(at + 1);
+		else if (e.key === "ArrowLeft" && view === "grid") go(at - 1);
+		else if (e.key === "Home") go(0);
+		else if (e.key === "End") go(shown.length - 1);
+		else if (e.key === "Enter" && chosen) openEntry(chosen);
+		else if (e.key === "F2" && chosen && !isViewer) openRenameDialog(chosen);
+		else if ((e.key === "Delete" || (e.key === "Backspace" && e.metaKey)) && chosen && !isViewer) setDeleteItem(chosen);
+		else if (e.key === "Backspace" && currentDir) navigateToDir(parentDir);
+	};
+
+	const header = (key: SortKey, label: string, className: string) => (
+		<button
+			type="button"
+			onClick={() => sortBy(key)}
+			aria-label={`Sort by ${label}`}
+			className={cn("flex items-center gap-1 outline-none hover:text-foreground focus-visible:text-foreground", className, sort.key === key && "text-foreground")}
+		>
+			{label}
+			{sort.key === key && <ChevronUp className={cn("size-3 transition-transform", sort.desc && "rotate-180")} />}
+		</button>
+	);
+
+	const folderCount = entries.filter((e) => e.is_dir).length;
+
 	return (
-		<div className="space-y-6">
-			{/* Header */}
-			<PageHeader
-				title="Files"
-				description="Manage your workspace files and folders."
-				actions={
-					<>
-{/* Toolbar Actions */}
-				<div className="flex gap-2">
-					<Button
-						variant="outline"
-						size="icon"
-						onPress={() => void loadEntries()}
-						aria-label="Refresh files"
-						isDisabled={isLoading}
-					>
-						<RefreshCw
-							className={`size-4 ${isLoading ? "animate-spin" : ""}`}
-						/>
-					</Button>
-					{!isViewer && (
-						<>
-							<Button
-								variant="outline"
-								onPress={() => openCreateDialog("file")}
+		<div className="flex h-full min-h-0 flex-col bg-background">
+			{/* Toolbar */}
+			<div className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b bg-card/40 px-3 py-1.5">
+				<Button variant="ghost" size="icon-xs" aria-label="Up one folder" isDisabled={!currentDir} onPress={() => navigateToDir(parentDir)}>
+					<ChevronUp className="size-4 -rotate-90" />
+				</Button>
+				<nav className="flex min-w-0 flex-wrap items-center gap-0.5 text-sm" aria-label="Breadcrumb">
+					{crumbs.map((crumb, i) => (
+						<div key={crumb.dir} className="flex items-center gap-0.5">
+							{i > 0 && <ChevronRight className="size-3.5 text-muted-foreground" />}
+							<button
+								type="button"
+								aria-current={i === crumbs.length - 1 ? "page" : undefined}
+								className={cn(
+									"px-1.5 py-0.5 outline-none transition-colors focus-visible:bg-muted",
+									i === crumbs.length - 1 ? "font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+								)}
+								onClick={() => navigateToDir(crumb.dir)}
 							>
-								<FilePlus data-icon="inline-start" className="size-4" />
-								New file
-							</Button>
-							<Button
-								variant="outline"
-								onPress={() => openCreateDialog("folder")}
-							>
-								<FolderInput
-									data-icon="inline-start"
-									className="size-4"
-								/>
-								New folder
-							</Button>
-						</>
+								{crumb.label}
+							</button>
+						</div>
+					))}
+				</nav>
+				<span className="flex-1" />
+				<div className="relative w-56">
+					<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+					<Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter this folder" aria-label="Filter this folder" className="h-8 border bg-background pl-8 text-sm" />
+					{filter && (
+						<button type="button" aria-label="Clear filter" onClick={() => setFilter("")} className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+							<X className="size-3.5" />
+						</button>
 					)}
 				</div>
-					</>
-				}
-			/>
-
-			{/* Breadcrumb navigation */}
-			<nav
-				className="flex flex-wrap items-center gap-1 text-sm"
-				aria-label="Breadcrumb"
-			>
-				{crumbs.map((crumb, i) => (
-					<div key={crumb.dir} className="flex items-center gap-1">
-						{i > 0 && (
-							<ChevronRight className="size-3.5 text-muted-foreground" />
-						)}
+				<div className="flex items-stretch border" role="group" aria-label="View">
+					{(["list", "grid"] as const).map((mode) => (
 						<button
+							key={mode}
 							type="button"
-							className={`rounded-none px-1.5 py-0.5 transition-colors ${
-								i === crumbs.length - 1 ?
-									"font-medium text-foreground"
-								:	"text-muted-foreground hover:bg-muted hover:text-foreground"
-							}`}
-							onClick={() => navigateToDir(crumb.dir)}
+							aria-pressed={view === mode}
+							aria-label={mode === "list" ? "List view" : "Tile view"}
+							onClick={() => setView(mode)}
+							className={cn("flex size-8 items-center justify-center outline-none focus-visible:bg-muted", view === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
 						>
-							{crumb.label}
+							{mode === "list" ? <ListFilter className="size-4" /> : <LayoutGrid className="size-4" />}
 						</button>
-					</div>
-				))}
-			</nav>
-
-			{/* File Listing Table */}
-			{isLoading ?
-				<Loading className="py-16" />
-			: entries.length === 0 ?
-				<div className="border border-dashed py-16 text-center text-sm text-muted-foreground">
-					{currentDir ?
-						"This folder is empty."
-					:	"No files yet. Create your first file or folder to get started."
-					}
+					))}
 				</div>
-			:	<div className="overflow-hidden border">
-					{/* Column headers */}
-					<div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b bg-muted/40 px-4 py-2 text-xs font-semibold text-muted-foreground">
-						<span>Name</span>
-						<span className="w-24 text-right">Size</span>
-						<span className="w-64 text-right">Modified</span>
-					</div>
+				<Button variant="ghost" size="icon-xs" onPress={() => void loadEntries()} aria-label="Refresh files" isDisabled={isLoading}>
+					<RefreshCw className={cn("size-4", isLoading && "animate-spin")} />
+				</Button>
+				{!isViewer && (
+					<>
+						<Button variant="outline" size="sm" onPress={() => openCreateDialog("folder")}>
+							<FolderPlus data-icon="inline-start" className="size-4" />
+							New folder
+						</Button>
+						<Button size="sm" onPress={() => openCreateDialog("file")}>
+							<FilePlus data-icon="inline-start" className="size-4" />
+							New file
+						</Button>
+					</>
+				)}
+			</div>
 
-					<ul className="divide-y">
-						{entries.map((entry) => (
-							<li key={entry.path}>
-								<div className="group grid grid-cols-[1fr_auto_auto] items-center gap-4 px-4 py-2.5 transition-colors hover:bg-muted/50">
-									{/* Name */}
-									<button
-										type="button"
-										className="flex min-w-0 items-center gap-2 text-left"
-										onClick={() => {
-											if (entry.is_dir) {
-												navigateToDir(
-													currentDir ?
-														`${currentDir}/${entry.name}`
-													:	entry.name,
-												);
-											} else {
-												void handleOpenEntry(entry);
-											}
-										}}
+			{/* Listing */}
+			<div className="min-h-0 flex-1 overflow-auto" onContextMenu={(e) => e.target === e.currentTarget && entryMenu(e, null)} onClick={(e) => e.target === e.currentTarget && setSelected(null)}>
+				{isLoading && entries.length === 0 ? (
+					<Loading className="py-16" />
+				) : shown.length === 0 ? (
+					<div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center" onContextMenu={(e) => entryMenu(e, null)}>
+						<p className="text-sm text-muted-foreground">
+							{filter ? `Nothing here matches “${filter}”.` : currentDir ? "This folder is empty." : "No files yet."}
+						</p>
+						{!filter && !isViewer && (
+							<div className="flex gap-2">
+								<Button size="sm" onPress={() => openCreateDialog("file")}>
+									<FilePlus data-icon="inline-start" className="size-4" />
+									New file
+								</Button>
+								<Button size="sm" variant="outline" onPress={() => openCreateDialog("folder")}>
+									<FolderPlus data-icon="inline-start" className="size-4" />
+									New folder
+								</Button>
+							</div>
+						)}
+					</div>
+				) : (
+					<>
+						{view === "list" && (
+							<div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_7rem_6rem_11rem] items-center gap-4 border-b bg-background px-4 py-2 font-mono text-xs text-muted-foreground">
+								{header("name", "Name", "")}
+								{header("kind", "Kind", "")}
+								{header("size", "Size", "justify-end")}
+								{header("modified", "Modified", "justify-end")}
+							</div>
+						)}
+						<ul
+							ref={listRef}
+							role="listbox"
+							aria-label="Files and folders"
+							aria-activedescendant={selected ? `file-${selected}` : undefined}
+							tabIndex={0}
+							onKeyDown={onListKey}
+							className={cn("outline-none focus-visible:shadow-[inset_0_0_0_2px_var(--ring)]", view === "grid" ? "grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2 p-4" : "")}
+						>
+							{shown.map((entry) => {
+								const active = entry.path === selected;
+								return (
+									<li
+										key={entry.path}
+										id={`file-${entry.path}`}
+										data-path={entry.path}
+										role="option"
+										aria-selected={active}
+										onClick={() => setSelected(entry.path)}
+										onDoubleClick={() => openEntry(entry)}
+										onContextMenu={(e) => entryMenu(e, entry)}
+										className={cn(
+											"group cursor-default select-none",
+											view === "grid"
+												? cn("flex flex-col items-center gap-2 border p-4 text-center", active ? "border-primary bg-primary/10" : "border-transparent hover:bg-muted/50")
+												: cn("grid grid-cols-[minmax(0,1fr)_7rem_6rem_11rem] items-center gap-4 border-b px-4 py-2", active ? "bg-primary/10 shadow-[inset_2px_0_0_var(--primary)]" : "hover:bg-muted/50"),
+										)}
 									>
-										{entry.is_dir ?
-											<FolderOpen className="size-4 shrink-0 text-primary/70" />
-										:	<File className="size-4 shrink-0 text-muted-foreground" />
-										}
-										<span className="truncate font-medium">
-											{entry.name}
-											{entry.is_dir && "/"}
+										<span className={cn("flex min-w-0 items-center gap-2.5", view === "grid" && "flex-col")}>
+											{entry.is_dir ? <FolderKindIcon name={entry.name} className={view === "grid" ? "size-10" : "size-5"} /> : <FileKindIcon name={entry.name} className={view === "grid" ? "size-10" : "size-5"} />}
+											<span className={cn("truncate text-sm", view === "grid" ? "w-full" : "font-medium")}>{entry.name}</span>
 										</span>
-									</button>
-
-									{/* Size */}
-									<span className="w-24 text-right text-xs text-muted-foreground">
-										{entry.is_dir && entry.size === 0 ?
-											"—"
-										:	formatSize(entry.size)}
-									</span>
-
-									{/* Modified + actions */}
-									<div className="flex w-64 items-center justify-end gap-1">
-										<span className="mr-2 whitespace-nowrap font-mono text-xs tabular-nums text-muted-foreground">
-											{formatDate(entry.modified_at)}
-										</span>
-
-										{!entry.is_dir && (
-											<Button
-												variant="ghost"
-												size="icon-sm"
-												className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-												onPress={() => setHistoryItem(entry)}
-												aria-label={`History of ${entry.name}`}
-											>
-												<History className="size-3.5" />
-											</Button>
+										{view === "list" && (
+											<>
+												<span className="truncate text-xs text-muted-foreground">{kindOf(entry)}</span>
+												<span className="text-right font-mono text-xs tabular-nums text-muted-foreground">{entry.is_dir ? "—" : formatSize(entry.size)}</span>
+												<span className="text-right font-mono text-xs tabular-nums whitespace-nowrap text-muted-foreground">{formatDate(entry.modified_at)}</span>
+											</>
 										)}
+									</li>
+								);
+							})}
+						</ul>
+					</>
+				)}
+			</div>
 
-										{/* Row actions */}
-										{!isViewer && (
-											<div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-												<Button
-													variant="ghost"
-													size="icon-sm"
-													onPress={() =>
-														openRenameDialog(entry)
-													}
-													aria-label={`Rename ${entry.name}`}
-												>
-													<Pencil className="size-3.5" />
-												</Button>
-												<Button
-													variant="ghost"
-													size="icon-sm"
-													onPress={() =>
-														setDeleteItem(entry)
-													}
-													aria-label={`Delete ${entry.name}`}
-												>
-													<Trash2 className="size-3.5 text-destructive" />
-												</Button>
-											</div>
-										)}
-									</div>
-								</div>
-							</li>
-						))}
-					</ul>
-				</div>
-			}
+			{/* Status line */}
+			<div className="flex h-8 shrink-0 items-center gap-4 border-t bg-card/40 px-4 font-mono text-xs text-muted-foreground" role="status">
+				<span>
+					{shown.length} {shown.length === 1 ? "item" : "items"}
+					{!filter && folderCount > 0 && ` · ${folderCount} ${folderCount === 1 ? "folder" : "folders"}`}
+				</span>
+				{chosen && (
+					<span className="min-w-0 truncate">
+						{chosen.name}
+						{!chosen.is_dir && ` · ${formatSize(chosen.size)}`}
+					</span>
+				)}
+				<span className="ml-auto hidden sm:inline">Enter open · F2 rename · Del delete · Backspace up</span>
+			</div>
+
+			{menu.menu}
 
 			{/* Create / Rename Dialog */}
 			<Dialog
