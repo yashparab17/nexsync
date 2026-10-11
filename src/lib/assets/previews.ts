@@ -27,11 +27,18 @@ export function textSnippet(base64: string, maxChars = 600): string {
 	return new TextDecoder().decode(head).slice(0, maxChars);
 }
 
+// The PDF reader, loaded the first time one is needed. The legacy build runs on the older web views some systems have.
+export async function loadPdfjs() {
+	const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+	pdfjs.GlobalWorkerOptions.workerSrc = (await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")).default;
+	return pdfjs;
+}
+
+export const base64Bytes = bytesOf;
+
 // The first page of a PDF, drawn small
 export async function pdfFirstPage(base64: string): Promise<TilePreview> {
-	const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-	const worker = (await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")).default;
-	pdfjs.GlobalWorkerOptions.workerSrc = worker;
+	const pdfjs = await loadPdfjs();
 	const task = pdfjs.getDocument({ data: bytesOf(base64) });
 	const doc = await task.promise;
 	try {

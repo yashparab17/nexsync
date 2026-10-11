@@ -5,6 +5,7 @@ import { Check, ChevronRight, Copy, Download, FileText, Film, Headphones, Histor
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import Loading from "@/components/Loading";
+import PdfViewer from "@/components/elements/PdfViewer";
 
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { displaySize } from "@/lib/assets/displaySize";
@@ -199,7 +200,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 										<audio src={dataUrl} controls className="w-full" />
 									</div>
 								)}
-								{isPdf && <iframe src={dataUrl} title={asset.name} className="h-full min-h-[60vh] w-full border-0 bg-card" />}
+								{isPdf && <PdfViewer name={asset.name} base64={dataUrl.slice(dataUrl.indexOf(",") + 1)} />}
 								{!isImage && !isVideo && !isAudio && !isPdf && (
 									<div className="m-auto flex max-w-sm flex-col items-center gap-3 border bg-card p-8 text-center">
 										<FileText className="size-12 text-muted-foreground" />

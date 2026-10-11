@@ -4,6 +4,8 @@ import { displaySize } from "@/lib/assets/displaySize";
 import { justify } from "@/lib/assets/justify";
 import { MAX_PREVIEW_BYTES, pdfFirstPage, previewKind, textSnippet, videoFrame, type TilePreview } from "@/lib/assets/previews";
 import { fileToBase64 } from "@/lib/assets/uploadScale";
+import { Ellipsis } from "lucide-react";
+import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -400,6 +402,28 @@ export default function WorkspaceAssets() {
 		{ key: "other", label: "Other", count: categoryCounts.other },
 	];
 
+	const menu = useContextMenu();
+	const renameAsset = (asset: AssetItem) => {
+		setAssetToRename(asset);
+		setNewName(asset.name);
+	};
+	// The same actions as the buttons on a wide tile, for narrow tiles and for a right-click
+	const assetMenu = (e: { clientX: number; clientY: number; preventDefault: () => void }, asset: AssetItem) => {
+		const entries: MenuEntry[] = [
+			{ label: "Open", icon: <ImageIcon className="size-4" />, onSelect: () => setPreviewAsset(asset) },
+			{ label: "Copy Markdown link", icon: <Copy className="size-4" />, onSelect: () => copy(asset.category === "image" ? `![${asset.name}](${asset.path.replace(/^\/+/, "")})` : `[${asset.name}](${asset.path.replace(/^\/+/, "")})`, asset.name) },
+			{ label: "File history", icon: <History className="size-4" />, onSelect: () => setHistoryAsset(asset) },
+			...(isViewer
+				? []
+				: ([
+						"separator",
+						{ label: "Rename…", icon: <Pencil className="size-4" />, onSelect: () => renameAsset(asset) },
+						{ label: "Delete…", icon: <Trash2 className="size-4" />, danger: true, onSelect: () => setAssetToDelete(asset) },
+					] as MenuEntry[])),
+		];
+		menu.open(e, entries);
+	};
+
 	const actionButton = "flex size-8 cursor-pointer items-center justify-center bg-background/90 text-foreground outline-none backdrop-blur hover:bg-background focus-visible:ring-2 focus-visible:ring-ring";
 
 	return (
@@ -520,14 +544,15 @@ export default function WorkspaceAssets() {
 							return (
 								<li
 									key={asset.name}
-									className="group absolute animate-in fade-in zoom-in-95 duration-300 [transition:left_350ms_cubic-bezier(.22,1,.36,1),top_350ms_cubic-bezier(.22,1,.36,1),width_350ms_cubic-bezier(.22,1,.36,1),height_350ms_cubic-bezier(.22,1,.36,1)] motion-reduce:animate-none motion-reduce:transition-none"
+									onContextMenu={(e) => assetMenu(e, asset)}
+									className="group absolute overflow-hidden animate-in fade-in zoom-in-95 duration-300 [transition:left_350ms_cubic-bezier(.22,1,.36,1),top_350ms_cubic-bezier(.22,1,.36,1),width_350ms_cubic-bezier(.22,1,.36,1),height_350ms_cubic-bezier(.22,1,.36,1)] motion-reduce:animate-none motion-reduce:transition-none"
 									style={{ left: box.x + PAD, top: box.y + PAD, width: box.w, height: box.h }}
 								>
 									<button
 										type="button"
 										onClick={() => setPreviewAsset(asset)}
 										aria-label={`${asset.name}, ${asset.category}, ${formatBytes(asset.size)}${isRemote ? ", not downloaded" : ""}`}
-										className="relative block h-full w-full cursor-pointer overflow-hidden bg-card text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+										className="relative block h-full w-full cursor-pointer overflow-hidden bg-card text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
 									>
 										{asset.category === "image" && thumbnail && !isRemote ? (
 											<img
@@ -564,30 +589,40 @@ export default function WorkspaceAssets() {
 											</span>
 										</span>
 									</button>
+									{/* Wide tiles show every action; narrow ones show one button that opens the same list as a menu */}
 									<div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none">
-										<button type="button" aria-label={`Copy a Markdown link to ${asset.name}`} onClick={(e) => handleCopyMarkdown(e, asset)} className={actionButton}>
-											{copiedKey === asset.name ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
-										</button>
-										<button type="button" aria-label={`History of ${asset.name}`} onClick={() => setHistoryAsset(asset)} className={actionButton}>
-											<History className="size-4" />
-										</button>
-										{!isViewer && (
+										{box.w >= 200 ? (
 											<>
-												<button
-													type="button"
-													aria-label={`Rename ${asset.name}`}
-													onClick={() => {
-														setAssetToRename(asset);
-														setNewName(asset.name);
-													}}
-													className={actionButton}
-												>
-													<Pencil className="size-4" />
+												<button type="button" aria-label={`Copy a Markdown link to ${asset.name}`} onClick={(e) => handleCopyMarkdown(e, asset)} className={actionButton}>
+													{copiedKey === asset.name ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
 												</button>
-												<button type="button" aria-label={`Delete ${asset.name}`} onClick={() => setAssetToDelete(asset)} className={cn(actionButton, "hover:bg-destructive hover:text-white")}>
-													<Trash2 className="size-4" />
+												<button type="button" aria-label={`History of ${asset.name}`} onClick={() => setHistoryAsset(asset)} className={actionButton}>
+													<History className="size-4" />
 												</button>
+												{!isViewer && (
+													<>
+														<button type="button" aria-label={`Rename ${asset.name}`} onClick={() => renameAsset(asset)} className={actionButton}>
+															<Pencil className="size-4" />
+														</button>
+														<button type="button" aria-label={`Delete ${asset.name}`} onClick={() => setAssetToDelete(asset)} className={cn(actionButton, "hover:bg-destructive hover:text-white")}>
+															<Trash2 className="size-4" />
+														</button>
+													</>
+												)}
 											</>
+										) : (
+											<button
+												type="button"
+												aria-label={`Actions for ${asset.name}`}
+												aria-haspopup="menu"
+												onClick={(e) => {
+													const r = e.currentTarget.getBoundingClientRect();
+													assetMenu({ clientX: r.left, clientY: r.bottom + 4, preventDefault: () => {} }, asset);
+												}}
+												className={actionButton}
+											>
+												<Ellipsis className="size-4" />
+											</button>
 										)}
 									</div>
 								</li>
@@ -714,6 +749,8 @@ export default function WorkspaceAssets() {
 				</div>
 				)}
 			</div>
+
+			{menu.menu}
 
 			{/* Asset Upload Modal */}
 			{isUploadOpen && workspace?.path && (
