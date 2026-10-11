@@ -52,6 +52,6 @@ export function fromHandle(Icon: ComponentType<any>) {
       }
     }, [active]);
     const decorative = !props['aria-label'] && !props['aria-labelledby'];
-    return <Icon ref={ref} size={24} aria-hidden={decorative || undefined} className={cn('lucide [&>svg]:size-full!', className)} {...props} />;
+    return <Icon ref={ref} size={24} aria-hidden={decorative || undefined} className={cn('lucide [&>svg]:h-full! [&>svg]:w-full!', className)} {...props} />;
   };
 }

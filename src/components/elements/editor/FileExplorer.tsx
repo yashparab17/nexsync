@@ -1,23 +1,15 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { ChevronRight, RefreshCw, Search, Trash2, ChevronDown, ChevronsDownUp, Download, File, FileCode, FilePlus, FileText, Folder, FolderOpen, FolderPlus, Pencil, X } from "@/components/animate-icons";
+import { ChevronRight, Columns3, Copy, RefreshCw, Search, Trash2, ChevronDown, ChevronsDownUp, Download, FilePlus, Folder, FolderOpen, FolderPlus, Pencil, X } from "@/components/animate-icons";
 
+import FileKindIcon from "./FileKindIcon";
+import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
 import { Button } from "@/components/ui/button";
 import PresenceDots from "@/components/elements/PresenceDots";
-import { extensionOf } from "@/lib/editor/languages";
 import { cn } from "@/lib/utils";
 import type { WorkspaceFile } from "@/types/workspace";
 
-const TEXT_EXTENSIONS = new Set(["txt", "md", "markdown", "log", "csv", "rst"]);
-
 // Entry paths from the backend start with a slash; the rest of the Editor tab uses them without it
 const toRel = (path: string) => path.replace(/^\/+/, "");
-
-function FileIcon({ name }: { name: string }) {
-	const ext = extensionOf(name);
-	if (TEXT_EXTENSIONS.has(ext)) return <FileText className="size-3.5 shrink-0 text-muted-foreground" />;
-	if (ext && ext !== name.toLowerCase()) return <FileCode className="size-3.5 shrink-0 text-primary/80" />;
-	return <File className="size-3.5 shrink-0 text-muted-foreground" />;
-}
 
 interface FileExplorerProps {
 	// Top-level folders shown, such as editor and files
@@ -45,6 +37,9 @@ interface FileExplorerProps {
 	// Zips the folder that new files go in; the result or its error shows under the filter
 	onExport: () => void;
 	notice: { ok: boolean; text: string } | null;
+	// Open a file in the pane beside the current one, and copy a path; the right-click menu offers both
+	onOpenSide?: (rel: string) => void;
+	onCopyPath?: (rel: string) => void;
 }
 
 // The Editor tab's file browser: a tree with folder actions, rename, delete, a filter and keyboard control
@@ -68,7 +63,10 @@ export default function FileExplorer({
 	onFilterStart,
 	onExport,
 	notice,
+	onOpenSide,
+	onCopyPath,
 }: FileExplorerProps) {
+	const { open: openMenu, menu } = useContextMenu();
 	const [query, setQuery] = useState("");
 	const treeRef = useRef<HTMLDivElement>(null);
 	const needle = query.trim().toLowerCase();
@@ -106,12 +104,33 @@ export default function FileExplorer({
 				if (isDir && isOpen) onToggleDir(rel);
 				break;
 			case "F2":
+			case "r":
 				if (entry && !readOnly) onRename(entry);
 				break;
 			case "Delete":
+			case "d":
 				if (entry && !readOnly) onDelete(entry);
 				break;
+			// As in NvimTree: a adds a file next to (or inside) the row, y copies its path
+			case "a":
+				if (!readOnly) onNew("file", isDir ? rel : rel.split("/").slice(0, -1).join("/") || targetDir);
+				break;
+			case "y":
+				onCopyPath?.(rel);
+				break;
 		}
+	};
+
+	const entryMenu = (entry: WorkspaceFile | null, rel: string): MenuEntry[] => {
+		const isDir = entry ? entry.is_dir : true;
+		const into = isDir ? rel : rel.split("/").slice(0, -1).join("/");
+		return [
+			...(!isDir ? [{ label: "Open", onSelect: () => onOpenFile(rel) }, ...(onOpenSide ? [{ label: "Open to the side", icon: <Columns3 className="size-4" />, shortcut: "Ctrl+Enter", onSelect: () => onOpenSide(rel) }] : []), "separator" as const] : []),
+			...(!readOnly ? [{ label: "New file", icon: <FilePlus className="size-4" />, shortcut: "a", onSelect: () => onNew("file", into) }, { label: "New folder", icon: <FolderPlus className="size-4" />, onSelect: () => onNew("folder", into) }] : []),
+			...(entry && !readOnly ? ["separator" as const, { label: "Rename", icon: <Pencil className="size-4" />, shortcut: "F2", onSelect: () => onRename(entry) }, { label: "Delete", icon: <Trash2 className="size-4" />, shortcut: "Del", danger: true, onSelect: () => onDelete(entry) }] : []),
+			"separator" as const,
+			{ label: "Copy path", icon: <Copy className="size-4" />, shortcut: "y", onSelect: () => onCopyPath?.(rel) },
+		];
 	};
 
 	const renderDir = (dir: string): React.ReactNode =>
@@ -124,8 +143,9 @@ export default function FileExplorer({
 				return (
 					<div key={entry.path}>
 						<div
+							onContextMenu={(e) => openMenu(e, entryMenu(entry, rel))}
 							className={cn(
-								"group flex items-center pr-1 text-xs hover:bg-muted/50",
+								"group flex items-center pr-1 text-sm hover:bg-muted/50",
 								isActive && "bg-primary/10 shadow-[inset_2px_0_0_var(--color-primary)]",
 								entry.is_dir && targetDir === rel && !filtering && "bg-muted/60",
 							)}
@@ -136,7 +156,7 @@ export default function FileExplorer({
 								title={rel}
 								className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pl-2 text-left outline-none focus-visible:bg-muted"
 								onClick={() => (entry.is_dir ? onToggleDir(rel) : onOpenFile(rel))}
-								onKeyDown={(e) => onRowKey(e, entry, rel, isOpen)}
+								onKeyDown={(e) => (e.key === "Enter" && e.ctrlKey && !entry.is_dir ? onOpenSide?.(rel) : onRowKey(e, entry, rel, isOpen))}
 							>
 								{entry.is_dir ? (
 									<>
@@ -150,7 +170,7 @@ export default function FileExplorer({
 								) : (
 									<>
 										<span className="w-3 shrink-0" />
-										<FileIcon name={entry.name} />
+										<FileKindIcon name={entry.name} className="size-3.5" />
 									</>
 								)}
 								<span className={cn("truncate", isActive && "font-medium")}>{entry.name}</span>
@@ -197,9 +217,9 @@ export default function FileExplorer({
 			});
 
 	return (
-		<div className="flex w-56 shrink-0 flex-col border-r bg-muted/20 lg:w-72">
+		<div className="flex h-full min-w-0 flex-col bg-sidebar">
 			<div className="flex items-center justify-between px-3 pt-3 pb-1">
-				<h2 className="text-xs font-semibold text-muted-foreground">Explorer</h2>
+				<h2 className="font-mono text-sm text-muted-foreground">explorer</h2>
 				<div className="flex">
 					{!readOnly && (
 						<>
@@ -263,7 +283,7 @@ export default function FileExplorer({
 					if (filtering && !isOpen) return null;
 					return (
 						<div key={root}>
-							<div className={cn("group flex items-center pr-1 hover:bg-muted/50", targetDir === root && !filtering && "bg-muted/60")}>
+							<div onContextMenu={(e) => openMenu(e, entryMenu(null, root))} className={cn("group flex items-center pr-1 hover:bg-muted/50", targetDir === root && !filtering && "bg-muted/60")}>
 								<button
 									type="button"
 									data-explorer-row
@@ -300,6 +320,7 @@ export default function FileExplorer({
 					<p className="px-3 py-2 text-xs text-muted-foreground">No files match “{query.trim()}”.</p>
 				)}
 			</div>
+			{menu}
 		</div>
 	);
 }

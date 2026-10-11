@@ -1,17 +1,33 @@
-import PageHeader from "@/components/layout/PageHeader";
-import { useCallback, useEffect, useState } from "react";
-import { UsersRound, Code2, Terminal, X, AlertTriangle, Pencil, Plus, Trash2 } from "@/components/animate-icons";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { AlertTriangle, Columns3, Command, Eye, FilePlus, FileSearch, FolderPlus, Pencil, Plus, Save, Search, Sparkles, StickyNote, Terminal, Trash2, UsersRound, X, GitBranch, History, MessageSquareDiff, Keyboard } from "@/components/animate-icons";
 
-import CodeTab from "@/components/elements/editor/CodeTab";
+import CodeTabBase from "@/components/elements/editor/CodeTab";
+import type { CursorInfo } from "@/components/elements/editor/CodeEditor";
+import type { CodeTabHandle, CodeTabStatus } from "@/components/elements/editor/codeTabTypes";
+import EditorDashboard from "@/components/elements/editor/EditorDashboard";
+import EditorPanel, { type PanelTab } from "@/components/elements/editor/EditorPanel";
+import EditorStatusLine from "@/components/elements/editor/EditorStatusLine";
+import EditorTabs from "@/components/elements/editor/EditorTabs";
+import EditorToolbar from "@/components/elements/editor/EditorToolbar";
 import FileExplorer from "@/components/elements/editor/FileExplorer";
-import RunPanel from "@/components/elements/editor/RunPanel";
+import QuickOpen, { type EditorCommand } from "@/components/elements/editor/QuickOpen";
+import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
+import MarkdownPreview from "@/components/elements/MarkdownPreview";
+import Splitter from "@/components/elements/Splitter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { exportFolders } from "@/lib/export";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
-import { isBinaryFile, isDocumentFile } from "@/lib/editor/languages";
+import { usePanelSize } from "@/hooks/usePanelSize";
+import { useReportItem } from "@/hooks/usePresence";
+import { isBinaryFile, isDocumentFile, isMarkdownFile } from "@/lib/editor/languages";
+import { baseName } from "@/lib/editor/fileKinds";
+import type { VimCommand } from "@/lib/editor/vimSetup";
+import { DEFAULT_EDITOR_PREFS, FONT_SIZE_RANGE, setEditorPrefs, useEditorPrefs } from "@/lib/editorPrefs";
+import { pushRecent, readRecent } from "@/lib/recentFiles";
 import {
 	createWorkspaceFile,
 	createWorkspaceFolder,
@@ -21,15 +37,33 @@ import {
 	renameWorkspaceItem,
 	renameYjsDoc,
 } from "@/lib/tauri";
-import { cn } from "@/lib/utils";
 import { useIsViewer, useP2P } from "@/store/p2p/P2PContext";
-import { useReportItem } from "@/hooks/usePresence";import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { WorkspaceFile } from "@/types/workspace";
+
+// Open files stay mounted while hidden, so each keeps its cursor, undo history and live connection
+const CodeTab = memo(CodeTabBase);
 
 // Folders shown in the explorer: code lives in editor, and files holds anything else worth opening here
 const ROOTS = ["editor", "files", "notes"];
 
 const toRel = (path: string) => path.replace(/^\/+/, "");
+
+const read = (key: string, fallback: boolean) => {
+	try {
+		const v = localStorage.getItem(key);
+		return v === null ? fallback : v === "true";
+	} catch {
+		return fallback;
+	}
+};
+const remember = (key: string, value: boolean) => {
+	try {
+		localStorage.setItem(key, String(value));
+	} catch {
+		// Not remembered this time
+	}
+};
 
 interface NewItemDialog {
 	kind: "file" | "folder";
@@ -37,12 +71,15 @@ interface NewItemDialog {
 	value: string;
 }
 
-// Code editor tab: an explorer, several open files as tabs, blame and contributions, and run output
+// The Editor: an explorer, open files as tabs (optionally split in two, or beside a Markdown preview), a command palette
+// and quick open, optional Vim keys, a terminal panel and a status line. Everyone in the workspace edits the same files live.
 export default function WorkspaceEditor() {
 	const { workspace, refreshStats, addActivityEvent } = useWorkspace();
 	const isViewer = useIsViewer();
 	const logError = useErrorLog();
+	const navigate = useNavigate();
 	const { lastSyncedFile, viewersAt } = useP2P();
+	const prefs = useEditorPrefs();
 	const workspacePath = workspace?.path ?? "";
 
 	const [expanded, setExpanded] = useState<Set<string>>(new Set(["editor"]));
@@ -50,16 +87,35 @@ export default function WorkspaceEditor() {
 	const [targetDir, setTargetDir] = useState("editor");
 	const [tabs, setTabs] = useState<string[]>([]);
 	const [active, setActive] = useState<string | null>(null);
-	useReportItem(active);
+	// The file shown in the right-hand pane when the editor is split, and the one whose pane was used last
+	const [side, setSide] = useState<string | null>(null);
+	const [focusPath, setFocusPath] = useState<string | null>(null);
+	const current = focusPath && (focusPath === active || focusPath === side) ? focusPath : active;
+	useReportItem(current);
 	const [dirty, setDirty] = useState<Set<string>>(new Set());
+	const [statuses, setStatuses] = useState<Record<string, CodeTabStatus>>({});
+	const [cursors, setCursors] = useState<Record<string, CursorInfo>>({});
+	const [texts, setTexts] = useState<Record<string, string>>({});
+	const [vimMode, setVimMode] = useState("");
 	const [showBlame, setShowBlame] = useState(false);
-	const [showRun, setShowRun] = useState(true);
+	const [preview, setPreview] = useState(false);
+	const [explorerOpen, setExplorerOpen] = useState(() => read("nexsync.editor.explorer", true));
+	const [showPanel, setShowPanel] = useState(() => read("nexsync.editor.panel", true));
+	const [panelTab, setPanelTab] = useState<PanelTab>("output");
+	const [explorerWidth, setExplorerWidth] = usePanelSize("editor.explorer", 288, 180, 560);
+	const [panelHeight, setPanelHeight] = usePanelSize("editor.panel", 208, 96, 640);
+	const [splitWidth, setSplitWidth] = usePanelSize("editor.split", 640, 240, 2400);
+	const [recent, setRecent] = useState<string[]>(() => readRecent(workspacePath));
+	const [quick, setQuick] = useState<{ open: boolean; initial: string; side: boolean }>({ open: false, initial: "", side: false });
 	const [newItem, setNewItem] = useState<NewItemDialog | null>(null);
 	const [itemError, setItemError] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState<WorkspaceFile | null>(null);
 	const [closing, setClosing] = useState<string | null>(null);
 	const [exportNotice, setExportNotice] = useState<{ ok: boolean; text: string } | null>(null);
 	const [renaming, setRenaming] = useState<{ entry: WorkspaceFile; value: string } | null>(null);
+	const { open: openMenu, menu } = useContextMenu();
+	const handles = useRef(new Map<string, CodeTabHandle | null>());
+	const handleRefs = useRef(new Map<string, (h: CodeTabHandle | null) => void>());
 
 	const loadDir = useCallback(
 		async (dir: string) => {
@@ -94,16 +150,22 @@ export default function WorkspaceEditor() {
 	};
 
 	const openPath = useCallback(
-		(rel: string) => {
+		(rel: string, options?: { side?: boolean }) => {
 			const name = rel.split("/").pop() ?? rel;
 			if (isBinaryFile(name) || isDocumentFile(name)) {
 				openWorkspaceFile(workspacePath, rel).catch((err) => logError(err, { source: "editor", workspace: workspacePath }));
 				return;
 			}
 			setTabs((prev) => (prev.includes(rel) ? prev : [...prev, rel]));
-			setActive(rel);
+			if (options?.side && rel !== active) setSide(rel);
+			else {
+				setActive(rel);
+				setFocusPath(rel);
+				setSide((s) => (s === rel ? null : s));
+			}
+			setRecent(pushRecent(workspacePath, rel));
 		},
-		[workspacePath, logError],
+		[workspacePath, logError, active],
 	);
 
 	useOpenParam((path) => openPath(toRel(path)), !!workspacePath);
@@ -116,6 +178,7 @@ export default function WorkspaceEditor() {
 
 	const discardTab = (path: string) => {
 		setClosing(null);
+		setSide((s) => (s === path ? null : s));
 		setTabs((prev) => {
 			const next = prev.filter((p) => p !== path);
 			setActive((current) => (current === path ? (next[Math.max(0, prev.indexOf(path) - 1)] ?? null) : current));
@@ -215,113 +278,419 @@ export default function WorkspaceEditor() {
 		}
 	};
 
-	return (
-		<div className="flex h-[calc(100vh-10rem)] flex-col">
-			{/* Header */}
-			<PageHeader title="Editor" description="Code and text files, edited live with everyone in the workspace." />
 
-			<div className="flex min-h-0 flex-1 border">
-			<FileExplorer
-				roots={ROOTS}
-				entries={entries}
-				expanded={expanded}
-				targetDir={targetDir}
-				activePath={active}
-				openPaths={tabs}
-				dirtyPaths={dirty}
-				readOnly={isViewer}
-				viewers={(rel) => viewersAt("editor", rel)}
-				onToggleDir={toggleDir}
-				onOpenFile={openPath}
-				onNew={(kind, dir) => {
-					setItemError(null);
-					setNewItem({ kind, dir, value: "" });
-				}}
-				onRename={(entry) => {
-					setItemError(null);
-					setRenaming({ entry, value: entry.name });
-				}}
-				onDelete={setDeleting}
-				onRefresh={refresh}
-				onCollapseAll={() => {
-					setExpanded(new Set());
-					setTargetDir("editor");
-				}}
-				onFilterStart={() => void loadTree()}
-				notice={exportNotice}
-				onExport={async () => {
-					setExportNotice(null);
-					try {
-						const name = `${workspace?.name ?? "workspace"}-${targetDir.replace(/\//g, "-")}`;
-						const result = await exportFolders(workspacePath, [targetDir], name);
-						if (result) setExportNotice({ ok: true, text: `Saved ${result.count} ${result.count === 1 ? "file" : "files"} to ${result.dest}` });
-					} catch (err) {
-						setExportNotice({ ok: false, text: err instanceof Error ? err.message : String(err) });
-					}
-				}}
+	const handleOf = (path: string | null) => (path ? handles.current.get(path) ?? undefined : undefined);
+	const refFor = (path: string) => {
+		let fn = handleRefs.current.get(path);
+		if (!fn) {
+			fn = (h) => void handles.current.set(path, h);
+			handleRefs.current.set(path, fn);
+		}
+		return fn;
+	};
+
+	const onStatus = useCallback((path: string, status: CodeTabStatus) => setStatuses((prev) => (JSON.stringify(prev[path]) === JSON.stringify(status) ? prev : { ...prev, [path]: status })), []);
+	const onCursor = useCallback((path: string, info: CursorInfo) => setCursors((prev) => ({ ...prev, [path]: info })), []);
+	const onText = useCallback((path: string, text: string) => setTexts((prev) => (prev[path] === text ? prev : { ...prev, [path]: text })), []);
+
+	// A file that is open beside the current one, or the preview of a Markdown file, takes the right-hand pane
+	const sideOpen = side !== null && side !== active && tabs.includes(side);
+	const canPreview = !!active && isMarkdownFile(active);
+	const previewOpen = preview && canPreview && !sideOpen;
+
+	const toggleExplorer = () => setExplorerOpen((v) => (remember("nexsync.editor.explorer", !v), !v));
+	const togglePanel = (tab?: PanelTab) => {
+		if (tab && (!showPanel || panelTab !== tab)) {
+			setPanelTab(tab);
+			if (!showPanel) {
+				setShowPanel(true);
+				remember("nexsync.editor.panel", true);
+			}
+			return;
+		}
+		setShowPanel((v) => (remember("nexsync.editor.panel", !v), !v));
+	};
+	const toggleSide = () => {
+		if (sideOpen) return setSide(null);
+		const other = tabs.find((t) => t !== active);
+		if (other) {
+			setSide(other);
+			setPreview(false);
+		} else setQuick({ open: true, initial: "", side: true });
+	};
+
+	const files = useMemo(() => Object.values(entries).flat().filter((e) => !e.is_dir).map((e) => toRel(e.path)).filter((p) => !isBinaryFile(baseName(p)) && !isDocumentFile(baseName(p))), [entries]);
+	const openQuick = (initial = "", asSide = false) => {
+		void loadTree();
+		setQuick({ open: true, initial, side: asSide });
+	};
+
+	const cycle = (step: number) => {
+		if (tabs.length < 2 || !active) return;
+		const next = tabs[(tabs.indexOf(active) + step + tabs.length) % tabs.length];
+		setActive(next);
+		setFocusPath(next);
+	};
+
+	// What a person typing Vim commands can ask for
+	const vimRun = (command: VimCommand) => {
+		const target = current;
+		switch (command) {
+			case "write":
+				return void handleOf(target)?.save();
+			case "quit":
+				return target ? closeTab(target) : undefined;
+			case "writeQuit":
+				return void handleOf(target)?.save().then(() => target && discardTab(target));
+			case "files":
+				return openQuick();
+			case "commands":
+				return openQuick(">");
+			case "explorer":
+				return toggleExplorer();
+			case "nextTab":
+				return cycle(1);
+			case "prevTab":
+				return cycle(-1);
+			case "closeTab":
+				return target ? closeTab(target) : undefined;
+			case "split":
+				return toggleSide();
+			case "panel":
+				return togglePanel();
+			case "preview":
+				return canPreview && setPreview((v) => !v);
+		}
+	};
+	const vimRef = useRef(vimRun);
+	vimRef.current = vimRun;
+	const onVimCommand = useCallback((command: VimCommand) => vimRef.current(command), []);
+
+	// Newest first: after the file just closed, the one beside it takes over
+	const closeOthers = (keep: string) => {
+		for (const t of tabs.filter((p) => p !== keep)) if (!dirty.has(t)) discardTab(t);
+		setActive(keep);
+	};
+
+	const commands: EditorCommand[] = [
+		{ id: "quick", group: "Go", label: "Go to file…", hint: "Ctrl P", icon: <FileSearch className="size-4" />, run: () => openQuick() },
+		{ id: "line", group: "Go", label: "Go to line…", hint: "Ctrl G", icon: <Keyboard className="size-4" />, run: () => openQuick(":") },
+		{ id: "notes", group: "Go", label: "Open notes", icon: <StickyNote className="size-4" />, run: () => navigate("/workspace/notes") },
+		...(isViewer ? [] : [{ id: "new-file", group: "File", label: "New file", hint: "Ctrl N", icon: <FilePlus className="size-4" />, run: () => { setItemError(null); setNewItem({ kind: "file", dir: targetDir, value: "" }); } }, { id: "new-folder", group: "File", label: "New folder", icon: <FolderPlus className="size-4" />, run: () => { setItemError(null); setNewItem({ kind: "folder", dir: targetDir, value: "" }); } }]),
+		{ id: "save", group: "File", label: "Save", hint: "Ctrl S", icon: <Save className="size-4" />, run: () => void handleOf(current)?.save() },
+		{ id: "close", group: "File", label: "Close tab", hint: "Ctrl W", icon: <X className="size-4" />, run: () => current && closeTab(current) },
+		{ id: "close-others", group: "File", label: "Close other tabs", run: () => current && closeOthers(current) },
+		{ id: "close-all", group: "File", label: "Close all tabs", run: () => tabs.filter((t) => !dirty.has(t)).forEach(discardTab) },
+		{ id: "copy-path", group: "File", label: "Copy path of this file", run: () => current && void navigator.clipboard?.writeText(current) },
+		{ id: "explorer", group: "View", label: "Toggle explorer", hint: "Ctrl B", icon: <FolderPlus className="size-4" />, run: toggleExplorer },
+		{ id: "terminal", group: "View", label: "Toggle terminal", hint: "Ctrl J", icon: <Terminal className="size-4" />, run: () => togglePanel("output") },
+		{ id: "problems", group: "View", label: "Show problems", icon: <AlertTriangle className="size-4" />, run: () => togglePanel("problems") },
+		{ id: "split", group: "View", label: sideOpen ? "Close the split" : "Open to the side", hint: "Ctrl \\", icon: <Columns3 className="size-4" />, run: toggleSide },
+		{ id: "preview", group: "View", label: previewOpen ? "Hide Markdown preview" : "Show Markdown preview", hint: "Ctrl Shift V", icon: <Eye className="size-4" />, run: () => canPreview && setPreview((v) => !v) },
+		{ id: "blame", group: "View", label: showBlame ? "Hide blame" : "Show blame", icon: <UsersRound className="size-4" />, run: () => setShowBlame((v) => !v) },
+		{ id: "zoom-in", group: "View", label: "Larger text", hint: "Ctrl +", run: () => setEditorPrefs({ fontSize: Math.min(FONT_SIZE_RANGE.max, prefs.fontSize + 1) }) },
+		{ id: "zoom-out", group: "View", label: "Smaller text", hint: "Ctrl -", run: () => setEditorPrefs({ fontSize: Math.max(FONT_SIZE_RANGE.min, prefs.fontSize - 1) }) },
+		{ id: "zoom-reset", group: "View", label: "Reset text size", run: () => setEditorPrefs({ fontSize: DEFAULT_EDITOR_PREFS.fontSize }) },
+		{ id: "vim", group: "Editor", label: prefs.vim ? "Turn off Vim keys" : "Turn on Vim keys", icon: <Keyboard className="size-4" />, run: () => setEditorPrefs({ vim: !prefs.vim }) },
+		{ id: "wrap", group: "Editor", label: prefs.wrap ? "Do not wrap long lines" : "Wrap long lines", hint: "Alt Z", run: () => setEditorPrefs({ wrap: !prefs.wrap }) },
+		{ id: "relative", group: "Editor", label: prefs.relativeNumbers ? "Number lines from the top" : "Number lines from the cursor", run: () => setEditorPrefs({ relativeNumbers: !prefs.relativeNumbers }) },
+		{ id: "minimap", group: "Editor", label: prefs.minimap ? "Hide minimap" : "Show minimap", run: () => setEditorPrefs({ minimap: !prefs.minimap }) },
+		{ id: "find", group: "Editor", label: "Find in file", hint: "Ctrl F", icon: <Search className="size-4" />, run: () => handleOf(current)?.find() },
+		...(statuses[current ?? ""]?.canFormat ? [{ id: "format", group: "Editor", label: "Format file", hint: "Shift Alt F", icon: <Sparkles className="size-4" />, run: () => void handleOf(current)?.format() }] : []),
+		{ id: "history", group: "Editor", label: "Show file history", icon: <History className="size-4" />, run: () => handleOf(current)?.history() },
+		...(statuses[current ?? ""]?.hasBranches ? [{ id: "branches", group: "Editor", label: "Branches of this file", icon: <GitBranch className="size-4" />, run: () => handleOf(current)?.branches() }] : []),
+		...(statuses[current ?? ""]?.canSuggest ? [{ id: "suggest", group: "Editor", label: "Suggest an edit", icon: <MessageSquareDiff className="size-4" />, run: () => handleOf(current)?.suggest() }] : []),
+		{ id: "palette", group: "Go", label: "Command palette", hint: "Ctrl Shift P", icon: <Command className="size-4" />, run: () => openQuick(">") },
+	];
+
+	// Keyboard: the shortcuts people know from VS Code. With Vim keys on, the ones Vim uses itself (Ctrl+B, Ctrl+W, Ctrl+G…) are left to Vim,
+	// and Space-prefixed commands stand in for them.
+	const shortcutsRef = useRef<(e: KeyboardEvent) => void>(() => {});
+	shortcutsRef.current = (e) => {
+		const mod = e.ctrlKey || e.metaKey;
+		const key = e.key.toLowerCase();
+		if (e.altKey && !mod && /^[1-9]$/.test(e.key)) {
+			const target = tabs[Number(e.key) - 1];
+			if (target) {
+				e.preventDefault();
+				setActive(target);
+				setFocusPath(target);
+			}
+			return;
+		}
+		if (e.altKey && !mod && key === "z") {
+			e.preventDefault();
+			return setEditorPrefs({ wrap: !prefs.wrap });
+		}
+		if (e.altKey && e.shiftKey && key === "f") {
+			e.preventDefault();
+			return void handleOf(current)?.format();
+		}
+		if (!mod) return;
+		const inVim = vimMode !== "" && !!(e.target as HTMLElement)?.closest?.(".cm-editor");
+		const vimOwns = new Set(["b", "w", "g", "n", "j", "\\"]);
+		if (inVim && vimOwns.has(key) && !e.shiftKey) return;
+		if (key === "p") {
+			e.preventDefault();
+			return e.shiftKey ? openQuick(">") : openQuick();
+		}
+		if (key === "g" && !e.shiftKey) {
+			e.preventDefault();
+			return openQuick(":");
+		}
+		if (key === "b" && !e.shiftKey) {
+			e.preventDefault();
+			return toggleExplorer();
+		}
+		if ((key === "j" || e.key === "`") && !e.shiftKey) {
+			e.preventDefault();
+			return togglePanel();
+		}
+		if (key === "w" && !e.shiftKey && current) {
+			e.preventDefault();
+			return closeTab(current);
+		}
+		if (key === "n" && !e.shiftKey && !isViewer) {
+			e.preventDefault();
+			setItemError(null);
+			return setNewItem({ kind: "file", dir: targetDir, value: "" });
+		}
+		if (key === "\\") {
+			e.preventDefault();
+			return toggleSide();
+		}
+		if (key === "v" && e.shiftKey && canPreview) {
+			e.preventDefault();
+			return setPreview((v) => !v);
+		}
+		if (e.key === "Tab" || e.key === "PageDown" || e.key === "PageUp") {
+			e.preventDefault();
+			return cycle(e.key === "PageUp" || e.shiftKey ? -1 : 1);
+		}
+		if ((e.key === "=" || e.key === "+") && !inVim) {
+			e.preventDefault();
+			return setEditorPrefs({ fontSize: Math.min(FONT_SIZE_RANGE.max, prefs.fontSize + 1) });
+		}
+		if (e.key === "-" && !inVim) {
+			e.preventDefault();
+			return setEditorPrefs({ fontSize: Math.max(FONT_SIZE_RANGE.min, prefs.fontSize - 1) });
+		}
+	};
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => shortcutsRef.current(e);
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, []);
+
+	// The file shown takes the keyboard when it changes
+	useEffect(() => {
+		if (current) handleOf(current)?.focus();
+	}, [current]); // eslint-disable-line react-hooks/exhaustive-deps
+
+	const tabMenu = (e: React.MouseEvent, path: string): void =>
+		openMenu(e, [
+			{ label: "Close", shortcut: "Ctrl+W", onSelect: () => closeTab(path) },
+			{ label: "Close others", onSelect: () => closeOthers(path) },
+			{ label: "Close all", onSelect: () => tabs.filter((t) => !dirty.has(t)).forEach(discardTab) },
+			"separator",
+			{ label: "Open to the side", shortcut: "Ctrl+\\", disabled: path === active && tabs.length < 2, onSelect: () => (path === active ? toggleSide() : (setSide(path), setPreview(false))) },
+			{ label: "Copy path", onSelect: () => void navigator.clipboard?.writeText(path) },
+		] as MenuEntry[]);
+
+	const reorder = (from: number, to: number) =>
+		setTabs((prev) => {
+			const next = [...prev];
+			const [moved] = next.splice(from, 1);
+			next.splice(to, 0, moved);
+			return next;
+		});
+
+	const rightPath = sideOpen ? side : null;
+	const columns = rightPath || previewOpen ? `${Math.max(splitWidth, 240)}px 1px minmax(0,1fr)` : "minmax(0,1fr)";
+	const currentStatus = current ? statuses[current] : undefined;
+	const rightText = previewOpen && active ? texts[active] ?? "" : "";
+	const noteRefs = useMemo(() => [], []);
+	const problemLines = active ? statuses[active]?.problemLines ?? [] : [];
+	const mdTextHandler = useCallback((path: string, text: string) => onText(path, text), [onText]);
+
+	return (
+		<div className="flex h-full min-h-0 flex-col bg-background">
+			<div className="flex min-h-0 flex-1">
+				{explorerOpen && (
+					<>
+						<div style={{ width: explorerWidth }} className="min-w-0 shrink-0">
+							<FileExplorer
+								roots={ROOTS}
+								entries={entries}
+								expanded={expanded}
+								targetDir={targetDir}
+								activePath={current}
+								openPaths={tabs}
+								dirtyPaths={dirty}
+								readOnly={isViewer}
+								viewers={(rel) => viewersAt("editor", rel)}
+								onToggleDir={toggleDir}
+								onOpenFile={openPath}
+								onOpenSide={(rel) => openPath(rel, { side: true })}
+								onCopyPath={(rel) => void navigator.clipboard?.writeText(rel)}
+								onNew={(kind, dir) => {
+									setItemError(null);
+									setNewItem({ kind, dir, value: "" });
+								}}
+								onRename={(entry) => {
+									setItemError(null);
+									setRenaming({ entry, value: entry.name });
+								}}
+								onDelete={setDeleting}
+								onRefresh={refresh}
+								onCollapseAll={() => {
+									setExpanded(new Set());
+									setTargetDir("editor");
+								}}
+								onFilterStart={() => void loadTree()}
+								notice={exportNotice}
+								onExport={async () => {
+									setExportNotice(null);
+									try {
+										const name = `${workspace?.name ?? "workspace"}-${targetDir.replace(/\//g, "-")}`;
+										const result = await exportFolders(workspacePath, [targetDir], name);
+										if (result) setExportNotice({ ok: true, text: `Saved ${result.count} ${result.count === 1 ? "file" : "files"} to ${result.dest}` });
+									} catch (err) {
+										setExportNotice({ ok: false, text: err instanceof Error ? err.message : String(err) });
+									}
+								}}
+							/>
+						</div>
+						<Splitter orientation="vertical" grows="right" size={explorerWidth} onResize={setExplorerWidth} label="Resize the explorer" />
+					</>
+				)}
+
+				<div className="flex min-w-0 flex-1 flex-col">
+					<div className="flex shrink-0 items-stretch border-b bg-card/40">
+						<EditorTabs
+							tabs={tabs}
+							active={active}
+							side={sideOpen ? side : null}
+							dirty={dirty}
+							onSelect={(path) => {
+								if (path === side) setSide(active);
+								setActive(path);
+								setFocusPath(path);
+							}}
+							onClose={closeTab}
+							onReorder={reorder}
+							onContextMenu={tabMenu}
+						/>
+					</div>
+					<EditorToolbar
+						path={current}
+						status={currentStatus}
+						handle={handleOf(current)}
+						explorerOpen={explorerOpen}
+						onToggleExplorer={toggleExplorer}
+						showBlame={showBlame}
+						onToggleBlame={() => setShowBlame((v) => !v)}
+						split={sideOpen}
+						onToggleSplit={toggleSide}
+						canPreview={canPreview}
+						preview={previewOpen}
+						onTogglePreview={() => {
+							setSide(null);
+							setPreview((v) => !v);
+						}}
+						panelOpen={showPanel}
+						onTogglePanel={() => togglePanel()}
+					/>
+
+					<div className="relative min-h-0 flex-1">
+						{tabs.length === 0 && (
+							<EditorDashboard
+								workspaceName={workspace?.name ?? ""}
+								recent={recent}
+								readOnly={isViewer}
+								onOpen={(path) => openPath(path)}
+								onQuickOpen={() => openQuick()}
+								onCommands={() => openQuick(">")}
+								onNewFile={() => {
+									setItemError(null);
+									setNewItem({ kind: "file", dir: targetDir, value: "" });
+								}}
+								onTogglePanel={() => togglePanel()}
+								onNotes={() => navigate("/workspace/notes")}
+							/>
+						)}
+						<div className="grid h-full min-h-0" style={{ gridTemplateColumns: columns, gridTemplateRows: "minmax(0,1fr)", display: tabs.length === 0 ? "none" : undefined }}>
+							{tabs.map((path) => {
+								const column = path === active ? 1 : path === rightPath ? 3 : 0;
+								return (
+									<div key={path} onFocusCapture={() => setFocusPath(path)} style={{ gridColumn: column || 1, gridRow: 1, display: column ? undefined : "none" }} className="min-h-0 min-w-0">
+										<CodeTab
+											ref={refFor(path)}
+											path={path}
+											active={column !== 0}
+											readOnly={isViewer}
+											showBlame={showBlame && path === current}
+											onDirtyChange={onDirtyChange}
+											onStatus={onStatus}
+											onCursor={onCursor}
+											onText={previewOpen && path === active ? mdTextHandler : undefined}
+											onVimMode={setVimMode}
+											onVimCommand={onVimCommand}
+										/>
+									</div>
+								);
+							})}
+							{(rightPath || previewOpen) && <Splitter orientation="vertical" grows="right" size={splitWidth} onResize={setSplitWidth} label="Resize the split" className="[grid-column:2] [grid-row:1]" />}
+							{previewOpen && (
+								<div style={{ gridColumn: 3, gridRow: 1 }} className="min-h-0 min-w-0 border-l bg-background">
+									<MarkdownPreview text={rightText} notes={noteRefs} />
+								</div>
+							)}
+						</div>
+					</div>
+
+					{showPanel && (
+						<>
+							<Splitter orientation="horizontal" grows="up" size={panelHeight} onResize={setPanelHeight} label="Resize the panel" />
+							<div style={{ height: panelHeight }} className="shrink-0">
+								<EditorPanel
+									tab={panelTab}
+									onTab={setPanelTab}
+									onClose={() => togglePanel()}
+									workspacePath={workspacePath}
+									activePath={current}
+									problemLines={current ? statuses[current]?.problemLines ?? problemLines : []}
+									onGoToLine={(line) => handleOf(current)?.goToLine(line)}
+								/>
+							</div>
+						</>
+					)}
+				</div>
+			</div>
+
+			<EditorStatusLine
+				mode={prefs.vim ? vimMode : ""}
+				path={current}
+				status={currentStatus}
+				cursor={current ? cursors[current] : undefined}
+				viewers={current ? viewersAt("editor", current) : []}
+				tabSize={prefs.tabSize}
+				onProblems={() => togglePanel("problems")}
 			/>
 
-			{/* Tabs, editor and run output */}
-			<div className="flex min-w-0 flex-1 flex-col bg-background">
-				<div className="flex min-h-11 items-stretch border-b">
-					<div className="flex min-w-0 flex-1 overflow-x-auto">
-						{tabs.map((path) => (
-							<div
-								key={path}
-								className={cn(
-									"group flex shrink-0 items-center gap-2 border-r border-t-2 px-4 text-sm",
-									active === path ? "border-t-primary bg-background font-medium text-foreground" : "border-t-transparent bg-card/50 text-muted-foreground hover:text-foreground",
-								)}
-							>
-								<button type="button" onClick={() => setActive(path)} title={path} className="flex items-center gap-1.5">
-									{path.split("/").pop()}
-									{dirty.has(path) && <span className="size-1.5 bg-warning" aria-label="Unsaved changes" />}
-								</button>
-								<button type="button" aria-label={`Close ${path}`} onClick={() => closeTab(path)}>
-									<X className="size-3" />
-								</button>
-							</div>
-						))}
-					</div>
-					<div className="flex shrink-0 items-center gap-1 px-2">
-						<Button variant={showBlame ? "secondary" : "ghost"} size="xs" onPress={() => setShowBlame((v) => !v)}>
-							<UsersRound className="size-3.5" />
-							Blame
-						</Button>
-						<Button variant={showRun ? "secondary" : "ghost"} size="xs" onPress={() => setShowRun((v) => !v)}>
-							<Terminal className="size-3.5" />
-							Run
-						</Button>
-					</div>
-				</div>
-
-				<div className="relative min-h-0 flex-1">
-					{tabs.length === 0 && (
-						<div className="flex h-full flex-col items-center justify-center p-8 text-center">
-							<div className="flex size-12 items-center justify-center bg-muted/60">
-								<Code2 className="size-6 text-muted-foreground" />
-							</div>
-							<h3 className="mt-4 text-base font-semibold">Open a file to start editing</h3>
-							<p className="mt-1 max-w-sm text-xs text-muted-foreground">
-								Pick a file in the explorer. Several files can stay open as tabs, and everyone in the workspace
-								edits the same file live.
-							</p>
-						</div>
-					)}
-					{tabs.map((path) => (
-						<div key={path} className={cn("absolute inset-0", active !== path && "hidden")}>
-							<CodeTab path={path} active={active === path} readOnly={isViewer} showBlame={showBlame} onDirtyChange={onDirtyChange} />
-						</div>
-					))}
-				</div>
-
-				{showRun && (
-					<div className="h-52 shrink-0 border-t">
-						<RunPanel workspacePath={workspacePath} activePath={active} />
-					</div>
-				)}
-			</div>
-			</div>
+			<QuickOpen
+				open={quick.open}
+				initialQuery={quick.initial}
+				onClose={() => setQuick((q) => ({ ...q, open: false }))}
+				workspacePath={workspacePath}
+				files={files}
+				recent={recent}
+				commands={commands}
+				onOpenFile={(path, asSide) => openPath(path, { side: asSide || quick.side })}
+				onGoToLine={(line) => handleOf(current)?.goToLine(line)}
+				hasFile={!!current}
+			/>
+			{menu}
 
 			{newItem && (
 				<Dialog isOpen onOpenChange={(open) => !open && setNewItem(null)} className="max-w-md">

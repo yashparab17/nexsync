@@ -252,3 +252,29 @@ h1, h2, h3 { text-wrap: balance; }
 /* No double-tap zoom delay on controls; no rubber-band scrolling of the whole window with a mouse */
 button, a, select, summary, label, [role="button"] { touch-action: manipulation; }
 @media (pointer: fine) { html { overscroll-behavior: none; } }
+
+/* The Markdown reading view (Editor preview and Notes) */
+.md-preview { font-size: 1rem; line-height: 1.7; color: var(--foreground); max-width: 48rem; margin-inline: auto; }
+.md-preview > :first-child { margin-top: 0; }
+.md-preview h1, .md-preview h2, .md-preview h3, .md-preview h4 { font-weight: 700; line-height: 1.25; margin: 1.6em 0 0.5em; letter-spacing: -0.01em; }
+.md-preview h1 { font-size: 2rem; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+.md-preview h2 { font-size: 1.5rem; padding-bottom: 0.25em; border-bottom: 1px solid var(--border); }
+.md-preview h3 { font-size: 1.2rem; }
+.md-preview p, .md-preview ul, .md-preview ol, .md-preview blockquote, .md-preview pre, .md-preview table { margin: 0.9em 0; }
+.md-preview ul { list-style: disc; padding-left: 1.5rem; }
+.md-preview ol { list-style: decimal; padding-left: 1.5rem; }
+.md-preview li > ul, .md-preview li > ol { margin: 0.2em 0; }
+.md-preview li::marker { color: var(--muted-foreground); }
+.md-preview a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.md-preview a.wikilink { text-decoration: none; border-bottom: 1px solid color-mix(in oklch, var(--primary) 50%, transparent); }
+.md-preview a.wikilink-missing { color: var(--muted-foreground); border-bottom-style: dashed; }
+.md-preview blockquote { border-left: 3px solid var(--primary); padding: 0.1em 1em; color: var(--muted-foreground); background: var(--card); }
+.md-preview code { font-family: var(--font-mono); font-size: 0.9em; background: var(--muted); padding: 0.1em 0.35em; }
+.md-preview pre { background: var(--card); border: 1px solid var(--border); padding: 0.9rem 1rem; overflow-x: auto; }
+.md-preview pre code { background: transparent; padding: 0; font-size: 0.875rem; }
+.md-preview hr { border: 0; border-top: 1px solid var(--border); margin: 1.8em 0; }
+.md-preview table { border-collapse: collapse; width: 100%; font-size: 0.95em; }
+.md-preview th, .md-preview td { border: 1px solid var(--border); padding: 0.4em 0.7em; text-align: left; }
+.md-preview th { background: var(--card); font-weight: 600; }
+.md-preview img { max-width: 100%; }
+.md-preview input[type="checkbox"] { margin-right: 0.5em; pointer-events: none; }

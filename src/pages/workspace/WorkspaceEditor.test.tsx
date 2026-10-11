@@ -56,12 +56,12 @@ import WorkspaceEditor from "./WorkspaceEditor";
 
 describe("Editor page", () => {
 	it("opens a file from the link and unmounts without a crash", async () => {
-		const { unmount, findByText } = render(
+		const { unmount, findByRole } = render(
 			<MemoryRouter initialEntries={["/editor?open=%2Feditor%2Fa.js"]}>
 				<WorkspaceEditor />
 			</MemoryRouter>,
 		);
-		await findByText("a.js");
+		await findByRole("tab", { name: /a\.js/ });
 		await waitFor(() => expect(document.querySelector(".cm-editor")).not.toBeNull());
 		expect(() => unmount()).not.toThrow();
 	});

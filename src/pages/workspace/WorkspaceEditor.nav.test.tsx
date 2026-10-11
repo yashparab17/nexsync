@@ -28,7 +28,7 @@ import WorkspaceEditor from "./WorkspaceEditor";
 // Regression: with a file open, the editor kept re-rendering itself, so the sidebar links did nothing
 describe("leaving the Editor page", () => {
 	it("navigates away while a file is open", async () => {
-		const { findByText, getByText } = render(
+		const { findByText, findByRole, getByText } = render(
 			<MemoryRouter initialEntries={["/editor?open=%2Feditor%2Fmain.py"]}>
 				<P2PProvider>
 					<Link to="/notes">go</Link>
@@ -39,7 +39,7 @@ describe("leaving the Editor page", () => {
 				</P2PProvider>
 			</MemoryRouter>,
 		);
-		await findByText("main.py");
+		await findByRole("tab", { name: /main\.py/ });
 		await waitFor(() => expect(document.querySelector(".cm-editor")).not.toBeNull());
 		fireEvent.click(getByText("go"));
 		await findByText("notes page");

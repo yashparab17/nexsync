@@ -49,6 +49,7 @@ export default defineConfig(async () => ({
 	test: {
 		environment: "jsdom",
 		include: ["src/**/*.test.{ts,tsx}"],
+		setupFiles: ["src/test-setup.ts"],
 	},
 	// 2. tauri expects a fixed port, fail if that port is not available
 	server: {

@@ -63,7 +63,7 @@ describe("Editor page with the real P2P provider", () => {
 	});
 
 	it("opens a file, then unmounts everything without a crash", async () => {
-		const { unmount, findByText } = render(
+		const { unmount, findByRole } = render(
 			<StrictMode>
 				<MemoryRouter initialEntries={["/editor?open=%2Feditor%2Fa.js"]}>
 					<P2PProvider>
@@ -73,7 +73,7 @@ describe("Editor page with the real P2P provider", () => {
 				</MemoryRouter>
 			</StrictMode>,
 		);
-		await findByText("a.js");
+		await findByRole("tab", { name: /a\.js/ });
 		await waitFor(() => expect(document.querySelector(".cm-editor")).not.toBeNull());
 		expect(() => unmount()).not.toThrow();
 	});

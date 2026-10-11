@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { lintGutter } from "@codemirror/lint";
 import { EditorState, type Extension } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
+import { EditorView, GutterMarker, gutter, keymap, lineNumbers } from "@codemirror/view";
 import { catppuccinLatte, catppuccinMocha } from "@catppuccin/codemirror";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
 
@@ -14,6 +14,52 @@ import { useEditorPrefs } from "@/lib/editorPrefs";
 import { useSeedOnce } from "@/hooks/useSeedOnce";
 import { seedText } from "@/lib/yjs/seed";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
+import { vimCommands, type VimCommand } from "@/lib/editor/vimSetup";
+
+// Where the cursor is, for the status line
+export interface CursorInfo {
+	line: number;
+	col: number;
+	lines: number;
+	// Characters and lines selected; 0 when nothing is
+	selected: number;
+	selectedLines: number;
+}
+
+function cursorOf(state: EditorState): CursorInfo {
+	const sel = state.selection.main;
+	const line = state.doc.lineAt(sel.head);
+	return {
+		line: line.number,
+		col: sel.head - line.from + 1,
+		lines: state.doc.lines,
+		selected: sel.to - sel.from,
+		selectedLines: sel.empty ? 0 : state.doc.lineAt(sel.to).number - state.doc.lineAt(sel.from).number + 1,
+	};
+}
+
+// Line numbers counted from the cursor line, as in Neovim's relativenumber; the cursor line shows its own number
+class NumberMarker extends GutterMarker {
+	constructor(private readonly text: string) {
+		super();
+	}
+	eq(other: NumberMarker) {
+		return other.text === this.text;
+	}
+	toDOM() {
+		return document.createTextNode(this.text);
+	}
+}
+const relativeLineNumbers = gutter({
+	class: "cm-lineNumbers",
+	lineMarker(view, line) {
+		const here = view.state.doc.lineAt(view.state.selection.main.head).number;
+		const n = view.state.doc.lineAt(line.from).number;
+		return new NumberMarker(String(n === here ? n : Math.abs(n - here)));
+	},
+	lineMarkerChange: (update) => update.selectionSet || update.docChanged || update.viewportChanged,
+	initialSpacer: (view) => new NumberMarker(String(view.state.doc.lines)),
+});
 
 interface CodeEditorProps {
 	value: string;
@@ -31,6 +77,11 @@ interface CodeEditorProps {
 	onLanguage?: (language: LoadedLanguage) => void;
 	// Extra CodeMirror extensions, for example clickable note links
 	extraExtensions?: Extension[];
+	// Told where the cursor is after every move or edit
+	onCursor?: (info: CursorInfo) => void;
+	// With Vim keys on: the mode changes (normal, insert, visual, replace), and the commands typed after a colon or Space
+	onVimMode?: (mode: string) => void;
+	onVimCommand?: (command: VimCommand) => void;
 }
 
 const PLAIN: LoadedLanguage = { name: "Plain Text", support: null };
@@ -47,8 +98,19 @@ export default function CodeEditor({
 	onReady,
 	onLanguage,
 	extraExtensions,
+	onCursor,
+	onVimMode,
+	onVimCommand,
 }: CodeEditorProps) {
 	const { isDark } = useThemeContext();
+	const viewRef = useRef<EditorView | null>(null);
+	// Read through refs, so a new callback each render does not rebuild the editor
+	const cursorRef = useRef(onCursor);
+	cursorRef.current = onCursor;
+	const modeRef = useRef(onVimMode);
+	modeRef.current = onVimMode;
+	const commandRef = useRef(onVimCommand);
+	commandRef.current = onVimCommand;
 
 	// A live document that already exists when the editor is created must be its starting text: the sync
 	// layer applies only later changes, so an editor started empty would stay blank.
@@ -76,7 +138,76 @@ export default function CodeEditor({
 	}, [language]);
 
 	// Look and feel from Settings; Markdown always wraps, since its lines are prose
-	const { fontSize, tabSize, wrap } = useEditorPrefs();
+	const { fontSize, tabSize, wrap, vim, relativeNumbers, minimap } = useEditorPrefs();
+
+	// Vim keys load on first use, so people who never turn them on do not download them
+	const [vimExtension, setVimExtension] = useState<Extension | null>(null);
+	useEffect(() => {
+		if (!vim) {
+			setVimExtension(null);
+			return;
+		}
+		let current = true;
+		void import("@replit/codemirror-vim").then((mod) => {
+			if (current) setVimExtension(mod.vim({ status: false }));
+		});
+		return () => {
+			current = false;
+		};
+	}, [vim]);
+
+	// The minimap loads the same way
+	const [minimapExtension, setMinimapExtension] = useState<Extension | null>(null);
+	useEffect(() => {
+		if (!minimap) {
+			setMinimapExtension(null);
+			return;
+		}
+		let current = true;
+		void import("@replit/codemirror-minimap").then((mod) => {
+			if (current)
+				setMinimapExtension(
+					mod.showMinimap.compute(["doc"], () => ({
+						create: () => ({ dom: document.createElement("div") }),
+						displayText: "blocks",
+						showOverlay: "mouse-over",
+					})),
+				);
+		});
+		return () => {
+			current = false;
+		};
+	}, [minimap]);
+
+	// Mode changes and the colon and Space commands reach the page through the vim module
+	const [viewReady, setViewReady] = useState(false);
+	useEffect(() => {
+		const view = viewRef.current;
+		if (!vimExtension || !view) {
+			modeRef.current?.("");
+			return;
+		}
+		let off: (() => void) | undefined;
+		void import("@replit/codemirror-vim").then((mod) => {
+			const cm = mod.getCM(view);
+			if (!cm) return;
+			vimCommands(mod, cm, (command) => commandRef.current?.(command));
+			const listener = (event: { mode: string; subMode?: string }) => modeRef.current?.(event.subMode ? `${event.mode}:${event.subMode}` : event.mode);
+			cm.on("vim-mode-change", listener);
+			modeRef.current?.("normal");
+			off = () => cm.off("vim-mode-change", listener);
+		});
+		return () => off?.();
+	}, [vimExtension, viewReady]);
+
+	const cursorExtension = useMemo(
+		() =>
+			EditorView.updateListener.of((update) => {
+				if (!update.selectionSet && !update.docChanged && !update.viewportChanged) return;
+				cursorRef.current?.(cursorOf(update.state));
+			}),
+		[],
+	);
 	const lookExtensions = useMemo(
 		() => [
 			EditorView.theme({
@@ -85,9 +216,13 @@ export default function CodeEditor({
 				".cm-gutters": { backgroundColor: "var(--sidebar)", borderRight: "1px solid var(--border)" },
 			}),
 			EditorState.tabSize.of(tabSize),
+			relativeNumbers ? relativeLineNumbers : lineNumbers(),
+			cursorExtension,
+			...(vimExtension ? [vimExtension] : []),
+			...(minimapExtension ? [minimapExtension] : []),
 			...(wrap || language.name === "Markdown" ? [EditorView.lineWrapping] : []),
 		],
-		[fontSize, tabSize, wrap, language.name],
+		[fontSize, tabSize, wrap, language.name, relativeNumbers, cursorExtension, vimExtension, minimapExtension],
 	);
 
 	// Seed the shared text from on-disk content the first time it's ever opened
@@ -129,10 +264,15 @@ export default function CodeEditor({
 				theme={isDark ? catppuccinMocha : catppuccinLatte}
 				extensions={extensions}
 				onChange={onChange}
-				onCreateEditor={onReady}
+				onCreateEditor={(view) => {
+					viewRef.current = view;
+					cursorRef.current?.(cursorOf(view.state));
+					setViewReady(true);
+					onReady?.(view);
+				}}
 				readOnly={readOnly}
 				basicSetup={{
-					lineNumbers: true,
+					lineNumbers: false,
 					highlightActiveLineGutter: true,
 					highlightSpecialChars: true,
 					// yCollab supplies its own CRDT-aware undo/redo when collaborating (see extensions above)

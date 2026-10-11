@@ -323,6 +323,33 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								onChange={(e) => setEditorPrefs({ wrap: e.target.checked })}
 							/>
 						</Row>
+						<Row title="Vim keys" hint="Modal editing in the Editor and Markdown notes: h j k l, i, :w, and Space f f to find files.">
+							<input
+								type="checkbox"
+								aria-label="Vim keys"
+								className="size-4 accent-primary"
+								checked={editorPrefs.vim}
+								onChange={(e) => setEditorPrefs({ vim: e.target.checked })}
+							/>
+						</Row>
+						<Row title="Relative line numbers" hint="Number lines by their distance from the cursor, which makes 5j and 12k easy to aim.">
+							<input
+								type="checkbox"
+								aria-label="Relative line numbers"
+								className="size-4 accent-primary"
+								checked={editorPrefs.relativeNumbers}
+								onChange={(e) => setEditorPrefs({ relativeNumbers: e.target.checked })}
+							/>
+						</Row>
+						<Row title="Minimap" hint="A small overview of the file at the right edge of the editor.">
+							<input
+								type="checkbox"
+								aria-label="Minimap"
+								className="size-4 accent-primary"
+								checked={editorPrefs.minimap}
+								onChange={(e) => setEditorPrefs({ minimap: e.target.checked })}
+							/>
+						</Row>
 						<pre
 							aria-label="Editor preview"
 							className="overflow-x-auto border bg-muted/20 p-3 font-mono"
