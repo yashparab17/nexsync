@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { justify, MAX_STRETCH } from "./justify";
+import { justify, LAST_STRETCH, MAX_STRETCH } from "./justify";
 
 const item = (id: string, aspect: number, height = 200) => ({ id, aspect, height });
 
@@ -23,16 +23,25 @@ describe("justify", () => {
 		for (const [id, aspect] of [["a", 2], ["b", 0.5], ["c", 1]] as const) expect(boxes[id].w / boxes[id].h).toBeCloseTo(aspect, 5);
 	});
 
-	it("never stretches a tile past the limit, and centres a row it cannot fill", () => {
+	it("keeps a lone tile at the left and within the last row's limit", () => {
 		const { boxes } = justify([item("a", 1, 200)], 1000, 8);
-		expect(boxes.a.h).toBeLessThanOrEqual(200 * MAX_STRETCH + 0.001);
-		expect(boxes.a.x).toBeGreaterThan(100);
+		expect(boxes.a.h).toBeLessThanOrEqual(200 * LAST_STRETCH + 0.001);
+		expect(boxes.a.x).toBe(0);
+	});
+
+	it("stretches a short gallery's only row up to the last-row limit to fill the width", () => {
+		const items = Array.from({ length: 7 }, (_, i) => item(`t${i}`, 1, 200));
+		const { boxes } = justify(items, 1500, 8);
+		const last = boxes.t6;
+		expect(Math.round(last.x + last.w)).toBe(1500);
 	});
 
 	it("never stretches any tile past the limit, even beside tiles that want to be taller", () => {
 		const items = [item("tall", 0.67, 450), item("banner", 2.4, 250), item("a", 1, 300), item("b", 1.3, 300), item("c", 0.8, 350), item("d", 1, 200)];
 		const { boxes } = justify(items, 1160, 8);
-		for (const it of items) expect(boxes[it.id].h).toBeLessThanOrEqual(it.height * MAX_STRETCH + 0.001);
+		// Every row but the last is held to MAX_STRETCH
+		const ys = [...new Set(items.map((it) => boxes[it.id].y))].sort((a, b) => a - b);
+		for (const it of items) if (boxes[it.id].y !== ys[ys.length - 1]) expect(boxes[it.id].h).toBeLessThanOrEqual(it.height * MAX_STRETCH + 0.001);
 	});
 
 	it("handles nothing to lay out", () => {

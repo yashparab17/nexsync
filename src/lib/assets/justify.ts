@@ -1,7 +1,8 @@
 // Lays tiles out in rows that each fill the full width, as photo galleries do. Where the rows break is chosen for the
 // whole set at once (the way a text editor breaks lines), so every row is as close as it can be to the height its tiles
-// want, and no row is stretched past MAX_STRETCH times that. A row that cannot fill the width within that limit is
-// centred instead of stretched.
+// want, and no row is stretched past MAX_STRETCH times that. The last row, which has no neighbour to be balanced
+// against, may stretch further (LAST_STRETCH) so a short gallery still fills the width. A row that cannot fill the
+// width within its limit stays at the left edge.
 
 export interface JustifyItem {
 	id: string;
@@ -19,6 +20,7 @@ export interface Box {
 }
 
 export const MAX_STRETCH = 1.3;
+export const LAST_STRETCH = 1.7;
 const MIN_SHRINK = 0.6;
 const MAX_ROW = 12;
 
@@ -72,10 +74,9 @@ export function justify(items: JustifyItem[], width: number, gap: number): { box
 	let y = 0;
 	for (const [start, end] of rows) {
 		const { height, shortest } = fill(start, end);
-		// Never stretched past the limit; a row held back this way is centred
-		const h = Math.min(height, shortest * MAX_STRETCH);
-		const rowWidth = items.slice(start, end).reduce((sum, it) => sum + it.aspect * h, 0) + gap * (end - start - 1);
-		let x = Math.max(0, (width - rowWidth) / 2);
+		// Never stretched past the limit; a row held back this way stays at the left
+		const h = Math.min(height, shortest * (end === n ? LAST_STRETCH : MAX_STRETCH));
+		let x = 0;
 		for (let k = start; k < end; k++) {
 			const w = items[k].aspect * h;
 			boxes[items[k].id] = { x, y, w, h };
