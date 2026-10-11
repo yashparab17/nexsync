@@ -1,9 +1,8 @@
 import { MAX_TITLE } from "@/lib/validation";
 import { useCallback, useEffect, useMemo, useState, type ElementType } from "react";
-import { Plus, Search, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, Sparkles } from "@/components/animate-icons";
+import { Plus, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, Sparkles } from "@/components/animate-icons";
 
-import PageHeader from "@/components/layout/PageHeader";
-import { Segmented } from "@/components/elements/SettingsParts";
+import Toolbar, { ToolbarSearch, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-field";
@@ -413,228 +412,160 @@ export default function WorkspaceTasks() {
 		</>
 	);
 
+	const filtering = searchQuery || statusFilter !== "all" || priorityFilter !== "all" || tagFilter;
+	const clearFilters = () => {
+		setSearchQuery("");
+		setStatusFilter("all");
+		setPriorityFilter("all");
+		setTagFilter(null);
+	};
+
 	return (
-		<div className="space-y-6">
-			<PageHeader
-				title="Tasks"
-				description={`${stats.total - stats.done} open, ${stats.done} done. Click the box on a task to move it along.`}
-				actions={!isViewer && (
-					<Button onPress={handleOpenCreate}>
+		<div className="flex h-full min-h-0 flex-col bg-background">
+			<Toolbar>
+				<ToolbarTabs
+					label="Status"
+					value={statusFilter}
+					onChange={setStatusFilter}
+					tabs={[
+						{ key: "all", label: "All", count: stats.total },
+						{ key: "todo", label: "To do", count: stats.todo },
+						{ key: "in_progress", label: "In progress", count: stats.inProgress },
+						{ key: "done", label: "Done", count: stats.done },
+					]}
+				/>
+				<span className="flex-1" />
+				<ToolbarSearch label="Search tasks" placeholder="Search tasks" value={searchQuery} onChange={setSearchQuery} />
+				<ToolbarSwitch
+					label="Priority"
+					value={priorityFilter}
+					onChange={setPriorityFilter}
+					options={[
+						{ value: "all", label: "Any", title: "Any priority" },
+						{ value: "high", label: "High", title: "High priority" },
+						{ value: "medium", label: "Med", title: "Medium priority" },
+						{ value: "low", label: "Low", title: "Low priority" },
+					]}
+				/>
+				<ToolbarSwitch
+					label="View"
+					value={view}
+					onChange={setView}
+					options={[
+						{ value: "list", label: <List className="size-4" />, title: "List" },
+						{ value: "calendar", label: <CalendarDays className="size-4" />, title: "Calendar" },
+					]}
+				/>
+				{!isViewer && (
+					<Button size="sm" onPress={handleOpenCreate}>
 						<Plus className="size-4" />
 						New task
 					</Button>
 				)}
-			/>
-
-			<div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-				<div className="relative min-w-56 flex-1">
-					<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-					<Input aria-label="Search tasks" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search tasks…" className="pl-9" />
-				</div>
-
-				<Segmented
-					label="View"
-					value={view}
-					onChange={setView}
-					options={[{ value: "list", label: "List", icon: <List className="size-4" /> }, { value: "calendar", label: "Calendar", icon: <CalendarDays className="size-4" /> }]}
-				/>
-
-				<Segmented
-					label="Status"
-					value={statusFilter}
-					onChange={setStatusFilter}
-					options={[
-						{ value: "all", label: "All", count: stats.total },
-						{ value: "todo", label: "To do", count: stats.todo },
-						{ value: "in_progress", label: "In progress", count: stats.inProgress },
-						{ value: "done", label: "Done", count: stats.done },
-					]}
-				/>
-
-				<Segmented
-					label="Priority"
-					value={priorityFilter}
-					onChange={setPriorityFilter}
-					options={[{ value: "all", label: "Any" }, { value: "high", label: "High" }, { value: "medium", label: "Medium" }, { value: "low", label: "Low" }]}
-				/>
-			</div>
+			</Toolbar>
 
 			{allTags.length > 0 && (
-				<div className="flex flex-wrap items-center gap-1.5">
-					<span className="text-xs font-medium text-muted-foreground">Tags:</span>
+				<Toolbar variant="sub" className="gap-1.5 overflow-x-auto">
+					<span className="font-mono text-[13px] text-muted-foreground">tags</span>
 					{allTags.map((tag) => (
-						<TagChip
-							key={tag}
-							tag={tag}
-							active={tagFilter === tag}
-							onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
-						/>
+						<TagChip key={tag} tag={tag} active={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)} />
 					))}
-				</div>
+				</Toolbar>
 			)}
 
-			{/* Tasks List */}
-			{loading ? (
-				<Loading className="h-48" />
-			) : view === "calendar" ? (
-				<TaskCalendar tasks={filteredTasks} onOpen={handleOpenEdit} />
-			) : filteredTasks.length === 0 ? (
-				<div className="flex flex-col items-center justify-center rounded-none border border-dashed border-border/80 p-12 text-center bg-card/10">
-					<div className="flex size-12 items-center justify-center rounded-none bg-muted/60">
-						<Sparkles className="size-6 text-muted-foreground" />
+			<div className="min-h-0 flex-1 overflow-auto">
+				{loading ? (
+					<Loading className="h-48" />
+				) : view === "calendar" ? (
+					<div className="p-3">
+						<TaskCalendar tasks={filteredTasks} onOpen={handleOpenEdit} />
 					</div>
-					<h3 className="mt-4 text-base font-semibold">No tasks found</h3>
-					<p className="mt-1 text-sm text-muted-foreground max-w-sm">
-						{searchQuery || statusFilter !== "all" || priorityFilter !== "all" || tagFilter
-							? "No tasks match your current search or active filters."
-							: "You have no tasks created yet. Create one to begin tracking."}
-					</p>
-					{searchQuery || statusFilter !== "all" || priorityFilter !== "all" || tagFilter ? (
-						<Button
-							variant="outline"
-							size="sm"
-							className="mt-4"
-							onPress={() => {
-								setSearchQuery("");
-								setStatusFilter("all");
-								setPriorityFilter("all");
-								setTagFilter(null);
-							}}
-						>
-							Clear filters
-						</Button>
-					) : (
-						!isViewer && (
-							<Button
-								size="sm"
-								className="mt-4 gap-1.5"
-								onPress={handleOpenCreate}
-							>
-								<Plus className="size-4" />
-								Create task
+				) : filteredTasks.length === 0 ? (
+					<div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
+						<Sparkles className="size-10 text-muted-foreground" />
+						<h3 className="text-base font-semibold">{filtering ? "No matching tasks" : "No tasks yet"}</h3>
+						<p className="max-w-sm text-sm text-muted-foreground">{filtering ? "Nothing matches the search or filters." : "Create one to start tracking what needs doing."}</p>
+						{filtering ? (
+							<Button variant="outline" size="sm" className="mt-2" onPress={clearFilters}>
+								Clear filters
 							</Button>
-						)
-					)}
-				</div>
-			) : (
-				<div className="divide-y border bg-card">
-					{filteredTasks.map((task) => {
-						const statusConf = STATUS_CONFIG[task.status];
-						const priorityConf = PRIORITY_CONFIG[task.priority];
-						const StatusIcon = statusConf.icon;
-
-						return (
-							<div
-								key={task.id}
-								className={cn(
-									"group flex flex-col justify-between gap-3 border-l-2 px-4 py-3.5 transition-colors hover:bg-muted/40 sm:flex-row sm:items-center",
-									task.priority === "high" ? "border-l-destructive" : task.priority === "medium" ? "border-l-warning" : "border-l-transparent",
-									task.status === "done" && "opacity-60",
-								)}
-							>
-								{/* Left: Checkmark & Title/Description */}
-								<div className="flex items-start gap-3 min-w-0">
+						) : (
+							!isViewer && (
+								<Button size="sm" className="mt-2" onPress={handleOpenCreate}>
+									<Plus className="size-4" />
+									Create task
+								</Button>
+							)
+						)}
+					</div>
+				) : (
+					<ul className="divide-y">
+						{filteredTasks.map((task) => {
+							const statusConf = STATUS_CONFIG[task.status];
+							const priorityConf = PRIORITY_CONFIG[task.priority];
+							const StatusIcon = statusConf.icon;
+							return (
+								<li
+									key={task.id}
+									className={cn(
+										"group flex items-start gap-3 border-l-2 px-3 py-2.5 transition-colors hover:bg-muted/40",
+										task.priority === "high" ? "border-l-destructive" : task.priority === "medium" ? "border-l-warning" : "border-l-transparent",
+										task.status === "done" && "opacity-60",
+									)}
+								>
 									<button
 										type="button"
 										onClick={() => handleToggleStatus(task)}
 										disabled={isViewer}
-										title={
-											isViewer
-												? undefined
-												: "Click to cycle status (To Do -> In Progress -> Done)"
-										}
+										aria-label={`${task.title}: ${statusConf.label}. ${isViewer ? "" : "Press to move it along."}`}
+										title={isViewer ? undefined : "Move along: To do, In progress, Done"}
 										className={cn(
-											"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-none border transition-colors",
+											"mt-0.5 flex size-5 shrink-0 items-center justify-center border transition-colors",
 											isViewer ? "cursor-default" : "cursor-pointer",
-											task.status === "done"
-												? "border-success bg-success/20 text-success"
-												: task.status === "in_progress"
-													? "border-warning bg-warning/20 text-warning"
-													: "border-muted-foreground/40 hover:border-primary",
+											task.status === "done" ? "border-success bg-success/20 text-success" : task.status === "in_progress" ? "border-warning bg-warning/20 text-warning" : "border-muted-foreground/40 hover:border-primary",
 										)}
 									>
 										<StatusIcon className="size-3.5" />
 									</button>
 
-									<div className="min-w-0 flex-1">
-										<div className="flex items-center gap-2 flex-wrap">
-											<h4
-												className={cn(
-													"font-medium text-foreground",
-													task.status === "done" &&
-														"line-through text-muted-foreground",
-												)}
-											>
-												{task.title}
-											</h4>
+									<button type="button" onClick={() => handleOpenEdit(task)} className="min-w-0 flex-1 cursor-pointer text-left outline-none focus-visible:bg-muted">
+										<span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+											<span className={cn("text-sm font-medium [overflow-wrap:anywhere]", task.status === "done" && "text-muted-foreground line-through")}>{task.title}</span>
 											<PresenceDots names={viewersAt("tasks", task.id)} doing="editing this task" />
 											{(task.conflicts?.length ?? 0) > 0 && (
 												<span title="Two people changed this at the same time" className="text-warning">
 													<AlertTriangle className="size-3.5" aria-label="Has a change to sort out" />
 												</span>
 											)}
-											<span
-												className={cn(
-													"inline-flex items-center rounded-none border px-2 py-0.5 text-xs font-semibold ",
-													priorityConf.color,
-													priorityConf.bg,
-													priorityConf.border,
-												)}
-											>
-												{priorityConf.label}
+										</span>
+										{task.description && <span className="mt-0.5 line-clamp-2 block text-sm text-muted-foreground">{task.description}</span>}
+									</button>
+
+									<div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm text-muted-foreground">
+										<RuleFlag violations={task.violations} />
+										{task.assignee_id && <span className="max-w-32 truncate">{memberName(task.assignee_id)}</span>}
+										{(task.tags ?? []).map((tag) => (
+											<TagChip key={tag} tag={tag} active={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)} />
+										))}
+										<DueBadge due={task.due_date} done={task.status === "done"} />
+										<span className={cn("font-mono text-[13px]", priorityConf.color)}>{priorityConf.label.toLowerCase()}</span>
+										{!isViewer && (
+											<span className="flex opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
+												<Button variant="ghost" size="icon-xs" onPress={() => handleOpenEdit(task)} aria-label="Edit task">
+													<Pencil className="size-3.5" />
+												</Button>
+												<Button variant="ghost" size="icon-xs" onPress={() => setDeletingTaskId(task.id)} aria-label="Delete task">
+													<Trash2 className="size-3.5 text-destructive" />
+												</Button>
 											</span>
-										</div>
-
-										{task.description && (
-											<p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-												{task.description}
-											</p>
-										)}
-
-										{(task.due_date || task.assignee_id || (task.tags ?? []).length > 0 || (task.violations ?? []).length > 0) && (
-											<div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-												<RuleFlag violations={task.violations} />
-												<DueBadge due={task.due_date} done={task.status === "done"} />
-												{task.assignee_id && <span>Assigned to {memberName(task.assignee_id)}</span>}
-												{(task.tags ?? []).map((tag) => (
-													<TagChip
-														key={tag}
-														tag={tag}
-														active={tagFilter === tag}
-														onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
-													/>
-												))}
-											</div>
 										)}
 									</div>
-								</div>
-
-								{/* Right: Actions */}
-								{!isViewer && (
-									<div className="flex items-center gap-1 sm:self-center self-end">
-										<Button
-											variant="ghost"
-											size="icon-xs"
-											onPress={() => handleOpenEdit(task)}
-											aria-label="Edit task"
-										>
-											<Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
-										</Button>
-										<Button
-											variant="ghost"
-											size="icon-xs"
-											onPress={() => setDeletingTaskId(task.id)}
-											aria-label="Delete task"
-										>
-											<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
-										</Button>
-									</div>
-								)}
-							</div>
-						);
-					})}
-				</div>
-			)}
+								</li>
+							);
+						})}
+					</ul>
+				)}
+			</div>
 
 			{/* Create task Modal */}
 			{isCreateOpen && (

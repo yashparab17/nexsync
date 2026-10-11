@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import Toolbar from "@/components/layout/Toolbar";
-import { Copy, Check, Play, Search, Trash2, FileText, Film, Headphones, Image as ImageIcon, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
+import Toolbar, { ToolbarSearch, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
+import { Copy, Check, Play, Trash2, FileText, Film, Headphones, Image as ImageIcon, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
 import { displaySize } from "@/lib/assets/displaySize";
 import { justify } from "@/lib/assets/justify";
 import { validateFileName } from "@/lib/validation";
@@ -414,45 +414,19 @@ export default function WorkspaceAssets() {
 
 			{/* Toolbar */}
 			<Toolbar>
-				<div role="tablist" aria-label="Kind of asset" className="flex items-center gap-1 overflow-x-auto">
-					{tabs.map((tab) => (
-						<button
-							key={tab.key}
-							type="button"
-							role="tab"
-							aria-selected={selectedCategory === tab.key}
-							onClick={() => setSelectedCategory(tab.key as AssetCategory)}
-							className={cn(
-								"flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-sm outline-none transition-colors focus-visible:bg-muted",
-								selectedCategory === tab.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-							)}
-						>
-							{tab.label}
-							<span className="font-mono text-xs tabular-nums opacity-70">{tab.count}</span>
-						</button>
-					))}
-				</div>
+				<ToolbarTabs label="Kind of asset" value={selectedCategory} onChange={setSelectedCategory} tabs={tabs as { key: AssetCategory; label: string; count: number }[]} />
 				<span className="flex-1" />
-				<div className="relative w-44">
-					<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-					<Input aria-label="Search assets" placeholder="Search assets" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-8 border bg-background pl-8 text-sm" />
-				</div>
-				{(
-					<div className="flex items-stretch border" role="group" aria-label="Tile size">
-						{(["s", "m", "l"] as const).map((size) => (
-							<button
-								key={size}
-								type="button"
-								aria-pressed={tile === size}
-								aria-label={size === "s" ? "Small tiles" : size === "m" ? "Medium tiles" : "Large tiles"}
-								onClick={() => setTile(size)}
-								className={cn("flex h-8 w-8 items-center justify-center font-mono text-xs outline-none focus-visible:bg-muted", tile === size ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
-							>
-								{size.toUpperCase()}
-							</button>
-						))}
-					</div>
-				)}
+				<ToolbarSearch label="Search assets" placeholder="Search assets" value={searchQuery} onChange={setSearchQuery} />
+				<ToolbarSwitch
+					label="Tile size"
+					value={tile}
+					onChange={setTile}
+					options={[
+						{ value: "s", label: "S", title: "Small tiles" },
+						{ value: "m", label: "M", title: "Medium tiles" },
+						{ value: "l", label: "L", title: "Large tiles" },
+					]}
+				/>
 				{!isViewer && (
 					<>
 						<Button size="sm" onPress={() => setIsUploadOpen(true)}>

@@ -2,7 +2,7 @@ import { MAX_TITLE } from "@/lib/validation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, AlertTriangle, ArrowRight, CheckSquare, Columns3, Pencil } from "@/components/animate-icons";
 
-import PageHeader from "@/components/layout/PageHeader";
+import Toolbar from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import EraseOption from "@/components/elements/EraseOption";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -485,52 +485,38 @@ export default function WorkspaceKanban() {
 	);
 
 	return (
-		<div className="flex h-[calc(100vh-10rem)] flex-col gap-4">
-			<PageHeader
-				title="Kanban"
-				description="Move cards across columns as work progresses."
-				actions={
-					<>
-					{workspace?.path && <BoardDraftBar workspacePath={workspace.path} columns={columns} board={board} onBoard={setBoard} canDraft={!isViewer} />}
-					{canChange && (
-						<Button
-							variant="outline"
-							size="sm"
-							onPress={() => setIsCreateColOpen(true)}
-							className="gap-1.5"
-						>
-							<Plus className="size-4" />
-							New column
-						</Button>
-					)}
-					</>
-				}
-			/>
+		<div className="flex h-full min-h-0 flex-col bg-background">
+			<Toolbar>
+				<h1 className="font-mono text-sm text-muted-foreground">
+					kanban · {columns.reduce((n, c) => n + c.cards.length, 0)} cards in {columns.length} {columns.length === 1 ? "column" : "columns"}
+				</h1>
+				<span className="flex-1" />
+				{workspace?.path && <BoardDraftBar workspacePath={workspace.path} columns={columns} board={board} onBoard={setBoard} canDraft={!isViewer} />}
+				{canChange && (
+					<Button size="sm" onPress={() => setIsCreateColOpen(true)}>
+						<Plus className="size-4" />
+						New column
+					</Button>
+				)}
+			</Toolbar>
 
 			{allTags.length > 0 && (
-				<div className="flex shrink-0 flex-wrap items-center gap-1.5">
-					<span className="text-xs font-medium text-muted-foreground">Tags:</span>
+				<Toolbar variant="sub" className="gap-1.5 overflow-x-auto">
+					<span className="font-mono text-[13px] text-muted-foreground">tags</span>
 					{allTags.map((tag) => (
-						<TagChip
-							key={tag}
-							tag={tag}
-							active={tagFilter === tag}
-							onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
-						/>
+						<TagChip key={tag} tag={tag} active={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)} />
 					))}
-				</div>
+				</Toolbar>
 			)}
 
 			{/* Kanban Container */}
 			{loading ? (
 				<Loading fill className="flex-1" />
 			) : columns.length === 0 ? (
-				<div className="flex flex-1 flex-col items-center justify-center rounded-none border border-dashed border-border/80 p-12 text-center bg-card/10">
-					<div className="flex size-12 items-center justify-center rounded-none bg-muted/60">
-						<Columns3 className="size-6 text-muted-foreground" />
-					</div>
-					<h3 className="mt-4 text-base font-semibold">No Columns Yet</h3>
-					<p className="mt-1 text-sm text-muted-foreground max-w-sm">
+				<div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+					<Columns3 className="size-10 text-muted-foreground" />
+					<h3 className="text-base font-semibold">No columns yet</h3>
+					<p className="max-w-sm text-sm text-muted-foreground">
 						Your Kanban board is currently empty. Create a column to get started.
 					</p>
 					{canChange && (
@@ -547,7 +533,7 @@ export default function WorkspaceKanban() {
 					)}
 				</div>
 			) : (
-				<div className="flex flex-1 gap-4 overflow-x-auto pb-4 pt-1">
+				<div className="flex min-h-0 flex-1 overflow-x-auto">
 					{columns.map((col, colIndex) => {
 						const prevCol = colIndex > 0 ? columns[colIndex - 1] : null;
 						const nextCol =
@@ -556,15 +542,15 @@ export default function WorkspaceKanban() {
 						return (
 							<div
 								key={col.id}
-								className="flex min-w-72 flex-1 basis-72 flex-col border bg-card/40 p-3"
+								className="flex min-h-0 min-w-72 flex-1 basis-72 flex-col border-r bg-sidebar last:border-r-0"
 							>
 								{/* Column Header */}
-								<div className="flex items-center justify-between pb-2">
+								<div className="flex h-10 shrink-0 items-center justify-between border-b pr-2 pl-3">
 									<div className="flex items-center gap-2">
-										<h3 className="text-sm font-semibold text-foreground">
+										<h3 className="truncate font-mono text-sm text-foreground">
 											{col.title}
 										</h3>
-										<span className="flex h-5 min-w-5 items-center justify-center bg-muted px-1 font-mono text-xs tabular-nums text-muted-foreground">
+										<span className="font-mono text-[13px] tabular-nums text-muted-foreground">
 											{col.cards.length}
 										</span>
 									</div>
@@ -597,7 +583,7 @@ export default function WorkspaceKanban() {
 
 								{/* Cards Column Body */}
 								<div
-								className="flex flex-1 flex-col gap-2.5 overflow-y-auto py-1"
+								className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2"
 								onDragOver={(e) => {
 									if (!dragId) return;
 									e.preventDefault();
@@ -613,7 +599,7 @@ export default function WorkspaceKanban() {
 								}}
 							>
 									{col.cards.length === 0 ? (
-										<div className="flex flex-1 flex-col items-center justify-center border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+										<div className="flex flex-1 flex-col items-center justify-center border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
 											No cards in this column.
 										</div>
 									) : (
@@ -621,7 +607,7 @@ export default function WorkspaceKanban() {
 											<div
 												key={card.id}
 												className={cn(
-													"group relative border-l-2 border-l-transparent bg-card p-3 transition-colors hover:border-l-primary hover:bg-card/80",
+													"group relative border border-l-2 border-l-transparent bg-card p-3 transition-colors hover:border-l-primary",
 													dragId === card.id && "opacity-40",
 													drop?.colId === col.id && drop.index === col.cards.indexOf(card) && "border-t-2 border-t-primary",
 													drop?.colId === col.id &&
@@ -684,7 +670,7 @@ export default function WorkspaceKanban() {
 												</div>
 
 												{card.description && (
-													<p className="mt-1.5 text-xs text-muted-foreground line-clamp-3">
+													<p className="mt-1.5 line-clamp-3 text-sm text-muted-foreground">
 														{card.description}
 													</p>
 												)}
@@ -694,7 +680,7 @@ export default function WorkspaceKanban() {
 													card.assignee_id ||
 													(card.checklist ?? []).length > 0 ||
 													(card.violations ?? []).length > 0) && (
-													<div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+													<div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
 														<RuleFlag violations={card.violations} />
 															<DueBadge due={card.due_date} done={colIndex === columns.length - 1} />
 														{(card.checklist ?? []).length > 0 && (
@@ -717,7 +703,7 @@ export default function WorkspaceKanban() {
 
 												{/* Quick Move Across Columns */}
 												{!isViewer && (
-												<div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2 text-xs text-muted-foreground">
+												<div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2 text-sm text-muted-foreground">
 													{prevCol ? (
 														<button
 															type="button"
@@ -759,7 +745,7 @@ export default function WorkspaceKanban() {
 									<Button
 										variant="ghost"
 										size="sm"
-										className="mt-2 w-full justify-start text-xs text-muted-foreground hover:text-foreground"
+										className="m-2 mt-0 justify-start text-muted-foreground hover:text-foreground"
 										onPress={() => {
 											setCardTitle("");
 											setCardDesc("");

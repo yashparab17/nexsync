@@ -24,7 +24,7 @@ export default function Workspace() {
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
 	// The Editor, Notes, Files and Assets are full-bleed workspaces: no page padding, and they fill the window
-	const flush = pathname.startsWith("/workspace/editor") || pathname.startsWith("/workspace/notes") || pathname.startsWith("/workspace/explorer") || pathname.startsWith("/workspace/files") || pathname.startsWith("/workspace/assets");
+	const flush = pathname.startsWith("/workspace/editor") || pathname.startsWith("/workspace/notes") || pathname.startsWith("/workspace/explorer") || pathname.startsWith("/workspace/files") || pathname.startsWith("/workspace/assets") || pathname.startsWith("/workspace/tasks") || pathname.startsWith("/workspace/kanban");
 	// Below the medium breakpoint the sidebar is a drawer
 	const [navOpen, setNavOpen] = useState(false);
 
