@@ -13,14 +13,15 @@ export const PageBody = ({ children, className, padded = true }: { children: Rea
 	<div className={cn("min-h-0 flex-1 overflow-auto", padded && "p-3", className)}>{children}</div>
 );
 
-// A titled block: a title with a line of context, then its content. `flush` lets a list touch the edges.
-export function Panel({ title, hint, children, className, right, flush }: { title: string; hint?: string; children: ReactNode; className?: string; right?: ReactNode; flush?: boolean }) {
+// A titled block: a title (with an icon if it has one) and a line of context, then its content. `flush` lets a list touch the edges.
+export function Panel({ title, hint, children, className, right, flush, icon, id, titleClassName }: { title: string; hint?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; flush?: boolean; icon?: ReactNode; id?: string; titleClassName?: string }) {
 	return (
-		<section className={cn("flex min-w-0 flex-col border bg-card/40", className)}>
-			<header className="flex items-baseline justify-between gap-3 border-b px-4 py-2.5">
-				<div className="min-w-0">
-					<h2 className="text-sm font-semibold text-foreground">{title}</h2>
-					{hint && <p className="truncate text-sm text-muted-foreground">{hint}</p>}
+		<section id={id} className={cn("flex min-w-0 flex-col border bg-card/40", className)}>
+			<header className="flex items-center justify-between gap-3 border-b px-4 py-2.5">
+				{icon && <span className={cn("shrink-0 [&>svg]:size-5", titleClassName?.includes("destructive") ? "text-destructive" : "text-primary")}>{icon}</span>}
+				<div className="min-w-0 flex-1">
+					<h2 className={cn("text-sm font-semibold text-foreground", titleClassName)}>{title}</h2>
+					{hint && <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{hint}</p>}
 				</div>
 				{right}
 			</header>

@@ -79,7 +79,7 @@ export default function WorkspaceInsights() {
 				/>
 				<span className="flex-1" />
 				{tab === "overview" ? (
-					<span className="font-mono text-sm text-muted-foreground">latest {events.length} actions{events.some((e) => !e.author) ? " · some older ones have no name" : ""}</span>
+					<span className="text-sm text-muted-foreground">Latest {events.length} actions{events.some((e) => !e.author) ? " · some older ones have no name" : ""}</span>
 				) : (
 					<>
 						<ToolbarSearch label="Search activity" placeholder="Search activity" value={filter.query ?? ""} onChange={(query) => set({ query })} />

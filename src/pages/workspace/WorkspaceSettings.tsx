@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { Moon, Radio, Sun, Trash2, AlertTriangle, Download, FolderOpen, Save, SlidersHorizontal, ShieldCheck, Undo2, User, X } from "@/components/animate-icons";
+import { Moon, Radio, Sun, Trash2, AlertTriangle, Download, FolderOpen, Save, SlidersHorizontal, ShieldCheck, Undo2, User } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import Avatar from "@/components/elements/Avatar";
-import { Row, SectionCard, SectionNav, Segmented } from "@/components/elements/SettingsParts";
+import { Row, SectionCard, SettingsShell, Segmented } from "@/components/elements/SettingsParts";
 import RulesCard from "@/components/elements/RulesCard";
 import HostRequiredCard from "@/components/elements/HostRequiredCard";
 
@@ -159,27 +159,34 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 	};
 
 	return (
-		<div className={onClose ? "h-[85vh] overflow-y-auto overscroll-contain" : undefined}>
-		<div className={onClose ? "flex gap-8 p-6" : "mx-auto flex max-w-5xl gap-8"}>
-			{/* Section list */}
-			<aside className="hidden w-44 shrink-0 md:block">
-				<SectionNav label="Workspace settings sections" sections={SECTIONS} />
-			</aside>
-
-			<div className="min-w-0 flex-1 space-y-6">
-				{/* Header */}
-				<div className="flex items-start justify-between gap-3">
-					<div>
-					<h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-					<p className="text-sm text-muted-foreground">Preferences, identity and sharing for {workspace?.name ?? "this workspace"}.</p>
+		<>
+			<SettingsShell
+				title="Workspace settings"
+				description={`Preferences, identity and sharing for ${workspace?.name ?? "this workspace"}.`}
+				onClose={() => (onClose ? (dirty ? setLeaving(true) : onClose()) : undefined)}
+				nav={SECTIONS}
+				navLabel="Workspace settings sections"
+				className={onClose ? "h-[85vh]" : "h-full"}
+				footer={
+					(dirty || saving || savedSuccess) && !isJoinedCopy && (
+					<div role="region" aria-label="Unsaved changes" >
+						<div className="flex flex-wrap items-center gap-3 px-3 py-2">
+							<p role="status" className={`min-w-0 flex-1 text-xs ${savedSuccess && !dirty ? "text-success" : "text-muted-foreground"}`}>
+								{saving ? "Saving…" : savedSuccess && !dirty ? "Settings saved" : "You have unsaved changes."}
+							</p>
+							<Button variant="outline" size="sm" isDisabled={saving || !dirty} onPress={discard}>
+								<Undo2 className="size-4" />
+								Discard
+							</Button>
+							<Button size="sm" isDisabled={saving || !dirty || !name.trim()} onPress={() => void handleSaveSettings()}>
+								{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+								{saving ? "Saving…" : "Save changes"}
+							</Button>
+						</div>
 					</div>
-					{onClose && (
-						<Button variant="ghost" size="icon" aria-label="Close" onPress={() => (dirty ? setLeaving(true) : onClose())}>
-							<X className="size-5" />
-						</Button>
-					)}
-				</div>
-
+				)
+				}
+			>
 				{isJoinedCopy && (
 					<p className="border p-3 text-xs text-muted-foreground">You joined this workspace, so its host manages these settings.</p>
 				)}
@@ -304,24 +311,8 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					</div>
 				</SectionCard>
 
-				{/* Appears while there is something to save */}
-				{(dirty || saving || savedSuccess) && !isJoinedCopy && (
-					<div role="region" aria-label="Unsaved changes" className="sticky bottom-0 -mx-1 border-t bg-background/95 backdrop-blur">
-						<div className="flex flex-wrap items-center gap-3 px-1 py-3">
-							<p role="status" className={`min-w-0 flex-1 text-xs ${savedSuccess && !dirty ? "text-success" : "text-muted-foreground"}`}>
-								{saving ? "Saving…" : savedSuccess && !dirty ? "Settings saved" : "You have unsaved changes."}
-							</p>
-							<Button variant="outline" size="sm" isDisabled={saving || !dirty} onPress={discard}>
-								<Undo2 className="size-4" />
-								Discard
-							</Button>
-							<Button size="sm" isDisabled={saving || !dirty || !name.trim()} onPress={() => void handleSaveSettings()}>
-								{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-								{saving ? "Saving…" : "Save changes"}
-							</Button>
-						</div>
-					</div>
-				)}
+			</SettingsShell>
+
 			{leaving && (
 				<Dialog isOpen onOpenChange={(open) => !open && setLeaving(false)}>
 					<div className="space-y-4">
@@ -421,8 +412,6 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					</div>
 				</Dialog>
 			)}
-			</div>
-		</div>
-		</div>
+		</>
 	);
 }

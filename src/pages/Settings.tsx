@@ -4,9 +4,9 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { APP_VERSION } from "@/lib/version";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Loader2 } from "lucide-react";
-import { Check, Moon, Plus, Sun, Trash2, Bug, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, Undo2, User, X, AlertTriangle } from "@/components/animate-icons";
+import { Check, Moon, Plus, Sun, Trash2, Bug, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, Undo2, User, AlertTriangle } from "@/components/animate-icons";
 
-import { Row, Segmented, SectionCard, SectionNav } from "@/components/elements/SettingsParts";
+import { Row, Segmented, SectionCard, SettingsShell } from "@/components/elements/SettingsParts";
 import Avatar from "@/components/elements/Avatar";
 import ErrorLogCard from "@/components/elements/ErrorLogCard";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ const NAME_LIMIT = 40;
 
 const SECTIONS = [
 	{ id: "profile", label: "Profile", icon: User },
+	{ id: "network", label: "Network", icon: Globe },
 	{ id: "appearance", label: "Appearance", icon: Palette },
 	{ id: "editor", label: "Editor", icon: Code2 },
 	{ id: "storage", label: "Storage", icon: HardDrive },
@@ -175,26 +176,47 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 	const back = () => (dirty ? setLeaving(true) : close());
 
 	return (
-		<div className={cn("bg-background", onClose ? "h-[85vh] overflow-y-auto overscroll-contain" : "min-h-full")}>
-			<div className="mx-auto flex max-w-5xl gap-8 p-8">
-				{/* Section list */}
-				<aside className="hidden w-44 shrink-0 md:block">
-					<SectionNav label="Settings sections" sections={NAV} />
-				</aside>
-
-				<div className="min-w-0 flex-1 space-y-6">
-					<div className="flex items-center gap-3">
-						<Button variant="ghost" size="icon" onPress={back} aria-label="Close">
-							<X className="size-5" />
+		<>
+			<SettingsShell
+				title="Settings"
+				description="Preferences for this device. Nothing here is shared with collaborators except your name."
+				onClose={back}
+				nav={NAV}
+				navLabel="Settings sections"
+				className={onClose ? "h-[85vh]" : "h-full"}
+				footer={
+					(dirty || saving || justSaved || saveError) && (
+				<div
+					role="region"
+					aria-label="Unsaved changes"
+					className=""
+				>
+					<div className="mx-auto flex max-w-3xl flex-wrap items-center gap-3 px-3 py-2">
+						<p
+							role={saveError ? "alert" : "status"}
+							className={cn(
+								"min-w-0 flex-1 text-xs",
+								saveError ? "text-destructive" : justSaved ? "text-success" : "text-muted-foreground",
+							)}
+						>
+							{saveError
+								? `Could not save: ${saveError}`
+								: justSaved && !dirty
+									? "Settings saved."
+									: "You have unsaved changes to your profile or storage folders."}
+						</p>
+						<Button variant="outline" size="sm" onPress={discard} isDisabled={!dirty || saving}>
+							Discard
 						</Button>
-						<div>
-							<h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-							<p className="text-sm text-muted-foreground">
-								Preferences for this device. Nothing here is shared with collaborators except your name.
-							</p>
-						</div>
+						<Button size="sm" onPress={() => void save()} isDisabled={!dirty || saving || noRoots}>
+							{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+							{saving ? "Saving…" : "Save changes"}
+						</Button>
 					</div>
-
+				</div>
+			)
+				}
+			>
 					{loadError && (
 						<p role="alert" className="border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
 							Could not load your settings: {loadError}
@@ -509,40 +531,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 					</SectionCard>
 
 					<ErrorLogCard />
-				</div>
-			</div>
-
-			{/* Appears while there is something to save; the profile and storage sections save together */}
-			{(dirty || saving || justSaved || saveError) && (
-				<div
-					role="region"
-					aria-label="Unsaved changes"
-					className="sticky bottom-0 border-t bg-background/95 backdrop-blur"
-				>
-					<div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-8 py-3">
-						<p
-							role={saveError ? "alert" : "status"}
-							className={cn(
-								"min-w-0 flex-1 text-xs",
-								saveError ? "text-destructive" : justSaved ? "text-success" : "text-muted-foreground",
-							)}
-						>
-							{saveError
-								? `Could not save: ${saveError}`
-								: justSaved && !dirty
-									? "Settings saved."
-									: "You have unsaved changes to your profile or storage folders."}
-						</p>
-						<Button variant="outline" size="sm" onPress={discard} isDisabled={!dirty || saving}>
-							Discard
-						</Button>
-						<Button size="sm" onPress={() => void save()} isDisabled={!dirty || saving || noRoots}>
-							{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-							{saving ? "Saving…" : "Save changes"}
-						</Button>
-					</div>
-				</div>
-			)}
+			</SettingsShell>
 
 			{leaving && (
 				<Dialog isOpen onOpenChange={(isOpen) => !isOpen && setLeaving(false)}>
@@ -559,6 +548,6 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 					</div>
 				</Dialog>
 			)}
-		</div>
+		</>
 	);
 }

@@ -2,7 +2,10 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { X } from "@/components/animate-icons";
+import { Panel } from "@/components/layout/Page";
+import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // A row inside a card: what the setting is on the left, its control on the right
@@ -52,37 +55,39 @@ export function Segmented<T extends string | number>({
 	);
 }
 
-// A titled card with an icon; `id` is what the section list on the left scrolls to
-export function SectionCard({
-	id,
-	title,
-	description,
-	icon,
-	children,
-	className,
-	titleClassName,
-}: {
-	id: string;
-	title: string;
-	description: ReactNode;
-	icon: ReactNode;
-	children: ReactNode;
-	className?: string;
-	titleClassName?: string;
-}) {
+// A titled panel with an icon; `id` is what the section list on the left scrolls to
+export function SectionCard({ id, title, description, icon, children, className, titleClassName }: { id: string; title: string; description: ReactNode; icon: ReactNode; children: ReactNode; className?: string; titleClassName?: string }) {
 	return (
-		<Card id={id} className={cn("scroll-mt-8", className)}>
-			<CardHeader>
-				<div className="flex items-start gap-4">
-					<span className={cn("flex size-10 shrink-0 items-center justify-center", titleClassName?.includes("destructive") ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary")}>{icon}</span>
-					<div className="min-w-0">
-						<CardTitle className={cn("text-lg", titleClassName)}>{title}</CardTitle>
-						<CardDescription className="mt-1">{description}</CardDescription>
-					</div>
+		<Panel id={id} title={title} hint={description} icon={icon} titleClassName={titleClassName} className={cn("scroll-mt-3", className)}>
+			<div className="space-y-4">{children}</div>
+		</Panel>
+	);
+}
+
+// The frame both Settings screens share, in the popup and as a page: a header that never scrolls away, with the title and
+// a Close button, then the section list beside the sections, and a bar along the bottom while there is something to save
+export function SettingsShell({ title, description, onClose, nav, navLabel, footer, className, children }: { title: string; description: ReactNode; onClose: () => void; nav: { id: string; label: string; icon: ReactNode }[]; navLabel: string; footer?: ReactNode; className?: string; children: ReactNode }) {
+	return (
+		<div className={cn("flex min-h-0 flex-col bg-background", className)}>
+			<Toolbar>
+				<ToolbarTitle name={title} />
+				<span className="ml-1 hidden min-w-0 flex-1 truncate border-l pl-3 text-sm text-muted-foreground md:block">{description}</span>
+				<span className="flex-1 md:hidden" />
+				<Button variant="outline" size="sm" onPress={onClose} aria-label="Close settings">
+					<X className="size-4" />
+					Close
+				</Button>
+			</Toolbar>
+			<div className="flex min-h-0 flex-1">
+				<aside className="hidden w-52 shrink-0 overflow-y-auto border-r bg-sidebar p-2 md:block">
+					<SectionNav label={navLabel} sections={nav} />
+				</aside>
+				<div data-settings-scroll className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-3">
+					<div className="mx-auto max-w-3xl space-y-3">{children}</div>
 				</div>
-			</CardHeader>
-			<CardContent className="space-y-4">{children}</CardContent>
-		</Card>
+			</div>
+			{footer && <div className="shrink-0 border-t bg-card/40">{footer}</div>}
+		</div>
 	);
 }
 
@@ -99,7 +104,7 @@ export function SectionNav({ label, sections }: { label: string; sections: { id:
 				const current = sections.filter((s) => seen.has(s.id)).pop();
 				if (current) setActive(current.id);
 			},
-			{ rootMargin: "-10% 0px -45% 0px" },
+			{ root: document.querySelector("[data-settings-scroll]"), rootMargin: "0px 0px -60% 0px" },
 		);
 		for (const { id } of sections) {
 			const el = document.getElementById(id);
@@ -109,7 +114,7 @@ export function SectionNav({ label, sections }: { label: string; sections: { id:
 	}, [sections]);
 
 	return (
-		<nav aria-label={label} className="sticky top-8 space-y-0.5">
+		<nav aria-label={label} className="space-y-0.5">
 			{sections.map(({ id, label: text, icon }) => (
 				<button
 					key={id}

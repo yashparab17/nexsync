@@ -396,7 +396,7 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 	// Construct breadcrumbs
 	const breadcrumbs = getBreadcrumbs(currentDir).slice(ROOT ? 1 : 0);
 	const crumbs = [
-		{ label: ROOT ? "Files" : workspace?.name || "Workspace", dir: ROOT },
+		{ label: ROOT ? "/" : workspace?.name || "Workspace", dir: ROOT },
 		...breadcrumbs.map((part, i) => ({
 			label: part,
 			dir: [ROOT, ...breadcrumbs.slice(0, i + 1)].filter(Boolean).join("/"),
