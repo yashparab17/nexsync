@@ -424,7 +424,7 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 						) : (
 							<>
 								<section className="space-y-2">
-									<h3 className="font-mono text-muted-foreground">Contributions</h3>
+									<h3 className="font-semibold text-muted-foreground">Contributions</h3>
 									{blame.people.map((person) => (
 										<div key={person.author} className="space-y-1">
 											<div className="flex justify-between gap-2">
@@ -443,7 +443,7 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 									))}
 								</section>
 								<section className="space-y-1">
-									<h3 className="font-mono text-muted-foreground">Blame</h3>
+									<h3 className="font-semibold text-muted-foreground">Blame</h3>
 									{blame.ranges.map((range) => (
 										<button
 											key={`${range.from}-${range.author}`}

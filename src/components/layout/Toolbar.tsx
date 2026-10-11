@@ -25,7 +25,7 @@ export default function Toolbar({ variant = "bar", className, ...props }: { vari
 // Filter tabs with a count each, like the kinds of asset: one is chosen, and the chosen one is filled
 export function ToolbarTabs<T extends string>({ label, value, onChange, tabs }: { label: string; value: T; onChange: (value: T) => void; tabs: { key: T; label: string; count?: number }[] }) {
 	return (
-		<div role="tablist" aria-label={label} className="flex items-center gap-1 overflow-x-auto">
+		<div role="tablist" aria-label={label} className="ml-1 flex items-center gap-1 overflow-x-auto border-l pl-3 first:ml-0 first:border-l-0 first:pl-0">
 			{tabs.map((tab) => (
 				<button
 					key={tab.key}
@@ -82,12 +82,12 @@ export function ToolbarSwitch<T extends string>({ label, value, onChange, option
 	);
 }
 
-// The page name at the left of a toolbar, in the mono the workspace uses for every heading, with what it holds after a dot
-export function ToolbarTitle({ name, meta }: { name: string; meta?: ReactNode }) {
+// The page name at the left of a toolbar, with what it holds after it in mono, as numbers are everywhere
+export function ToolbarTitle({ name, meta, as: Heading = "h1" }: { name: string; meta?: ReactNode; as?: "h1" | "h2" }) {
 	return (
-		<h1 className="min-w-0 truncate font-mono text-sm">
-			{name}
-			{meta !== undefined && meta !== "" && <span className="text-muted-foreground"> · {meta}</span>}
-		</h1>
+		<Heading className="flex min-w-0 items-baseline gap-2 text-sm font-semibold">
+			<span className="truncate">{name}</span>
+			{meta !== undefined && meta !== "" && <span className="shrink-0 font-mono text-[13px] font-normal text-muted-foreground">{meta}</span>}
+		</Heading>
 	);
 }

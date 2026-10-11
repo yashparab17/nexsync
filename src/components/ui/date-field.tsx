@@ -1,4 +1,4 @@
-import { parseDate } from "@internationalized/date";
+import { getLocalTimeZone, parseDate, today } from "@internationalized/date";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from "@/components/animate-icons";
 import {
 	Button,
@@ -36,16 +36,19 @@ export function DateField({
 	value,
 	onChange,
 	className,
+	noPast,
 	"aria-label": ariaLabel = "Date",
 }: {
 	id?: string;
 	value: string;
 	onChange: (value: string) => void;
 	className?: string;
+	// Days before today cannot be picked or typed
+	noPast?: boolean;
 	"aria-label"?: string;
 }) {
 	return (
-		<DatePicker aria-label={ariaLabel} value={toDate(value)} onChange={(d) => onChange(d ? d.toString() : "")} className={cn("group", className)}>
+		<DatePicker aria-label={ariaLabel} minValue={noPast ? today(getLocalTimeZone()) : undefined} value={toDate(value)} onChange={(d) => onChange(d ? d.toString() : "")} className={cn("group", className)}>
 			<Group
 				id={id}
 				className="flex h-10 w-full items-center border border-input bg-background pl-3 text-sm focus-within:ring-2 focus-within:ring-ring"

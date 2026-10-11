@@ -39,7 +39,7 @@ export default function TaskCalendar({ tasks, onOpen }: { tasks: Task[]; onOpen:
 	return (
 		<div className="space-y-2">
 			<div className="flex items-center justify-between">
-				<h2 className="font-mono text-sm" aria-live="polite">
+				<h2 className="text-sm font-semibold" aria-live="polite">
 					{title}
 				</h2>
 				<div className="flex items-center gap-1">

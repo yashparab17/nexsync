@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, AlertTriangle, ArrowRight, CheckSquare, Columns3, Pencil } from "@/components/animate-icons";
 
 import { EmptyState } from "@/components/layout/Page";
-import Toolbar from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import EraseOption from "@/components/elements/EraseOption";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -455,7 +455,7 @@ export default function WorkspaceKanban() {
 			<div className="grid grid-cols-2 gap-3">
 				<div>
 					<Label htmlFor={`${prefix}-due`}>Due date</Label>
-					<DateField id={`${prefix}-due`} value={cardDue} onChange={setCardDue} className="mt-1" />
+					<DateField noPast={prefix === "new-card"} id={`${prefix}-due`} value={cardDue} onChange={setCardDue} className="mt-1" />
 				</div>
 				<div>
 					<Label htmlFor={`${prefix}-assignee`}>Assignee</Label>
@@ -488,9 +488,7 @@ export default function WorkspaceKanban() {
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-background">
 			<Toolbar>
-				<h1 className="font-mono text-sm text-muted-foreground">
-					kanban · {columns.reduce((n, c) => n + c.cards.length, 0)} cards in {columns.length} {columns.length === 1 ? "column" : "columns"}
-				</h1>
+				<ToolbarTitle name="Kanban" meta={`${columns.reduce((n, c) => n + c.cards.length, 0)} cards · ${columns.length} ${columns.length === 1 ? "column" : "columns"}`} />
 				<span className="flex-1" />
 				{workspace?.path && <BoardDraftBar workspacePath={workspace.path} columns={columns} board={board} onBoard={setBoard} canDraft={!isViewer} />}
 				{canChange && (
@@ -543,7 +541,7 @@ export default function WorkspaceKanban() {
 								{/* Column Header */}
 								<div className="flex h-10 shrink-0 items-center justify-between border-b pr-2 pl-3">
 									<div className="flex items-center gap-2">
-										<h3 className="truncate font-mono text-sm text-foreground">
+										<h3 className="truncate text-sm font-semibold text-foreground">
 											{col.title}
 										</h3>
 										<span className="font-mono text-[13px] tabular-nums text-muted-foreground">

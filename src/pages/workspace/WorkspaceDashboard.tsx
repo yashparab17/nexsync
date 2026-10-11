@@ -85,8 +85,9 @@ export default function WorkspaceDashboard() {
 	return (
 		<Page>
 			<Toolbar>
-				<ToolbarTitle name={workspace?.name ?? "dashboard"} meta={workspace?.description} />
-				<span className="flex-1" />
+				<ToolbarTitle name={workspace?.name ?? "Dashboard"} />
+				{workspace?.description && <span className="ml-1 hidden min-w-0 flex-1 truncate border-l pl-3 text-sm text-muted-foreground md:block">{workspace.description}</span>}
+				<span className="flex-1 md:hidden" />
 				<Button variant="outline" size="sm" onPress={() => navigate("/workspace/notes")}><StickyNote className="size-4" />Notes</Button>
 				<Button variant="outline" size="sm" onPress={() => navigate("/workspace/tasks")}><ListTodo className="size-4" />Tasks</Button>
 				<Button variant="outline" size="sm" onPress={() => navigate("/workspace/files")}><FilePlus className="size-4" />Files</Button>
@@ -103,7 +104,7 @@ export default function WorkspaceDashboard() {
 				</dl>
 
 				<div className="flex min-w-0 flex-col gap-3">
-					<Panel title="pick up where you left off" hint={recent.length ? `${Math.min(recent.length, 5)} recent` : undefined} flush={recent.length > 0}>
+					<Panel title="Pick up where you left off" hint={recent.length ? `${Math.min(recent.length, 5)} recent` : undefined} flush={recent.length > 0}>
 						{recent.length === 0 ? (
 							<p className="text-sm text-muted-foreground">Files you open show up here, so you can jump back in.</p>
 						) : (
@@ -125,7 +126,7 @@ export default function WorkspaceDashboard() {
 						)}
 					</Panel>
 
-					<Panel title="activity" hint="The latest changes" flush={activity.length > 0}>
+					<Panel title="Activity" hint="The latest changes" flush={activity.length > 0}>
 						{activity.length === 0 ? (
 							<p className="text-sm text-muted-foreground">Nothing has changed yet. Create a note, file or task to get started.</p>
 						) : (
@@ -152,7 +153,7 @@ export default function WorkspaceDashboard() {
 				</div>
 
 				<aside className="flex flex-col gap-3">
-					<Panel title="people" hint={`${[...online].filter((n) => members.some((m) => m.name === n)).length} online`} flush>
+					<Panel title="People" hint={`${[...online].filter((n) => members.some((m) => m.name === n)).length} online`} flush>
 						<ul className="divide-y">
 							{members.map((m) => {
 								const here = online.has(m.name);
@@ -172,7 +173,7 @@ export default function WorkspaceDashboard() {
 						</ul>
 					</Panel>
 
-					<Panel title="due soon" flush={due.length > 0}>
+					<Panel title="Due soon" flush={due.length > 0}>
 						{due.length === 0 ? (
 							<p className="text-sm text-muted-foreground">No dates set. Give a task a due date and it appears here.</p>
 						) : (

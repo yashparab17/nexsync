@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import Toolbar from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
 import { ChevronRight, Columns3, Copy, RefreshCw, Search, Trash2, ChevronDown, ChevronsDownUp, Download, FilePlus, FolderPlus, Pencil, X } from "@/components/animate-icons";
 
 import FileKindIcon, { FolderKindIcon } from "./FileKindIcon";
@@ -237,7 +237,7 @@ export default function FileExplorer({
 			className={cn("flex h-full min-w-0 flex-col bg-sidebar", dragging && "ring-2 ring-primary ring-inset")}
 		>
 			<Toolbar variant="header" className="justify-between">
-				<h2 className="font-mono text-sm text-muted-foreground">explorer</h2>
+				<ToolbarTitle as="h2" name="Explorer" />
 				<div className="flex">
 					{!readOnly && (
 						<>

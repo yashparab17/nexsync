@@ -13,13 +13,13 @@ export const PageBody = ({ children, className, padded = true }: { children: Rea
 	<div className={cn("min-h-0 flex-1 overflow-auto", padded && "p-3", className)}>{children}</div>
 );
 
-// A titled block: a lowercase mono title with a line of context, then its content. `flush` lets a list touch the edges.
+// A titled block: a title with a line of context, then its content. `flush` lets a list touch the edges.
 export function Panel({ title, hint, children, className, right, flush }: { title: string; hint?: string; children: ReactNode; className?: string; right?: ReactNode; flush?: boolean }) {
 	return (
 		<section className={cn("flex min-w-0 flex-col border bg-card/40", className)}>
 			<header className="flex items-baseline justify-between gap-3 border-b px-4 py-2.5">
 				<div className="min-w-0">
-					<h2 className="font-mono text-sm text-foreground">{title}</h2>
+					<h2 className="text-sm font-semibold text-foreground">{title}</h2>
 					{hint && <p className="truncate text-sm text-muted-foreground">{hint}</p>}
 				</div>
 				{right}
@@ -29,12 +29,12 @@ export function Panel({ title, hint, children, className, right, flush }: { titl
 	);
 }
 
-// What a page shows when there is nothing to list: an icon, a mono title, a sentence and maybe a button
+// What a page shows when there is nothing to list: an icon, a title, a sentence and maybe a button
 export function EmptyState({ icon, title, children, action, className }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode; className?: string }) {
 	return (
 		<div className={cn("flex h-full min-h-48 flex-col items-center justify-center gap-2 p-8 text-center", className)}>
 			{icon && <span className="text-muted-foreground [&>svg]:size-10">{icon}</span>}
-			<h3 className="font-mono text-sm">{title}</h3>
+			<h3 className="text-base font-semibold">{title}</h3>
 			{children && <p className="max-w-sm text-sm text-muted-foreground">{children}</p>}
 			{action && <div className="mt-2">{action}</div>}
 		</div>

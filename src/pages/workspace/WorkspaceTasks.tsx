@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type ElementType } from "rea
 import { Plus, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, Sparkles } from "@/components/animate-icons";
 
 import { EmptyState } from "@/components/layout/Page";
-import Toolbar, { ToolbarSearch, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarTitle, ToolbarSearch, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-field";
@@ -424,6 +424,7 @@ export default function WorkspaceTasks() {
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-background">
 			<Toolbar>
+				<ToolbarTitle name="Tasks" meta={stats.total - stats.done ? `${stats.total - stats.done} open` : undefined} />
 				<ToolbarTabs
 					label="Status"
 					value={statusFilter}
@@ -644,7 +645,7 @@ export default function WorkspaceTasks() {
 
 							<div>
 								<Label htmlFor="create-due">Due Date</Label>
-								<DateField id="create-due" value={formDueDate} onChange={setFormDueDate} className="mt-1" />
+								<DateField id="create-due" noPast value={formDueDate} onChange={setFormDueDate} className="mt-1" />
 							</div>
 							{renderExtras("create")}
 						</div>

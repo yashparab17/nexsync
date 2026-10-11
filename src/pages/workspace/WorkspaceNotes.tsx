@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
 import { dropSummary, importDropped } from "@/lib/dropImport";
-import Toolbar from "@/components/layout/Toolbar";
+import Welcome from "@/components/elements/Welcome";
+import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
 import { useNavigate } from "react-router-dom";
-import { CalendarPlus, FileText, LayoutGrid, Network, PanelLeftClose, PanelLeftOpen, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "@/components/animate-icons";
+import { CalendarPlus, FilePlus, FileText, LayoutGrid, Network, PanelLeftClose, PanelLeftOpen, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "@/components/animate-icons";
 
 import NoteEditor from "@/components/elements/editor/NoteEditor";
 import NoteBoard from "@/components/elements/notes/NoteBoard";
@@ -443,7 +444,6 @@ export default function WorkspaceNotes() {
 		</Button>
 	);
 
-	const kbd = (k: string) => <kbd className="border bg-card px-1.5 py-0.5 font-mono text-xs text-muted-foreground">{k}</kbd>;
 
 	return (
 		<div {...dropProps} className="relative flex h-full min-h-0 bg-background">
@@ -454,7 +454,7 @@ export default function WorkspaceNotes() {
 				<>
 					<aside aria-label="Notes list" style={{ width: listWidth }} className="flex shrink-0 flex-col bg-sidebar">
 						<Toolbar variant="header">
-							<h2 className="flex-1 font-mono text-sm text-muted-foreground">notes · {notes.length}</h2>
+							<div className="flex-1"><ToolbarTitle as="h2" name="Notes" meta={notes.length} /></div>
 							{!isViewer && (
 								<>
 									<Button variant="ghost" size="icon-xs" aria-label="Open today's note" onPress={openToday}>
@@ -559,44 +559,19 @@ export default function WorkspaceNotes() {
 							/>
 						)
 					) : (
-						<div className="flex h-full overflow-auto">
-							<div className="m-auto w-full max-w-md space-y-6 p-8">
-								<div>
-									<h2 className="font-mono text-sm">{notes.length === 0 ? "Start your first note" : "Pick up where you left off"}</h2>
-									<p className="mt-1 text-sm text-muted-foreground">
-										Notes save themselves. Link one to another with <code className="font-mono">[[Note name]]</code>.
-									</p>
-								</div>
-								<ul className="space-y-2 text-sm">
-									{!isViewer && (
-										<li className="flex items-center justify-between gap-4">
-											<button type="button" className="cursor-pointer text-primary hover:underline" onClick={() => { setNewTitle(""); setIsNewOpen(true); }}>
-												New note
-											</button>
-											{kbd("Ctrl N")}
-										</li>
-									)}
-									<li className="flex items-center justify-between gap-4">
-										<button type="button" className="cursor-pointer text-primary hover:underline" onClick={() => { setSwitcherQuery(""); setSwitcher(true); }}>
-											Go to a note
-										</button>
-										{kbd("Ctrl O")}
-									</li>
-									{!isViewer && (
-										<li className="flex items-center justify-between gap-4">
-											<button type="button" className="cursor-pointer text-primary hover:underline" onClick={openToday}>
-												Open today’s note
-											</button>
-											{kbd(today())}
-										</li>
-									)}
-									<li className="flex items-center justify-between gap-4">
-										<span className="text-muted-foreground">Hide the list</span>
-										{kbd("Ctrl \\")}
-									</li>
-								</ul>
-							</div>
-						</div>
+						<Welcome
+							title={notes.length === 0 ? "Start your first note" : "Notes"}
+							intro={<>Notes save themselves. Link one to another with <code className="font-mono">[[Note name]]</code>.</>}
+							actions={[
+								...(isViewer ? [] : [{ label: "New note", keys: "Ctrl N", icon: <FilePlus className="size-4" />, run: () => { setNewTitle(""); setIsNewOpen(true); } }]),
+								{ label: "Go to a note", keys: "Ctrl O", icon: <Search className="size-4" />, run: () => { setSwitcherQuery(""); setSwitcher(true); } },
+								...(isViewer ? [] : [{ label: "Open today’s note", keys: today(), icon: <CalendarPlus className="size-4" />, run: openToday }]),
+							]}
+							recentTitle="Recent notes"
+							recent={notes.slice(0, 6).map((n) => ({ key: n.path, label: noteTitle(n.name), icon: <FileText className="size-4 text-muted-foreground" />, run: () => openNote(n.path) }))}
+							recentEmpty="Notes you write are listed here."
+							tip={"Hide the list with Ctrl \\ for more room to write."}
+						/>
 					)}
 				</div>
 			</section>
@@ -624,7 +599,7 @@ export default function WorkspaceNotes() {
 					const text = liveTexts[item.id] ?? texts[item.id] ?? "";
 					return (
 						<div className="h-full overflow-hidden p-4">
-							<h3 className="font-mono text-sm">{item.label}</h3>
+							<h3 className="text-base font-semibold">{item.label}</h3>
 							<p className="mt-3 text-sm whitespace-pre-wrap text-muted-foreground">{text.slice(0, 700) || "This note is empty."}</p>
 						</div>
 					);

@@ -249,7 +249,7 @@ export default function WorkspaceMembers() {
 	return (
 		<Page>
 			<Toolbar>
-				<ToolbarTitle name="members" meta={members.length || undefined} />
+				<ToolbarTitle name="Members" meta={members.length || undefined} />
 				<span className="ml-1 hidden min-w-0 flex-1 truncate border-l pl-3 text-sm text-muted-foreground md:block">Who is here, who is online, and what each role can do</span>
 				<span className="flex-1 md:hidden" />
 				<Button variant="outline" size="sm" onPress={() => setIsInviteOpen(true)}>
@@ -273,7 +273,7 @@ export default function WorkspaceMembers() {
 
 			{/* Members Grid & Roles Overview */}
 			<PageBody className="grid content-start grid-cols-1 gap-3 lg:grid-cols-3">
-				<Panel title="people" hint="Grouped by role. Offline people are dimmed." className="lg:col-span-2">
+				<Panel title="People" hint="Grouped by role. Offline people are dimmed." className="lg:col-span-2">
 					<div className="space-y-3">
 							{isJoinedCopy && (
 								<p className="text-xs text-muted-foreground">
@@ -425,7 +425,7 @@ export default function WorkspaceMembers() {
 					</div>
 				</Panel>
 
-				<Panel title="roles" hint="What each role can do here" className="self-start">
+				<Panel title="Roles" hint="What each role can do here" className="self-start">
 					<div className="space-y-4 text-sm">
 							<div className="border-l-2 border-border py-1 pl-4">
 								<div className="flex items-center gap-1.5 font-semibold text-warning">
