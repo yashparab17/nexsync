@@ -40,9 +40,9 @@ describe("NoteSidePanel", () => {
 
 	it("lists the notes that link here and opens one", async () => {
 		const { onOpenNote } = open("");
-		fireEvent.click(await screen.findByRole("button", { name: "Budget.md" }));
+		fireEvent.click(await screen.findByRole("button", { name: "Budget" }));
 		expect(onOpenNote).toHaveBeenCalledWith("/notes/Budget.md");
-		expect(screen.queryByRole("button", { name: "Ideas.md" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Ideas" })).toBeNull();
 	});
 
 	it("explains each empty section", () => {
