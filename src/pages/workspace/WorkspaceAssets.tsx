@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { Copy, Check, Search, Trash2, FileText, Film, Headphones, Image as ImageIcon, LayoutGrid, List, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
 import { displaySize } from "@/lib/assets/displaySize";
+import { justify } from "@/lib/assets/justify";
 import { fileToBase64 } from "@/lib/assets/uploadScale";
 import { cn } from "@/lib/utils";
 
@@ -334,14 +335,12 @@ export default function WorkspaceAssets() {
 	const kindIcon = (category: AssetItem["category"], className: string) =>
 		category === "video" ? <Film className={className} /> : category === "audio" ? <Headphones className={className} /> : category === "image" ? <ImageIcon className={className} /> : <FileText className={className} />;
 
-	// The grid is made of narrow columns and short rows; a tile spans as many as its picture needs, so tiles of every
-	// shape pack together without gaps. Pictures bigger than 500 pixels are drawn at half size, smaller ones at their own.
-	const UNIT = 40;
+	// Tiles sit in rows that each fill the width, so no space is left over. A tile wants to be drawn at its own size,
+	// or half of it for pictures bigger than 500 pixels, and each row stretches its tiles together to reach the edges.
 	const GAP = 8;
-	const ROW = 4;
+	const PAD = 12;
 	const mul = tile === "s" ? 0.7 : tile === "l" ? 1.4 : 1;
-	const columns = Math.max(1, Math.floor((gridWidth - 24 + GAP) / (UNIT + GAP)));
-	const tileGeometry = (asset: AssetItem) => {
+	const tileWish = (asset: AssetItem): { aspect: number; height: number } => {
 		const natural = sizes[asset.name];
 		let w: number;
 		let h: number;
@@ -354,11 +353,13 @@ export default function WorkspaceAssets() {
 		else if (asset.category === "audio") [w, h] = [180, 135];
 		else if (asset.category === "document") [w, h] = [150, 200];
 		else [w, h] = [120, 120];
-		const span = Math.min(columns, Math.max(1, Math.round((w * mul + GAP) / (UNIT + GAP))));
-		const width = span * UNIT + (span - 1) * GAP;
-		const rows = Math.ceil(((width * h) / w + GAP) / ROW);
-		return { span, rows };
+		return { aspect: w / h, height: h * mul };
 	};
+	const layout = useMemo(
+		() => justify(filteredAssets.map((a) => ({ id: a.name, ...tileWish(a) })), gridWidth - PAD * 2, GAP),
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[filteredAssets, sizes, gridWidth, tile],
+	);
 
 	const tabs = [
 		{ key: "all", label: "All", count: categoryCounts.all },
@@ -475,21 +476,22 @@ export default function WorkspaceAssets() {
 					</div>
 				) : viewMode === "grid" ? (
 					/* Mosaic: columns that each fill from the top, so tiles of different heights pack together */
-					<ul
-						ref={gridRef}
-						className="grid p-3"
-						style={{ gridTemplateColumns: `repeat(auto-fill, ${UNIT}px)`, gridAutoRows: `${ROW}px`, columnGap: GAP, gridAutoFlow: "dense" }}
-					>
+					<ul ref={gridRef} className="relative" style={{ height: layout.height + PAD * 2 }}>
 						{filteredAssets.map((asset) => {
 							const thumbnail = thumbnails[asset.name];
 							const isRemote = asset.syncStatus === "remote_placeholder";
 							const ext = asset.name.split(".").pop()?.toUpperCase() ?? "";
 							const natural = sizes[asset.name];
 							const shown = natural ? displaySize(natural.w, natural.h) : null;
-							const { span, rows } = tileGeometry(asset);
+							const box = layout.boxes[asset.name];
+							if (!box) return null;
 							const details = [natural && `${natural.w}×${natural.h}${shown?.halved ? " (shown at 50%)" : ""}`, formatBytes(asset.size), new Date(asset.modified_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })].filter(Boolean).join(" · ");
 							return (
-								<li key={asset.name} className="group relative" style={{ gridColumn: `span ${span}`, gridRow: `span ${rows}`, paddingBottom: GAP }}>
+								<li
+									key={asset.name}
+									className="group absolute animate-in fade-in zoom-in-95 duration-300 [transition:left_350ms_cubic-bezier(.22,1,.36,1),top_350ms_cubic-bezier(.22,1,.36,1),width_350ms_cubic-bezier(.22,1,.36,1),height_350ms_cubic-bezier(.22,1,.36,1)] motion-reduce:animate-none motion-reduce:transition-none"
+									style={{ left: box.x + PAD, top: box.y + PAD, width: box.w, height: box.h }}
+								>
 									<button
 										type="button"
 										onClick={() => setPreviewAsset(asset)}
