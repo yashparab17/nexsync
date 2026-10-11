@@ -76,6 +76,8 @@ export default function Finder({ open, onClose, query, onQueryChange, filterText
 	}, [index]);
 
 	const current = shown[index]?.item;
+	// Items without an icon keep the icon's column, so labels line up
+	const anyIcon = items.some((item) => item.icon);
 
 	const move = (step: number) => setIndex((i) => Math.min(Math.max(i + step, 0), Math.max(shown.length - 1, 0)));
 
@@ -120,7 +122,7 @@ export default function Finder({ open, onClose, query, onQueryChange, filterText
 				onClick={() => onChoose(item, false)}
 				className={cn("flex cursor-pointer items-center gap-3 px-3 py-1.5 text-sm", i === index ? "bg-primary/10 shadow-[inset_2px_0_0_var(--primary)]" : "hover:bg-muted/50")}
 			>
-				{item.icon && <span className="shrink-0 text-muted-foreground">{item.icon}</span>}
+				{anyIcon && <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">{item.icon}</span>}
 				<span className="min-w-0 flex-1 truncate">
 					<Highlighted text={item.label} indexes={inLabel} />
 					{item.detail && <span className="ml-2 font-mono text-xs text-muted-foreground">{item.detail}</span>}
