@@ -645,7 +645,7 @@ export default function WorkspaceNotes() {
 					>
 						<DialogHeading icon={<Plus className="size-6" />} title="New note" description={<>A rich-text note with headings and lists. For a Markdown file, make it in the Editor.</>} />
 						<Input aria-label="Note title" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Architecture overview, Meeting notes" autoFocus />
-						<DialogFooter>
+						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setIsNewOpen(false)} isDisabled={submitting}>
 								Cancel
 							</Button>
@@ -669,7 +669,7 @@ export default function WorkspaceNotes() {
 						<DialogHeading icon={<Pencil className="size-6" />} title="Rename note" description={<>{renaming.note.name}</>} />
 						<Input aria-label="New name" value={renaming.value} onChange={(e) => setRenaming({ ...renaming, value: e.target.value })} autoFocus />
 						{renameError && <p className="text-xs text-destructive">{renameError}</p>}
-						<DialogFooter>
+						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setRenaming(null)}>
 								Cancel
 							</Button>
@@ -683,7 +683,7 @@ export default function WorkspaceNotes() {
 				<Dialog isOpen onOpenChange={(open) => !open && setDeleting(null)}>
 					<div className="space-y-4">
 						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete note" description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can restore it from there.</>} />
-						<DialogFooter>
+						<DialogFooter className="mt-2">
 							<Button variant="outline" onPress={() => setDeleting(null)}>
 								Cancel
 							</Button>

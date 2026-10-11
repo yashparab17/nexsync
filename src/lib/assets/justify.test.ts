@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { justify } from "./justify";
+import { justify, MAX_STRETCH } from "./justify";
 
 const item = (id: string, aspect: number, height = 200) => ({ id, aspect, height });
 
@@ -23,9 +23,16 @@ describe("justify", () => {
 		for (const [id, aspect] of [["a", 2], ["b", 0.5], ["c", 1]] as const) expect(boxes[id].w / boxes[id].h).toBeCloseTo(aspect, 5);
 	});
 
-	it("does not stretch a lone tile far past its wanted height", () => {
+	it("never stretches a tile past the limit, and centres a row it cannot fill", () => {
 		const { boxes } = justify([item("a", 1, 200)], 1000, 8);
-		expect(boxes.a.h).toBeLessThanOrEqual(250);
+		expect(boxes.a.h).toBeLessThanOrEqual(200 * MAX_STRETCH + 0.001);
+		expect(boxes.a.x).toBeGreaterThan(100);
+	});
+
+	it("never stretches any tile past the limit, even beside tiles that want to be taller", () => {
+		const items = [item("tall", 0.67, 450), item("banner", 2.4, 250), item("a", 1, 300), item("b", 1.3, 300), item("c", 0.8, 350), item("d", 1, 200)];
+		const { boxes } = justify(items, 1160, 8);
+		for (const it of items) expect(boxes[it.id].h).toBeLessThanOrEqual(it.height * MAX_STRETCH + 0.001);
 	});
 
 	it("handles nothing to lay out", () => {
