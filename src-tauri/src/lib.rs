@@ -26,6 +26,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
+        // Only its show_snap_overlay command is used, by the title bar's maximize button (Windows 11 snap layouts)
+        .plugin(tauri_plugin_decorum::init())
         .invoke_handler(tauri::generate_handler![
             // Updates
             commands::updates::check_for_update,

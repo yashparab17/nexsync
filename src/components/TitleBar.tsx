@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { cn } from "@/lib/utils";
@@ -7,6 +8,18 @@ import { APP_VERSION } from "@/lib/version";
 // macOS keeps its own traffic-light buttons (the window is configured to draw them over this bar, see
 // tauri.macos.conf.json), so the bar only leaves room for them; they also give macOS its native full screen and tiling.
 const IS_MAC = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform || navigator.userAgent);
+
+// Windows 11 shows its snap layouts when the pointer rests on a native maximize button. This one is drawn by the app, so
+// resting on it for a moment asks the decorum plugin to bring the flyout up (it presses Win+Z). Windows 10 has none.
+const IS_WINDOWS = typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
+const SNAP_DELAY_MS = 620;
+let windows11: Promise<boolean> | undefined;
+const isWindows11 = () =>
+	(windows11 ??= IS_WINDOWS
+		? ((navigator as Navigator & { userAgentData?: { getHighEntropyValues: (hints: string[]) => Promise<{ platformVersion?: string }> } }).userAgentData
+				?.getHighEntropyValues(["platformVersion"])
+				.then((v) => parseInt(v.platformVersion ?? "0", 10) >= 13) ?? Promise.resolve(false)).catch(() => false)
+		: Promise.resolve(false));
 
 const glyph = { fill: "none", stroke: "currentColor", strokeWidth: 1, className: "size-[10px]", viewBox: "0 0 10 10", "aria-hidden": true } as const;
 const Minimize = () => (
@@ -56,9 +69,23 @@ export default function TitleBar() {
 		};
 	}, []);
 
+	// The snap flyout is asked for once the pointer has rested on the maximize button, and not if it leaves or clicks first
+	const snapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const cancelSnap = () => clearTimeout(snapTimer.current);
+	const armSnap = () => {
+		cancelSnap();
+		void isWindows11().then((yes) => {
+			if (!yes) return;
+			snapTimer.current = setTimeout(() => {
+				void getCurrentWindow().setFocus().then(() => invoke("plugin:decorum|show_snap_overlay")).catch(() => {});
+			}, SNAP_DELAY_MS);
+		});
+	};
+	useEffect(() => cancelSnap, []);
+
 	const controls = [
 		{ label: "Minimize", icon: <Minimize />, run: () => getCurrentWindow().minimize() },
-		{ label: maximized ? "Restore" : "Maximize", icon: maximized ? <Restore /> : <Maximize />, run: () => getCurrentWindow().toggleMaximize() },
+		{ label: maximized ? "Restore" : "Maximize", icon: maximized ? <Restore /> : <Maximize />, run: () => { cancelSnap(); void getCurrentWindow().toggleMaximize(); }, snap: true },
 		{ label: "Close", icon: <Close />, run: () => getCurrentWindow().close(), danger: true },
 	];
 
@@ -73,11 +100,13 @@ export default function TitleBar() {
 				</span>
 			</div>
 			{!IS_MAC &&
-				controls.map(({ label, icon, run, danger }) => (
+				controls.map(({ label, icon, run, danger, snap }) => (
 					<button
 						key={label}
 						type="button"
 						onClick={run}
+						onMouseEnter={snap ? armSnap : undefined}
+						onMouseLeave={snap ? cancelSnap : undefined}
 						aria-label={label}
 						title={label}
 						className={cn(
