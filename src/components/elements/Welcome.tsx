@@ -23,11 +23,16 @@ export interface WelcomeItem {
 
 export const Kbd = ({ children }: { children: ReactNode }) => <kbd className="border bg-card px-1.5 py-0.5 font-mono text-[13px] text-muted-foreground shadow-[0_2px_0_var(--edge)]">{children}</kbd>;
 
-export default function Welcome({ title, intro, actions, recentTitle, recent, recentEmpty, tip }: { title: string; intro: ReactNode; actions: WelcomeAction[]; recentTitle: string; recent: WelcomeItem[]; recentEmpty: string; tip?: string }) {
+export default function Welcome({ logo, title, intro, actions, recentTitle, recent, recentEmpty, tip }: { logo?: string; title: string; intro: ReactNode; actions: WelcomeAction[]; recentTitle: string; recent: WelcomeItem[]; recentEmpty: string; tip?: string }) {
 	return (
 		<div className="h-full overflow-auto p-3">
 			<div className="mx-auto flex max-w-4xl flex-col gap-3 py-6">
-				<header className="px-1 pb-2">
+				<header className={logo ? "flex flex-col items-center gap-3 px-1 pb-4 text-center" : "px-1 pb-2"}>
+					{logo && (
+						<pre aria-label="Nexsync" className="font-mono text-[0.7rem] leading-[1.05] whitespace-pre text-primary select-none sm:text-sm">
+							{logo}
+						</pre>
+					)}
 					<h2 className="text-xl font-semibold">{title}</h2>
 					<p className="mt-1 text-sm text-muted-foreground">{intro}</p>
 				</header>

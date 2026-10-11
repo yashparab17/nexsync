@@ -237,7 +237,7 @@ export default function FileExplorer({
 			className={cn("flex h-full min-w-0 flex-col bg-sidebar", dragging && "ring-2 ring-primary ring-inset")}
 		>
 			<Toolbar variant="header" className="justify-between">
-				<ToolbarTitle as="h2" name="Explorer" />
+				<ToolbarTitle as="h2" name="Editor" />
 				<div className="flex">
 					{!readOnly && (
 						<>

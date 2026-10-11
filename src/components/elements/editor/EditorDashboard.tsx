@@ -1,10 +1,19 @@
-// What the Editor shows when no file is open: the things to do next with their keys, and the files opened most recently.
+// What the Editor shows when no file is open: the wordmark, the things to do next with their keys, and the files opened most recently.
 
 import { Command, FilePlus, FileSearch, StickyNote, Terminal } from "@/components/animate-icons";
 
 import Welcome from "@/components/elements/Welcome";
 import FileKindIcon from "./FileKindIcon";
 import { baseName, folderOf } from "@/lib/editor/fileKinds";
+
+const WORDMARK = [
+	"███╗   ██╗███████╗██╗  ██╗███████╗██╗   ██╗███╗   ██╗ ██████╗",
+	"████╗  ██║██╔════╝╚██╗██╔╝██╔════╝╚██╗ ██╔╝████╗  ██║██╔════╝",
+	"██╔██╗ ██║█████╗   ╚███╔╝ ███████╗ ╚████╔╝ ██╔██╗ ██║██║",
+	"██║╚██╗██║██╔══╝   ██╔██╗ ╚════██║  ╚██╔╝  ██║╚██╗██║██║",
+	"██║ ╚████║███████╗██╔╝ ██╗███████║   ██║   ██║ ╚████║╚██████╗",
+	"╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═══╝ ╚═════╝",
+].join("\n");
 
 const TIPS = [
 	"Type > in Quick open to run any command, and : followed by a number to jump to a line.",
@@ -38,6 +47,7 @@ export default function EditorDashboard({ workspaceName, recent, readOnly, onOpe
 
 	return (
 		<Welcome
+			logo={WORDMARK}
 			title={workspaceName ? `${workspaceName} editor` : "Editor"}
 			intro="Open a file from the explorer, or pick one of these."
 			actions={actions}
