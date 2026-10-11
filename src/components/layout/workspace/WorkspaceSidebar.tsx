@@ -6,7 +6,7 @@ import { useCallback, useState, type ElementType } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
 // Icons
-import { ArrowLeft, ChartColumn as BarChart3, SquareKanban as KanbanSquare, LayoutDashboard, ChevronDown, ChevronLeft, ChevronRight, Trash2, UsersRound } from "@/components/animate-icons";
+import { ArrowLeft, ChartColumn as BarChart3, SquareKanban as KanbanSquare, LayoutDashboard, ChevronDown, Trash2, UsersRound } from "@/components/animate-icons";
 
 // Components
 import { Button } from "@/components/ui/button";
@@ -126,14 +126,10 @@ const readFolded = (): string[] => {
 	}
 };
 
-const COLLAPSED_KEY = "nexsync.sidebar.collapsed";
-const readCollapsed = () => {
-	try {
-		return localStorage.getItem(COLLAPSED_KEY) === "true";
-	} catch {
-		return false;
-	}
-};
+// Dragging the edge narrower than this folds the sidebar to its icons; dragging it wider opens it again
+const RAIL = 72;
+const COLLAPSE_BELOW = 150;
+const MIN_OPEN = 200;
 
 // Sidebar navigation link component
 function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; expanded: boolean; onNavigate?: () => void }) {
@@ -179,9 +175,11 @@ function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; 
 export default function WorkspaceSidebar({ expanded = false, onNavigate }: { expanded?: boolean; onNavigate?: () => void }) {
 	const { workspace, clearWorkspace } = useWorkspace();
 	const navigate = useNavigate();
-	const [collapsed, setCollapsed] = useState(readCollapsed);
 	// How wide the sidebar is when open, remembered on this device; groups with a label can be folded away
-	const [width, setWidth] = usePanelSize("sidebar", DEFAULT_WIDTH, 200, 380);
+	const [width, setWidth] = usePanelSize("sidebar", DEFAULT_WIDTH, RAIL, 380);
+	// The drag decides it: a narrow sidebar is the icon rail, a wider one is at least MIN_OPEN
+	const collapsed = !expanded && width < COLLAPSE_BELOW;
+	const shownWidth = collapsed ? RAIL : Math.max(width, MIN_OPEN);
 	const [folded, setFolded] = useState(readFolded);
 	const toggleGroup = useCallback((id: string) => {
 		setFolded((prev) => {
@@ -196,15 +194,6 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 	}, []);
 	// The drawer on small windows always shows labels
 	const showLabels = expanded || !collapsed;
-	const toggle = () => {
-		setCollapsed(!collapsed);
-		try {
-			localStorage.setItem(COLLAPSED_KEY, String(!collapsed));
-		} catch {
-			// Not remembered this time
-		}
-	};
-
 	// Unload workspace and return to Welcome view
 	const handleBackToWelcome = async () => {
 		await clearWorkspace();
@@ -214,8 +203,8 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 	return (
 		<div className="relative flex h-full shrink-0">
 		<aside
-			style={!expanded && !collapsed ? { width } : undefined}
-			className={cn("flex h-full shrink-0 flex-col overflow-hidden bg-muted/20 transition-[width] duration-200 motion-reduce:transition-none", expanded ? "w-64 border-r bg-background" : collapsed ? "w-[4.5rem]" : "")}
+			style={!expanded ? { width: shownWidth } : undefined}
+			className={cn("flex h-full shrink-0 flex-col overflow-hidden bg-muted/20", expanded && "w-64 border-r bg-background")}
 		>
 			{/* Workspace identity */}
 			<div className={cn("flex h-16 shrink-0 items-center gap-2 border-b", showLabels ? "justify-start px-3" : "justify-center")}>
@@ -262,23 +251,8 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 			</nav>
 		</aside>
 
-			{/* The sidebar edge: drag it to change the width, double-click to reset */}
-			{expanded ? null : collapsed ? <div className="w-px shrink-0 bg-border" /> : <Splitter orientation="vertical" grows="right" size={width} onResize={(next) => setWidth(next === 0 ? DEFAULT_WIDTH : next)} label="Resize the sidebar" />}
-
-			{/* The tab on the sidebar edge, level with the header */}
-			{!expanded && (
-				<AnimateIcon animateOnHover asChild>
-					<button
-						type="button"
-						onClick={toggle}
-						aria-label={t(collapsed ? "nav.expand" : "nav.collapse")}
-						title={t(collapsed ? "nav.expand" : "nav.collapse")}
-						className="absolute top-5 -right-3 z-10 flex size-6 items-center justify-center border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-					>
-						{collapsed ? <ChevronRight className="size-3.5" aria-hidden /> : <ChevronLeft className="size-3.5" aria-hidden />}
-					</button>
-				</AnimateIcon>
-			)}
+			{/* The sidebar edge: drag it to change the width, narrow enough and it folds to icons; double-click to reset */}
+			{!expanded && <Splitter orientation="vertical" grows="right" size={shownWidth} onResize={(next) => setWidth(next === 0 ? DEFAULT_WIDTH : next)} label="Resize the sidebar" />}
 		</div>
 	);
 }

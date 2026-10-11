@@ -5,8 +5,8 @@ export default function PageHeader({ title, description, actions }: { title: str
 	return (
 		<header className="mb-6 flex shrink-0 flex-wrap items-end justify-between gap-4">
 			<div className="min-w-0">
-				<h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-				{description && <p className="mt-1 max-w-prose text-muted-foreground">{description}</p>}
+				<h1 className="line-clamp-2 text-3xl font-bold tracking-tight [overflow-wrap:anywhere]" title={title}>{title}</h1>
+				{description && <p className="mt-1 line-clamp-3 max-w-prose text-muted-foreground [overflow-wrap:anywhere]">{description}</p>}
 			</div>
 			{actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
 		</header>

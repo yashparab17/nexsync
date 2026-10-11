@@ -1,12 +1,11 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { Copy, Check, Play, Search, Trash2, FileText, Film, Headphones, Image as ImageIcon, LayoutGrid, List, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
+import { Copy, Check, Play, Search, Trash2, FileText, Film, Headphones, Image as ImageIcon, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
 import { displaySize } from "@/lib/assets/displaySize";
 import { justify } from "@/lib/assets/justify";
 import { safeUploadName, validateFileName } from "@/lib/validation";
 import { MAX_PREVIEW_BYTES, pdfFirstPage, previewKind, textSnippet, videoFrame, type TilePreview } from "@/lib/assets/previews";
 import { fileToBase64 } from "@/lib/assets/uploadScale";
 import { Ellipsis } from "lucide-react";
-import FileKindIcon from "@/components/elements/editor/FileKindIcon";
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
 import { cn } from "@/lib/utils";
 
@@ -68,22 +67,21 @@ export default function WorkspaceAssets() {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCategory, setSelectedCategory] =
 		useState<AssetCategory>("all");
-	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 	// How big the tiles are drawn, and each picture's own size once it is known
 	const [tile, setTile] = useState<"s" | "m" | "l">("m");
 	const [sizes, setSizes] = useState<Record<string, { w: number; h: number }>>({});
 	// Small pictures of PDFs, videos and text files, made in the background
 	const [previews, setPreviews] = useState<Record<string, TilePreview>>({});
-	const gridRef = useRef<HTMLUListElement>(null);
 	const [gridWidth, setGridWidth] = useState(1200);
-	useEffect(() => {
-		const el = gridRef.current;
+	// The mosaic's width is watched from the moment it is on screen, however many times it has been hidden and shown again
+	const observer = useRef<ResizeObserver | null>(null);
+	const gridRef = useCallback((el: HTMLUListElement | null) => {
+		observer.current?.disconnect();
 		if (!el) return;
-		const observer = new ResizeObserver(() => setGridWidth(el.clientWidth));
-		observer.observe(el);
+		observer.current = new ResizeObserver(() => setGridWidth(el.clientWidth));
+		observer.current.observe(el);
 		setGridWidth(el.clientWidth);
-		return () => observer.disconnect();
-	}, [viewMode, loading]);
+	}, []);
 
 	// Thumbnails cache for images (base64 URLs)
 	const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
@@ -472,7 +470,7 @@ export default function WorkspaceAssets() {
 					<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 					<Input aria-label="Search assets" placeholder="Search assets" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-8 border bg-background pl-8 text-sm" />
 				</div>
-				{viewMode === "grid" && (
+				{(
 					<div className="flex items-stretch border" role="group" aria-label="Tile size">
 						{(["s", "m", "l"] as const).map((size) => (
 							<button
@@ -488,20 +486,6 @@ export default function WorkspaceAssets() {
 						))}
 					</div>
 				)}
-				<div className="flex items-stretch border" role="group" aria-label="View">
-					{(["grid", "list"] as const).map((mode) => (
-						<button
-							key={mode}
-							type="button"
-							aria-pressed={viewMode === mode}
-							aria-label={mode === "grid" ? "Mosaic view" : "List view"}
-							onClick={() => setViewMode(mode)}
-							className={cn("flex size-8 cursor-pointer items-center justify-center outline-none focus-visible:bg-muted", viewMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
-						>
-							{mode === "grid" ? <LayoutGrid className="size-4" /> : <List className="size-4" />}
-						</button>
-					))}
-				</div>
 				{!isViewer && (
 					<>
 						<Button size="sm" onPress={() => setIsUploadOpen(true)}>
@@ -530,7 +514,7 @@ export default function WorkspaceAssets() {
 							</Button>
 						)}
 					</div>
-				) : viewMode === "grid" ? (
+				) : (
 					/* Mosaic: columns that each fill from the top, so tiles of different heights pack together */
 					<ul ref={gridRef} className="relative" style={{ height: (Number.isFinite(layout.height) ? layout.height : 0) + PAD * 2 }}>
 						{filteredAssets.map((asset) => {
@@ -631,53 +615,6 @@ export default function WorkspaceAssets() {
 							);
 						})}
 					</ul>
-				) : (
-				/* List: laid out like the Files page, with the same icons, columns and right-click menu */
-				<div>
-					<div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_7rem_6rem_11rem_2rem] items-center gap-4 border-b bg-background px-4 py-2 font-mono text-xs text-muted-foreground">
-						<span>Name</span>
-						<span>Kind</span>
-						<span className="text-right">Size</span>
-						<span className="text-right">Modified</span>
-						<span />
-					</div>
-					<ul aria-label="Assets">
-						{filteredAssets.map((asset) => {
-							const isRemote = asset.syncStatus === "remote_placeholder";
-							const ext = asset.name.split(".").pop()?.toUpperCase() ?? "";
-							return (
-								<li
-									key={asset.name}
-									onContextMenu={(e) => assetMenu(e, asset)}
-									className="group grid grid-cols-[minmax(0,1fr)_7rem_6rem_11rem_2rem] items-center gap-4 border-b px-4 transition-colors hover:bg-muted/50 focus-within:bg-muted/50"
-								>
-									<button type="button" onClick={() => setPreviewAsset(asset)} className="flex min-w-0 items-center gap-2.5 py-2 text-left outline-none focus-visible:underline">
-										<FileKindIcon name={asset.name} className="size-5" />
-										<span className="truncate text-sm font-medium">{asset.name}</span>
-										{isRemote && <span className="shrink-0 border border-dashed border-warning/60 px-1.5 text-xs text-warning">not downloaded</span>}
-									</button>
-									<span className="truncate text-xs text-muted-foreground">{ext ? `${ext} file` : "File"}</span>
-									<span className="text-right font-mono text-xs tabular-nums text-muted-foreground">{formatBytes(asset.size)}</span>
-									<span className="text-right font-mono text-xs tabular-nums whitespace-nowrap text-muted-foreground">
-										{new Date(asset.modified_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-									</span>
-									<button
-										type="button"
-										aria-label={`Actions for ${asset.name}`}
-										aria-haspopup="menu"
-										onClick={(e) => {
-											const r = e.currentTarget.getBoundingClientRect();
-											assetMenu({ clientX: r.left - 160, clientY: r.bottom + 4, preventDefault: () => {} }, asset);
-										}}
-										className="flex size-7 items-center justify-center text-muted-foreground opacity-0 outline-none group-focus-within:opacity-100 group-hover:opacity-100 hover:text-foreground focus-visible:bg-muted"
-									>
-										<Ellipsis className="size-4" />
-									</button>
-								</li>
-							);
-						})}
-					</ul>
-				</div>
 				)}
 			</div>
 

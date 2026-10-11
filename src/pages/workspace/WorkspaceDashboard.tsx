@@ -156,7 +156,7 @@ export default function WorkspaceDashboard() {
 											</div>
 											<div className="min-w-0 flex-1 pb-5">
 												<p className="flex flex-wrap items-baseline gap-x-2">
-													<span className="font-semibold">{event.author ?? formatAction(event.action)}</span>
+													<span className="max-w-full truncate font-semibold">{event.author ?? formatAction(event.action)}</span>
 													{event.author && <span className="text-muted-foreground">{formatAction(event.action).toLowerCase()}</span>}
 													<span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground">{formatRelative(event.timestamp)}</span>
 												</p>
