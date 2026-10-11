@@ -17,8 +17,16 @@ interface Instance {
 	run: number;
 }
 
+// What the panel header needs to offer a switcher between terminals
+export interface TerminalSummary {
+	items: { key: number; title: string; ended: boolean }[];
+	active: number | null;
+}
+
 export interface TerminalPanelHandle {
 	newTerminal: () => void;
+	select: (key: number) => void;
+	close: (key: number) => void;
 	// Text for the shell in front, typed as if pasted
 	send: (text: string) => void;
 }
@@ -28,9 +36,11 @@ interface TerminalPanelProps {
 	dir: string;
 	// Whether the Terminal tab is on screen
 	visible: boolean;
+	// Told whenever terminals open, close or change, so the panel header can switch between them
+	onSummary?: (summary: TerminalSummary) => void;
 }
 
-const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(function TerminalPanel({ workspacePath, dir, visible }, ref) {
+const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(function TerminalPanel({ workspacePath, dir, visible, onSummary }, ref) {
 	const [items, setItems] = useState<Instance[]>([]);
 	const [active, setActive] = useState<number | null>(null);
 	const counter = useRef(0);
@@ -47,8 +57,16 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(functi
 		if (visible && counter.current === 0) create();
 	}, [visible, create]);
 
+	const summaryRef = useRef(onSummary);
+	summaryRef.current = onSummary;
+	useEffect(() => {
+		summaryRef.current?.({ items: items.map((i) => ({ key: i.key, title: i.title, ended: !!i.ended })), active });
+	}, [items, active]);
+
 	useImperativeHandle(ref, () => ({
 		newTerminal: create,
+		select: setActive,
+		close: (key) => close(key),
 		send: (text) => active !== null && views.current.get(active)?.send(text),
 	}));
 
@@ -65,8 +83,17 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(functi
 
 	const current = items.find((i) => i.key === active);
 
+	// Ctrl+PageDown and Ctrl+PageUp move to the next and previous terminal, as in VS Code
+	const onKeyDownCapture = (e: React.KeyboardEvent) => {
+		if (!e.ctrlKey || e.altKey || e.metaKey || (e.key !== "PageDown" && e.key !== "PageUp") || items.length < 2) return;
+		e.preventDefault();
+		e.stopPropagation();
+		const at = items.findIndex((i) => i.key === active);
+		setActive(items[(at + (e.key === "PageDown" ? 1 : -1) + items.length) % items.length].key);
+	};
+
 	return (
-		<div className="flex h-full min-h-0">
+		<div className="flex h-full min-h-0" onKeyDownCapture={onKeyDownCapture}>
 			<div className="relative min-w-0 flex-1">
 				{items.length === 0 && (
 					<div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
@@ -78,7 +105,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(functi
 					</div>
 				)}
 				{items.map((item) => (
-					<div key={`${item.key}-${item.run}`} hidden={item.key !== active || !visible} className="absolute inset-0">
+					<div key={`${item.key}-${item.run}`} inert={item.key !== active || !visible} className={cn("absolute inset-0", (item.key !== active || !visible) && "pointer-events-none invisible")}>
 						<TerminalView
 							ref={(handle) => void views.current.set(item.key, handle)}
 							workspacePath={workspacePath}

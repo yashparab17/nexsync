@@ -1,10 +1,11 @@
 // The panel under the editor: command output, and the problems found in the open file.
 
-import { forwardRef } from "react";
-import { AlertTriangle, Play, Terminal, X } from "@/components/animate-icons";
+import { forwardRef, useState, type RefObject } from "react";
+import { AlertTriangle, ChevronDown, Play, Plus, Terminal, Trash2, X } from "@/components/animate-icons";
 
 import RunPanel from "./RunPanel";
-import TerminalPanel, { type TerminalPanelHandle } from "./TerminalPanel";
+import TerminalPanel, { type TerminalPanelHandle, type TerminalSummary } from "./TerminalPanel";
+import { useContextMenu } from "@/components/elements/ContextMenu";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,21 @@ interface EditorPanelProps {
 }
 
 export default forwardRef<TerminalPanelHandle, EditorPanelProps>(function EditorPanel({ open, tab, onTab, onClose, workspacePath, activePath, problemLines, onGoToLine }, terminalRef) {
+	// Switching between the terminals that are open, from a menu in the header
+	const [terminals, setTerminals] = useState<TerminalSummary>({ items: [], active: null });
+	const menu = useContextMenu();
+	const handle = terminalRef as RefObject<TerminalPanelHandle | null> | null;
+	const current = terminals.items.find((t) => t.key === terminals.active);
+	const openSwitcher = (e: React.MouseEvent<HTMLButtonElement>) => {
+		const r = e.currentTarget.getBoundingClientRect();
+		menu.open({ clientX: r.left, clientY: r.bottom + 2, preventDefault: () => {} }, [
+			...terminals.items.map((t) => ({ label: t.title + (t.key === terminals.active ? "  ✓" : ""), icon: <Terminal className="size-4" />, onSelect: () => handle?.current?.select(t.key) })),
+			"separator" as const,
+			{ label: "New terminal", icon: <Plus className="size-4" />, shortcut: "Ctrl Shift `", onSelect: () => handle?.current?.newTerminal() },
+			...(current ? [{ label: `Kill ${current.title}`, icon: <Trash2 className="size-4" />, danger: true, onSelect: () => handle?.current?.close(current.key) }] : []),
+		]);
+	};
+
 	const tabs: { id: PanelTab; label: string; icon: React.ReactNode; count?: number }[] = [
 		{ id: "terminal", label: "Terminal", icon: <Terminal className="size-4" /> },
 		{ id: "output", label: "Output", icon: <Play className="size-4" /> },
@@ -47,6 +63,19 @@ export default forwardRef<TerminalPanelHandle, EditorPanelProps>(function Editor
 						</button>
 					))}
 				</div>
+				{tab === "terminal" && terminals.items.length > 0 && (
+					<button
+						type="button"
+						aria-haspopup="menu"
+						aria-label={`Switch terminal, now ${current?.title ?? "none"}`}
+						onClick={openSwitcher}
+						className="ml-2 flex h-7 items-center gap-1.5 border px-2 text-sm outline-none hover:bg-muted focus-visible:bg-muted"
+					>
+						<span className="max-w-40 truncate">{current?.title ?? "Terminal"}</span>
+						<span className="font-mono text-xs text-muted-foreground">{terminals.items.length > 1 ? `${terminals.items.findIndex((t) => t.key === terminals.active) + 1}/${terminals.items.length}` : ""}</span>
+						<ChevronDown className="size-3.5" />
+					</button>
+				)}
 				<span className="flex-1" />
 				<Button variant="ghost" size="icon-xs" aria-label="Close panel" onPress={onClose}>
 					<X className="size-4" />
@@ -55,7 +84,7 @@ export default forwardRef<TerminalPanelHandle, EditorPanelProps>(function Editor
 			<div className="min-h-0 flex-1">
 				{/* Terminals stay mounted, so their shells survive switching tabs and hiding the panel */}
 				<div className={cn("h-full", tab !== "terminal" && "hidden")}>
-					<TerminalPanel ref={terminalRef} workspacePath={workspacePath} dir="editor" visible={open && tab === "terminal"} />
+					<TerminalPanel ref={terminalRef} workspacePath={workspacePath} dir="editor" visible={open && tab === "terminal"} onSummary={setTerminals} />
 				</div>
 				{tab === "output" ? (
 					<RunPanel workspacePath={workspacePath} activePath={activePath} />
@@ -77,6 +106,7 @@ export default forwardRef<TerminalPanelHandle, EditorPanelProps>(function Editor
 					</ul>
 				)}
 			</div>
+			{menu.menu}
 		</div>
 	);
 });

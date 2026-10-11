@@ -77,6 +77,11 @@ app=folder-app admin=folder-admin android=folder-android benchmark=folder-benchm
 macos=folder-macos windows=folder-windows next=folder-next .next=folder-next nuxt=folder-nuxt prisma=folder-prisma
 storybook=folder-storybook .storybook=folder-storybook vercel=folder-vercel xcode=folder-xcode graphql=folder-graphql
 kubernetes=folder-kubernetes k8s=folder-kubernetes proto=folder-proto animation=folder-animation animations=folder-animation
+editor=folder-vscode files=folder-shared kanban=folder-queue notes=folder-content tasks=folder-workflows
+data=folder-database model=folder-database models=folder-database service=folder-functions services=folder-functions
+pictures=folder-images photos=folder-images sounds=folder-audio music=folder-audio movies=folder-video
+backup=folder-temp backups=folder-temp archive=folder-temp archives=folder-temp release=folder-dist releases=folder-dist
+deploy=folder-cloud ci=folder-workflows pipelines=folder-workflows
 `);
 
 const used = new Set(["file", "folder", "folder-open", ...Object.values(EXT), ...Object.values(NAMES), ...PATTERNS.map((p) => p[1])]);

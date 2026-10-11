@@ -214,7 +214,7 @@ export default function FileExplorer({
 
 	return (
 		<div className="flex h-full min-w-0 flex-col bg-sidebar">
-			<div className="flex items-center justify-between px-3 pt-3 pb-1">
+			<div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
 				<h2 className="font-mono text-sm text-muted-foreground">explorer</h2>
 				<div className="flex">
 					{!readOnly && (

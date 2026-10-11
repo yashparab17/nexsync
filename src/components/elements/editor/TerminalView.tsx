@@ -189,11 +189,17 @@ const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function Term
 		if (term.current) term.current.options.theme = themeFromTokens();
 	}, [isDark]);
 
+	// A terminal that comes back on screen measures its letters again and sets its own font size again, so it never keeps a
+	// size worked out while it was hidden
 	useEffect(() => {
-		if (visible) {
-			fit.current?.fit();
-			term.current?.focus();
-		}
+		const t = term.current;
+		if (!visible || !t) return;
+		t.options.fontSize = fontSize + 1;
+		t.options.fontSize = fontSize;
+		fit.current?.fit();
+		t.refresh(0, t.rows - 1);
+		t.focus();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [visible]);
 
 	const find = (backwards: boolean) => {

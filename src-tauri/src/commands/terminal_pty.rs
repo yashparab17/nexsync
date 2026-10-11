@@ -14,13 +14,19 @@ pub struct PtySession {
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
 }
 
-/// The user's own shell: `$SHELL`, falling back to `sh`; PowerShell, falling back to `cmd`, on Windows
+/// The user's own shell: `$SHELL`, falling back to `sh`; on Windows, PowerShell without its banner and with a prompt that
+/// shows only the folder (falling back to `cmd`, which already prompts with the folder)
 fn shell_command() -> CommandBuilder {
     #[cfg(windows)]
     {
-        let program = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".into());
-        let powershell = which_powershell();
-        CommandBuilder::new(powershell.unwrap_or(program))
+        if let Some(powershell) = which_powershell() {
+            let mut cmd = CommandBuilder::new(powershell);
+            cmd.args(["-NoLogo", "-NoExit", "-Command", "function prompt { (Get-Location).ProviderPath + '> ' }"]);
+            return cmd;
+        }
+        let mut cmd = CommandBuilder::new(std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".into()));
+        cmd.args(["/K", "prompt $P$G"]);
+        cmd
     }
     #[cfg(not(windows))]
     {
@@ -39,6 +45,18 @@ fn which_powershell() -> Option<String> {
     Path::new(&path).is_file().then_some(path)
 }
 
+/// Windows spells a canonical path `\\?\E:\folder`, which shells show as `Microsoft.PowerShell.Core\FileSystem::\\?\E:\...`;
+/// this gives the plain `E:\folder` (network paths `\\?\UNC\server\share` become `\\server\share`)
+pub fn plain_path(path: &str) -> String {
+    if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{rest}")
+    } else if let Some(rest) = path.strip_prefix(r"\\?\") {
+        rest.to_string()
+    } else {
+        path.to_string()
+    }
+}
+
 fn size(cols: u16, rows: u16) -> PtySize {
     PtySize { rows: rows.clamp(1, 500), cols: cols.clamp(1, 1000), pixel_width: 0, pixel_height: 0 }
 }
@@ -55,7 +73,7 @@ impl PtySession {
     ) -> Result<Self, String> {
         let pair = native_pty_system().openpty(size(cols, rows)).map_err(|e| format!("Could not open a terminal: {e}"))?;
         let mut cmd = shell_command();
-        cmd.cwd(cwd);
+        cmd.cwd(plain_path(&cwd.to_string_lossy()));
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
         let mut child = pair.slave.spawn_command(cmd).map_err(|e| format!("Could not start the shell: {e}"))?;
@@ -125,6 +143,13 @@ mod tests {
         assert_eq!(code, Some(3));
         let text = String::from_utf8_lossy(&out.lock().unwrap()).to_string();
         assert!(text.contains("nexsync-42"), "{text:?}");
+    }
+
+    #[test]
+    fn test_verbatim_paths_are_made_plain() {
+        assert_eq!(plain_path(r"\\?\E:\nexsynctest\Test 123\editor"), r"E:\nexsynctest\Test 123\editor");
+        assert_eq!(plain_path(r"\\?\UNC\server\share\x"), r"\\server\share\x");
+        assert_eq!(plain_path("/home/user/editor"), "/home/user/editor");
     }
 
     #[test]

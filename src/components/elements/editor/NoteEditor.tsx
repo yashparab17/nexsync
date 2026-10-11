@@ -183,7 +183,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 
 	return (
 		<div className="flex h-full w-full flex-col bg-background">
-			<div className="flex min-h-11 flex-wrap items-center justify-between gap-3 border-b px-4 py-1.5">
+			<div className="flex h-10 shrink-0 items-center justify-between gap-3 border-b px-3">
 				<div className="flex min-w-0 items-center gap-2 text-sm">
 					{isMarkdown ? <FileText className="size-4 shrink-0 text-info" /> : <Type className="size-4 shrink-0 text-warning" />}
 					<span className="truncate font-medium">{noteTitle(fileName)}</span>

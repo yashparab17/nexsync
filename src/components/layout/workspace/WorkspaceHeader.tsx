@@ -36,15 +36,16 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 
 	const connectedCount = peers.filter((p) => p.status === "connected").length;
 
-	// One small colored dot says how the connection is: green when people are connected or the network is ready, amber while connecting, red when offline
+	// How the connection is, as a small dot on the button: green when people are connected or the network is ready,
+	// amber and pulsing while connecting, red when offline. The words are in the tooltip and the accessible name.
 	const connecting = connectionStatus === "connecting" || connectionStatus === "reconnecting";
 	const status = connectedCount > 0
-		? { label: `Collaborate, ${connectedCount} connected`, short: `${connectedCount} online`, dot: "bg-success" }
+		? { label: `Collaborate: ${connectedCount} ${connectedCount === 1 ? "person" : "people"} connected`, dot: "bg-success" }
 		: !network.online
-			? { label: "Collaborate, offline", short: "Offline", dot: "bg-destructive" }
+			? { label: "Collaborate: offline", dot: "bg-destructive" }
 			: connecting
-				? { label: "Collaborate, connecting", short: "Connecting", dot: "bg-warning animate-pulse" }
-				: { label: "Collaborate, online", short: "Ready to share", dot: "bg-success" };
+				? { label: "Collaborate: connecting", dot: "bg-warning animate-pulse motion-reduce:animate-none" }
+				: { label: "Collaborate: online, ready to invite", dot: "bg-success" };
 
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 lg:px-6">
@@ -65,11 +66,12 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 				<PresenceStrip />
 				<CatchUp />
 					<NotificationBell />
-				<Button variant="outline" size="sm" onPress={() => setIsP2POpen(true)} aria-label={status.label} className="gap-2" data-testid="connection-chip">
-					<span className={cn("size-2 rounded-full", status.dot)} aria-hidden />
-					<Radio className="size-4" />
-					<span className="hidden lg:inline">{status.short}</span>
-				</Button>
+				<span title={status.label} className="inline-flex">
+					<Button variant="ghost" size="icon" onPress={() => setIsP2POpen(true)} aria-label={status.label} className="relative" data-testid="connection-chip">
+						<Radio className="size-5" />
+						<span className={cn("absolute right-1.5 bottom-1.5 size-2.5 ring-2 ring-background", status.dot)} aria-hidden />
+					</Button>
+				</span>
 
 				<Button
 					variant="ghost"

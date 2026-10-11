@@ -425,19 +425,10 @@ export default function WorkspaceNotes() {
 	};
 
 	const segment = (value: View, label: string, icon: React.ReactNode) => (
-		<button
-			key={value}
-			type="button"
-			aria-pressed={view === value}
-			onClick={() => setView(value)}
-			className={cn(
-				"flex h-full cursor-pointer items-center gap-1.5 px-3 text-sm font-medium transition-colors outline-none focus-visible:bg-muted",
-				view === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-			)}
-		>
+		<Button key={value} variant={view === value ? "secondary" : "ghost"} size="sm" aria-pressed={view === value} onPress={() => setView(value)} className={cn(view !== value && "text-muted-foreground")}>
 			{icon}
 			{label}
-		</button>
+		</Button>
 	);
 
 	const kbd = (k: string) => <kbd className="border bg-card px-1.5 py-0.5 font-mono text-xs text-muted-foreground">{k}</kbd>;
@@ -447,9 +438,9 @@ export default function WorkspaceNotes() {
 			{/* Notes list */}
 			{listOpen && (
 				<>
-					<aside aria-label="Notes list" style={{ width: listWidth }} className="flex shrink-0 flex-col bg-card/40">
-						<div className="flex h-11 shrink-0 items-center gap-1 border-b pr-1 pl-3">
-							<span className="flex-1 font-mono text-xs tracking-wide text-muted-foreground uppercase">Notes · {notes.length}</span>
+					<aside aria-label="Notes list" style={{ width: listWidth }} className="flex shrink-0 flex-col bg-sidebar">
+						<div className="flex h-10 shrink-0 items-center gap-1 border-b pr-1 pl-3">
+							<h2 className="flex-1 font-mono text-sm text-muted-foreground">notes · {notes.length}</h2>
 							{!isViewer && (
 								<>
 									<Button variant="ghost" size="icon-xs" aria-label="Open today's note" onPress={openToday}>
@@ -508,14 +499,14 @@ export default function WorkspaceNotes() {
 
 			{/* Tabs and the open note */}
 			<section className="flex min-w-0 flex-1 flex-col" aria-label="Note">
-				<div className="flex h-11 shrink-0 items-stretch border-b bg-card/40">
+				<div className="flex h-10 shrink-0 items-stretch border-b bg-card/40">
 					{!listOpen && (
 						<Button variant="ghost" size="icon-xs" aria-label="Show notes list" onPress={() => setListOpen(true)} className="m-2">
 							<PanelLeftOpen className="size-4" />
 						</Button>
 					)}
 					{view === "note" ? <EditorTabs tabs={tabs} active={selectedPath} side={null} dirty={NO_DIRTY} onSelect={setSelectedPath} onClose={closeTab} onReorder={(from, to) => setTabs((prev) => { const next = [...prev]; next.splice(to, 0, next.splice(from, 1)[0]); return next; })} onContextMenu={noteMenu} label={(path) => noteTitle(path.split("/").pop() ?? path)} /> : <div className="flex-1" />}
-					<div className="flex shrink-0 items-stretch border-l" role="group" aria-label="View">
+					<div className="flex shrink-0 items-center gap-1 border-l px-2" role="group" aria-label="View">
 						{segment("note", "Note", <FileText className="size-3.5" />)}
 						{segment("board", "Board", <LayoutGrid className="size-3.5" />)}
 						{segment("graph", "Graph", <Network className="size-3.5" />)}

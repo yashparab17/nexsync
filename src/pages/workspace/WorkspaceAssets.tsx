@@ -6,6 +6,7 @@ import { safeUploadName, validateFileName } from "@/lib/validation";
 import { MAX_PREVIEW_BYTES, pdfFirstPage, previewKind, textSnippet, videoFrame, type TilePreview } from "@/lib/assets/previews";
 import { fileToBase64 } from "@/lib/assets/uploadScale";
 import { Ellipsis } from "lucide-react";
+import FileKindIcon from "@/components/elements/editor/FileKindIcon";
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
 import { cn } from "@/lib/utils";
 
@@ -631,122 +632,51 @@ export default function WorkspaceAssets() {
 						})}
 					</ul>
 				) : (
-				<div className="p-3">
-				<div className="border border-border rounded-none overflow-hidden bg-card/60">
-					<table className="w-full text-left text-xs">
-						<thead className="bg-muted/50 border-b border-border text-muted-foreground text-xs">
-							<tr>
-								<th className="py-3 px-4">Name</th>
-								<th className="py-3 px-4">Category</th>
-								<th className="py-3 px-4">Size</th>
-								<th className="py-3 px-4">Status</th>
-								<th className="py-3 px-4">Modified</th>
-								<th className="py-3 px-4 text-right">Actions</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-border/60">
-							{filteredAssets.map((asset) => {
-								const isRemote =
-									asset.syncStatus === "remote_placeholder";
-
-								return (
-									<tr
-										key={asset.name}
-										onClick={() => setPreviewAsset(asset)}
-										className="hover:bg-muted/40 cursor-pointer transition-colors group"
+				/* List: laid out like the Files page, with the same icons, columns and right-click menu */
+				<div>
+					<div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_7rem_6rem_11rem_2rem] items-center gap-4 border-b bg-background px-4 py-2 font-mono text-xs text-muted-foreground">
+						<span>Name</span>
+						<span>Kind</span>
+						<span className="text-right">Size</span>
+						<span className="text-right">Modified</span>
+						<span />
+					</div>
+					<ul aria-label="Assets">
+						{filteredAssets.map((asset) => {
+							const isRemote = asset.syncStatus === "remote_placeholder";
+							const ext = asset.name.split(".").pop()?.toUpperCase() ?? "";
+							return (
+								<li
+									key={asset.name}
+									onContextMenu={(e) => assetMenu(e, asset)}
+									className="group grid grid-cols-[minmax(0,1fr)_7rem_6rem_11rem_2rem] items-center gap-4 border-b px-4 transition-colors hover:bg-muted/50 focus-within:bg-muted/50"
+								>
+									<button type="button" onClick={() => setPreviewAsset(asset)} className="flex min-w-0 items-center gap-2.5 py-2 text-left outline-none focus-visible:underline">
+										<FileKindIcon name={asset.name} className="size-5" />
+										<span className="truncate text-sm font-medium">{asset.name}</span>
+										{isRemote && <span className="shrink-0 border border-dashed border-warning/60 px-1.5 text-xs text-warning">not downloaded</span>}
+									</button>
+									<span className="truncate text-xs text-muted-foreground">{ext ? `${ext} file` : "File"}</span>
+									<span className="text-right font-mono text-xs tabular-nums text-muted-foreground">{formatBytes(asset.size)}</span>
+									<span className="text-right font-mono text-xs tabular-nums whitespace-nowrap text-muted-foreground">
+										{new Date(asset.modified_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+									</span>
+									<button
+										type="button"
+										aria-label={`Actions for ${asset.name}`}
+										aria-haspopup="menu"
+										onClick={(e) => {
+											const r = e.currentTarget.getBoundingClientRect();
+											assetMenu({ clientX: r.left - 160, clientY: r.bottom + 4, preventDefault: () => {} }, asset);
+										}}
+										className="flex size-7 items-center justify-center text-muted-foreground opacity-0 outline-none group-focus-within:opacity-100 group-hover:opacity-100 hover:text-foreground focus-visible:bg-muted"
 									>
-										<td className="py-3 px-4 font-medium text-foreground flex items-center gap-3">
-											<div className="p-1.5 rounded-none bg-muted text-muted-foreground group-hover:text-primary">
-												{asset.category === "image" ?
-													<ImageIcon className="size-4" />
-												: asset.category === "video" ?
-													<Film className="size-4" />
-												: asset.category === "audio" ?
-													<Headphones className="size-4" />
-												:	<FileText className="size-4" />}
-											</div>
-											<span className="truncate max-w-xs">{asset.name}</span>
-										</td>
-										<td className="py-3 px-4">
-											<span className="font-mono text-xs bg-muted px-2 py-0.5 rounded-none text-foreground/80 capitalize">
-												{asset.category}
-											</span>
-										</td>
-										<td className="py-3 px-4 font-mono text-muted-foreground">
-											{formatBytes(asset.size)}
-										</td>
-										<td className="py-3 px-4">
-											{isRemote ?
-												<span className="text-warning font-medium flex items-center gap-1">
-													○ Not downloaded
-												</span>
-											:	<span className="text-success font-medium flex items-center gap-1">
-													● Local
-												</span>
-											}
-										</td>
-										<td className="py-3 px-4 text-muted-foreground">
-											{new Date(asset.modified_at).toLocaleDateString(
-												undefined,
-												{
-													month: "short",
-													day: "numeric",
-													year: "numeric",
-												},
-											)}
-										</td>
-										<td className="py-3 px-4 text-right">
-											<div className="flex items-center justify-end gap-1.5">
-												<button
-													onClick={(e) => handleCopyMarkdown(e, asset)}
-													className="h-7 px-2 text-xs rounded-none bg-muted/60 hover:bg-muted text-foreground flex items-center gap-1 cursor-pointer transition-colors border border-border/40"
-												>
-													{copiedKey === asset.name ?
-														<Check className="size-3 text-success" />
-													:	<Copy className="size-3" />}
-													{copiedKey === asset.name ? "Copied" : "Copy"}
-												</button>
-												<button
-													onClick={(e) => {
-														e.stopPropagation();
-														setHistoryAsset(asset);
-													}}
-													title="History"
-													className="p-1.5 rounded-none hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-												>
-													<History className="size-3.5" />
-												</button>
-												{!isViewer && (
-													<>
-														<button
-															onClick={(e) => {
-																e.stopPropagation();
-																setAssetToRename(asset);
-																setNewName(asset.name);
-															}}
-															className="p-1.5 rounded-none hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-														>
-															<Pencil className="size-3.5" />
-														</button>
-														<button
-															onClick={(e) => {
-																e.stopPropagation();
-																setAssetToDelete(asset);
-															}}
-															className="p-1.5 rounded-none hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer transition-colors"
-														>
-															<Trash2 className="size-3.5" />
-														</button>
-													</>
-												)}
-											</div>
-										</td>
-									</tr>
-								);
-							})}
-						</tbody>
-					</table>
-				</div>
+										<Ellipsis className="size-4" />
+									</button>
+								</li>
+							);
+						})}
+					</ul>
 				</div>
 				)}
 			</div>
