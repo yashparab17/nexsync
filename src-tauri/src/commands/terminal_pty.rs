@@ -14,35 +14,97 @@ pub struct PtySession {
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
 }
 
-/// The user's own shell: `$SHELL`, falling back to `sh`; on Windows, PowerShell without its banner and with a prompt that
-/// shows only the folder (falling back to `cmd`, which already prompts with the folder)
-fn shell_command() -> CommandBuilder {
+/// A shell that can be opened in a terminal
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Shell {
+    /// Stable name the panel sends back: `powershell`, `cmd`, ... on Windows, the full path elsewhere
+    pub id: String,
+    pub name: String,
+    pub path: String,
+}
+
+fn shell(id: &str, name: &str, path: impl Into<String>) -> Shell {
+    Shell { id: id.into(), name: name.into(), path: path.into() }
+}
+
+/// Shells found on this machine; the first is the default
+pub fn shells() -> Vec<Shell> {
+    let mut found = Vec::new();
     #[cfg(windows)]
     {
-        if let Some(powershell) = which_powershell() {
-            let mut cmd = CommandBuilder::new(powershell);
-            cmd.args(["-NoLogo", "-NoExit", "-Command", "function prompt { (Get-Location).ProviderPath + '> ' }"]);
-            return cmd;
+        let root = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        let exists = |p: &str| Path::new(p).is_file();
+        let ps = format!(r"{root}\System32\WindowsPowerShell\v1.0\powershell.exe");
+        if exists(&ps) {
+            found.push(shell("powershell", "Windows PowerShell", ps));
         }
-        let mut cmd = CommandBuilder::new(std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".into()));
-        cmd.args(["/K", "prompt $P$G"]);
-        cmd
+        for dir in std::env::var("PATH").unwrap_or_default().split(';') {
+            let pwsh = format!(r"{dir}\pwsh.exe");
+            if !dir.is_empty() && exists(&pwsh) {
+                found.push(shell("pwsh", "PowerShell 7", pwsh));
+                break;
+            }
+        }
+        found.push(shell("cmd", "Command Prompt", std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".into())));
+        for base in ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"] {
+            let Ok(base) = std::env::var(base) else { continue };
+            for tail in [r"\Git\bin\bash.exe", r"\Programs\Git\bin\bash.exe"] {
+                let bash = format!("{base}{tail}");
+                if exists(&bash) && !found.iter().any(|s| s.id == "gitbash") {
+                    found.push(shell("gitbash", "Git Bash", bash));
+                }
+            }
+        }
+        let wsl = format!(r"{root}\System32\wsl.exe");
+        if exists(&wsl) {
+            found.push(shell("wsl", "WSL", wsl));
+        }
     }
     #[cfg(not(windows))]
     {
-        let shell = std::env::var("SHELL").ok().filter(|s| !s.is_empty()).unwrap_or_else(|| "sh".into());
-        let mut cmd = CommandBuilder::new(shell);
-        // A login shell, as a terminal app opens one, so PATH and the user's profile are what they expect
-        cmd.arg("-l");
-        cmd
+        let mut paths: Vec<String> = std::env::var("SHELL").ok().filter(|s| !s.is_empty()).into_iter().collect();
+        if let Ok(list) = std::fs::read_to_string("/etc/shells") {
+            paths.extend(list.lines().map(str::trim).filter(|l| l.starts_with('/')).map(String::from));
+        }
+        for path in paths {
+            let name = path.rsplit('/').next().unwrap_or(&path).to_string();
+            // /bin/bash and /usr/bin/bash are one shell to the person choosing; nologin and the like are not shells
+            if name.contains("nologin") || name == "false" || found.iter().any(|s: &Shell| s.name == name) || !Path::new(&path).is_file() {
+                continue;
+            }
+            found.push(shell(&path, &name, path.clone()));
+        }
+        if found.is_empty() {
+            found.push(shell("sh", "sh", "sh"));
+        }
     }
+    found
 }
 
-#[cfg(windows)]
-fn which_powershell() -> Option<String> {
-    let root = std::env::var("SystemRoot").ok()?;
-    let path = format!(r"{root}\System32\WindowsPowerShell\v1.0\powershell.exe");
-    Path::new(&path).is_file().then_some(path)
+/// The command for a shell, started the way each one expects: PowerShell without its banner and with a prompt that shows
+/// only the folder, `cmd` prompting with the folder, Git Bash as a login shell, others as login shells as well so PATH and
+/// the profile are what the user expects
+fn shell_command(choice: Option<&str>) -> CommandBuilder {
+    let all = shells();
+    let chosen = choice.and_then(|id| all.iter().find(|s| s.id == id)).or(all.first()).cloned().unwrap_or_else(|| shell("sh", "sh", "sh"));
+    let stem = Path::new(&chosen.path.replace('\\', "/")).file_stem().map(|s| s.to_string_lossy().to_lowercase()).unwrap_or_default();
+    let mut cmd = CommandBuilder::new(&chosen.path);
+    match stem.as_str() {
+        "powershell" | "pwsh" => {
+            cmd.args(["-NoLogo", "-NoExit", "-Command", "function prompt { (Get-Location).ProviderPath + '> ' }"]);
+        }
+        "cmd" => {
+            cmd.args(["/K", "prompt $P$G"]);
+        }
+        "wsl" => {}
+        "bash" if chosen.id == "gitbash" => {
+            cmd.args(["--login", "-i"]);
+        }
+        _ => {
+            cmd.arg("-l");
+        }
+    }
+    cmd
 }
 
 /// Windows spells a canonical path `\\?\E:\folder`, which shells show as `Microsoft.PowerShell.Core\FileSystem::\\?\E:\...`;
@@ -68,11 +130,12 @@ impl PtySession {
         cwd: &Path,
         cols: u16,
         rows: u16,
+        shell: Option<&str>,
         on_data: impl Fn(&[u8]) + Send + 'static,
         on_exit: impl FnOnce(Option<u32>) + Send + 'static,
     ) -> Result<Self, String> {
         let pair = native_pty_system().openpty(size(cols, rows)).map_err(|e| format!("Could not open a terminal: {e}"))?;
-        let mut cmd = shell_command();
+        let mut cmd = shell_command(shell);
         cmd.cwd(plain_path(&cwd.to_string_lossy()));
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
@@ -133,6 +196,7 @@ mod tests {
             &std::env::temp_dir(),
             80,
             24,
+            None,
             move |b| sink.lock().unwrap().extend_from_slice(b),
             move |code| tx.send(code).unwrap(),
         )
@@ -146,6 +210,28 @@ mod tests {
     }
 
     #[test]
+    fn test_shells_are_found_and_unique() {
+        let all = shells();
+        assert!(!all.is_empty());
+        let mut names: Vec<_> = all.iter().map(|s| s.name.clone()).collect();
+        names.sort();
+        names.dedup();
+        assert_eq!(names.len(), all.len());
+    }
+
+    #[test]
+    fn test_a_chosen_shell_is_the_one_started() {
+        let Some(sh) = shells().into_iter().find(|s| s.name == "sh") else { return };
+        let (tx, rx) = mpsc::channel();
+        let out = Arc::new(Mutex::new(Vec::<u8>::new()));
+        let sink = out.clone();
+        let s = PtySession::spawn(&std::env::temp_dir(), 80, 24, Some(&sh.id), move |b| sink.lock().unwrap().extend_from_slice(b), move |c| tx.send(c).unwrap()).unwrap();
+        s.write(b"echo picked-$0\nexit\n").unwrap();
+        rx.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert!(String::from_utf8_lossy(&out.lock().unwrap()).contains("picked-"));
+    }
+
+    #[test]
     fn test_verbatim_paths_are_made_plain() {
         assert_eq!(plain_path(r"\\?\E:\nexsynctest\Test 123\editor"), r"E:\nexsynctest\Test 123\editor");
         assert_eq!(plain_path(r"\\?\UNC\server\share\x"), r"\\server\share\x");
@@ -155,7 +241,7 @@ mod tests {
     #[test]
     fn test_killing_ends_the_shell() {
         let (tx, rx) = mpsc::channel();
-        let session = PtySession::spawn(&std::env::temp_dir(), 80, 24, |_| {}, move |code| tx.send(code).unwrap()).unwrap();
+        let session = PtySession::spawn(&std::env::temp_dir(), 80, 24, None, |_| {}, move |code| tx.send(code).unwrap()).unwrap();
         session.kill();
         assert!(rx.recv_timeout(Duration::from_secs(10)).is_ok());
     }

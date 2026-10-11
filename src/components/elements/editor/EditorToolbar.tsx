@@ -36,7 +36,7 @@ function Tool({ label, shortcut, pressed, onPress, disabled, children }: { label
 export default function EditorToolbar({ path, status, handle, explorerOpen, onToggleExplorer, showBlame, onToggleBlame, split, onToggleSplit, canPreview, preview, onTogglePreview, panelOpen, onTogglePanel }: EditorToolbarProps) {
 	const segments = path ? path.split("/") : [];
 	return (
-		<div className="flex h-10 shrink-0 items-center gap-1 border-b px-2">
+		<div className="flex h-10 shrink-0 items-center gap-1 border-b px-3">
 			<Tool label={explorerOpen ? "Hide explorer" : "Show explorer"} shortcut="Ctrl+B" pressed={explorerOpen} onPress={onToggleExplorer}>
 				<FolderClose className="size-4" />
 			</Tool>

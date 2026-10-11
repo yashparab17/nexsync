@@ -131,7 +131,8 @@ export { Users } from './users';
 export { UsersRound } from './users-round';
 export { Volume2 } from './volume-2';
 export { Wifi } from './wifi';
-export { X } from './x';
+// A plain, still cross: the animated one wobbled
+export { X } from 'lucide-react';
 export const AlertCircle = fromHandle(SrcCircleAlertIcon);
 export const AlertTriangle = fromHandle(SrcTriangleAlertIcon);
 export const ArrowUpRight = fromHandle(SrcArrowUpRightIcon);

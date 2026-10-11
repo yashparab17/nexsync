@@ -154,7 +154,7 @@ export default function FileExplorer({
 								type="button"
 								data-explorer-row
 								title={rel}
-								className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pl-2 text-left outline-none focus-visible:bg-muted"
+								className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 pl-3 text-left outline-none focus-visible:bg-muted"
 								onClick={() => (entry.is_dir ? onToggleDir(rel) : onOpenFile(rel))}
 								onKeyDown={(e) => (e.key === "Enter" && e.ctrlKey && !entry.is_dir ? onOpenSide?.(rel) : onRowKey(e, entry, rel, isOpen))}
 							>
@@ -214,7 +214,7 @@ export default function FileExplorer({
 
 	return (
 		<div className="flex h-full min-w-0 flex-col bg-sidebar">
-			<div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
+			<div className="flex h-12 shrink-0 items-center justify-between border-b pr-2 pl-3">
 				<h2 className="font-mono text-sm text-muted-foreground">explorer</h2>
 				<div className="flex">
 					{!readOnly && (
@@ -240,8 +240,8 @@ export default function FileExplorer({
 			</div>
 
 			{/* The filter sits in the same row as the search in Notes */}
-			<div className="shrink-0 border-b p-2">
-				<div className="relative">
+			<div className="flex h-10 shrink-0 items-center border-b px-3">
+				<div className="relative w-full">
 					<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 					<input
 						value={query}

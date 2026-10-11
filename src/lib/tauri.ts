@@ -657,8 +657,18 @@ export interface TerminalExit {
 }
 
 // Open a shell in a folder of the editor area; what it prints arrives through onTerminalData
-export function openTerminal(workspacePath: string, dir: string, cols: number, rows: number): Promise<string> {
-	return invoke("terminal_open", { workspacePath, dir, cols, rows });
+export function openTerminal(workspacePath: string, dir: string, cols: number, rows: number, shell?: string): Promise<string> {
+	return invoke("terminal_open", { workspacePath, dir, cols, rows, shell: shell ?? null });
+}
+
+// The shells installed on this device (PowerShell, cmd, bash, ...), the default first
+export interface TerminalShell {
+	id: string;
+	name: string;
+	path: string;
+}
+export function listTerminalShells(): Promise<TerminalShell[]> {
+	return invoke("terminal_shells");
 }
 
 export function writeTerminal(id: string, data: string): Promise<void> {

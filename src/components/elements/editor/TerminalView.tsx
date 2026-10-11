@@ -22,6 +22,8 @@ export interface TerminalHandle {
 
 interface TerminalViewProps {
 	workspacePath: string;
+	// Which shell to start (an id from listTerminalShells); the default one when unset
+	shell?: string;
 	dir: string;
 	// Whether it is on screen; a hidden terminal keeps running but cannot be measured
 	visible: boolean;
@@ -61,7 +63,7 @@ function themeFromTokens(): ITheme {
 
 const fromBase64 = (data: string) => Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
 
-const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function TerminalView({ workspacePath, dir, visible, onExit, onFailed }, ref) {
+const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function TerminalView({ workspacePath, dir, shell, visible, onExit, onFailed }, ref) {
 	const host = useRef<HTMLDivElement>(null);
 	const term = useRef<XTerm | null>(null);
 	const fit = useRef<FitAddon | null>(null);
@@ -127,7 +129,7 @@ const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function Term
 				cleanups.push(offData, offExit);
 				if (disposed) return;
 
-				const id = await openTerminal(workspacePath, dir, t.cols, t.rows);
+				const id = await openTerminal(workspacePath, dir, t.cols, t.rows, shell);
 				if (disposed) {
 					void closeTerminal(id);
 					return;

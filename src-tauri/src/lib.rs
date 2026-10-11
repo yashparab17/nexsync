@@ -149,6 +149,7 @@ pub fn run() {
             commands::editor_run::run_command,
             commands::editor_run::kill_run,
             commands::terminal::terminal_open,
+            commands::terminal::terminal_shells,
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,
             commands::terminal::terminal_close,

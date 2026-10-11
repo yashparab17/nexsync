@@ -438,7 +438,7 @@ export default function WorkspaceNotes() {
 			{listOpen && (
 				<>
 					<aside aria-label="Notes list" style={{ width: listWidth }} className="flex shrink-0 flex-col bg-sidebar">
-						<div className="flex h-10 shrink-0 items-center gap-1 border-b pr-1 pl-3">
+						<div className="flex h-12 shrink-0 items-center gap-1 border-b pr-2 pl-3">
 							<h2 className="flex-1 font-mono text-sm text-muted-foreground">notes · {notes.length}</h2>
 							{!isViewer && (
 								<>
@@ -462,7 +462,7 @@ export default function WorkspaceNotes() {
 								<PanelLeftClose className="size-4" />
 							</Button>
 						</div>
-						<div className="flex shrink-0 items-center gap-2 border-b p-2">
+						<div className="flex shrink-0 items-center gap-2 border-b px-3 h-10">
 							<div className="relative min-w-0 flex-1">
 								<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
 								<Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search notes" aria-label="Search notes" className="h-8 border bg-background pl-8 text-sm" />
@@ -495,7 +495,7 @@ export default function WorkspaceNotes() {
 
 			{/* Tabs and the open note */}
 			<section className="flex min-w-0 flex-1 flex-col" aria-label="Note">
-				<div className="flex h-10 shrink-0 items-stretch border-b bg-card/40">
+				<div className="flex h-12 shrink-0 items-stretch border-b bg-card/40">
 					{!listOpen && (
 						<Button variant="ghost" size="icon-xs" aria-label="Show notes list" onPress={() => setListOpen(true)} className="m-2">
 							<PanelLeftOpen className="size-4" />

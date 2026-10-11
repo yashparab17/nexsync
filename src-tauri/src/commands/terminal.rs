@@ -9,7 +9,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
-use crate::commands::{config::validate_allowed_root, path_utils::resolve_workspace_path, terminal_pty::PtySession};
+use crate::commands::{config::validate_allowed_root, path_utils::resolve_workspace_path, terminal_pty::{self, PtySession, Shell}};
 
 pub const EVENT_TERMINAL_DATA: &str = "terminal://data";
 pub const EVENT_TERMINAL_EXIT: &str = "terminal://exit";
@@ -47,6 +47,7 @@ pub fn terminal_open(
     dir: String,
     cols: u16,
     rows: u16,
+    shell: Option<String>,
 ) -> Result<String, String> {
     validate_allowed_root(&app, &workspace_path)?;
     let dir = dir.trim_matches('/');
@@ -71,6 +72,7 @@ pub fn terminal_open(
         &cwd,
         cols,
         rows,
+        shell.as_deref(),
         move |bytes| {
             let _ = data_app.emit(EVENT_TERMINAL_DATA, TerminalData { id: &data_id, data: STANDARD.encode(bytes) });
         },
@@ -80,6 +82,12 @@ pub fn terminal_open(
     )?;
     state.sessions.lock().unwrap_or_else(|p| p.into_inner()).insert(id.clone(), Arc::new(pty));
     Ok(id)
+}
+
+/// The shells installed here, the default first
+#[tauri::command]
+pub fn terminal_shells() -> Vec<Shell> {
+    terminal_pty::shells()
 }
 
 /// Keys typed into the terminal, as the text the panel's emulator produced

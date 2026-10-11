@@ -3,30 +3,35 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
-import { Plus, RefreshCw, Terminal, Trash2, X } from "@/components/animate-icons";
+import { ChevronDown, Plus, RefreshCw, Terminal, Trash2, X } from "@/components/animate-icons";
 import TerminalView, { type TerminalHandle } from "./TerminalView";
 import { Button } from "@/components/ui/button";
+import { useContextMenu } from "@/components/elements/ContextMenu";
+import { listTerminalShells, type TerminalShell } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
+
+const SHELL_KEY = "nexsync.terminal.shell";
+const rememberedShell = () => {
+	try {
+		return localStorage.getItem(SHELL_KEY);
+	} catch {
+		return null;
+	}
+};
 
 interface Instance {
 	key: number;
 	title: string;
+	// The shell it runs, an id from listTerminalShells; unset for the default
+	shell?: string;
 	// How it ended, once it has; a failure to start has a message instead
 	ended: { code: number | null } | { error: string } | null;
 	// Changes when it is restarted, so a new shell replaces the old view
 	run: number;
 }
 
-// What the panel header needs to offer a switcher between terminals
-export interface TerminalSummary {
-	items: { key: number; title: string; ended: boolean }[];
-	active: number | null;
-}
-
 export interface TerminalPanelHandle {
 	newTerminal: () => void;
-	select: (key: number) => void;
-	close: (key: number) => void;
 	// Text for the shell in front, typed as if pasted
 	send: (text: string) => void;
 }
@@ -36,37 +41,47 @@ interface TerminalPanelProps {
 	dir: string;
 	// Whether the Terminal tab is on screen
 	visible: boolean;
-	// Told whenever terminals open, close or change, so the panel header can switch between them
-	onSummary?: (summary: TerminalSummary) => void;
 }
 
-const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(function TerminalPanel({ workspacePath, dir, visible, onSummary }, ref) {
+const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(function TerminalPanel({ workspacePath, dir, visible }, ref) {
 	const [items, setItems] = useState<Instance[]>([]);
 	const [active, setActive] = useState<number | null>(null);
 	const counter = useRef(0);
 	const views = useRef(new Map<number, TerminalHandle | null>());
 
-	const create = useCallback(() => {
+	// Installed shells, found once; a remembered choice that is gone falls back to the first
+	const [shells, setShells] = useState<TerminalShell[]>([]);
+	const [shellsKnown, setShellsKnown] = useState(false);
+	const menu = useContextMenu();
+	useEffect(() => {
+		listTerminalShells().then((list) => setShells(Array.isArray(list) ? list : []), () => {}).finally(() => setShellsKnown(true));
+	}, []);
+	const shellsRef = useRef(shells);
+	shellsRef.current = shells;
+
+	const create = useCallback((shellId?: string) => {
 		const key = ++counter.current;
-		setItems((prev) => [...prev, { key, title: `Terminal ${key}`, ended: null, run: 0 }]);
+		const all = shellsRef.current;
+		const wanted = shellId ?? rememberedShell();
+		const shell = all.find((s) => s.id === wanted) ?? all[0];
+		if (shellId) {
+			try {
+				localStorage.setItem(SHELL_KEY, shellId);
+			} catch {
+				// Not remembered this time
+			}
+		}
+		setItems((prev) => [...prev, { key, title: shell?.name ?? "Terminal", shell: shell?.id, ended: null, run: 0 }]);
 		setActive(key);
 	}, []);
 
 	// The first shell starts when the panel is first looked at, not when the Editor opens
 	useEffect(() => {
-		if (visible && counter.current === 0) create();
-	}, [visible, create]);
-
-	const summaryRef = useRef(onSummary);
-	summaryRef.current = onSummary;
-	useEffect(() => {
-		summaryRef.current?.({ items: items.map((i) => ({ key: i.key, title: i.title, ended: !!i.ended })), active });
-	}, [items, active]);
+		if (visible && shellsKnown && counter.current === 0) create();
+	}, [visible, shellsKnown, create]);
 
 	useImperativeHandle(ref, () => ({
-		newTerminal: create,
-		select: setActive,
-		close: (key) => close(key),
+		newTerminal: () => create(),
 		send: (text) => active !== null && views.current.get(active)?.send(text),
 	}));
 
@@ -98,7 +113,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(functi
 				{items.length === 0 && (
 					<div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
 						<p>No terminals are open.</p>
-						<Button size="sm" onPress={create}>
+						<Button size="sm" onPress={() => create()}>
 							<Plus className="size-4" />
 							New terminal
 						</Button>
@@ -110,6 +125,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(functi
 							ref={(handle) => void views.current.set(item.key, handle)}
 							workspacePath={workspacePath}
 							dir={dir}
+							shell={item.shell}
 							visible={visible && item.key === active}
 							onExit={(code) => patch(item.key, { ended: { code } })}
 							onFailed={(error) => patch(item.key, { ended: { error } })}
@@ -132,8 +148,24 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(functi
 			{/* The list of terminals, on the right as in VS Code */}
 			<div role="tablist" aria-label="Terminals" aria-orientation="vertical" className="flex w-44 shrink-0 flex-col border-l bg-card/40">
 				<div className="flex h-8 shrink-0 items-center justify-end gap-0.5 border-b px-1">
-					<Button variant="ghost" size="icon-xs" aria-label="New terminal" onPress={create}>
+					<Button variant="ghost" size="icon-xs" aria-label="New terminal" onPress={() => create()}>
 						<Plus className="size-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-xs"
+						aria-label="Choose a shell for a new terminal"
+						aria-haspopup="menu"
+						isDisabled={shells.length === 0}
+						onPress={() => {
+							const r = document.activeElement?.getBoundingClientRect();
+							menu.open(
+								{ clientX: (r?.right ?? 0) - 160, clientY: (r?.bottom ?? 0) + 2, preventDefault: () => {} },
+								shells.map((s) => ({ label: s.name, icon: <Terminal className="size-4" />, onSelect: () => create(s.id) })),
+							);
+						}}
+					>
+						<ChevronDown className="size-4" />
 					</Button>
 					<Button variant="ghost" size="icon-xs" aria-label="Clear terminal" isDisabled={!current} onPress={() => active !== null && views.current.get(active)?.clear()}>
 						<Trash2 className="size-4" />
@@ -164,6 +196,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(functi
 					))}
 				</div>
 			</div>
+			{menu.menu}
 		</div>
 	);
 });

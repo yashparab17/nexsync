@@ -75,7 +75,7 @@ export default function EditorTabs({ tabs, active, side, dirty, onSelect, onClos
 							}
 						}}
 						className={cn(
-							"group relative flex h-10 shrink-0 items-center border-r border-t-2 pr-1 text-sm transition-colors",
+							"group relative flex h-12 shrink-0 items-center border-r border-t-2 pr-1 text-sm transition-colors",
 							isActive ? "border-t-primary bg-background text-foreground" : "border-t-transparent bg-card/60 text-muted-foreground hover:bg-card hover:text-foreground",
 							over === i && dragging !== null && dragging !== i && "shadow-[inset_2px_0_0_var(--primary)]",
 						)}
