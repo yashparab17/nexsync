@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Trash2, FileText, Folder, RotateCcw } from "@/components/animate-icons";
 
+import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -75,20 +76,20 @@ export default function WorkspaceTrash() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-start justify-between gap-4">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight">Trash</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Deleted files and folders, including ones removed by collaborators. Restore them or remove them for good.
-					</p>
-				</div>
-				{!isViewer && items.length > 0 && (
+			<PageHeader
+				title="Trash"
+				description="Deleted files and folders, including ones removed by collaborators. Restore them or remove them for good."
+				actions={
+					<>
+{!isViewer && items.length > 0 && (
 					<Button variant="outline" size="sm" onPress={() => setConfirm("all")} className="gap-1.5">
 						<Trash2 className="size-3.5" />
 						Empty Trash
 					</Button>
 				)}
-			</div>
+					</>
+				}
+			/>
 
 			{message && <p className="text-sm text-destructive">{message}</p>}
 

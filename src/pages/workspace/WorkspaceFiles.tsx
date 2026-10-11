@@ -8,6 +8,7 @@ import { ChevronRight, RefreshCw, Trash2, File, FilePlus, FolderInput, FolderOpe
 
 // Components
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
+import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -61,10 +62,11 @@ function formatDate(iso: string): string {
 	if (!iso) return "—";
 	const date = new Date(iso);
 	if (Number.isNaN(date.getTime())) return "—";
+	// The year only when it is not this one
 	return date.toLocaleString(undefined, {
 		month: "short",
 		day: "numeric",
-		year: "numeric",
+		...(date.getFullYear() === new Date().getFullYear() ? {} : { year: "numeric" }),
 		hour: "numeric",
 		minute: "2-digit",
 	});
@@ -346,15 +348,12 @@ export default function WorkspaceFiles() {
 	return (
 		<div className="space-y-6">
 			{/* Header */}
-			<div className="flex flex-wrap items-end justify-between gap-4">
-				<div>
-					<h1 className="text-2xl font-semibold">Files</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Manage your workspace files and folders.
-					</p>
-				</div>
-
-				{/* Toolbar Actions */}
+			<PageHeader
+				title="Files"
+				description="Manage your workspace files and folders."
+				actions={
+					<>
+{/* Toolbar Actions */}
 				<div className="flex gap-2">
 					<Button
 						variant="outline"
@@ -389,7 +388,9 @@ export default function WorkspaceFiles() {
 						</>
 					)}
 				</div>
-			</div>
+					</>
+				}
+			/>
 
 			{/* Breadcrumb navigation */}
 			<nav
@@ -431,7 +432,7 @@ export default function WorkspaceFiles() {
 					<div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b bg-muted/40 px-4 py-2 text-xs font-semibold text-muted-foreground">
 						<span>Name</span>
 						<span className="w-24 text-right">Size</span>
-						<span className="w-44 text-right">Modified</span>
+						<span className="w-64 text-right">Modified</span>
 					</div>
 
 					<ul className="divide-y">
@@ -472,8 +473,8 @@ export default function WorkspaceFiles() {
 									</span>
 
 									{/* Modified + actions */}
-									<div className="flex w-44 items-center justify-end gap-1">
-										<span className="mr-2 text-xs tabular-nums text-muted-foreground">
+									<div className="flex w-64 items-center justify-end gap-1">
+										<span className="mr-2 whitespace-nowrap font-mono text-xs tabular-nums text-muted-foreground">
 											{formatDate(entry.modified_at)}
 										</span>
 

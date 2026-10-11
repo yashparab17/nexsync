@@ -1,5 +1,6 @@
+import PageHeader from "@/components/layout/PageHeader";
 import { useEffect, useMemo, useState } from "react";
-import { ChartColumn as BarChart3, History, X } from "@/components/animate-icons";
+import { History, X } from "@/components/animate-icons";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -85,17 +86,11 @@ export default function WorkspaceInsights() {
 	const filtered = Object.values(filter).some(Boolean);
 
 	return (
-		<div className="space-y-6">
-			<div>
-				<h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-					<BarChart3 className="size-6 text-primary" />
-					Insights
-				</h1>
-				<p className="mt-1 text-sm text-muted-foreground">
-					Who has been doing what in this workspace. Based on the latest {events.length} recorded actions
-					{events.some((e) => !e.author) && "; older ones have no name attached"}.
-				</p>
-			</div>
+		<div className="flex flex-col gap-6">
+			<PageHeader
+				title="Insights"
+				description={`Who has been doing what in this workspace. Based on the latest ${events.length} recorded actions${events.some((e) => !e.author) ? "; older ones have no name attached" : ""}.`}
+			/>
 
 			<div className="grid grid-cols-2 gap-3 md:grid-cols-4">
 				<Stat label="Actions recorded" value={events.length} />

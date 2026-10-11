@@ -5,6 +5,7 @@ import { Plus, Search, LayoutGrid, Network } from "@/components/animate-icons";
 import NoteEditor from "@/components/elements/editor/NoteEditor";
 import NoteBoard from "@/components/elements/notes/NoteBoard";
 import NoteGraph from "@/components/elements/notes/NoteGraph";
+import PageHeader from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -251,14 +252,12 @@ export default function WorkspaceNotes() {
 	return (
 		<div className="flex h-[calc(100vh-10rem)] flex-col gap-4">
 			{/* Header */}
-			<div className="flex shrink-0 flex-wrap items-end justify-between gap-4">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight">Notes</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Notes float on a shared board and link to each other with [[Note name]]. Markdown files live in the Editor.
-					</p>
-				</div>
-				{!isViewer && (
+			<PageHeader
+				title="Notes"
+				description="Notes float on a shared board and link to each other with [[Note name]]. Markdown files live in the Editor."
+				actions={
+					<>
+{!isViewer && (
 					<Button
 						onPress={() => {
 							setNewTitle("");
@@ -269,7 +268,9 @@ export default function WorkspaceNotes() {
 						New note
 					</Button>
 				)}
-			</div>
+					</>
+				}
+			/>
 
 			<div className="relative flex min-h-0 flex-1 flex-col border">
 				{/* Toolbar */}

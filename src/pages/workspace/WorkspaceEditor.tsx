@@ -1,3 +1,4 @@
+import PageHeader from "@/components/layout/PageHeader";
 import { useCallback, useEffect, useState } from "react";
 import { UsersRound, Code2, Terminal, X } from "@/components/animate-icons";
 
@@ -221,12 +222,9 @@ export default function WorkspaceEditor() {
 	};
 
 	return (
-		<div className="flex h-[calc(100vh-10rem)] flex-col gap-4">
+		<div className="flex h-[calc(100vh-10rem)] flex-col">
 			{/* Header */}
-			<div className="shrink-0">
-				<h1 className="text-2xl font-bold tracking-tight">Editor</h1>
-				<p className="mt-1 text-sm text-muted-foreground">Edit code and text files. Several can stay open as tabs, and everyone in the workspace edits the same file live.</p>
-			</div>
+			<PageHeader title="Editor" description="Edit code and text files. Several can stay open as tabs, and everyone in the workspace edits the same file live." />
 
 			<div className="flex min-h-0 flex-1 border">
 			<FileExplorer
