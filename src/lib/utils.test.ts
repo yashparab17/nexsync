@@ -24,6 +24,6 @@ describe("utils", () => {
 
 	it("gives a collaborator the same color every time", () => {
 		expect(colorForName("Ada")).toBe(colorForName("Ada"));
-		expect(colorForName("Ada")).toMatch(/^hsl\(\d+, 70%, 55%\)$/);
+		expect(colorForName("Ada")).toMatch(/^#[0-9a-f]{6}$/);
 	});
 });

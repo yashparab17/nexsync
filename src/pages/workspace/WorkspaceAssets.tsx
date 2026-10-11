@@ -508,7 +508,7 @@ export default function WorkspaceAssets() {
 								className="group relative overflow-hidden cursor-pointer border-border hover:border-primary/60 hover:shadow-lg transition-all duration-200 bg-card/60 flex flex-col"
 							>
 								{/* Thumbnail Header Area */}
-								<div className="relative h-36 bg-black/40 flex items-center justify-center overflow-hidden border-b border-border/40">
+								<div className="relative h-36 bg-muted flex items-center justify-center overflow-hidden border-b border-border/40">
 									{isRemote ?
 										<div className="flex flex-col items-center gap-2 text-warning/80 p-4 text-center">
 											<Sparkles className="size-7" />
@@ -539,10 +539,10 @@ export default function WorkspaceAssets() {
 									{/* Status Badge */}
 									<div className="absolute top-2 left-2">
 										{isRemote ?
-											<span className="bg-warning/90 text-black text-xs font-bold px-2 py-0.5 rounded-none shadow-sm">
+											<span className="bg-warning text-background text-xs font-bold px-2 py-0.5 rounded-none shadow-sm">
 												Remote
 											</span>
-										:	<span className="bg-black/60 backdrop-blur text-white text-xs font-mono px-2 py-0.5 rounded-none border border-white/10">
+										:	<span className="bg-background/85 backdrop-blur text-foreground text-xs font-mono px-2 py-0.5 rounded-none border border-border">
 												{asset.name.split(".").pop()?.toUpperCase()}
 											</span>
 										}
