@@ -328,7 +328,7 @@ export default function P2PConnectDialog({
 						)}
 
 						{shortCode && (
-							<div className="space-y-4 border bg-card/50 p-5 text-center">
+							<div className="space-y-4 border bg-muted/40 p-5 text-center">
 								<p className="text-sm text-muted-foreground">Tell {hostRole === "Viewer" ? "the person you are inviting" : "your collaborator"} this code</p>
 								<div className="font-mono text-5xl font-bold tracking-[0.25em] text-primary select-all" aria-label={`Code ${shortCode.code.split("").join(" ")}`}>
 									{shortCode.code.slice(0, 3)} {shortCode.code.slice(3)}
@@ -350,7 +350,7 @@ export default function P2PConnectDialog({
 						)}
 
 						{invite && (
-							<div className="space-y-4 border bg-card/50 p-5">
+							<div className="space-y-4 border bg-muted/40 p-5">
 								<div className="flex items-center justify-between gap-3">
 									<p className="text-sm text-muted-foreground">Send this invite to your collaborator</p>
 									<Button variant="secondary" size="sm" onPress={() => copy(invite.ticket)}>
@@ -453,7 +453,7 @@ export default function P2PConnectDialog({
 								)}
 								<ul className="max-h-72 space-y-2 overflow-y-auto" aria-label="People connected">
 									{peers.map((peer) => (
-										<li key={peer.id} className="flex items-center gap-3 border bg-card p-3">
+										<li key={peer.id} className="flex items-center gap-3 border bg-muted/40 p-3">
 											<Avatar name={peer.name} className="size-9" />
 											<div className="min-w-0 flex-1">
 												<div className="flex flex-wrap items-center gap-2">

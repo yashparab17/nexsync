@@ -96,7 +96,7 @@ export default function WorkspaceDashboard() {
 			<PageBody className="grid content-start gap-3 xl:grid-cols-[minmax(0,1fr)_24rem]">
 				<dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:col-span-2">
 					{counts.map(([label, value, path]) => (
-						<button key={label} type="button" onClick={() => navigate(path)} className="border bg-card/40 p-4 text-left outline-none transition-colors hover:border-primary focus-visible:border-primary">
+						<button key={label} type="button" onClick={() => navigate(path)} className="border bg-muted/40 p-4 text-left outline-none transition-colors hover:border-primary focus-visible:border-primary">
 							<dd className="font-mono text-3xl font-semibold tabular-nums">{value}</dd>
 							<dt className="text-sm text-muted-foreground">{label}</dt>
 						</button>

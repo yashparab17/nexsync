@@ -194,7 +194,7 @@ export default function NoteBoard({ notes, positions, edges, activePath, onMove,
 							onKeyDown={(e) => e.key === "Enter" && onOpen(note.path)}
 							style={{ left: at.x, top: at.y, width: CARD_W, height: CARD_H }}
 							className={cn(
-								"group absolute flex cursor-pointer flex-col gap-1.5 overflow-hidden border bg-card p-3 text-card-foreground shadow-[0_2px_0_var(--edge)] outline-none transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-ring",
+								"group absolute flex cursor-pointer flex-col gap-1.5 overflow-hidden border bg-muted/40 p-3 text-card-foreground shadow-[0_2px_0_var(--edge)] outline-none transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-ring",
 								activePath === note.path && "border-primary ring-1 ring-primary",
 							)}
 						>

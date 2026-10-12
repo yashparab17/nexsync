@@ -361,5 +361,5 @@ button, a, select, summary, label, [role="button"] { touch-action: manipulation;
 }
 :root:not([data-borders="on"]) .border:focus-visible,
 :root:not([data-borders="on"]) .border:focus-within {
-  border-color: var(--ring);
+  border-color: var(--primary);
 }

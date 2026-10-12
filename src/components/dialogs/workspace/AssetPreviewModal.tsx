@@ -150,7 +150,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 	const canZoom = isImage && !!dimensions && (dimensions.width > size.w + 1 || dimensions.height > size.h + 1);
 
 	const details = (
-		<aside aria-label="Asset details" className={cn("flex shrink-0 flex-col gap-5 overflow-y-auto border-border bg-card/40 p-4", adaptive ? "w-80 border-l" : "max-h-[40%] w-full border-t")}>
+		<aside aria-label="Asset details" className={cn("flex shrink-0 flex-col gap-5 overflow-y-auto border-border bg-muted/40 p-4", adaptive ? "w-80 border-l" : "max-h-[40%] w-full border-t")}>
 			<div className="flex flex-wrap gap-1.5">
 				{dataUrl && (
 					<Button variant="outline" size="sm" onPress={exportFile}>
@@ -258,7 +258,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 								</div>
 							)}
 							{isRemote && (
-								<div className="m-auto flex max-w-sm flex-col items-center gap-4 border bg-card p-8 text-center">
+								<div className="m-auto flex max-w-sm flex-col items-center gap-4 border bg-muted/40 p-8 text-center">
 									<Sparkles className="size-8 text-warning" />
 									<div>
 										<h4 className="font-semibold">Not downloaded yet</h4>
@@ -296,7 +296,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 										/>
 									)}
 									{isAudio && (
-										<div className="m-auto flex w-full max-w-md flex-col items-center gap-4 border bg-card p-6">
+										<div className="m-auto flex w-full max-w-md flex-col items-center gap-4 border bg-muted/40 p-6">
 											<Volume2 className="size-8 text-primary" />
 											<p className="text-sm font-semibold">{asset.name}</p>
 											<audio src={dataUrl} controls className="w-full" />
@@ -304,7 +304,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 									)}
 									{isPdf && <PdfViewer name={asset.name} base64={dataUrl.slice(dataUrl.indexOf(",") + 1)} />}
 									{!isImage && !isVideo && !isAudio && !isPdf && (
-										<div className="m-auto flex max-w-sm flex-col items-center gap-3 border bg-card p-8 text-center">
+										<div className="m-auto flex max-w-sm flex-col items-center gap-3 border bg-muted/40 p-8 text-center">
 											<FileText className="size-12 text-muted-foreground" />
 											<p className="font-semibold">{asset.name}</p>
 											<p className="text-sm text-muted-foreground">This kind of file cannot be previewed here.</p>

@@ -174,7 +174,7 @@ export default function Welcome() {
 												<button
 													type="button"
 													onClick={() => handleOpenWorkspace(ws)}
-													className={`flex h-full min-h-44 w-full flex-col gap-3 border bg-card p-6 text-left shadow-[0_2px_0_var(--edge)] transition-colors hover:border-primary active:translate-y-0.5 active:shadow-none ${last ? "border-primary" : ""}`}
+													className={`flex h-full min-h-44 w-full flex-col gap-3 border bg-muted/40 p-6 text-left shadow-[0_2px_0_var(--edge)] transition-colors hover:border-primary active:translate-y-0.5 active:shadow-none ${last ? "border-primary" : ""}`}
 												>
 													<span className="flex items-start justify-between gap-3">
 														<span className={`font-semibold text-xl`}>{ws.name}</span>
