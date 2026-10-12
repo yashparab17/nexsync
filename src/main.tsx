@@ -12,13 +12,11 @@ import { NotificationProvider } from "./store/notifications/NotificationContext"
 import WorkspaceLoader from "./components/WorkspaceLoader";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { initSecurityPolicies } from "./lib/security";
-import { readBorders, setBorders } from "./lib/borders";
 
 // Enforce desktop security policies: disable right-click, dev tools, and history tracking
 initSecurityPolicies();
 
 // Application root bootstrap mounting React providers and router
-setBorders(readBorders());
 ReactDOM.createRoot(document.getElementById("root")!).render(
 	<React.StrictMode>
 		<ThemeProvider>
