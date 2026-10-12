@@ -140,6 +140,20 @@
     --sidebar-ring: oklch(0.552 0.016 285.938);
 }
 
+/* Code colours follow the theme unless a scheme is chosen (src/lib/codeSchemes.ts sets these on :root[data-code]) */
+:root {
+  --syn-keyword: var(--primary);
+  --syn-string: var(--success);
+  --syn-number: var(--warning);
+  --syn-function: var(--info);
+  --syn-type: color-mix(in oklch, var(--warning) 70%, var(--foreground));
+  --syn-variable: var(--foreground);
+  --syn-tag: var(--destructive);
+  --syn-constant: color-mix(in oklch, var(--destructive) 55%, var(--warning));
+  --syn-comment: var(--muted-foreground);
+  --syn-operator: color-mix(in oklch, var(--foreground) 65%, var(--background));
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { Check, Moon, Plus, Sun, Trash2, Bug, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, Undo2, User, AlertTriangle } from "@/components/animate-icons";
 
 import { Row, Segmented, SectionCard, SettingsShell } from "@/components/elements/SettingsParts";
+import CodeSchemePicker from "@/components/elements/CodeSchemePicker";
 import ThemePicker from "@/components/elements/ThemePicker";
 import Avatar from "@/components/elements/Avatar";
 import ErrorLogCard from "@/components/elements/ErrorLogCard";
@@ -392,6 +393,9 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 							<Undo2 />
 							Reset editor settings
 						</Button>
+					<div className="border-t pt-4">
+							<CodeSchemePicker />
+						</div>
 					</SectionCard>
 
 					<SectionCard

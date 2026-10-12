@@ -3,7 +3,7 @@ import CodeMirror from "@uiw/react-codemirror";
 import { lintGutter } from "@codemirror/lint";
 import { EditorState, Prec, type Extension } from "@codemirror/state";
 import { EditorView, GutterMarker, gutter, keymap, lineNumbers } from "@codemirror/view";
-import { catppuccinLatte, catppuccinMocha } from "@catppuccin/codemirror";
+import { codeLook } from "@/lib/editor/codeTheme";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
 
 import { useThemeContext } from "@/store/ThemeContext";
@@ -220,6 +220,7 @@ export default function CodeEditor({
 	);
 	const lookExtensions = useMemo(
 		() => [
+			...codeLook(isDark),
 			EditorView.theme({
 				"&": { fontSize: `${fontSize}px`, backgroundColor: "var(--background)" },
 				".cm-scroller": { fontFamily: "var(--font-mono)" },
@@ -232,7 +233,7 @@ export default function CodeEditor({
 			...(minimapExtension ? [minimapExtension] : []),
 			...(wrap || language.name === "Markdown" ? [EditorView.lineWrapping] : []),
 		],
-		[fontSize, tabSize, wrap, language.name, relativeNumbers, cursorExtension, vimExtension, minimapExtension, leader],
+		[isDark, fontSize, tabSize, wrap, language.name, relativeNumbers, cursorExtension, vimExtension, minimapExtension, leader],
 	);
 
 	// Seed the shared text from on-disk content the first time it's ever opened
@@ -271,7 +272,7 @@ export default function CodeEditor({
 				{...(collab ? (startedWithCollab.current ? { value: startingText.current } : {}) : { value })}
 				height="100%"
 				minHeight={minHeight}
-				theme={isDark ? catppuccinMocha : catppuccinLatte}
+				theme="none"
 				extensions={extensions}
 				onChange={onChange}
 				onCreateEditor={(view) => {

@@ -8,6 +8,7 @@ import {
 	type ReactNode,
 } from "react";
 
+import { AUTO_SCHEME, BUILTIN_SCHEMES, cleanCustomSchemes, schemeCss, type CodeSchemeDef } from "@/lib/codeSchemes";
 import { BUILTIN_THEMES, DEFAULT_THEME, cleanCustomThemes, themeCss, type ThemeDef, type ThemeMode } from "@/lib/themes";
 
 type Theme = ThemeMode;
@@ -33,6 +34,12 @@ interface ThemeContextValue {
 	// Adds a custom theme, or replaces the one with the same id
 	saveCustomTheme: (theme: ThemeDef) => void;
 	deleteCustomTheme: (id: string) => void;
+	// Colours for code: "auto" follows the theme, otherwise a built-in or custom scheme, chosen for each mode
+	codeSchemeFor: (mode: ThemeMode) => string;
+	codeSchemesFor: (mode: ThemeMode) => CodeSchemeDef[];
+	setCodeScheme: (mode: ThemeMode, id: string) => void;
+	saveCustomScheme: (scheme: CodeSchemeDef) => void;
+	deleteCustomScheme: (id: string) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
@@ -43,6 +50,7 @@ interface ThemeProviderProps {
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 const CUSTOM_KEY = "theme.custom";
+const CODE_CUSTOM_KEY = "code.custom";
 const STYLE_ID = "nexsync-themes";
 
 const systemTheme = (): Theme =>
@@ -64,6 +72,14 @@ const readCustom = (): ThemeDef[] => {
 	}
 };
 
+const readCustomSchemes = (): CodeSchemeDef[] => {
+	try {
+		return cleanCustomSchemes(JSON.parse(readString(CODE_CUSTOM_KEY) ?? "[]"));
+	} catch {
+		return [];
+	}
+};
+
 // Provider that manages light/dark mode and the theme of each, and syncs them to the root HTML element
 export function ThemeProvider({ children }: ThemeProviderProps) {
 	// Initialize the preference from localStorage, falling back to dark
@@ -75,6 +91,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 	const [customThemes, setCustomThemes] = useState<ThemeDef[]>(readCustom);
 	const [lightId, setLightTheme] = useState(() => readString("theme.light") ?? DEFAULT_THEME);
 	const [darkId, setDarkTheme] = useState(() => readString("theme.dark") ?? DEFAULT_THEME);
+
+	const [customSchemes, setCustomSchemes] = useState<CodeSchemeDef[]>(readCustomSchemes);
+	const [codeLightId, setCodeLightId] = useState(() => readString("code.light") ?? AUTO_SCHEME);
+	const [codeDarkId, setCodeDarkId] = useState(() => readString("code.dark") ?? AUTO_SCHEME);
 
 	// Follow the operating system while the preference is "system"
 	useEffect(() => {
@@ -95,6 +115,13 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 	const darkTheme = valid(darkId, "dark");
 	const themeId = theme === "dark" ? darkTheme : lightTheme;
 
+	const schemes = useMemo(() => [...BUILTIN_SCHEMES, ...customSchemes], [customSchemes]);
+	const codeSchemesFor = (mode: ThemeMode) => schemes.filter((c) => c.mode === mode);
+	const validScheme = (id: string, mode: ThemeMode) => (schemes.some((c) => c.id === id && c.mode === mode) ? id : AUTO_SCHEME);
+	const codeLight = validScheme(codeLightId, "light");
+	const codeDark = validScheme(codeDarkId, "dark");
+	const codeId = theme === "dark" ? codeDark : codeLight;
+
 	// Every theme except the originals is a style rule; the page switches between them with data-theme. This runs before the
 	// first paint, so a chosen theme never flashes the original.
 	useLayoutEffect(() => {
@@ -104,15 +131,17 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 			style.id = STYLE_ID;
 			document.head.appendChild(style);
 		}
-		style.textContent = all.filter((t) => t.id !== DEFAULT_THEME).map(themeCss).join("\n");
-	}, [all]);
+		style.textContent = [...all.filter((t) => t.id !== DEFAULT_THEME).map(themeCss), ...schemes.map(schemeCss)].join("\n");
+	}, [all, schemes]);
 
 	useLayoutEffect(() => {
 		const root = document.documentElement;
 		root.classList.toggle("dark", theme === "dark");
 		if (themeId === DEFAULT_THEME) root.removeAttribute("data-theme");
 		else root.setAttribute("data-theme", themeId);
-	}, [theme, themeId]);
+		if (codeId === AUTO_SCHEME) root.removeAttribute("data-code");
+		else root.setAttribute("data-code", codeId);
+	}, [theme, themeId, codeId]);
 
 	// Remember the choices
 	useEffect(() => {
@@ -121,13 +150,20 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 			localStorage.setItem("theme.light", lightTheme);
 			localStorage.setItem("theme.dark", darkTheme);
 			localStorage.setItem(CUSTOM_KEY, JSON.stringify(customThemes));
+			localStorage.setItem("code.light", codeLight);
+			localStorage.setItem("code.dark", codeDark);
+			localStorage.setItem(CODE_CUSTOM_KEY, JSON.stringify(customSchemes));
 		} catch {
 			// Not remembered this time
 		}
-	}, [preference, lightTheme, darkTheme, customThemes]);
+	}, [preference, lightTheme, darkTheme, customThemes, codeLight, codeDark, customSchemes]);
 
 	const saveCustomTheme = (next: ThemeDef) => setCustomThemes((prev) => (prev.some((t) => t.id === next.id) ? prev.map((t) => (t.id === next.id ? next : t)) : [...prev, next]));
 	const deleteCustomTheme = (id: string) => setCustomThemes((prev) => prev.filter((t) => t.id !== id));
+
+	const setCodeScheme = (mode: ThemeMode, id: string) => (mode === "dark" ? setCodeDarkId : setCodeLightId)(id);
+	const saveCustomScheme = (next: CodeSchemeDef) => setCustomSchemes((prev) => (prev.some((t) => t.id === next.id) ? prev.map((t) => (t.id === next.id ? next : t)) : [...prev, next]));
+	const deleteCustomScheme = (id: string) => setCustomSchemes((prev) => prev.filter((t) => t.id !== id));
 
 	// Switch to the opposite of what is showing now
 	const toggleTheme = () => setPreference(theme === "dark" ? "light" : "dark");
@@ -149,6 +185,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 				customThemes,
 				saveCustomTheme,
 				deleteCustomTheme,
+				codeSchemeFor: (mode) => (mode === "dark" ? codeDark : codeLight),
+				codeSchemesFor,
+				setCodeScheme,
+				saveCustomScheme,
+				deleteCustomScheme,
 			}}
 		>
 			{children}
