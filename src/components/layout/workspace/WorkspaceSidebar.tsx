@@ -204,7 +204,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 		<div className="relative flex h-full shrink-0">
 		<aside
 			style={!expanded ? { width: shownWidth } : undefined}
-			className={cn("flex h-full shrink-0 flex-col overflow-hidden bg-muted/20", expanded && "w-64 border-r bg-background")}
+			className={cn("flex h-full shrink-0 flex-col overflow-hidden bg-sidebar", expanded && "w-64 border-r")}
 		>
 			{/* Workspace identity */}
 			<div className={cn("flex h-16 shrink-0 items-center gap-2 border-b", showLabels ? "justify-start px-3" : "justify-center")}>

@@ -10,7 +10,7 @@ const VARIANTS = {
 	// A page toolbar: wraps onto more rows when the window is narrow
 	bar: "min-h-12 flex-wrap items-center gap-2 bg-card/40 px-3 py-1",
 	// The title row of a side panel: its name, then icon buttons at the right
-	header: "h-12 items-center gap-1 bg-card/40 px-3",
+	header: "h-12 items-center gap-1 px-3",
 	// A row of tabs that run the full height of the strip
 	tabs: "h-12 items-stretch bg-card/40",
 	// A second, slimmer row under a header: a filter box, editor actions

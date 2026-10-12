@@ -452,7 +452,7 @@ export default function WorkspaceNotes() {
 			{/* Notes list */}
 			{listOpen && (
 				<>
-					<aside aria-label="Notes list" style={{ width: listWidth }} className="flex shrink-0 flex-col bg-sidebar">
+					<aside aria-label="Notes list" style={{ width: listWidth }} className="flex shrink-0 flex-col bg-panel">
 						<Toolbar variant="header">
 							<div className="flex-1"><ToolbarTitle as="h2" name="Notes" meta={notes.length} /></div>
 							{!isViewer && (

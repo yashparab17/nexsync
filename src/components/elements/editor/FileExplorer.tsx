@@ -234,7 +234,7 @@ export default function FileExplorer({
 				bind.onDragOver(e);
 				if (dragging) setDropDir(dirAt(e.target));
 			}}
-			className={cn("flex h-full min-w-0 flex-col bg-sidebar", dragging && "ring-2 ring-primary ring-inset")}
+			className={cn("flex h-full min-w-0 flex-col bg-panel", dragging && "ring-2 ring-primary ring-inset")}
 		>
 			<Toolbar variant="header" className="justify-between">
 				<ToolbarTitle as="h2" name="Editor" />

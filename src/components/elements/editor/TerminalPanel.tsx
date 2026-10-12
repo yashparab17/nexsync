@@ -146,7 +146,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(functi
 			</div>
 
 			{/* The list of terminals, on the right as in VS Code */}
-			<div role="tablist" aria-label="Terminals" aria-orientation="vertical" className="flex w-44 shrink-0 flex-col border-l bg-card/40">
+			<div role="tablist" aria-label="Terminals" aria-orientation="vertical" className="flex w-44 shrink-0 flex-col border-l bg-panel">
 				<div className="flex h-8 shrink-0 items-center justify-end gap-0.5 border-b px-1">
 					<Button variant="ghost" size="icon-xs" aria-label="New terminal" onPress={() => create()}>
 						<Plus className="size-4" />
