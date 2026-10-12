@@ -2,34 +2,15 @@ import {
 	createContext,
 	useContext,
 	useEffect,
+	useLayoutEffect,
+	useMemo,
 	useState,
 	type ReactNode,
 } from "react";
 
-type Theme = "dark" | "light";
+import { BUILTIN_THEMES, DEFAULT_THEME, cleanCustomThemes, themeCss, type ThemeDef, type ThemeMode } from "@/lib/themes";
 
-// The four themes: each mode has the original look and one Catppuccin flavour. The swatch shows its page, panel and accent
-// colours in the picker.
-export type LightThemeId = "default" | "latte";
-export type DarkThemeId = "default" | "mocha";
-export const THEMES = {
-	light: [
-		{ id: "default", name: "Original light", swatch: ["#ffffff", "#f4f4f5", "#0f766e"] },
-		{ id: "latte", name: "Catppuccin Latte", swatch: ["#dce0e8", "#eff1f5", "#0e6269"] },
-	],
-	dark: [
-		{ id: "default", name: "Original dark", swatch: ["#09090b", "#18181b", "#2dd4bf"] },
-		{ id: "mocha", name: "Catppuccin Mocha", swatch: ["#11111b", "#1e1e2e", "#94e2d5"] },
-	],
-} as const;
-const read = <T extends string>(key: string, allowed: readonly T[], fallback: T): T => {
-	try {
-		const saved = localStorage.getItem(key);
-		return allowed.find((a) => a === saved) ?? fallback;
-	} catch {
-		return fallback;
-	}
-};
+type Theme = ThemeMode;
 // What the person picked; "system" follows the operating system
 export type ThemePreference = Theme | "system";
 
@@ -39,13 +20,19 @@ interface ThemeContextValue {
 	preference: ThemePreference;
 	setPreference: (preference: ThemePreference) => void;
 	toggleTheme: () => void;
-	// Which theme each mode uses
-	lightTheme: LightThemeId;
-	darkTheme: DarkThemeId;
-	setLightTheme: (id: LightThemeId) => void;
-	setDarkTheme: (id: DarkThemeId) => void;
-	// The theme on screen now, such as "default" or "mocha"
+	// Which theme each mode uses, by id: "default", "latte", "custom-ab12cd" ...
+	lightTheme: string;
+	darkTheme: string;
+	setLightTheme: (id: string) => void;
+	setDarkTheme: (id: string) => void;
+	// The theme on screen now
 	themeId: string;
+	// Every theme of a mode, the built-in ones first and then the ones people made
+	themesFor: (mode: ThemeMode) => ThemeDef[];
+	customThemes: ThemeDef[];
+	// Adds a custom theme, or replaces the one with the same id
+	saveCustomTheme: (theme: ThemeDef) => void;
+	deleteCustomTheme: (id: string) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
@@ -55,20 +42,39 @@ interface ThemeProviderProps {
 }
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
+const CUSTOM_KEY = "theme.custom";
+const STYLE_ID = "nexsync-themes";
 
 const systemTheme = (): Theme =>
 	typeof window.matchMedia === "function" && !window.matchMedia(DARK_QUERY).matches ? "light" : "dark";
 
-// Provider that manages light/dark mode and syncs class on root HTML element
+const readString = (key: string): string | null => {
+	try {
+		return localStorage.getItem(key);
+	} catch {
+		return null;
+	}
+};
+
+const readCustom = (): ThemeDef[] => {
+	try {
+		return cleanCustomThemes(JSON.parse(readString(CUSTOM_KEY) ?? "[]"));
+	} catch {
+		return [];
+	}
+};
+
+// Provider that manages light/dark mode and the theme of each, and syncs them to the root HTML element
 export function ThemeProvider({ children }: ThemeProviderProps) {
 	// Initialize the preference from localStorage, falling back to dark
 	const [preference, setPreference] = useState<ThemePreference>(() => {
-		const saved = localStorage.getItem("theme");
+		const saved = readString("theme");
 		return saved === "light" || saved === "system" ? saved : "dark";
 	});
 	const [system, setSystem] = useState<Theme>(systemTheme);
-	const [lightTheme, setLightTheme] = useState<LightThemeId>(() => read("theme.light", ["default", "latte"], "default"));
-	const [darkTheme, setDarkTheme] = useState<DarkThemeId>(() => read("theme.dark", ["default", "mocha"], "default"));
+	const [customThemes, setCustomThemes] = useState<ThemeDef[]>(readCustom);
+	const [lightId, setLightTheme] = useState(() => readString("theme.light") ?? DEFAULT_THEME);
+	const [darkId, setDarkTheme] = useState(() => readString("theme.dark") ?? DEFAULT_THEME);
 
 	// Follow the operating system while the preference is "system"
 	useEffect(() => {
@@ -81,22 +87,47 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
 	const theme: Theme = preference === "system" ? system : preference;
 
+	const all = useMemo(() => [...BUILTIN_THEMES, ...customThemes], [customThemes]);
+	const themesFor = (mode: ThemeMode) => all.filter((t) => t.mode === mode);
+	// A choice that no longer exists (a deleted custom theme) falls back to the original
+	const valid = (id: string, mode: ThemeMode) => (all.some((t) => t.id === id && t.mode === mode) ? id : DEFAULT_THEME);
+	const lightTheme = valid(lightId, "light");
+	const darkTheme = valid(darkId, "dark");
 	const themeId = theme === "dark" ? darkTheme : lightTheme;
 
-	// Synchronize the dark class and the theme name on the document element, and save the choices
-	useEffect(() => {
+	// Every theme except the originals is a style rule; the page switches between them with data-theme. This runs before the
+	// first paint, so a chosen theme never flashes the original.
+	useLayoutEffect(() => {
+		let style = document.getElementById(STYLE_ID);
+		if (!style) {
+			style = document.createElement("style");
+			style.id = STYLE_ID;
+			document.head.appendChild(style);
+		}
+		style.textContent = all.filter((t) => t.id !== DEFAULT_THEME).map(themeCss).join("\n");
+	}, [all]);
+
+	useLayoutEffect(() => {
 		const root = document.documentElement;
 		root.classList.toggle("dark", theme === "dark");
-		if (themeId === "default") root.removeAttribute("data-theme");
+		if (themeId === DEFAULT_THEME) root.removeAttribute("data-theme");
 		else root.setAttribute("data-theme", themeId);
+	}, [theme, themeId]);
+
+	// Remember the choices
+	useEffect(() => {
 		try {
 			localStorage.setItem("theme", preference);
 			localStorage.setItem("theme.light", lightTheme);
 			localStorage.setItem("theme.dark", darkTheme);
+			localStorage.setItem(CUSTOM_KEY, JSON.stringify(customThemes));
 		} catch {
 			// Not remembered this time
 		}
-	}, [theme, themeId, preference, lightTheme, darkTheme]);
+	}, [preference, lightTheme, darkTheme, customThemes]);
+
+	const saveCustomTheme = (next: ThemeDef) => setCustomThemes((prev) => (prev.some((t) => t.id === next.id) ? prev.map((t) => (t.id === next.id ? next : t)) : [...prev, next]));
+	const deleteCustomTheme = (id: string) => setCustomThemes((prev) => prev.filter((t) => t.id !== id));
 
 	// Switch to the opposite of what is showing now
 	const toggleTheme = () => setPreference(theme === "dark" ? "light" : "dark");
@@ -114,6 +145,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 				setLightTheme,
 				setDarkTheme,
 				themeId,
+				themesFor,
+				customThemes,
+				saveCustomTheme,
+				deleteCustomTheme,
 			}}
 		>
 			{children}

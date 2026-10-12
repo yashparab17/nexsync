@@ -1,0 +1,39 @@
+import { describe, expect, it } from "vitest";
+
+import { BUILTIN_THEMES, TOKENS, cleanCustomThemes, isColor, textToVars, themeCss, varsToText } from "./themes";
+
+describe("themes", () => {
+	it("has five light and five dark themes, each with every colour", () => {
+		for (const mode of ["light", "dark"] as const) expect(BUILTIN_THEMES.filter((t) => t.mode === mode)).toHaveLength(5);
+		for (const t of BUILTIN_THEMES) for (const { key } of TOKENS) expect(isColor(t.vars[key]), `${t.id} ${key}`).toBe(true);
+	});
+
+	it("only accepts colours that cannot break out of a style rule", () => {
+		expect(isColor("#abc")).toBe(true);
+		expect(isColor("oklch(0.7 0.1 180 / 50%)")).toBe(true);
+		expect(isColor("red; } body { display: none")).toBe(false);
+		expect(isColor("url(x)")).toBe(false);
+	});
+
+	it("round-trips through CSS text and skips bad lines", () => {
+		const base = BUILTIN_THEMES[0].vars;
+		expect(textToVars(varsToText(base), base)).toEqual({ vars: base, skipped: 0 });
+		const r = textToVars("--primary: #123456;\n--nope: #fff;\n--border: expression(1);", base);
+		expect(r.vars.primary).toBe("#123456");
+		expect(r.skipped).toBe(2);
+	});
+
+	it("scopes a dark theme to the dark class and fills in derived colours", () => {
+		const css = themeCss(BUILTIN_THEMES.find((t) => t.id === "dracula")!);
+		expect(css).toContain('.dark[data-theme="dracula"]');
+		expect(css).toContain("--chart-3:");
+	});
+
+	it("drops stored custom themes that are not well formed", () => {
+		const ok = { id: "custom-abcd1234", name: "Mine", mode: "dark", vars: { primary: "#ff0000", border: "evil;}" } };
+		const [t, ...rest] = cleanCustomThemes([ok, { id: "x", name: "bad", mode: "dark", vars: {} }, null]);
+		expect(rest).toHaveLength(0);
+		expect(t.vars.primary).toBe("#ff0000");
+		expect(t.vars.border).not.toBe("evil;}");
+	});
+});

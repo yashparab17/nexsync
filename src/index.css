@@ -58,8 +58,8 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* The four themes. The original light and dark are the plain :root and .dark; Catppuccin Latte and Mocha switch on with
-   data-theme on <html>, which ThemeContext sets, and only ever on the matching mode (Latte on light, Mocha on dark). */
+/* The original light and dark themes are the plain :root and .dark. Every other theme (src/lib/themes.ts, and the ones people
+   make) is a rule ThemeContext adds for data-theme on <html>, and applies only in its own mode. */
 :root {
     --background: oklch(1 0 0);
     --foreground: oklch(0.141 0.005 285.823);
@@ -138,88 +138,6 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.552 0.016 285.938);
-}
-
-/* Catppuccin Latte (light) and Mocha (dark). Page background is the darkest tone of each (crust); mantle and base step up
-   from it for panels and raised surfaces. Latte's teal, red, green, yellow and blue are deepened from the stock values so
-   they hold 4.5:1 as text on crust. */
-:root[data-theme="latte"] {
-    --background: #dce0e8;            /* crust */
-    --foreground: #4c4f69;            /* text */
-    --card: #eff1f5;                  /* base */
-    --card-foreground: #4c4f69;
-    --popover: #eff1f5;
-    --popover-foreground: #4c4f69;
-    --primary: #0e6269;               /* teal, deepened */
-    --primary-foreground: #eff1f5;
-    --secondary: #ccd0da;             /* surface0 */
-    --secondary-foreground: #4c4f69;
-    --muted: #ccd0da;
-    --muted-foreground: #5c5f77;      /* subtext1 */
-    --accent: #ccd0da;
-    --accent-foreground: #4c4f69;
-    --destructive: #b00d31;
-    --success: #26701a;
-    --warning: #8f5200;
-    --info: #1850c9;
-    --border: #bcc0cc;                /* surface1 */
-    --input: #bcc0cc;
-    --ring: #0e6269;
-    --scrim: color-mix(in srgb, #4c4f69 45%, transparent);
-    --edge: #acb0be;                  /* surface2: the lip under a keycap button */
-    --chart-1: #7fd3c8;
-    --chart-2: #3fb0a8;
-    --chart-3: #1f8c90;
-    --chart-4: #0e6269;
-    --chart-5: #0a4a50;
-    --radius: 0;
-    --sidebar: #e6e9ef;               /* mantle */
-    --sidebar-foreground: #4c4f69;
-    --sidebar-primary: #0e6269;
-    --sidebar-primary-foreground: #eff1f5;
-    --sidebar-accent: #ccd0da;
-    --sidebar-accent-foreground: #4c4f69;
-    --sidebar-border: #bcc0cc;
-    --sidebar-ring: #0e6269;
-}
-
-.dark[data-theme="mocha"] {
-    --background: #11111b;            /* crust */
-    --foreground: #cdd6f4;            /* text */
-    --card: #181825;                  /* mantle */
-    --card-foreground: #cdd6f4;
-    --popover: #1e1e2e;               /* base */
-    --popover-foreground: #cdd6f4;
-    --primary: #94e2d5;               /* teal */
-    --primary-foreground: #11111b;
-    --secondary: #313244;             /* surface0 */
-    --secondary-foreground: #cdd6f4;
-    --muted: #313244;
-    --muted-foreground: #a6adc8;      /* subtext0 */
-    --accent: #313244;
-    --accent-foreground: #cdd6f4;
-    --destructive: #f38ba8;
-    --success: #a6e3a1;
-    --warning: #f9e2af;
-    --info: #89b4fa;
-    --border: #313244;
-    --input: #45475a;                 /* surface1 */
-    --ring: #94e2d5;
-    --scrim: color-mix(in srgb, #11111b 75%, transparent);
-    --edge: #000000;
-    --chart-1: #94e2d5;
-    --chart-2: #74c7ba;
-    --chart-3: #56a99f;
-    --chart-4: #3b8b83;
-    --chart-5: #2a6d67;
-    --sidebar: #181825;
-    --sidebar-foreground: #cdd6f4;
-    --sidebar-primary: #94e2d5;
-    --sidebar-primary-foreground: #11111b;
-    --sidebar-accent: #313244;
-    --sidebar-accent-foreground: #cdd6f4;
-    --sidebar-border: #313244;
-    --sidebar-ring: #94e2d5;
 }
 
 @layer base {
