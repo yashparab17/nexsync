@@ -4,8 +4,9 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { APP_VERSION } from "@/lib/version";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Loader2 } from "lucide-react";
-import { Check, Moon, Plus, Sun, Trash2, Bug, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, Undo2, User, AlertTriangle } from "@/components/animate-icons";
+import { Check, Moon, Plus, Sun, Trash2, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, Undo2, User, AlertTriangle } from "@/components/animate-icons";
 
+import { readBorders, setBorders } from "@/lib/borders";
 import { Row, Segmented, SectionCard, SettingsShell } from "@/components/elements/SettingsParts";
 import CodeSchemePicker from "@/components/elements/CodeSchemePicker";
 import ThemePicker from "@/components/elements/ThemePicker";
@@ -31,17 +32,6 @@ import Loading from "@/components/Loading";
 
 const NAME_LIMIT = 40;
 
-const SECTIONS = [
-	{ id: "profile", label: "Profile", icon: User },
-	{ id: "network", label: "Network", icon: Globe },
-	{ id: "appearance", label: "Appearance", icon: Palette },
-	{ id: "editor", label: "Editor", icon: Code2 },
-	{ id: "storage", label: "Storage", icon: HardDrive },
-	{ id: "updates", label: "Updates & About", icon: DownloadCloud },
-	{ id: "diagnostics", label: "Diagnostics", icon: Bug },
-];
-const NAV = SECTIONS.map(({ id, label, icon: Icon }) => ({ id, label, icon: <Icon className="size-4 shrink-0" /> }));
-
 // Two paths are the same folder if they differ only in slashes, a trailing slash or letter case
 const samePath = (a: string, b: string) => {
 	const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
@@ -54,6 +44,7 @@ const sameList = (a: string[], b: string[]) => a.length === b.length && a.every(
 export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 	const navigate = useNavigate();
 	const { preference, setPreference } = useThemeContext();
+	const [borders, setBorders_] = useState(readBorders);
 	const logError = useErrorLog();
 	const updater = useAppUpdater();
 	const editorPrefs = useEditorPrefs();
@@ -183,8 +174,6 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 				title="Settings"
 				description="Preferences for this device. Nothing here is shared with collaborators except your name."
 				onClose={back}
-				nav={NAV}
-				navLabel="Settings sections"
 				className={onClose ? "h-[85vh]" : "h-full"}
 				footer={
 					(dirty || saving || justSaved || saveError) && (
@@ -296,6 +285,20 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 									{ value: "light", label: "Light", icon: <Sun className="size-3.5" /> },
 									{ value: "dark", label: "Dark", icon: <Moon className="size-3.5" /> },
 									{ value: "system", label: "System", icon: <Monitor className="size-3.5" /> },
+								]}
+							/>
+						</Row>
+						<Row title="Borders" hint="Off tells boxes apart by their fill. Lines that separate areas stay either way.">
+							<Segmented<"off" | "on">
+								label="Borders"
+								value={borders ? "on" : "off"}
+								onChange={(v) => {
+									setBorders(v === "on");
+									setBorders_(v === "on");
+								}}
+								options={[
+									{ value: "off", label: "Off" },
+									{ value: "on", label: "On" },
 								]}
 							/>
 						</Row>

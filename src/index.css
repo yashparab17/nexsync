@@ -352,3 +352,14 @@ button, a, select, summary, label, [role="button"] { touch-action: manipulation;
 .md-preview th { background: var(--card); font-weight: 600; }
 .md-preview img { max-width: 100%; }
 .md-preview input[type="checkbox"] { margin-right: 0.5em; pointer-events: none; }
+
+/* Borderless: boxes (cards, panels, fields, buttons, chips) are told apart by their fill. Only the lines that separate things
+   stay: the sidebar's and any single-side border (border-b, border-r, divide-y…). Dashed drop zones, status colours and focus
+   rings keep theirs. Settings → Appearance → Borders turns the lines back on (data-borders="on"). */
+:root:not([data-borders="on"]) .border:not(.border-dashed, .border-primary, .border-destructive, .border-success, .border-warning, .border-info, .border-ring, .border-foreground, [class*="border-primary/"], [class*="border-destructive/"], [class*="border-warning/"]) {
+  border-color: transparent;
+}
+:root:not([data-borders="on"]) .border:focus-visible,
+:root:not([data-borders="on"]) .border:focus-within {
+  border-color: var(--ring);
+}

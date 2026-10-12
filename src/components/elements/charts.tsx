@@ -1,8 +1,9 @@
 // Small charts drawn with plain markup, coloured from the theme tokens so they follow light and dark. Colours are written
 // out as whole class names so Tailwind finds them.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
+import { ChevronLeft, ChevronRight } from "@/components/animate-icons";
 import { cn } from "@/lib/utils";
 
 // A set of colours that stay apart on both themes, in the order series are given them
@@ -158,6 +159,57 @@ export function Heatmap({ days, label }: { days: { day: string; count: number }[
 					<span key={l} className={cn("size-3.5", l)} aria-hidden />
 				))}
 				more
+			</div>
+		</div>
+	);
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+// One month at a time, a square per day with its number and shade, paged with the arrows
+export function MonthCalendar({ days, label }: { days: { day: string; count: number }[]; label: string }) {
+	const counts = new Map(days.map((d) => [d.day, d.count]));
+	const first = days.length ? new Date(`${days[0].day}T00:00:00`) : new Date();
+	const today = new Date();
+	const [shown, setShown] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+	const y = shown.getFullYear();
+	const m = shown.getMonth();
+	const length = new Date(y, m + 1, 0).getDate();
+	const cells = [...Array(shown.getDay()).fill(null), ...Array.from({ length }, (_, i) => `${y}-${pad2(m + 1)}-${pad2(i + 1)}`)];
+	const total = cells.reduce((n, d) => n + (d ? (counts.get(d) ?? 0) : 0), 0);
+	const peak = Math.max(1, ...cells.map((d) => (d ? (counts.get(d) ?? 0) : 0)));
+	const page = (by: number) => setShown(new Date(y, m + by, 1));
+	const todayKey = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
+	const step = "flex size-8 cursor-pointer items-center justify-center text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted disabled:pointer-events-none disabled:opacity-40";
+	return (
+		<div className="mx-auto max-w-md">
+			<div className="mb-2 flex items-center gap-1">
+				<button type="button" aria-label="Previous month" className={step} onClick={() => page(-1)} disabled={new Date(y, m, 1) <= new Date(first.getFullYear(), first.getMonth(), 1)}>
+					<ChevronLeft className="size-4" />
+				</button>
+				<p className="flex-1 text-center text-sm font-medium">
+					{shown.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+					<span className="ml-2 font-mono text-[13px] font-normal text-muted-foreground">{total}</span>
+				</p>
+				<button type="button" aria-label="Next month" className={step} onClick={() => page(1)} disabled={new Date(y, m + 1, 1) > today}>
+					<ChevronRight className="size-4" />
+				</button>
+			</div>
+			<div role="img" aria-label={label} className="grid grid-cols-7 gap-1">
+				{WEEKDAYS.map((w) => (
+					<span key={w} className="pb-1 text-center font-mono text-[13px] text-muted-foreground">{w}</span>
+				))}
+				{cells.map((d, i) => {
+					const n = d ? (counts.get(d) ?? 0) : 0;
+					return d ? (
+						<span key={d} title={`${d}: ${n}`} className={cn("flex aspect-square items-start justify-between p-1 font-mono text-[13px] tabular-nums", LEVELS[n === 0 ? 0 : Math.max(1, Math.ceil((n / peak) * 4))], n > peak / 2 && n > 0 ? "text-primary-foreground" : "text-muted-foreground", d === todayKey && "outline outline-2 -outline-offset-2 outline-primary")}>
+							{i - shown.getDay() + 1}
+						</span>
+					) : (
+						<span key={`pad${i}`} />
+					);
+				})}
 			</div>
 		</div>
 	);

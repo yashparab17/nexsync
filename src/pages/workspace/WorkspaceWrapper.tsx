@@ -17,6 +17,8 @@ import HostHandoffDialog from "@/components/dialogs/workspace/HostHandoffDialog"
 import TransferTray from "@/components/layout/workspace/TransferTray";
 import HostGate from "@/components/layout/workspace/HostGate";
 import DueReminders from "@/components/layout/workspace/DueReminders";
+import ShortcutsDialog from "@/components/dialogs/workspace/ShortcutsDialog";
+import { shortcutFor } from "@/lib/shortcuts";
 
 // Shell layout for all workspace sub-routes
 export default function Workspace() {
@@ -40,6 +42,22 @@ export default function Workspace() {
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
 	}, [navOpen]);
+
+	// Workspace-wide shortcuts; the Editor and Notes handle their own keys
+	const [help, setHelp] = useState(false);
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			const action = shortcutFor(e);
+			if (!action) return;
+			e.preventDefault();
+			if (action.type === "go") navigate(action.to);
+			else if (action.type === "help") setHelp((h) => !h);
+			else if (action.type === "settings") navigate(`${pathname}?settings=1`);
+			else document.querySelector<HTMLInputElement>('input[aria-label="Search workspace"]')?.focus();
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [navigate, pathname]);
 
 	// Show loader while workspace data is being fetched
 	if (isLoading) {
@@ -87,6 +105,8 @@ export default function Workspace() {
 					</div>
 				</div>
 			</div>
+
+			{help && <ShortcutsDialog onClose={() => setHelp(false)} />}
 
 			{/* Warns about work due today or late, whichever page is open */}
 			<DueReminders />

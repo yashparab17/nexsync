@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { Moon, Radio, Sun, Trash2, AlertTriangle, Download, FolderOpen, Save, SlidersHorizontal, ShieldCheck, Undo2, User } from "@/components/animate-icons";
+import { Moon, Sun, Trash2, AlertTriangle, Download, FolderOpen, Save, SlidersHorizontal, Undo2, User } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -20,16 +20,6 @@ import { errorText } from "@/lib/utils";
 import { removeRecentWorkspace, writeWorkspaceMetadata } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
-
-const SECTIONS = [
-	{ id: "you", label: "You", icon: <User className="size-4 shrink-0" /> },
-	{ id: "workspace", label: "Workspace", icon: <FolderOpen className="size-4 shrink-0" /> },
-	{ id: "preferences", label: "Preferences", icon: <SlidersHorizontal className="size-4 shrink-0" /> },
-	{ id: "rules", label: "Rules", icon: <ShieldCheck className="size-4 shrink-0" /> },
-	{ id: "collaboration", label: "Collaboration", icon: <Radio className="size-4 shrink-0" /> },
-	{ id: "export", label: "Export", icon: <Download className="size-4 shrink-0" /> },
-	{ id: "danger", label: "Danger zone", icon: <AlertTriangle className="size-4 shrink-0" /> },
-];
 
 export default function WorkspaceSettings({ onClose }: { onClose?: () => void } = {}) {
 	const {
@@ -164,8 +154,6 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 				title="Workspace settings"
 				description={`Preferences, identity and sharing for ${workspace?.name ?? "this workspace"}.`}
 				onClose={() => (onClose ? (dirty ? setLeaving(true) : onClose()) : undefined)}
-				nav={SECTIONS}
-				navLabel="Workspace settings sections"
 				className={onClose ? "h-[85vh]" : "h-full"}
 				footer={
 					(dirty || saving || savedSuccess) && !isJoinedCopy && (

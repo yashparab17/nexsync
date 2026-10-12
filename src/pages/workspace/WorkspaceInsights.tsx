@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { History, X } from "@/components/animate-icons";
 
 import Avatar from "@/components/elements/Avatar";
-import { BarRows, DayColumns, Donut, Empty, Heatmap, SERIES, Stat, StackBar } from "@/components/elements/charts";
+import { BarRows, DayColumns, Donut, Empty, Heatmap, MonthCalendar, SERIES, Stat, StackBar } from "@/components/elements/charts";
 import { Page, PageBody, Panel } from "@/components/layout/Page";
 import Toolbar, { ToolbarTitle, ToolbarSearch, ToolbarTabs } from "@/components/layout/Toolbar";
 import {
@@ -23,6 +23,7 @@ import type { KanbanColumn, Task } from "@/types/workspace";
 
 const DAYS = 14;
 const WEEKS = 16;
+const YEAR = 366;
 const FEED_LIMIT = 100;
 
 const select = "h-8 border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -53,6 +54,7 @@ export default function WorkspaceInsights() {
 	const finished = useMemo(() => countBy(events.filter(isCompletion), authorOf), [events]);
 	const days = useMemo(() => perDay(events, DAYS), [events]);
 	const weeks = useMemo(() => perDay(events, WEEKS * 7), [events]);
+	const year = useMemo(() => perDay(events, YEAR), [events]);
 	const load = useMemo(() => workload(tasks, columns, members), [tasks, columns, members]);
 	const feed = useMemo(() => filterEvents(events, filter), [events, filter]);
 	const filtered = Object.values(filter).some(Boolean);
@@ -155,7 +157,10 @@ export default function WorkspaceInsights() {
 							)}
 						</Panel>
 
-						<Panel title="Activity calendar" hint={`The last ${WEEKS} weeks, a square per day`} className="lg:col-span-6">
+						<Panel title="Activity calendar" hint="One month at a time, use the arrows to page" className="lg:col-span-3">
+							<MonthCalendar days={year} label="Actions per day, by month" />
+						</Panel>
+						<Panel title="Last 16 weeks" hint="A square per day, darker when busier" className="lg:col-span-3">
 							<Heatmap days={weeks} label={`Actions per day over the last ${WEEKS} weeks`} />
 						</Panel>
 

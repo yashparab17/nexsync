@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { EmptyState } from "@/components/layout/Page";
-import Toolbar, { ToolbarTitle, ToolbarSearch, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarTitle, ToolbarSearch, ToolbarSelect, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
 import { Copy, Check, Play, Trash2, FileText, Film, Headphones, Image as ImageIcon, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
 import { displaySize } from "@/lib/assets/displaySize";
 import { justify } from "@/lib/assets/justify";
@@ -57,6 +57,34 @@ function getAssetCategory(fileName: string): AssetCategory {
 	return "other";
 }
 
+const SORTS = {
+	newest: "Newest first",
+	oldest: "Oldest first",
+	name: "Name A–Z",
+	"name-desc": "Name Z–A",
+	largest: "Largest first",
+	smallest: "Smallest first",
+	type: "Kind",
+};
+type SortKey = keyof typeof SORTS;
+const SIZE_BANDS = { any: "Any size", small: "Under 1 MB", medium: "1–10 MB", large: "Over 10 MB" };
+type SizeBand = keyof typeof SIZE_BANDS;
+const AGES = { any: "Any time", day: "Past day", week: "Past week", month: "Past month" };
+type Age = keyof typeof AGES;
+const MB = 1024 * 1024;
+const DAY_MS = 86_400_000;
+const AGE_MS: Record<Age, number> = { any: Infinity, day: DAY_MS, week: 7 * DAY_MS, month: 30 * DAY_MS };
+const when = (a: AssetItem) => new Date(a.modified_at).getTime() || 0;
+const COMPARE: Record<SortKey, (a: AssetItem, b: AssetItem) => number> = {
+	newest: (a, b) => when(b) - when(a),
+	oldest: (a, b) => when(a) - when(b),
+	name: (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
+	"name-desc": (a, b) => b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: "base" }),
+	largest: (a, b) => b.size - a.size,
+	smallest: (a, b) => a.size - b.size,
+	type: (a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
+};
+
 export default function WorkspaceAssets() {
 	const { workspace, refreshStats, addActivityEvent } = useWorkspace();
 	const { placeholders, downloadFileOnDemand, lastSyncedFile } = useP2P();
@@ -69,6 +97,9 @@ export default function WorkspaceAssets() {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCategory, setSelectedCategory] =
 		useState<AssetCategory>("all");
+	const [sort, setSort] = useState<SortKey>("newest");
+	const [sizeBand, setSizeBand] = useState<SizeBand>("any");
+	const [age, setAge] = useState<Age>("any");
 	// How big the tiles are drawn, and each picture's own size once it is known
 	const [tile, setTile] = useState<"s" | "m" | "l">("m");
 	const [sizes, setSizes] = useState<Record<string, { w: number; h: number }>>({});
@@ -216,15 +247,21 @@ export default function WorkspaceAssets() {
 
 	// Filtered assets
 	const filteredAssets = useMemo(() => {
-		return assets.filter((asset) => {
-			const matchesCategory =
-				selectedCategory === "all" || asset.category === selectedCategory;
-			const matchesSearch = asset.name
-				.toLowerCase()
-				.includes(searchQuery.toLowerCase());
-			return matchesCategory && matchesSearch;
-		});
-	}, [assets, selectedCategory, searchQuery]);
+		const now = Date.now();
+		return assets
+			.filter((asset) => {
+				const matchesCategory =
+					selectedCategory === "all" || asset.category === selectedCategory;
+				const matchesSearch = asset.name
+					.toLowerCase()
+					.includes(searchQuery.toLowerCase());
+				const matchesSize = sizeBand === "any" || (sizeBand === "small" ? asset.size < MB : sizeBand === "medium" ? asset.size >= MB && asset.size <= 10 * MB : asset.size > 10 * MB);
+				const matchesAge = age === "any" || now - when(asset) <= AGE_MS[age];
+				return matchesCategory && matchesSearch && matchesSize && matchesAge;
+			})
+			.sort(COMPARE[sort]);
+	}, [assets, selectedCategory, searchQuery, sizeBand, age, sort]);
+	const narrowed = sizeBand !== "any" || age !== "any";
 
 	// Category counts
 	const categoryCounts = useMemo(() => {
@@ -417,26 +454,30 @@ export default function WorkspaceAssets() {
 			<Toolbar>
 				<ToolbarTitle name="Assets" meta={assets.length || undefined} />
 				<ToolbarTabs label="Kind of asset" value={selectedCategory} onChange={setSelectedCategory} tabs={tabs as { key: AssetCategory; label: string; count: number }[]} />
-				<span className="flex-1" />
-				<ToolbarSearch label="Search assets" placeholder="Search assets" value={searchQuery} onChange={setSearchQuery} />
-				<ToolbarSwitch
-					label="Tile size"
-					value={tile}
-					onChange={setTile}
-					options={[
-						{ value: "s", label: "S", title: "Small tiles" },
-						{ value: "m", label: "M", title: "Medium tiles" },
-						{ value: "l", label: "L", title: "Large tiles" },
-					]}
-				/>
-				{!isViewer && (
-					<>
-						<Button size="sm" onPress={() => setIsUploadOpen(true)}>
-							<Upload data-icon="inline-start" className="size-4" />
-							Upload
-						</Button>
-					</>
-				)}
+				<div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+					<ToolbarSearch label="Search assets" placeholder="Search assets" value={searchQuery} onChange={setSearchQuery} />
+					<ToolbarSelect label="Size" value={sizeBand} onChange={setSizeBand} active={sizeBand !== "any"} options={Object.entries(SIZE_BANDS).map(([value, label]) => ({ value: value as SizeBand, label }))} />
+					<ToolbarSelect label="Modified" value={age} onChange={setAge} active={age !== "any"} options={Object.entries(AGES).map(([value, label]) => ({ value: value as Age, label }))} />
+					<ToolbarSelect label="Sort by" value={sort} onChange={setSort} options={Object.entries(SORTS).map(([value, label]) => ({ value: value as SortKey, label }))} />
+					<ToolbarSwitch
+						label="Tile size"
+						value={tile}
+						onChange={setTile}
+						options={[
+							{ value: "s", label: "S", title: "Small tiles" },
+							{ value: "m", label: "M", title: "Medium tiles" },
+							{ value: "l", label: "L", title: "Large tiles" },
+						]}
+					/>
+					{!isViewer && (
+						<>
+							<Button size="sm" onPress={() => setIsUploadOpen(true)}>
+								<Upload data-icon="inline-start" className="size-4" />
+								Upload
+							</Button>
+						</>
+					)}
+				</div>
 			</Toolbar>
 
 			{/* Assets */}
@@ -446,9 +487,9 @@ export default function WorkspaceAssets() {
 				) : filteredAssets.length === 0 ? (
 					<EmptyState
 						icon={<ImageIcon />}
-						title={searchQuery ? "No matching assets" : "Nothing here yet"}
+						title={searchQuery || narrowed ? "No matching assets" : "Nothing here yet"}
 						action={
-							!searchQuery && !isViewer && (
+							!searchQuery && !narrowed && !isViewer && (
 								<Button size="sm" onPress={() => setIsUploadOpen(true)}>
 									<UploadCloud data-icon="inline-start" className="size-4" />
 									Upload assets
@@ -456,7 +497,7 @@ export default function WorkspaceAssets() {
 							)
 						}
 					>
-						{searchQuery ? "Try a different search, or another kind of asset." : "Drop pictures, audio, video or documents anywhere on this page, or press Upload."}
+						{searchQuery || narrowed ? "Try a different search, a wider size or date, or another kind of asset." : "Drop pictures, audio, video or documents anywhere on this page, or press Upload."}
 					</EmptyState>
 				) : (
 					/* Mosaic: columns that each fill from the top, so tiles of different heights pack together */

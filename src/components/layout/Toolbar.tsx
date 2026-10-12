@@ -68,6 +68,25 @@ export function ToolbarSearch({ label, value, onChange, placeholder, className }
 	);
 }
 
+// A native dropdown in the toolbar's look, for sorting and for narrowing a list; `active` marks one that is narrowing it
+export function ToolbarSelect<T extends string>({ label, value, onChange, options, active }: { label: string; value: T; onChange: (value: T) => void; options: { value: T; label: string }[]; active?: boolean }) {
+	return (
+		<select
+			aria-label={label}
+			title={label}
+			value={value}
+			onChange={(e) => onChange(e.target.value as T)}
+			className={cn("h-8 cursor-pointer border bg-background px-2 text-sm outline-none focus-visible:border-ring", active ? "border-primary text-foreground" : "text-muted-foreground hover:text-foreground")}
+		>
+			{options.map((o) => (
+				<option key={o.value} value={o.value}>
+					{o.label}
+				</option>
+			))}
+		</select>
+	);
+}
+
 // A few square buttons joined together, one pressed: tile size, list or calendar, and the like
 export function ToolbarSwitch<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (value: T) => void; options: { value: T; label: ReactNode; title: string }[] }) {
 	return (

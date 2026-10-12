@@ -50,6 +50,10 @@ const COMMANDS: Hit[] = PAGES.map(([title, to]) => ({ key: `go:${to}`, kind: "Go
 const FILTERS = ["All", "Note", "Task", "Card", "Code", "File", "Asset", "Go to"] as const;
 type Filter = (typeof FILTERS)[number];
 
+// Where in an item the words must be found
+const SCOPES = [["any", "Anywhere"], ["title", "Titles"], ["body", "Contents"]] as const;
+type Scope = (typeof SCOPES)[number][0];
+
 // The last few results opened, per workspace, kept in this browser only
 const MAX_RECENT = 8;
 const recentKey = (workspaceId?: string) => `nexsync.recent:${workspaceId ?? ""}`;
@@ -82,6 +86,7 @@ export default function WorkspaceSearch() {
 	const [open, setOpen] = useState(false);
 	const [active, setActive] = useState(0);
 	const [filter, setFilter] = useState<Filter>("All");
+	const [scope, setScope] = useState<Scope>("any");
 	const [recent, setRecent] = useState<Hit[]>([]);
 	const box = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -130,7 +135,8 @@ export default function WorkspaceSearch() {
 					const inTitle = h.title.toLowerCase().includes(q);
 					const inMeta = `${h.title} ${h.sub}`.toLowerCase().includes(q);
 					const inBody = !!h.body && h.body.toLowerCase().includes(q);
-					return { hit: inMeta || !inBody ? h : { ...h, sub: snippet(h.body!, q) }, score: inTitle ? 2 : inMeta ? 1 : inBody ? 0 : -1 };
+					const score = scope === "title" ? (inTitle ? 2 : -1) : scope === "body" ? (inBody ? 0 : -1) : inTitle ? 2 : inMeta ? 1 : inBody ? 0 : -1;
+					return { hit: scope === "body" || (!inMeta && inBody) ? { ...h, sub: snippet(h.body!, q) } : h, score };
 				})
 				.filter((r) => r.score >= 0)
 				.sort((a, b) => b.score - a.score)
@@ -140,7 +146,7 @@ export default function WorkspaceSearch() {
 			? recent
 			: [];
 
-	useEffect(() => setActive(0), [query]);
+	useEffect(() => setActive(0), [query, filter, scope]);
 
 	useEffect(() => {
 		const close = (e: MouseEvent) => {
@@ -211,21 +217,17 @@ export default function WorkspaceSearch() {
 
 			{showList && (
 				<div className="absolute top-full left-0 z-40 mt-1 w-[34rem] max-w-[calc(100vw-1.5rem)] border bg-popover shadow-lg">
-					<div role="group" aria-label="Filter results" className="flex flex-wrap gap-1 border-b p-2">
-						{FILTERS.map((f) => (
-							<button
-								key={f}
-								type="button"
-								aria-pressed={filter === f}
-								onClick={() => { setFilter(f); inputRef.current?.focus(); }}
-								className={cn(
-									"border px-2 py-0.5 font-mono text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-									filter === f ? "border-primary bg-primary text-primary-foreground" : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
-								)}
-							>
-								{f}
-							</button>
-						))}
+					<div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b p-2">
+						<div role="group" aria-label="Filter results" className="flex flex-wrap gap-1">
+							{FILTERS.map((f) => (
+								<Chip key={f} on={filter === f} onClick={() => { setFilter(f); inputRef.current?.focus(); }}>{f}</Chip>
+							))}
+						</div>
+						<div role="group" aria-label="Search in" className="ml-auto flex gap-1 border-l pl-3">
+							{SCOPES.map(([key, text]) => (
+								<Chip key={key} on={scope === key} onClick={() => { setScope(key); inputRef.current?.focus(); }}>{text}</Chip>
+							))}
+						</div>
 					</div>
 					<ul id={listId} role="listbox" aria-label="Results" className="max-h-96 overflow-y-auto py-1">
 						{!q && results.length > 0 && (
@@ -273,6 +275,22 @@ export default function WorkspaceSearch() {
 				</div>
 			)}
 		</div>
+	);
+}
+
+function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+	return (
+		<button
+			type="button"
+			aria-pressed={on}
+			onClick={onClick}
+			className={cn(
+				"border px-2 py-0.5 font-mono text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+				on ? "border-primary bg-primary text-primary-foreground" : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
+			)}
+		>
+			{children}
+		</button>
 	);
 }
 
