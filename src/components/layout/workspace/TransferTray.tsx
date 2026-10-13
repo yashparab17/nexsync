@@ -14,7 +14,7 @@ export default function TransferTray() {
 				<span className="font-semibold">Downloading {transfers.length} file{transfers.length > 1 ? "s" : ""}</span>
 				{transfers.length > 1 && (
 					<Button variant="ghost" size="xs" onPress={() => cancelTransfers()}>
-						Cancel all
+						Cancel All
 					</Button>
 				)}
 			</div>

@@ -330,10 +330,10 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 						You are working on the branch <span className="font-semibold">{branch.name}</span>. {fileName} does not change until the branch is merged.
 					</span>
 					<Button size="xs" onPress={() => setBranchesOpen(true)}>
-						Review and merge
+						Review and Merge
 					</Button>
 					<Button variant="ghost" size="xs" onPress={() => openBranch(null)}>
-						Back to the file
+						Back to the File
 					</Button>
 				</div>
 			)}
@@ -353,11 +353,11 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 							if (first && viewRef.current) jumpToLine(viewRef.current.state.doc.lineAt(first.from).number);
 						}}
 					>
-						Show first
+						Show First
 					</Button>
 					{!readOnly && !repair && (
 						<Button variant="ghost" size="xs" onPress={findRepair}>
-							Suggest a fix
+							Suggest a Fix
 						</Button>
 					)}
 					<Button variant="ghost" size="xs" onPress={() => { setMergeWarning(null); setRepair(null); }}>

@@ -170,7 +170,6 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 		<>
 			<SettingsShell
 				title="Settings"
-				description="Preferences for this device. Nothing here is shared with collaborators except your name."
 				onClose={back}
 				className={onClose ? "h-[85vh]" : "h-full"}
 				footer={
@@ -199,7 +198,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						</Button>
 						<Button size="sm" onPress={() => void save()} isDisabled={!dirty || saving || noRoots}>
 							{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-							{saving ? "Saving…" : "Save changes"}
+							{saving ? "Saving…" : "Save Changes"}
 						</Button>
 					</div>
 				</div>
@@ -215,7 +214,6 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 					<SectionCard
 						id="profile"
 						title="Profile"
-						description="How collaborators see you when you join a workspace."
 						icon={<User className="size-5" />}
 					>
 						<div className="flex items-center gap-4">
@@ -242,7 +240,6 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 					<SectionCard
 						id="network"
 						title="Network"
-						description="Only needed if your network allows web traffic through a proxy and nothing else."
 						icon={<Globe className="size-5" />}
 					>
 						<div className="space-y-1">
@@ -261,7 +258,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								<div className="flex items-center justify-between gap-2 border border-warning/30 bg-warning/10 p-2 text-xs text-warning">
 									<span>Restart Nexsync to use the new proxy.</span>
 									<Button size="sm" variant="outline" onPress={() => void relaunch()}>
-										Restart now
+										Restart Now
 									</Button>
 								</div>
 							)}
@@ -271,10 +268,9 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 					<SectionCard
 						id="appearance"
 						title="Appearance"
-						description="The theme is applied at once and remembered on this device."
 						icon={<Palette className="size-5" />}
 					>
-						<Row title="Theme" hint="System follows your operating system, including when it switches at night.">
+						<Row title="Theme" hint="System follows your OS">
 							<Segmented<ThemePreference>
 								label="Theme"
 								value={preference}
@@ -294,10 +290,9 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 					<SectionCard
 						id="editor"
 						title="Editor"
-						description="How code and Markdown look in the Editor and Notes tabs. Applied at once to open files."
 						icon={<Code2 className="size-5" />}
 					>
-						<Row title="Font size" hint={`${FONT_SIZE_RANGE.min} to ${FONT_SIZE_RANGE.max} px`}>
+						<Row title="Font size">
 							<Button
 								variant="outline"
 								size="icon-xs"
@@ -320,7 +315,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								<Plus />
 							</Button>
 						</Row>
-						<Row title="Tab width" hint="How wide a tab character looks.">
+						<Row title="Tab width">
 							<Segmented
 								label="Tab width"
 								value={editorPrefs.tabSize}
@@ -328,7 +323,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								options={TAB_SIZES.map((size) => ({ value: size, label: String(size) }))}
 							/>
 						</Row>
-						<Row title="Wrap long lines" hint="Markdown always wraps.">
+						<Row title="Wrap long lines">
 							<input
 								type="checkbox"
 								aria-label="Wrap long lines"
@@ -336,7 +331,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								onChange={(e) => setEditorPrefs({ wrap: e.target.checked })}
 							/>
 						</Row>
-						<Row title="Vim keys" hint="Modal editing in the Editor and Markdown notes: h j k l, i, :w, and Space f f to find files.">
+						<Row title="Vim keys" hint="Modal editing in the Editor and Markdown notes">
 							<input
 								type="checkbox"
 								aria-label="Vim keys"
@@ -344,7 +339,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								onChange={(e) => setEditorPrefs({ vim: e.target.checked })}
 							/>
 						</Row>
-						<Row title="Relative line numbers" hint="Number lines by their distance from the cursor, which makes 5j and 12k easy to aim.">
+						<Row title="Relative line numbers" hint="Number lines by distance from the cursor">
 							<input
 								type="checkbox"
 								aria-label="Relative line numbers"
@@ -352,7 +347,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								onChange={(e) => setEditorPrefs({ relativeNumbers: e.target.checked })}
 							/>
 						</Row>
-						<Row title="Minimap" hint="A small overview of the file at the right edge of the editor.">
+						<Row title="Minimap">
 							<input
 								type="checkbox"
 								aria-label="Minimap"
@@ -378,7 +373,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 							isDisabled={JSON.stringify(editorPrefs) === JSON.stringify(DEFAULT_EDITOR_PREFS)}
 						>
 							<Undo2 />
-							Reset editor settings
+							Reset Editor Settings
 						</Button>
 					<div className="border-t pt-4">
 							<CodeSchemePicker />
@@ -388,7 +383,6 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 					<SectionCard
 						id="storage"
 						title="Storage"
-						description="Workspaces can only be created or imported inside these folders. This keeps Nexsync away from the rest of your disk."
 						icon={<HardDrive className="size-5" />}
 					>
 						{saved === null && !loadError ? (
@@ -458,13 +452,12 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 					<SectionCard
 						id="updates"
 						title="Updates & About"
-						description="Nexsync keeps your work on your own computer: no account, no cloud, and no server holding your data."
 						icon={<DownloadCloud className="size-5" />}
 					>
-						<Row title="Version" hint="Notes, tasks and code, shared directly between your devices.">
+						<Row title="Version">
 							<span className="text-sm font-semibold tabular-nums">{version ? `v${version}` : "…"}</span>
 						</Row>
-						<Row title="Update channel" hint="Stable is the tested release. Beta gets new builds sooner and may have rough edges.">
+						<Row title="Update channel" hint="Beta gets new builds sooner">
 							<Segmented
 								label="Update channel"
 								value={updater.channel}
@@ -477,7 +470,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						</Row>
 						<Row
 							title="Updates"
-							hint="Signed builds come from GitHub Releases. Nothing is checked until you ask."
+							hint="Nothing is checked until you ask"
 						>
 							{updater.status === "available" || updater.status === "installing" ? (
 								<Button size="sm" onPress={updater.installUpdate} isDisabled={updater.status === "installing"}>
@@ -500,7 +493,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 									) : (
 										<DownloadCloud className="size-3.5" />
 									)}
-									Check for updates
+									Check for Updates
 								</Button>
 							)}
 						</Row>
@@ -530,10 +523,10 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Leave without saving?" description={<>Your changes to the profile or storage folders will be lost.</>} />
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setLeaving(false)}>
-								Keep editing
+								Keep Editing
 							</Button>
 							<Button variant="destructive" onPress={close}>
-								Discard and leave
+								Discard and Leave
 							</Button>
 						</DialogFooter>
 					</div>

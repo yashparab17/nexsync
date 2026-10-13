@@ -115,7 +115,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(functi
 						<p>No terminals are open.</p>
 						<Button size="sm" onPress={() => create()}>
 							<Plus className="size-4" />
-							New terminal
+							New Terminal
 						</Button>
 					</div>
 				)}

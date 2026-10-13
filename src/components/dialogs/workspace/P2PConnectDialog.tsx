@@ -23,7 +23,6 @@ export default function P2PConnectDialog({
 }: P2PConnectDialogProps) {
 	const {
 		peers,
-		connectionStatus,
 		syncProgress,
 		createInvite,
 		createShortCode,
@@ -144,30 +143,6 @@ export default function P2PConnectDialog({
 		}
 	};
 
-	// "Online" means the internet and relay are reachable, whether or not a peer is connected
-	const statusLabel = !network.online
-		? "Offline"
-		: peers.length > 0
-		  ? hostName !== null && link === "members"
-			? `Connected to ${peers.length === 1 ? "a member" : `${peers.length} members`} (${hostName} is offline)`
-			: "Connected"
-		  : connectionStatus === "reconnecting"
-			? hostName ? `Reconnecting to ${hostName}…` : "Reconnecting"
-			: connectionStatus === "connecting"
-			  ? hostName ? `Reaching ${hostName}…` : "Connecting"
-			  : hostUnreachable
-				? `${hostName ?? "The host"} is offline`
-				: "Online";
-	const statusDot = !network.online
-		? "bg-destructive"
-		: peers.length > 0
-		  ? "bg-success animate-ping"
-		  : connectionStatus === "reconnecting" || connectionStatus === "connecting"
-			? "bg-warning animate-pulse"
-			: hostUnreachable
-			  ? "bg-destructive"
-			  : "bg-success";
-
 	const tabs = [
 		{ id: "invite" as const, label: "Invite", icon: <Users className="size-4" /> },
 		{ id: "join" as const, label: "Join", icon: <Globe className="size-4" /> },
@@ -190,12 +165,7 @@ export default function P2PConnectDialog({
 	return (
 		<Dialog isOpen={open} onOpenChange={onOpenChange} className="max-w-2xl">
 			<div className="min-w-0 space-y-5">
-				<DialogHeading icon={<Radio className="size-6" />} title="Collaborate" description="Work on this workspace together, from any network. Everything is encrypted between your devices." />
-
-				<div className="flex items-center gap-2 font-mono text-xs" role="status">
-					<span className={cn("size-2.5 shrink-0", statusDot)} aria-hidden />
-					<span className="min-w-0 truncate">{statusLabel}</span>
-				</div>
+				<DialogHeading icon={<Radio className="size-6" />} title="Collaborate" />
 
 				{network.online && hostUnreachable && peers.length === 0 &&
 					notice(
@@ -206,7 +176,7 @@ export default function P2PConnectDialog({
 							</p>
 							<Button variant="outline" size="sm" onPress={handleRetry}>
 								<RefreshCw data-icon="inline-start" className="size-3.5" />
-								Try now
+								Try Now
 							</Button>
 						</>,
 					)}
@@ -223,7 +193,7 @@ export default function P2PConnectDialog({
 							<p className="text-muted-foreground">On a college or office network a firewall may be blocking it. Try a phone hotspot or a VPN, or ask IT to allow *.relay.n0.iroh.link.</p>
 							<Button variant="outline" size="sm" onPress={handleRetry}>
 								<RefreshCw data-icon="inline-start" className="size-3.5" />
-								Retry connection
+								Retry Connection
 							</Button>
 						</>,
 					)}
@@ -340,7 +310,7 @@ export default function P2PConnectDialog({
 								<div className="flex justify-center gap-2">
 									<Button variant="secondary" onPress={() => copy(shortCode.code, "code")}>
 										{copiedKey === "code" ? <Check data-icon="inline-start" className="size-4 text-success" /> : <Copy data-icon="inline-start" className="size-4" />}
-										{copiedKey === "code" ? "Copied" : "Copy code"}
+										{copiedKey === "code" ? "Copied" : "Copy Code"}
 									</Button>
 									<Button variant="ghost" onPress={handleStopInviting}>
 										Cancel
@@ -355,7 +325,7 @@ export default function P2PConnectDialog({
 									<p className="text-sm text-muted-foreground">Send this invite to your collaborator</p>
 									<Button variant="secondary" size="sm" onPress={() => copy(invite.ticket)}>
 										{copiedKey === "copied" ? <Check data-icon="inline-start" className="size-4 text-success" /> : <Copy data-icon="inline-start" className="size-4" />}
-										{copiedKey === "copied" ? "Copied" : "Copy invite"}
+										{copiedKey === "copied" ? "Copied" : "Copy Invite"}
 									</Button>
 								</div>
 								<div className="max-h-28 overflow-y-auto border border-primary/30 bg-background px-3 py-2 font-mono text-xs leading-relaxed break-all select-all text-primary">{invite.ticket}</div>
@@ -378,7 +348,7 @@ export default function P2PConnectDialog({
 									)}
 									<span className="flex shrink-0 gap-1">
 										<Button variant="ghost" size="sm" onPress={handleGenerateInvite}>
-											New invite
+											New Invite
 										</Button>
 										<Button variant="ghost" size="sm" onPress={handleStopInviting} className="hover:text-destructive">
 											Stop
@@ -417,7 +387,7 @@ export default function P2PConnectDialog({
 						) : (
 							<Button onPress={handleJoin} isDisabled={!ticketInput.trim() || isJoining} className="w-full">
 								{isJoining ? <RefreshCw data-icon="inline-start" className="size-4 animate-spin motion-reduce:animate-none" /> : <Globe data-icon="inline-start" className="size-4" />}
-								{isJoining ? "Connecting…" : "Join workspace"}
+								{isJoining ? "Connecting…" : "Join Workspace"}
 							</Button>
 						)}
 					</div>
@@ -433,11 +403,11 @@ export default function P2PConnectDialog({
 								<p className="text-sm text-muted-foreground">Invite someone, or join a workspace with an invite you were sent.</p>
 								<div className="mt-2 flex gap-2">
 									<Button size="sm" onPress={() => setActiveTab("invite")}>
-										Invite someone
+										Invite Someone
 									</Button>
 									<Button variant="outline" size="sm" onPress={handleRetry}>
 										<RefreshCw data-icon="inline-start" className="size-3.5" />
-										Reconnect to host
+										Reconnect to Host
 									</Button>
 								</div>
 							</div>
@@ -447,7 +417,7 @@ export default function P2PConnectDialog({
 									<div className="flex justify-end">
 										<Button size="sm" variant="outline" onPress={() => requestWorkspaceSnapshot()} isDisabled={syncProgress !== null}>
 											<RefreshCw data-icon="inline-start" className="size-3.5" />
-											Refresh from host
+											Refresh from Host
 										</Button>
 									</div>
 								)}

@@ -490,7 +490,7 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 
 	return (
 		<div {...dropProps} className="relative flex h-full min-h-0 flex-col bg-background">
-			<DropOverlay show={dragging} title={currentDir ? `Drop to add to ${currentDir}` : "Drop into a folder"} hint={currentDir ? undefined : "Open a folder first; the top level holds only folders."} />
+			<DropOverlay show={dragging} title={currentDir ? `Drop to add to ${currentDir}` : "Drop into a folder"} hint={currentDir ? undefined : "Open a folder first"} />
 			{notice.node}
 			{/* Toolbar */}
 			<Toolbar>
@@ -533,11 +533,11 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 					<>
 						<Button variant="outline" size="sm" onPress={() => openCreateDialog("folder")}>
 							<FolderPlus data-icon="inline-start" className="size-4" />
-							New folder
+							New Folder
 						</Button>
 						<Button size="sm" onPress={() => openCreateDialog("file")}>
 							<FilePlus data-icon="inline-start" className="size-4" />
-							New file
+							New File
 						</Button>
 					</>
 				)}
@@ -557,11 +557,11 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 									<div className="flex gap-2">
 										<Button size="sm" onPress={() => openCreateDialog("file")}>
 											<FilePlus data-icon="inline-start" className="size-4" />
-											New file
+											New File
 										</Button>
 										<Button size="sm" variant="outline" onPress={() => openCreateDialog("folder")}>
 											<FolderPlus data-icon="inline-start" className="size-4" />
-											New folder
+											New Folder
 										</Button>
 									</div>
 								)

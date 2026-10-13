@@ -69,7 +69,7 @@ export default function ConflictPanel({ conflicts, violations = [], show, canCho
 										</span>
 										{canChoose && (
 											<Button type="button" size="sm" variant={i === 0 ? "default" : "outline"} onPress={() => onChoose(c.field, o.value)}>
-												Keep this
+												Keep This
 											</Button>
 										)}
 									</li>

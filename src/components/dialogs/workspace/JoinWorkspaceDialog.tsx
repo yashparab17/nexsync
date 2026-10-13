@@ -134,7 +134,7 @@ export default function JoinWorkspaceDialog({
 			{children}
 
 			<Dialog className="sm:max-w-xl">
-				<DialogHeading icon={<UsersRound className="size-6" />} title="Join with a ticket" description="Paste the invite or 6-digit code a teammate sent you. You get your own copy of their workspace, and it stays in sync." />
+				<DialogHeading icon={<UsersRound className="size-6" />} title="Join with a ticket" />
 
 				<p className="flex items-center gap-2 text-sm text-muted-foreground">
 					<Lock className="size-4 shrink-0 text-primary" />

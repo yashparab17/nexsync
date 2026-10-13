@@ -48,7 +48,7 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 			.join("\n\n");
 
 	return (
-		<SectionCard id="diagnostics" title="Error log" icon={<Bug className="size-5" />} description={<>Recent errors recorded on this device. Nothing is sent anywhere; copy it when reporting a bug.</>}>
+		<SectionCard id="diagnostics" title="Error log" icon={<Bug className="size-5" />}>
 				<div className="flex flex-wrap gap-2">
 					<Button variant="outline" size="sm" onPress={refresh} className="gap-1.5">
 						<RefreshCw className="size-3.5" />
@@ -66,7 +66,7 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 					</Button>
 					<Button variant="outline" size="sm" onPress={copyDiagnostics} className="gap-1.5">
 						{copiedKey === "diagnostics" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-						{copiedKey === "diagnostics" ? "Copied" : "Copy diagnostics"}
+						{copiedKey === "diagnostics" ? "Copied" : "Copy Diagnostics"}
 					</Button>
 					<Button
 						variant="outline"

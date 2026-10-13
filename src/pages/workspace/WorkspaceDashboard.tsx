@@ -89,7 +89,7 @@ export default function WorkspaceDashboard() {
 
 			{/* A bento grid: tile size follows importance, with where to continue largest */}
 			<PageBody className="grid content-start gap-3 md:grid-cols-6 xl:grid-cols-12">
-				<Panel title="Pick up where you left off" hint={recent.length ? `${Math.min(recent.length, 6)} recent` : undefined} flush={recent.length > 0} className="md:col-span-6 xl:col-span-5 xl:row-span-2">
+				<Panel title="Pick up where you left off" flush={recent.length > 0} className="md:col-span-6 xl:col-span-5 xl:row-span-2">
 					{recent.length === 0 ? (
 						<p className="text-sm text-muted-foreground">Files you open show up here, so you can jump back in.</p>
 					) : (
@@ -176,7 +176,7 @@ export default function WorkspaceDashboard() {
 					</ul>
 				</Panel>
 
-				<Panel title="Activity" hint="The latest changes" flush={activity.length > 0} className="md:col-span-6 xl:col-span-8">
+				<Panel title="Activity" flush={activity.length > 0} className="md:col-span-6 xl:col-span-8">
 					{activity.length === 0 ? (
 						<p className="text-sm text-muted-foreground">Nothing has changed yet. Create a note, file or task to get started.</p>
 					) : (

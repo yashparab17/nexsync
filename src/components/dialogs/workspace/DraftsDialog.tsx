@@ -148,8 +148,7 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 	return (
 		<Dialog isOpen onOpenChange={(isOpen) => !isOpen && onClose()} className="sm:max-w-2xl">
 			<div className="flex max-h-[75vh] min-h-0 flex-col gap-4 overflow-y-auto">
-				<DialogHeading icon={<FilePen className="size-6" />} title={`Drafts of "${record.title}"`} description={<>A draft is a private copy to change without touching the real {entity}. When it is ready, review what merging it would do, then merge it. Anything somebody else changed in the meantime is kept,
-						and a field you both changed is left for you to choose.</>} />
+				<DialogHeading icon={<FilePen className="size-6" />} title={`Drafts of "${record.title}"`} />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
@@ -168,7 +167,7 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 						>
 							<Input aria-label="Draft name" placeholder="Name the draft, for example Reword for the client" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
 							<Button type="submit" isDisabled={busy || !name.trim()}>
-								Start a draft
+								Start a Draft
 							</Button>
 						</form>
 						{drafts.length === 0 ? (
@@ -229,7 +228,7 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 						)}
 						<div className="flex flex-wrap justify-between gap-2">
 							<Button variant="ghost" isDisabled={busy} onPress={() => setPreview(null)}>
-								Back to editing
+								Back to Editing
 							</Button>
 							{!preview.deleted && (
 								<Button isDisabled={busy} onPress={() => void merge()} className="gap-1.5">
@@ -303,14 +302,14 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 									setForm(null);
 								}}
 							>
-								All drafts
+								All Drafts
 							</Button>
 							<div className="flex gap-2">
 								<Button type="button" variant="outline" isDisabled={busy} onPress={() => void save()}>
-									Save draft
+									Save Draft
 								</Button>
 								<Button type="submit" isDisabled={busy || !form.title.trim()}>
-									Review and merge
+									Review and Merge
 								</Button>
 							</div>
 						</div>

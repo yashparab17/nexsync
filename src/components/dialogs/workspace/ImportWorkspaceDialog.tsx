@@ -73,7 +73,7 @@ export default function ImportWorkspaceDialog({
 			{children}
 
 			<Dialog className="sm:max-w-xl">
-				<DialogHeading icon={<FolderUp className="size-6" />} title="Import a folder" description="Open a Nexsync workspace that is already on this computer, for example one you copied from another device." />
+				<DialogHeading icon={<FolderUp className="size-6" />} title="Import a folder" />
 
 				<div className="flex flex-col gap-2">
 					<Label htmlFor="workspace-path">Workspace folder</Label>
@@ -91,7 +91,7 @@ export default function ImportWorkspaceDialog({
 					<Button variant="outline" slot="close">Cancel</Button>
 					<Button onPress={handleImportWorkspace} isDisabled={!workspacePath}>
 						<FolderUp className="size-4" />
-						Import workspace
+						Import Workspace
 					</Button>
 				</DialogFooter>
 			</Dialog>

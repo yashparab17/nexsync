@@ -180,10 +180,10 @@ function DialogDescription({
 
 // The top of a dialog: an icon tile, the title and one line saying what the dialog does. `danger` marks deleting and
 // removing, `warning` marks losing work or running something.
-function DialogHeading({ icon, title, description, tone = "default" }: { icon: React.ReactNode; title: string; description: React.ReactNode; tone?: "default" | "warning" | "danger" }) {
+function DialogHeading({ icon, title, description, tone = "default" }: { icon: React.ReactNode; title: string; description?: React.ReactNode; tone?: "default" | "warning" | "danger" }) {
 	return (
 		<DialogHeader>
-			<div className="flex items-start gap-4">
+			<div className={cn("flex gap-4", description ? "items-start" : "items-center")}>
 				<span
 					className={cn(
 						"flex size-11 shrink-0 items-center justify-center",
@@ -194,7 +194,7 @@ function DialogHeading({ icon, title, description, tone = "default" }: { icon: R
 				</span>
 				<div className="min-w-0">
 					<DialogTitle>{title}</DialogTitle>
-					<DialogDescription className="mt-1.5">{description}</DialogDescription>
+					{description && <DialogDescription className="mt-1.5">{description}</DialogDescription>}
 				</div>
 			</div>
 		</DialogHeader>

@@ -95,10 +95,10 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 						You are trying out <span className="font-semibold">{board.name}</span>. Moves here are private until you merge them. Cards can be moved; to edit or add cards, go back to the board.
 					</span>
 					<Button size="xs" onPress={() => void review()} isDisabled={busy}>
-						Review and merge
+						Review and Merge
 					</Button>
 					<Button variant="ghost" size="xs" onPress={() => onBoard(null)}>
-						Back to the board
+						Back to the Board
 					</Button>
 					<Button variant="ghost" size="xs" onPress={() => void discard(board)} isDisabled={busy}>
 						Discard
@@ -107,7 +107,7 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 			) : (
 				<Button variant="outline" size="sm" onPress={() => setChoosing(true)} className="gap-1.5">
 					<GitBranch className="size-4" />
-					Try a reorganisation
+					Try a Reorganisation
 				</Button>
 			)}
 
@@ -202,10 +202,10 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 						)}
 						<div className="flex justify-end gap-2">
 							<Button variant="ghost" onPress={() => setReviewing(null)}>
-								Keep working
+								Keep Working
 							</Button>
 							<Button onPress={() => void merge()} isDisabled={busy || reviewing.cards.length === 0}>
-								Merge into the board
+								Merge into the Board
 							</Button>
 						</div>
 					</div>

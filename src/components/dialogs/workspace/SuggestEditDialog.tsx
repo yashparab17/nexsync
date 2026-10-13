@@ -36,8 +36,7 @@ export default function SuggestEditDialog({ doc, userName, from, to, onClose }: 
 	return (
 		<Dialog isOpen onOpenChange={(open) => !open && onClose()} className="sm:max-w-lg">
 			<div className="flex flex-col gap-4">
-				<DialogHeading icon={<Pencil className="size-6" />} title="Suggest an edit" description={<>{from === to ? "Write what should be added here." : "Change what is below to what you want it to say."} The text is not changed. The others see your suggestion in the file and can accept or
-						reject it.</>} />
+				<DialogHeading icon={<Pencil className="size-6" />} title="Suggest an edit" />
 				{original && <pre className="max-h-32 overflow-auto border bg-muted/40 p-2 text-xs whitespace-pre-wrap">{original}</pre>}
 				<div className="space-y-1">
 					<Label htmlFor="suggested-text">{from === to ? "Add" : "Replace with"}</Label>

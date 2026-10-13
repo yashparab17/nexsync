@@ -37,7 +37,7 @@ export default function HostHandoffDialog() {
 						Decline
 					</Button>
 					<Button isDisabled={busy} onPress={accept}>
-						{busy ? "Taking over…" : "Become Host"}
+						{busy ? "Taking Over…" : "Become Host"}
 					</Button>
 				</DialogFooter>
 			</div>

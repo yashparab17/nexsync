@@ -73,12 +73,11 @@ export default function WorkspaceTrash() {
 		<Page>
 			<Toolbar>
 				<ToolbarTitle name="Trash" meta={items.length ? `${items.length} ${items.length === 1 ? "item" : "items"}` : undefined} />
-				<span className="ml-1 hidden min-w-0 flex-1 truncate border-l pl-3 text-sm text-muted-foreground md:block">Deleted files and folders, including ones removed by collaborators</span>
-				<span className="flex-1 md:hidden" />
+				<span className="flex-1" />
 				{!isViewer && items.length > 0 && (
 					<Button variant="outline" size="sm" onPress={() => setConfirm("all")}>
 						<Trash2 className="size-4" />
-						Empty trash
+						Empty Trash
 					</Button>
 				)}
 			</Toolbar>

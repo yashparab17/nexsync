@@ -109,7 +109,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 							) : (
 								<Button size="sm" variant="outline" isDisabled={busy || e.state === "reverted"} onPress={() => void revertHunkOf(e, index)} className="h-6 gap-1.5 px-2 text-xs">
 									<Undo2 className="size-3" />
-									Undo this change
+									Undo This Change
 								</Button>
 							)}
 						</div>
@@ -123,8 +123,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 	return (
 		<Dialog isOpen onOpenChange={(open) => !open && onClose()} className="sm:max-w-3xl">
 			<div className="flex max-h-[75vh] min-h-0 flex-col gap-4">
-				<DialogHeading icon={<History className="size-6" />} title="Catch up" description={<>What other people changed, by who did it. Merging never loses anything, but it does not ask you either, so this is where you check it. Undoing a change is a new edit that reaches
-						everyone like any other.</>} />
+				<DialogHeading icon={<History className="size-6" />} title="Catch up" />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
@@ -162,7 +161,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 										</h3>
 										<Button size="sm" variant="ghost" isDisabled={busy} onPress={() => void markReviewed(group.entries)} className="gap-1.5">
 											<Check className="size-3.5" />
-											Mark reviewed
+											Mark Reviewed
 										</Button>
 									</div>
 									<ul className="divide-y divide-border/60">
@@ -205,7 +204,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 				<div className="flex justify-end gap-2">
 					{entries.length > 0 && (
 						<Button variant="outline" isDisabled={busy} onPress={() => void markReviewed(entries)}>
-							Mark all reviewed
+							Mark All Reviewed
 						</Button>
 					)}
 					<Button onPress={onClose}>Close</Button>

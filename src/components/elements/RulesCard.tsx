@@ -38,8 +38,7 @@ export default function RulesCard({ workspacePath }: { workspacePath: string }) 
 	};
 
 	return (
-		<SectionCard id="rules" title="Rules for tasks and cards" icon={<ShieldCheck className="size-5" />} description={<>Two people can each make a correct edit at the same time and still leave a task that breaks a rule, such as a finished task with nobody assigned. With a rule on, that task is flagged until
-					someone fixes it. {guest ? "The host of this workspace chooses these, and they apply to everyone." : "These apply to everyone in the workspace, and are sent to them whenever you change them."}</>}>
+		<SectionCard id="rules" title="Rules for tasks and cards" icon={<ShieldCheck className="size-5" />}>
 				{error && (
 					<p role="alert" className="text-xs text-destructive">
 						{error}

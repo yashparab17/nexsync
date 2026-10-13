@@ -200,20 +200,20 @@ export default function Welcome() {
 							<CreateWorkspaceDialog>
 								<Button className={tile}>
 									<FolderPlus className="size-6 shrink-0" />
-									<span><span className="block font-semibold">Create a workspace</span><span className="block text-sm font-normal opacity-80">A new folder on this computer</span></span>
+									<span><span className="block font-semibold">Create a Workspace</span><span className="block text-sm font-normal opacity-80">A new folder on this computer</span></span>
 								</Button>
 							</CreateWorkspaceDialog>
 							<JoinWorkspaceDialog>
 								<Button variant="outline" className={tile}>
 									<UsersRound className="size-6 shrink-0" />
-									<span><span className="block font-semibold">Join with a ticket</span><span className="block text-sm font-normal text-muted-foreground">Paste what a teammate sent you</span></span>
+									<span><span className="block font-semibold">Join with a Ticket</span><span className="block text-sm font-normal text-muted-foreground">Paste what a teammate sent you</span></span>
 								</Button>
 							</JoinWorkspaceDialog>
 							<ImportWorkspaceDialog>
 								<Button variant="outline" className={tile}>
 									<AnimateIcon animateOnHover className="flex items-center gap-4">
 										<FolderClose className="size-6 shrink-0" />
-										<span><span className="block font-semibold">Import a folder</span><span className="block text-sm font-normal text-muted-foreground">Use files you already have</span></span>
+										<span><span className="block font-semibold">Import a Folder</span><span className="block text-sm font-normal text-muted-foreground">Use files you already have</span></span>
 									</AnimateIcon>
 								</Button>
 							</ImportWorkspaceDialog>

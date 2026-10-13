@@ -84,12 +84,6 @@ export default function AssetUploadDialog({ workspacePath, isOpen, onClose, onUp
 				<DialogHeading
 					icon={<UploadCloud className="size-6" />}
 					title="Upload assets"
-					description={
-						<>
-							Add pictures, audio, video or documents to the workspace{" "}
-							<code className="bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">assets/</code> folder.
-						</>
-					}
 				/>
 
 				{/* Drop zone */}
@@ -117,7 +111,7 @@ export default function AssetUploadDialog({ workspacePath, isOpen, onClose, onUp
 					<FileUp className="size-7 text-primary" />
 					<p className="text-sm font-medium">Drop files here, or</p>
 					<Button variant="outline" size="sm" onPress={() => fileInputRef.current?.click()}>
-						Choose files
+						Choose Files
 					</Button>
 				</div>
 

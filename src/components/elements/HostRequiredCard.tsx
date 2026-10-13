@@ -26,7 +26,7 @@ export default function HostRequiredCard() {
 	};
 
 	return (
-		<SectionCard id="collaboration" title="Host availability" icon={<Radio className="size-5" />} description={<>Choose whether people who joined this workspace can use it while its host is offline. {guest ? "The host and Admins choose this." : "Admins can change this too."}</>}>
+		<SectionCard id="collaboration" title="Host availability" icon={<Radio className="size-5" />}>
 				{error && (
 					<p role="alert" className="text-xs text-destructive">
 						{error}

@@ -452,7 +452,7 @@ export default function WorkspaceNotes() {
 
 	return (
 		<div {...dropProps} className="relative flex h-full min-h-0 bg-background">
-			<DropOverlay show={dragging} title="Drop to add to notes" hint="Markdown and text files" />
+			<DropOverlay show={dragging} title="Drop to add to notes" />
 			{dropNotice.node}
 			{/* Notes list */}
 			{listOpen && (
@@ -625,7 +625,7 @@ export default function WorkspaceNotes() {
 						}}
 						className="space-y-4"
 					>
-						<DialogHeading icon={<Plus className="size-6" />} title="New note" description={<>A rich-text note with headings and lists. For a Markdown file, make it in the Editor.</>} />
+						<DialogHeading icon={<Plus className="size-6" />} title="New note" />
 						<Input aria-label="Note title" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Architecture overview, Meeting notes" aria-invalid={!!validateFileName(newTitle)} autoFocus />
 						{validateFileName(newTitle) && <p role="alert" className="text-xs text-destructive">{validateFileName(newTitle)}</p>}
 						<DialogFooter className="mt-2">
@@ -633,7 +633,7 @@ export default function WorkspaceNotes() {
 								Cancel
 							</Button>
 							<Button type="submit" isDisabled={submitting || !newTitle.trim() || !!validateFileName(newTitle)}>
-								{submitting ? "Creating…" : "Create note"}
+								{submitting ? "Creating…" : "Create Note"}
 							</Button>
 						</DialogFooter>
 					</form>

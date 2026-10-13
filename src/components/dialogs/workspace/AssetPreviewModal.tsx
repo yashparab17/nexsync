@@ -310,7 +310,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 											<p className="text-sm text-muted-foreground">This kind of file cannot be previewed here.</p>
 											<Button variant="outline" size="sm" onPress={exportFile}>
 												<Download data-icon="inline-start" className="size-4" />
-												Export file
+												Export File
 											</Button>
 										</div>
 									)}
@@ -320,7 +320,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 						{canZoom && (
 							<Button variant="outline" size="sm" onPress={() => setFit((f) => !f)} aria-pressed={!fit} className="absolute right-3 bottom-3 bg-background">
 								{fit ? <Maximize2 data-icon="inline-start" className="size-4" /> : <Minimize2 data-icon="inline-start" className="size-4" />}
-								{fit ? "Actual size" : "Fit to window"}
+								{fit ? "Actual Size" : "Fit to Window"}
 							</Button>
 						)}
 					</div>

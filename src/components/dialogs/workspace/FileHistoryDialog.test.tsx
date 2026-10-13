@@ -55,7 +55,7 @@ describe("FileHistoryDialog", () => {
 	it("compares a version with the one before it", async () => {
 		open();
 		await screen.findByText("four");
-		fireEvent.click(screen.getByRole("button", { name: "Changes in this version" }));
+		fireEvent.click(screen.getByRole("button", { name: "Changes in This Version" }));
 		await waitFor(() => expect(screen.getByText("-1")).toBeTruthy());
 		expect(screen.getByText("+1")).toBeTruthy();
 	});

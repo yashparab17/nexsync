@@ -250,8 +250,7 @@ export default function WorkspaceMembers() {
 		<Page>
 			<Toolbar>
 				<ToolbarTitle name="Members" meta={members.length || undefined} />
-				<span className="ml-1 hidden min-w-0 flex-1 truncate border-l pl-3 text-sm text-muted-foreground md:block">Who is here, who is online, and what each role can do</span>
-				<span className="flex-1 md:hidden" />
+				<span className="flex-1" />
 				<Button variant="outline" size="sm" onPress={() => setIsInviteOpen(true)}>
 					<KeyRound className="size-4 text-info" />
 					Sharing & Invites
@@ -267,13 +266,13 @@ export default function WorkspaceMembers() {
 					}}
 				>
 					<UserPlus className="size-4" />
-					Add member
+					Add Member
 				</Button>
 			</Toolbar>
 
 			{/* Members Grid & Roles Overview */}
 			<PageBody className="grid content-start grid-cols-1 gap-3 lg:grid-cols-3">
-				<Panel title="People" hint="Grouped by role. Offline people are dimmed." className="lg:col-span-2">
+				<Panel title="People" className="lg:col-span-2">
 					<div className="space-y-3">
 							{isJoinedCopy && (
 								<p className="text-xs text-muted-foreground">
@@ -425,7 +424,7 @@ export default function WorkspaceMembers() {
 					</div>
 				</Panel>
 
-				<Panel title="Roles" hint="What each role can do here" className="self-start">
+				<Panel title="Roles" className="self-start">
 					<div className="space-y-4 text-sm">
 							<div className="border-l-2 border-border py-1 pl-4">
 								<div className="flex items-center gap-1.5 font-semibold text-warning">
@@ -485,7 +484,7 @@ export default function WorkspaceMembers() {
 					className="max-w-md"
 				>
 					<form onSubmit={handleAddMemberSubmit} className="space-y-4">
-						<DialogHeading icon={<Plus className="size-6" />} title="Add member" description={<>Add a collaborator to this workspace.</>} />
+						<DialogHeading icon={<Plus className="size-6" />} title="Add member" />
 
 						<div className="space-y-3">
 							<div>
@@ -530,7 +529,7 @@ export default function WorkspaceMembers() {
 								type="submit"
 								isDisabled={submitting || !newMemberName.trim()}
 							>
-								{submitting ? "Adding…" : "Add member"}
+								{submitting ? "Adding…" : "Add Member"}
 							</Button>
 						</DialogFooter>
 					</form>
@@ -545,11 +544,7 @@ export default function WorkspaceMembers() {
 					className="max-w-md"
 				>
 					<form onSubmit={handleEditRoleSubmit} className="space-y-4">
-						<DialogHeading icon={<Pencil className="size-6" />} title="Edit member" description={<>Update the name and permissions for{" "}
-								<span className="font-semibold text-foreground">
-									{editingMember.name}
-								</span>
-								.</>} />
+						<DialogHeading icon={<Pencil className="size-6" />} title="Edit member" />
 
 						{!isJoinedCopy && (
 						<div>
@@ -616,7 +611,7 @@ export default function WorkspaceMembers() {
 						}}
 						className="space-y-4"
 					>
-						<DialogHeading icon={<Pencil className="size-6" />} title="Change my name here" description={<>This is the name others see in this workspace. It does not change the name you use elsewhere, and nobody else here can have the same one.</>} />
+						<DialogHeading icon={<Pencil className="size-6" />} title="Change my name here" />
 						<div>
 							<Label htmlFor="my-workspace-name">Name in this workspace</Label>
 							<Input
@@ -656,7 +651,7 @@ export default function WorkspaceMembers() {
 					Cancel
 				</Button>
 				<Button isDisabled={handoffBusy} onPress={handleTransferHost}>
-					{handoffBusy ? "Waiting for them…" : "Transfer Host"}
+					{handoffBusy ? "Waiting for Them…" : "Transfer Host"}
 				</Button>
 			</DialogFooter>
 		</div>

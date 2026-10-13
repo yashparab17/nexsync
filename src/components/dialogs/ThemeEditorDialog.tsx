@@ -77,7 +77,7 @@ export default function ThemeEditorDialog({ mode, initial, onClose }: { mode: Th
 	return (
 		<Dialog isOpen onOpenChange={(o) => !o && onClose()} className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
 			<div className="space-y-4">
-				<DialogHeading icon={<Palette className="size-6" />} title={initial ? "Edit theme" : "New theme"} description={<>A {mode} theme. Change any colour; the rest of the app follows from them.</>} />
+				<DialogHeading icon={<Palette className="size-6" />} title={initial ? "Edit theme" : "New theme"} />
 
 				<div className="grid gap-3 sm:grid-cols-2">
 					<div>
@@ -168,7 +168,7 @@ export default function ThemeEditorDialog({ mode, initial, onClose }: { mode: Th
 						Cancel
 					</Button>
 					<Button isDisabled={!canSave} onPress={save}>
-						Save theme
+						Save Theme
 					</Button>
 				</DialogFooter>
 			</div>

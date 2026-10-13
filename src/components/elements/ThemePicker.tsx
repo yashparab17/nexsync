@@ -25,7 +25,7 @@ function Group({ mode, label }: { mode: ThemeMode; label: string }) {
 				</p>
 				<Button variant="outline" size="sm" onPress={() => setEditing({})}>
 					<Plus className="size-4" />
-					New theme
+					New Theme
 				</Button>
 			</div>
 			<div className="grid gap-2 sm:grid-cols-2">

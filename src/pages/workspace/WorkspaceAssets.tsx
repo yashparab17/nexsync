@@ -450,7 +450,7 @@ export default function WorkspaceAssets() {
 
 	return (
 		<div {...dropProps} className="relative flex h-full min-h-0 flex-col bg-background">
-			<DropOverlay show={dragging} title="Drop to add to assets" hint="Pictures keep their original size. Use Upload to save them smaller." />
+			<DropOverlay show={dragging} title="Drop to add to assets" />
 			{notice.node}
 
 			{/* Toolbar */}
@@ -509,7 +509,7 @@ export default function WorkspaceAssets() {
 							!searchQuery && !narrowed && !isViewer && (
 								<Button size="sm" onPress={() => setIsUploadOpen(true)}>
 									<UploadCloud data-icon="inline-start" className="size-4" />
-									Upload assets
+									Upload Assets
 								</Button>
 							)
 						}
@@ -680,10 +680,7 @@ export default function WorkspaceAssets() {
 					className="max-w-sm p-5 bg-card border-border"
 				>
 					<div className="space-y-4">
-						<DialogHeading icon={<Pencil className="size-6" />} title="Rename asset" description={<>Provide a new name for{" "}
-								<span className="font-semibold text-foreground">
-									{assetToRename.name}
-								</span></>} />
+						<DialogHeading icon={<Pencil className="size-6" />} title="Rename asset" />
 
 						<div className="space-y-2">
 							<Label htmlFor="rename-input">New name</Label>

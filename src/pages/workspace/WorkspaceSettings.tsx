@@ -152,7 +152,6 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 		<>
 			<SettingsShell
 				title="Workspace settings"
-				description={`Preferences, identity and sharing for ${workspace?.name ?? "this workspace"}.`}
 				onClose={() => (onClose ? (dirty ? setLeaving(true) : onClose()) : undefined)}
 				className={onClose ? "h-[85vh]" : "h-full"}
 				footer={
@@ -168,7 +167,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 							</Button>
 							<Button size="sm" isDisabled={saving || !dirty || !name.trim()} onPress={() => void handleSaveSettings()}>
 								{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-								{saving ? "Saving…" : "Save changes"}
+								{saving ? "Saving…" : "Save Changes"}
 							</Button>
 						</div>
 					</div>
@@ -179,7 +178,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					<p className="border p-3 text-xs text-muted-foreground">You joined this workspace, so its host manages these settings.</p>
 				)}
 
-				<SectionCard id="you" title="You" description="How collaborators see you in this workspace." icon={<User className="size-5" />}>
+				<SectionCard id="you" title="You" icon={<User className="size-5" />}>
 					<div className="flex items-center gap-4">
 						<Avatar name={myName} className="size-12 text-lg" />
 						<div className="min-w-0 flex-1">
@@ -191,7 +190,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					</div>
 				</SectionCard>
 
-				<SectionCard id="workspace" title="Workspace" description="Basic details about this workspace, saved on your computer." icon={<FolderOpen className="size-5" />}>
+				<SectionCard id="workspace" title="Workspace" icon={<FolderOpen className="size-5" />}>
 					<div>
 						<Label htmlFor="ws-name">Workspace name</Label>
 						<Input id="ws-name" required value={name} disabled={isJoinedCopy} onChange={(e) => setName(e.target.value)} className="mt-1" />
@@ -207,14 +206,14 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					</div>
 				</SectionCard>
 
-				<SectionCard id="preferences" title="Preferences" description="Autosave, live sharing and the color scheme of this workspace." icon={<SlidersHorizontal className="size-5" />}>
-					<Row title="Autosave files" hint="Save your changes to files automatically.">
+				<SectionCard id="preferences" title="Preferences" icon={<SlidersHorizontal className="size-5" />}>
+					<Row title="Autosave files">
 						<input type="checkbox" aria-label="Autosave files" checked={autosave} disabled={isJoinedCopy} onChange={(e) => setAutosave(e.target.checked)} />
 					</Row>
-					<Row title="Share changes live" hint="Let collaborators connect and see each other's changes as they happen.">
+					<Row title="Share changes live" hint="Let collaborators connect and see changes live">
 						<input type="checkbox" aria-label="Share changes live" checked={sync} disabled={isJoinedCopy} onChange={(e) => setSync(e.target.checked)} />
 					</Row>
-					<Row title="Workspace theme" hint="Color scheme preference for this workspace.">
+					<Row title="Workspace theme">
 						<Segmented
 							label="Workspace theme"
 							value={theme}
@@ -234,7 +233,6 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 				<SectionCard
 					id="export"
 					title="Export"
-					description="Save a copy of the workspace files as one zip: notes, files, assets and code, in their folders. Tasks and the Kanban board are not part of the zip."
 					icon={<Download className="size-5" />}
 				>
 					<div className="flex flex-wrap items-center gap-3">
@@ -256,7 +254,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 							}}
 						>
 							{exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-							Export workspace as zip
+							Export Workspace as Zip
 						</Button>
 						{exportResult && (
 							<span role={exportResult.ok ? "status" : "alert"} className={`text-xs ${exportResult.ok ? "text-success" : "text-destructive"}`}>
@@ -269,12 +267,11 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 				<SectionCard
 					id="danger"
 					title="Danger zone"
-					description="Leave, remove or delete this workspace."
 					icon={<AlertTriangle className="size-5" />}
 					className="border-destructive/30"
 					titleClassName="text-destructive"
 				>
-					<Row title="Remove from recent workspaces" hint="Takes the workspace off your quick access list. Your files on disk are not deleted.">
+					<Row title="Remove from recent workspaces" hint="Your files on disk are not deleted">
 						<Button variant="destructive" size="sm" onPress={() => setIsRemoveConfirmOpen(true)}>
 							<Trash2 className="size-3.5" />
 							Remove
@@ -282,14 +279,14 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					</Row>
 					<div className="border-t pt-4">
 						{isJoinedCopy ? (
-							<Row title="Leave workspace" hint="Disconnect from the host and remove this workspace from the app. You can keep your copy of the files or move it to the recycle bin.">
+							<Row title="Leave workspace" hint="Disconnect from the host and remove it from the app">
 								<Button variant="destructive" size="sm" onPress={() => setIsLeaveOpen(true)}>
 									<Trash2 className="size-3.5" />
 									Leave
 								</Button>
 							</Row>
 						) : (
-							<Row title="Delete workspace" hint="Move this workspace to the recycle bin. Collaborators keep their own copies.">
+							<Row title="Delete workspace" hint="Moves it to the recycle bin. Collaborators keep their copies">
 								<Button variant="destructive" size="sm" onPress={() => setIsDeleteOpen(true)}>
 									<Trash2 className="size-3.5" />
 									Delete
@@ -306,8 +303,8 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					<div className="space-y-4">
 						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Leave without saving?" description={<>Your changes to these settings will be lost.</>} />
 						<DialogFooter>
-							<Button variant="outline" onPress={() => setLeaving(false)}>Keep editing</Button>
-							<Button variant="destructive" onPress={() => onClose?.()}>Discard and leave</Button>
+							<Button variant="outline" onPress={() => setLeaving(false)}>Keep Editing</Button>
+							<Button variant="destructive" onPress={() => onClose?.()}>Discard and Leave</Button>
 						</DialogFooter>
 					</div>
 				</Dialog>
@@ -394,7 +391,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 								isDisabled={busy || confirmName.trim() !== workspace?.name}
 								onPress={() => runAction(true, true)}
 							>
-								{busy ? "Deleting…" : "Delete workspace"}
+								{busy ? "Deleting…" : "Delete Workspace"}
 							</Button>
 						</DialogFooter>
 					</div>

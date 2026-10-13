@@ -202,7 +202,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 	return (
 		<Dialog isOpen onOpenChange={(open) => !open && onClose()} className="sm:max-w-5xl">
 			<div className="flex h-[70vh] min-h-0 flex-col gap-4">
-				<DialogHeading icon={<History className="size-6" />} title={`History of ${fileName}`} description={<>Versions are kept on this device each time the file is saved, synced or imported{isText ? ", and automatically while you edit" : ""}.</>} />
+				<DialogHeading icon={<History className="size-6" />} title={`History of ${fileName}`} />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
@@ -248,10 +248,10 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 									<div className="flex flex-wrap items-center gap-3 text-xs">
 										<div role="group" aria-label="Compare" className="inline-flex border">
 											<Button size="xs" variant={mode === "since" ? "secondary" : "ghost"} aria-pressed={mode === "since"} onPress={() => setMode("since")}>
-												Changes since this version
+												Changes Since This Version
 											</Button>
 											<Button size="xs" variant={mode === "in" ? "secondary" : "ghost"} aria-pressed={mode === "in"} onPress={() => setMode("in")}>
-												Changes in this version
+												Changes in This Version
 											</Button>
 										</div>
 										<label className="flex items-center gap-1.5">
@@ -293,7 +293,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 										<Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Name the current text" maxLength={80} aria-label="Version name" className="h-8 w-56 text-xs" />
 										<Button type="submit" size="sm" variant="outline" isDisabled={busy || !label.trim()}>
 											<Save className="size-3.5" />
-											Save version
+											Save Version
 										</Button>
 									</form>
 								)}
@@ -316,7 +316,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 									) : (
 										<Button size="sm" isDisabled={!canRestore || busy} onPress={() => (isText ? void restore() : setConfirming(true))}>
 											<RotateCcw className="size-3.5" />
-											Restore this version
+											Restore This Version
 										</Button>
 									)}
 								</div>

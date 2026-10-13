@@ -64,7 +64,6 @@ export default function WorkspaceInsights() {
 	const openTasks = tasks.length - done;
 	const people = byPerson.filter(([n]) => n !== "Unknown").length;
 	const finishedTotal = finished.reduce((n, [, c]) => n + c, 0);
-	const cards = columns.reduce((n, c) => n + c.cards.length, 0);
 
 	return (
 		<Page>
@@ -116,7 +115,7 @@ export default function WorkspaceInsights() {
 			<PageBody padded={false}>
 				{tab === "overview" ? (
 					<div className="grid gap-3 p-3 lg:grid-cols-6">
-						<Panel title="Last 14 days" hint="Actions per day, today on the right" className="lg:col-span-4 lg:row-span-2">
+						<Panel title="Last 14 days" className="lg:col-span-4 lg:row-span-2">
 							<DayColumns days={days} label={`Actions per day over the last ${DAYS} days`} tall />
 						</Panel>
 						<div className="grid grid-cols-2 gap-3 lg:col-span-2">
@@ -125,7 +124,7 @@ export default function WorkspaceInsights() {
 							<Stat label="Tasks finished" value={finishedTotal} />
 							<Stat label="Tasks still open" value={openTasks} />
 						</div>
-						<Panel title="Task progress" hint={`${tasks.length} tasks, ${cards} cards`} className="lg:col-span-2">
+						<Panel title="Task progress" className="lg:col-span-2">
 							{tasks.length === 0 ? (
 								<Empty>No tasks yet.</Empty>
 							) : (
@@ -156,20 +155,20 @@ export default function WorkspaceInsights() {
 							)}
 						</Panel>
 
-						<Panel title="Activity calendar" hint="One month at a time, use the arrows to page" className="lg:col-span-3">
+						<Panel title="Activity calendar" className="lg:col-span-3">
 							<MonthCalendar days={year} label="Actions per day, by month" />
 						</Panel>
-						<Panel title="Last 16 weeks" hint="A square per day, darker when busier" className="lg:col-span-3">
+						<Panel title="Last 16 weeks" className="lg:col-span-3">
 							<Heatmap days={weeks} label={`Actions per day over the last ${WEEKS} weeks`} />
 						</Panel>
 
-						<Panel title="Actions by person" hint="Everything in the activity log, by who did it" className="lg:col-span-3">
+						<Panel title="Actions by person" className="lg:col-span-3">
 							<BarRows rows={byPerson.map(([label, n]) => ({ label, parts: [{ value: n, bg: "bg-primary", title: "Actions" }] }))} lead={(l) => <Avatar name={l} className="size-6 text-xs" />} empty="Nothing recorded yet." />
 						</Panel>
-						<Panel title="Tasks finished" hint="Moved to Done, by who moved them" className="lg:col-span-3">
+						<Panel title="Tasks finished" className="lg:col-span-3">
 							<BarRows rows={finished.map(([label, n]) => ({ label, parts: [{ value: n, bg: "bg-success", title: "Finished" }] }))} lead={(l) => <Avatar name={l} className="size-6 text-xs" />} empty="No task has been finished yet." />
 						</Panel>
-						<Panel title="Open work by person" hint="Tasks and cards not yet done, by who they are assigned to" className="lg:col-span-3">
+						<Panel title="Open work by person" className="lg:col-span-3">
 							<BarRows
 								rows={load.map((w) => ({
 									label: w.name,
@@ -188,7 +187,7 @@ export default function WorkspaceInsights() {
 								</p>
 							)}
 						</Panel>
-						<Panel title="Where the work happens" hint="Actions by part of the app" className="lg:col-span-3">
+						<Panel title="Where the work happens" className="lg:col-span-3">
 							{byKind.length === 0 ? <Empty>Nothing recorded yet.</Empty> : <Donut label="Actions by part of the app" parts={byKind.slice(0, SERIES.length).map(([label, value]) => ({ label, value }))} center={<><span className="font-mono text-2xl font-semibold tabular-nums">{events.length}</span><span className="text-sm text-muted-foreground">actions</span></>} />}
 						</Panel>
 					</div>

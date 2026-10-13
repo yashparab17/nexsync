@@ -788,7 +788,7 @@ export default function WorkspaceEditor() {
 								not saved to the file. Close it anyway?</>} />
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setClosing(null)}>
-								Keep open
+								Keep Open
 							</Button>
 							<Button variant="destructive" onPress={() => discardTab(closing)}>
 								Close

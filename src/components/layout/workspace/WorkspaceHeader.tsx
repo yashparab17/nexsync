@@ -40,12 +40,12 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 	// amber and pulsing while connecting, red when offline. The words are in the tooltip and the accessible name.
 	const connecting = connectionStatus === "connecting" || connectionStatus === "reconnecting";
 	const status = connectedCount > 0
-		? { label: `Collaborate: ${connectedCount} ${connectedCount === 1 ? "person" : "people"} connected`, dot: "bg-success" }
+		? { label: `Collaborate: ${connectedCount} ${connectedCount === 1 ? "person" : "people"} connected`, short: `${connectedCount} connected`, dot: "bg-success" }
 		: !network.online
-			? { label: "Collaborate: offline", dot: "bg-destructive" }
+			? { label: "Collaborate: offline", short: "Offline", dot: "bg-destructive" }
 			: connecting
-				? { label: "Collaborate: connecting", dot: "bg-warning animate-pulse motion-reduce:animate-none" }
-				: { label: "Collaborate: online, ready to invite", dot: "bg-success" };
+				? { label: "Collaborate: connecting", short: "Connecting", dot: "bg-warning animate-pulse motion-reduce:animate-none" }
+				: { label: "Collaborate: online, ready to invite", short: "Online", dot: "bg-success" };
 
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 lg:px-6">
@@ -67,9 +67,10 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 				<CatchUp />
 					<NotificationBell />
 				<span title={status.label} className="inline-flex">
-					<Button variant="ghost" size="icon" onPress={() => setIsP2POpen(true)} aria-label={status.label} className="relative" data-testid="connection-chip">
+					<Button variant="ghost" onPress={() => setIsP2POpen(true)} aria-label={status.label} className="gap-2 px-3" data-testid="connection-chip">
 						<Radio className="size-5" />
-						<span className={cn("absolute right-1.5 bottom-1.5 size-2.5 ring-2 ring-background", status.dot)} aria-hidden />
+						<span className={cn("size-2.5 shrink-0", status.dot)} aria-hidden />
+						<span className="hidden text-sm lg:inline">{status.short}</span>
 					</Button>
 				</span>
 

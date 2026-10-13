@@ -105,8 +105,7 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 	return (
 		<Dialog isOpen onOpenChange={(open) => !open && onClose()} className="sm:max-w-3xl">
 			<div className="flex max-h-[75vh] min-h-0 flex-col gap-4">
-				<DialogHeading icon={<GitBranch className="size-6" />} title={`Branches of ${fileName}`} description={<>A branch is a copy to work on without changing the file. When it is ready, review what it would change, then merge it in. Merging adds exactly what was written on the branch, so nothing a
-						collaborator wrote in the file meanwhile is lost.</>} />
+				<DialogHeading icon={<GitBranch className="size-6" />} title={`Branches of ${fileName}`} />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
@@ -130,10 +129,10 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 										<div className="flex gap-2">
 											<Button size="sm" onPress={merge} className="gap-1.5">
 												<GitMerge className="size-3.5" />
-												Merge into the file
+												Merge into the File
 											</Button>
 											<Button size="sm" variant="outline" onPress={close}>
-												Close without merging
+												Close Without Merging
 											</Button>
 										</div>
 									)}
@@ -145,7 +144,7 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 						)}
 						<div>
 							<Button size="sm" variant="ghost" onPress={() => setReview(null)}>
-								Back to the list
+								Back to the List
 							</Button>
 						</div>
 					</div>
@@ -161,7 +160,7 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 							>
 								<Input aria-label="Branch name" placeholder="Name the branch, for example Try a new layout" value={name} maxLength={MAX_BRANCH_NAME} onChange={(e) => setName(e.target.value)} />
 								<Button type="submit" isDisabled={busy || !name.trim()}>
-									Start a branch
+									Start a Branch
 								</Button>
 							</form>
 						)}
@@ -192,11 +191,11 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 														onClose();
 													}}
 												>
-													Work on it
+													Work on It
 												</Button>
 											)}
 											<Button size="sm" variant="outline" onPress={() => void openReview(b)} isDisabled={busy}>
-												{b.status === "open" ? "Review" : "See changes"}
+												{b.status === "open" ? "Review" : "See Changes"}
 											</Button>
 										</div>
 									</li>
@@ -213,7 +212,7 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 										onClose();
 									}}
 								>
-									Go back to the file
+									Go Back to the File
 								</Button>
 							</div>
 						)}

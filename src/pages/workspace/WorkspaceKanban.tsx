@@ -504,7 +504,7 @@ export default function WorkspaceKanban() {
 				{canChange && (
 					<Button size="sm" onPress={() => setIsCreateColOpen(true)}>
 						<Plus className="size-4" />
-						New column
+						New Column
 					</Button>
 				)}
 			</Toolbar>
@@ -529,7 +529,7 @@ export default function WorkspaceKanban() {
 						canChange && (
 							<Button size="sm" onPress={() => setIsCreateColOpen(true)}>
 								<Plus className="size-4" />
-								New column
+								New Column
 							</Button>
 						)
 					}
@@ -759,7 +759,7 @@ export default function WorkspaceKanban() {
 										}}
 									>
 										<Plus className="size-3.5 mr-1.5" />
-										Add a card
+										Add a Card
 									</Button>
 								)}
 							</div>
@@ -776,7 +776,7 @@ export default function WorkspaceKanban() {
 					className="max-w-md"
 				>
 					<form onSubmit={handleCreateColumnSubmit} className="space-y-4">
-						<DialogHeading icon={<Plus className="size-6" />} title="Add a column" description={<>Create a new status column for organizing workspace cards.</>} />
+						<DialogHeading icon={<Plus className="size-6" />} title="Add a column" />
 
 						<div>
 							<Label htmlFor="col-title">Column Title *</Label>
@@ -820,7 +820,7 @@ export default function WorkspaceKanban() {
 					className="max-h-[90vh] max-w-md overflow-y-auto"
 				>
 					<form onSubmit={handleCreateCardSubmit} className="space-y-4">
-						<DialogHeading icon={<Plus className="size-6" />} title="Add a card" description={<>Add a card to this column.</>} />
+						<DialogHeading icon={<Plus className="size-6" />} title="Add a card" />
 
 						<div className="space-y-3">
 							<div>
@@ -949,7 +949,7 @@ export default function WorkspaceKanban() {
 								Cancel
 							</Button>
 							<Button variant="destructive" onPress={handleDeleteColumn}>
-								Delete column
+								Delete Column
 							</Button>
 						</DialogFooter>
 					</div>
@@ -982,7 +982,7 @@ export default function WorkspaceKanban() {
 								Cancel
 							</Button>
 							<Button variant="destructive" onPress={handleDeleteCard}>
-								{eraseCard ? "Erase Card" : "Delete card"}
+								{eraseCard ? "Erase Card" : "Delete Card"}
 							</Button>
 						</DialogFooter>
 					</div>

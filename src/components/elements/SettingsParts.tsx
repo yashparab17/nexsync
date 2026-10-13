@@ -56,9 +56,9 @@ export function Segmented<T extends string | number>({
 }
 
 // A titled panel with an icon
-export function SectionCard({ id, title, description, icon, children, className, titleClassName }: { id: string; title: string; description: ReactNode; icon: ReactNode; children: ReactNode; className?: string; titleClassName?: string }) {
+export function SectionCard({ id, title, icon, children, className, titleClassName }: { id: string; title: string; icon: ReactNode; children: ReactNode; className?: string; titleClassName?: string }) {
 	return (
-		<Panel id={id} title={title} hint={description} icon={icon} titleClassName={titleClassName} className={cn("scroll-mt-3", className)}>
+		<Panel id={id} title={title} icon={icon} titleClassName={titleClassName} className={cn("scroll-mt-3", className)}>
 			<div className="space-y-4">{children}</div>
 		</Panel>
 	);
@@ -66,20 +66,19 @@ export function SectionCard({ id, title, description, icon, children, className,
 
 // The frame both Settings screens share, in the popup and as a page: a header that never scrolls away, with the title and
 // a Close button, then the sections, and a bar along the bottom while there is something to save
-export function SettingsShell({ title, description, onClose, footer, className, children }: { title: string; description: ReactNode; onClose: () => void; footer?: ReactNode; className?: string; children: ReactNode }) {
+export function SettingsShell({ title, onClose, footer, className, children }: { title: string; onClose: () => void; footer?: ReactNode; className?: string; children: ReactNode }) {
 	return (
 		<div className={cn("flex min-h-0 flex-col bg-background", className)}>
 			<Toolbar>
 				<ToolbarTitle name={title} />
-				<span className="ml-1 hidden min-w-0 flex-1 truncate border-l pl-3 text-sm text-muted-foreground md:block">{description}</span>
-				<span className="flex-1 md:hidden" />
+				<span className="flex-1" />
 				<Button variant="outline" size="sm" onPress={onClose} aria-label="Close settings">
 					<X className="size-4" />
 					Close
 				</Button>
 			</Toolbar>
 			<div className="flex min-h-0 flex-1">
-				<div data-settings-scroll className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain py-3">
+				<div data-settings-scroll className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-2">
 					<div className="space-y-3">{children}</div>
 				</div>
 			</div>

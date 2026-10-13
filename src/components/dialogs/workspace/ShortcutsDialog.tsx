@@ -8,7 +8,7 @@ export default function ShortcutsDialog({ onClose }: { onClose: () => void }) {
 	return (
 		<Dialog isOpen onOpenChange={(open) => !open && onClose()} className="sm:max-w-3xl">
 			<div className="space-y-4">
-				<DialogHeading icon={<Keyboard className="size-6" />} title="Keyboard shortcuts" description="The same keys as VS Code where there is a match. The Editor adds its own while it is open." />
+				<DialogHeading icon={<Keyboard className="size-6" />} title="Keyboard shortcuts" />
 				<div className="grid max-h-[60vh] gap-x-8 gap-y-4 overflow-y-auto sm:grid-cols-2">
 					{SHORTCUT_GROUPS.map((g) => (
 						<section key={g.title} aria-label={g.title}>

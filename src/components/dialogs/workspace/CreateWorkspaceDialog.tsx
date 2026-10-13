@@ -104,7 +104,7 @@ export default function CreateWorkspaceDialog({
 
 			{/* Dialog */}
 			<Dialog className="sm:max-w-3xl">
-				<DialogHeading icon={<FolderPlus className="size-6" />} title="Create a workspace" description="A workspace is a folder on this computer. Notes, tasks and code live in it as plain files." />
+				<DialogHeading icon={<FolderPlus className="size-6" />} title="Create a workspace" />
 
 				<div className="grid gap-8 md:grid-cols-[3fr_2fr]">
 					<div className="flex flex-col gap-5">
@@ -152,7 +152,7 @@ export default function CreateWorkspaceDialog({
 					<Button variant="outline" slot="close">Cancel</Button>
 					<Button onPress={handleCreateWorkspace} isDisabled={!canCreate}>
 						<FolderPlus className="size-4" />
-						Create workspace
+						Create Workspace
 					</Button>
 				</DialogFooter>
 			</Dialog>

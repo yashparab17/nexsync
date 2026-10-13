@@ -256,7 +256,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 												Markdown (.md)
 											</Button>
 											<Button variant="ghost" size="sm" className="w-full justify-start" onPress={() => void runExport("pdf")}>
-												PDF document
+												PDF Document
 											</Button>
 										</div>
 									</>
@@ -279,10 +279,10 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 						You are working on the branch <span className="font-semibold">{branch.name}</span>. {fileName} does not change until the branch is merged.
 					</span>
 					<Button size="sm" onPress={() => setBranchesOpen(true)}>
-						Review and merge
+						Review and Merge
 					</Button>
 					<Button variant="ghost" size="sm" onPress={() => openBranch(null)}>
-						Back to the note
+						Back to the Note
 					</Button>
 				</div>
 			)}

@@ -466,7 +466,7 @@ export default function WorkspaceTasks() {
 				{!isViewer && (
 					<Button size="sm" onPress={handleOpenCreate}>
 						<Plus className="size-4" />
-						New task
+						New Task
 					</Button>
 				)}
 			</Toolbar>
@@ -494,13 +494,13 @@ export default function WorkspaceTasks() {
 						action={
 							filtering ? (
 								<Button variant="outline" size="sm" onPress={clearFilters}>
-									Clear filters
+									Clear Filters
 								</Button>
 							) : (
 								!isViewer && (
 									<Button size="sm" onPress={handleOpenCreate}>
 										<Plus className="size-4" />
-										Create task
+										Create Task
 									</Button>
 								)
 							)
@@ -585,7 +585,7 @@ export default function WorkspaceTasks() {
 					className="max-w-lg"
 				>
 					<form onSubmit={handleCreateSubmit} className="space-y-4">
-						<DialogHeading icon={<Plus className="size-6" />} title="New task" description={<>Add a task to this workspace.</>} />
+						<DialogHeading icon={<Plus className="size-6" />} title="New task" />
 
 						<div className="space-y-3">
 							<div>
@@ -668,7 +668,7 @@ export default function WorkspaceTasks() {
 								type="submit"
 								isDisabled={formSubmitting || !formTitle.trim()}
 							>
-								{formSubmitting ? "Creating…" : "Create task"}
+								{formSubmitting ? "Creating…" : "Create Task"}
 							</Button>
 						</DialogFooter>
 					</form>
@@ -810,7 +810,7 @@ export default function WorkspaceTasks() {
 								Cancel
 							</Button>
 							<Button variant="destructive" onPress={handleDeleteTask}>
-								{eraseTask ? "Erase Task" : "Delete task"}
+								{eraseTask ? "Erase Task" : "Delete Task"}
 							</Button>
 						</DialogFooter>
 					</div>
