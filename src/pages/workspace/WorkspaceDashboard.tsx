@@ -88,7 +88,7 @@ export default function WorkspaceDashboard() {
 			</Toolbar>
 
 			{/* A bento grid: tile size follows importance, with where to continue largest */}
-			<PageBody className="grid content-start gap-3 md:grid-cols-6 xl:grid-cols-12">
+			<PageBody className="grid content-start gap-4 md:grid-cols-6 xl:grid-cols-12">
 				<Panel index="01" title="Pick Up Where You Left Off" flush={recent.length > 0} className="md:col-span-6 xl:col-span-5 xl:row-span-2">
 					{recent.length === 0 ? (
 						<p className="text-sm text-muted-foreground">Files you open show up here, so you can jump back in.</p>
@@ -97,7 +97,7 @@ export default function WorkspaceDashboard() {
 							{recent.slice(0, 6).map((file) => (
 								<li key={file}>
 									<AnimateIcon animateOnHover asChild>
-										<button type="button" onClick={() => navigate(openPath(file))} className="flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
+										<button type="button" onClick={() => navigate(openPath(file))} className="flex w-full items-center gap-3 px-4 py-4 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
 											<FileText className="size-5 shrink-0 text-muted-foreground" />
 											<span className="min-w-0">
 												<span className="block truncate text-sm font-medium">{file.split("/").pop()}</span>
@@ -136,9 +136,9 @@ export default function WorkspaceDashboard() {
 								return (
 									<li key={task.id}>
 										<AnimateIcon animateOnHover asChild>
-											<button type="button" onClick={() => navigate(`/workspace/tasks?open=${encodeURIComponent(task.id)}`)} className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
+											<button type="button" onClick={() => navigate(`/workspace/tasks?open=${encodeURIComponent(task.id)}`)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
 												<span className="truncate font-medium">{task.title}</span>
-												<span className={cn("flex shrink-0 items-center gap-1.5 font-mono text-[13px] tabular-nums", overdue ? "text-destructive" : task.due_date === today ? "text-warning" : "text-muted-foreground")}>
+												<span className={cn("flex shrink-0 items-center gap-2 font-mono text-[13px] tabular-nums", overdue ? "text-destructive" : task.due_date === today ? "text-warning" : "text-muted-foreground")}>
 													<Calendar className="size-3.5" />
 													{task.due_date === today ? "today" : task.due_date}
 												</span>
@@ -156,7 +156,7 @@ export default function WorkspaceDashboard() {
 						{members.slice(0, 4).map((m) => {
 							const here = online.has(m.name);
 							return (
-								<li key={m.id} className="flex items-center gap-3 px-4 py-2.5">
+								<li key={m.id} className="flex items-center gap-3 px-4 py-3">
 									<span className="relative">
 										<Avatar name={m.name} className={cn("size-8", !here && "opacity-50")} />
 										<span className={cn("absolute -right-0.5 -bottom-0.5 size-2.5 ring-2 ring-background", here ? "bg-success" : "bg-muted-foreground/50")} />
@@ -168,7 +168,7 @@ export default function WorkspaceDashboard() {
 						})}
 						{members.length > 4 && (
 							<li>
-								<button type="button" onClick={goTo("/workspace/members")} className="w-full px-4 py-2.5 text-left text-sm text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted">
+								<button type="button" onClick={goTo("/workspace/members")} className="w-full px-4 py-3 text-left text-sm text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted">
 									and {members.length - 4} more
 								</button>
 							</li>
@@ -184,7 +184,7 @@ export default function WorkspaceDashboard() {
 							{activity.slice(0, 6).map((event) => {
 								const Icon = eventIcon(event.target_type, event.action);
 								return (
-									<li key={event.id} className="flex items-center gap-3 px-4 py-2.5">
+									<li key={event.id} className="flex items-center gap-3 px-4 py-3">
 										{event.author ? <Avatar name={event.author} className="size-7 text-xs" /> : <span className="flex size-7 shrink-0 items-center justify-center bg-muted text-muted-foreground"><Icon className="size-4" /></span>}
 										<div className="min-w-0 flex-1">
 											<p className="truncate text-sm">

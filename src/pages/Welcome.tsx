@@ -144,12 +144,12 @@ export default function Welcome() {
 			</header>
 
 			{/* The window is the canvas: content fills it up to a wide cap, centred in both directions */}
-			<main className="scanlines flex flex-1 items-center justify-center py-12">
+			<main className="flex flex-1 items-center justify-center py-12">
 				<div className="grid w-full max-w-[88rem] gap-12 xl:grid-cols-[minmax(0,1fr)_24rem] xl:gap-16">
 					<div className="flex min-w-0 flex-col gap-10">
 						<div>
-							<h1 className="cursor text-5xl font-bold tracking-tight 2xl:text-6xl">{greeting}</h1>
-							<p className="mt-3 max-w-prose text-lg text-muted-foreground">
+							<h1 className="text-5xl font-bold tracking-tight 2xl:text-5xl">{greeting}</h1>
+							<p className="mt-3 max-w-prose text-xl text-muted-foreground">
 								Notes, tasks and code, shared with your team and kept on your own computer.
 							</p>
 						</div>

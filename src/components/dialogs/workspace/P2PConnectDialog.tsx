@@ -156,9 +156,9 @@ export default function P2PConnectDialog({
 
 	// A notice above the tabs; the tone says how serious it is
 	const notice = (tone: "warning" | "info" | "error", children: React.ReactNode) => (
-		<div role={tone === "error" ? "alert" : "status"} className={cn("flex items-start gap-3 border px-3 py-2.5 text-sm", tone === "warning" ? "border-warning/40 bg-warning/10" : tone === "info" ? "border-info/40 bg-info/10" : "border-destructive/40 bg-destructive/10 text-destructive")}>
+		<div role={tone === "error" ? "alert" : "status"} className={cn("flex items-start gap-3 border px-3 py-3 text-sm", tone === "warning" ? "border-warning/40 bg-warning/10" : tone === "info" ? "border-info/40 bg-info/10" : "border-destructive/40 bg-destructive/10 text-destructive")}>
 			<AlertTriangle className={cn("mt-0.5 size-4 shrink-0", tone === "warning" ? "text-warning" : tone === "info" ? "text-info" : "text-destructive")} />
-			<div className="min-w-0 flex-1 space-y-1.5">{children}</div>
+			<div className="min-w-0 flex-1 space-y-2">{children}</div>
 		</div>
 	);
 
@@ -217,7 +217,7 @@ export default function P2PConnectDialog({
 							aria-selected={activeTab === tab.id}
 							onClick={() => setActiveTab(tab.id)}
 							className={cn(
-								"flex flex-1 items-center justify-center gap-2 border-b-2 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:bg-muted",
+								"flex flex-1 items-center justify-center gap-2 border-b-2 py-3 text-sm font-medium outline-none transition-colors focus-visible:bg-muted",
 								activeTab === tab.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
 							)}
 						>
@@ -428,7 +428,7 @@ export default function P2PConnectDialog({
 											<div className="min-w-0 flex-1">
 												<div className="flex flex-wrap items-center gap-2">
 													<span className="truncate text-sm font-medium">{peer.name}</span>
-													<span className="bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{peer.isHost ? "Host" : peer.role}</span>
+													<span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">{peer.isHost ? "Host" : peer.role}</span>
 													<span
 														className={cn("text-xs", peer.connectionType === "direct" ? "text-success" : "text-warning")}
 														title={peer.connectionType === "relay" ? "Connected through a helper server because a direct link is not possible here. Still private. Nexsync keeps trying for a direct one." : undefined}

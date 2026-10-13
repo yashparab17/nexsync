@@ -53,11 +53,11 @@ export default function ConflictPanel({ conflicts, violations = [], show, canCho
 						{conflicts.length === 1 ? "Two people changed this at the same time" : "Two people changed some things at the same time"}
 					</p>
 					{conflicts.map((c) => (
-						<div key={c.field} className="space-y-1.5">
+						<div key={c.field} className="space-y-2">
 							<p className="text-xs font-semibold text-muted-foreground">{fieldName(c.field)}</p>
-							<ul className="space-y-1.5">
+							<ul className="space-y-2">
 								{c.options.map((o, i) => (
-									<li key={i} className="flex items-center justify-between gap-2 border border-border/60 bg-background px-2 py-1.5 text-sm">
+									<li key={i} className="flex items-center justify-between gap-2 border border-border/60 bg-background px-2 py-2 text-sm">
 										<span className="min-w-0">
 											<span className="break-words">{show(c.field, o.value) || "(empty)"}</span>
 											<span className="block text-xs text-muted-foreground">

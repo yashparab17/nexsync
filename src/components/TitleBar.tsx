@@ -90,7 +90,7 @@ export default function TitleBar() {
 	];
 
 	return (
-		<header className="scanlines relative z-[60] flex h-9 shrink-0 select-none items-center border-b bg-background">
+		<header className="relative z-[60] flex h-9 shrink-0 select-none items-center border-b bg-background">
 			<div data-tauri-drag-region className={cn("flex h-full min-w-0 flex-1 items-center gap-2", IS_MAC ? "pl-20" : "pl-3")}>
 				<span data-tauri-drag-region className="font-mono text-sm font-semibold">
 					nexsync

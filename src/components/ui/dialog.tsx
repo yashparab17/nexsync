@@ -194,7 +194,7 @@ function DialogHeading({ icon, title, description, tone = "default" }: { icon: R
 				</span>
 				<div className="min-w-0">
 					<DialogTitle>{title}</DialogTitle>
-					{description && <DialogDescription className="mt-1.5">{description}</DialogDescription>}
+					{description && <DialogDescription className="mt-2">{description}</DialogDescription>}
 				</div>
 			</div>
 		</DialogHeader>

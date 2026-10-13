@@ -38,7 +38,7 @@ export function Donut({ parts, label, center }: { parts: { label: string; value:
 				</svg>
 				<div className="absolute inset-0 flex flex-col items-center justify-center text-center">{center}</div>
 			</div>
-			<ul className="min-w-40 flex-1 space-y-1.5 text-sm">
+			<ul className="min-w-40 flex-1 space-y-2 text-sm">
 				{parts.map((p, i) => (
 					<li key={p.label} className="flex items-center gap-2">
 						<span className={cn("size-3 shrink-0", SERIES[i % SERIES.length].bg)} aria-hidden />
@@ -63,7 +63,7 @@ export function StackBar({ parts, label }: { parts: { label: string; value: numb
 			</div>
 			<ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
 				{parts.map((p) => (
-					<li key={p.label} className="flex items-center gap-1.5">
+					<li key={p.label} className="flex items-center gap-2">
 						<span className={cn("size-3", p.bg)} aria-hidden />
 						<span className="text-muted-foreground">{p.label}</span>
 						<span className="font-mono tabular-nums">{p.value}</span>
@@ -80,7 +80,7 @@ export function BarRows({ rows, empty, lead }: { rows: { label: string; parts: {
 	const max = Math.max(1, ...sums);
 	if (rows.length === 0) return <Empty>{empty}</Empty>;
 	return (
-		<ul className="space-y-2.5">
+		<ul className="space-y-3">
 			{rows.map((r, i) => (
 				<li key={r.label} className="flex items-center gap-3 text-sm">
 					{lead?.(r.label)}
@@ -154,7 +154,7 @@ export function Heatmap({ days, label }: { days: { day: string; count: number }[
 					/>
 				))}
 			</div>
-			<div className="mt-2 flex items-center justify-end gap-1.5 font-mono text-[13px] text-muted-foreground">
+			<div className="mt-2 flex items-center justify-end gap-2 font-mono text-[13px] text-muted-foreground">
 				less
 				{LEVELS.map((l) => (
 					<span key={l} className={cn("size-3.5", l)} aria-hidden />

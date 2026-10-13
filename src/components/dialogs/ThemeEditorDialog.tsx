@@ -1,4 +1,4 @@
-// Making or changing a custom theme: a name, a starting point, the eighteen colours (each a picker and a field), and the same
+// Making or changing a custom theme: a name, a starting point, the seventeen colours (each a picker and a field), and the same
 // colours as CSS that can be copied out or pasted in. A sample shows the result as it is edited.
 
 import { useMemo, useState } from "react";
@@ -21,15 +21,15 @@ function Sample({ mode, vars }: { mode: ThemeMode; vars: ThemeVars }) {
 	return (
 		<div style={style} className="flex h-44 overflow-hidden border bg-background text-foreground" aria-label="Sample of the theme" role="img">
 			<div className="flex w-24 shrink-0 flex-col gap-1 border-r bg-sidebar p-2 text-[13px]">
-				<span className="bg-primary/15 px-1.5 py-0.5 text-primary">Notes</span>
-				<span className="px-1.5 py-0.5 text-muted-foreground">Files</span>
-				<span className="px-1.5 py-0.5 text-muted-foreground">Tasks</span>
+				<span className="bg-primary/15 px-2 py-0.5 text-primary">Notes</span>
+				<span className="px-2 py-0.5 text-muted-foreground">Files</span>
+				<span className="px-2 py-0.5 text-muted-foreground">Tasks</span>
 			</div>
 			<div className="flex min-w-0 flex-1 flex-col gap-2 p-2">
 				<div className="border bg-card p-2">
 					<p className="text-sm font-semibold">A panel</p>
 					<p className="text-[13px] text-muted-foreground">Hints and secondary text</p>
-					<div className="mt-2 flex gap-1.5">
+					<div className="mt-2 flex gap-2">
 						<span className="border bg-primary px-2 py-0.5 text-[13px] text-primary-foreground">Save</span>
 						<span className="border bg-secondary px-2 py-0.5 text-[13px]">Cancel</span>
 						<span className="border border-input bg-background px-2 py-0.5 font-mono text-[13px] text-muted-foreground">field</span>

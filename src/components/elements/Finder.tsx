@@ -120,14 +120,14 @@ export default function Finder({ open, onClose, query, onQueryChange, filterText
 				aria-selected={i === index}
 				onMouseMove={() => i !== index && setIndex(i)}
 				onClick={() => onChoose(item, false)}
-				className={cn("flex cursor-pointer items-center gap-3 px-3 py-1.5 text-sm", i === index ? "bg-primary/10 shadow-[inset_2px_0_0_var(--primary)]" : "hover:bg-muted/50")}
+				className={cn("flex cursor-pointer items-center gap-3 px-3 py-2 text-sm", i === index ? "bg-primary/10 shadow-[inset_2px_0_0_var(--primary)]" : "hover:bg-muted/50")}
 			>
 				{anyIcon && <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">{item.icon}</span>}
 				<span className="min-w-0 flex-1 truncate">
 					<Highlighted text={item.label} indexes={inLabel} />
 					{item.detail && <span className="ml-2 font-mono text-xs text-muted-foreground">{item.detail}</span>}
 				</span>
-				{item.hint && <kbd className="shrink-0 border bg-card px-1.5 py-0.5 font-mono text-xs text-muted-foreground">{item.hint}</kbd>}
+				{item.hint && <kbd className="shrink-0 border bg-card px-2 py-0.5 font-mono text-xs text-muted-foreground">{item.hint}</kbd>}
 			</li>,
 		);
 	});

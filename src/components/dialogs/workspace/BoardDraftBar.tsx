@@ -89,7 +89,7 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 	return (
 		<>
 			{board ? (
-				<div className="flex shrink-0 flex-wrap items-center gap-2 border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs">
+				<div className="flex shrink-0 flex-wrap items-center gap-2 border border-primary/30 bg-primary/10 px-3 py-2 text-xs">
 					<GitBranch className="size-3.5 shrink-0 text-primary" />
 					<span className="min-w-0 flex-1">
 						You are trying out <span className="font-semibold">{board.name}</span>. Moves here are private until you merge them. Cards can be moved; to edit or add cards, go back to the board.
@@ -105,7 +105,7 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 					</Button>
 				</div>
 			) : (
-				<Button variant="outline" size="sm" onPress={() => setChoosing(true)} className="gap-1.5">
+				<Button variant="outline" size="sm" onPress={() => setChoosing(true)} className="gap-2">
 					<GitBranch className="size-4" />
 					Try a Reorganisation
 				</Button>

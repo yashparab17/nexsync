@@ -231,7 +231,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 									type="button"
 									aria-expanded={open}
 									onClick={() => toggleGroup(group.id)}
-									className="flex items-center gap-1.5 px-3 pb-1 text-left font-mono text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground"
+									className="flex items-center gap-2 px-3 pb-1 text-left font-mono text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground"
 								>
 									<ChevronDown className={cn("size-3 transition-transform", !open && "-rotate-90")} aria-hidden />
 									{t(group.label)}

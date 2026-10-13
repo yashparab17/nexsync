@@ -4,23 +4,22 @@ Branch `ui-redesign-alt`. Swiss design decides layout and hierarchy, a terminal/
 small touches, and minimalism decides what is left out. It is a work tool first: nothing here may cost readability or speed.
 
 ## Swiss: layout and hierarchy
-- 12-column grid on an 8px unit. Page padding and tile gaps are 12px. Everything lines up to the same left edge; text is flush left.
-- Hierarchy comes from size, weight and position, not decoration. Four sizes: 13px secondary and readouts, 15px body and titles,
-  20px section heads, 32 to 48px display numbers (in Onest, never mono).
-- Opacity is the second hierarchy: text and rules use 100, 60, 40 and 20% of the foreground, not extra greys.
+- 12-column grid on an 8px unit with a 4px half step: spacing is 4, 8, 12, 16, 24, 32, 48 (no 6 or 10). Page padding and tile gaps are 16px; toolbars, panel headers and column headers are 48px. Everything lines up to the same left edge; text is flush left.
+- Hierarchy comes from size, weight and position, not decoration. Four sizes: 13px secondary and readouts (`text-xs`), 15px body
+  and titles (`text-sm`), 20px section heads (`text-xl`), 32 to 48px display numbers (`text-4xl`, `text-5xl`; Onest, never mono).
+- Opacity is the second hierarchy, from the text colour itself, not extra greys: 100% text, secondary text (`text-muted-foreground`)
+  66% or more (as much more as it takes to reach 4.5:1, see `secondaryShare`), tertiary (`text-fg-3`) 45% for metadata only, rules 16% (`--rule`).
 - Fills tell panels apart; thin rules (`.frame`, a 1px outline in `--rule`) frame tiles, and single-side lines separate areas.
 
 ## Terminal / HUD: the signal layer
-- Accent: electric blue with teal as its partner (Cyber Dark and Cyber Light are the first-run themes; the originals stay).
+- Accent: electric blue with teal as its partner. Themes come only in pairs, one light and one dark, applied together: Cyber (first, the first-run theme), Legacy (the original light and dark), Catppuccin, Solarized, Gruvbox, GitHub. Custom themes are made per mode.
 - Readouts are mono, 13px or smaller: numbers, paths, times, status, shortcuts, tile labels. Display numbers stay in Onest.
-- Section index numbers (`01`, `02`…) on tiles, a `>` prompt in search, ASCII logos, a blinking block cursor (`.cursor`) in headings
-  of the Welcome page and empty states.
+- Section index numbers (`01`, `02`…) on tiles and Kanban columns, a `>` prompt in every search box, ASCII logos.
 - Corner ticks (`.ticks`) mark hover, focus and selection like a HUD reticle; `.ticks-on` keeps them showing on a hero tile.
-- Scanlines (`.scanlines`) sit on the title bar and the Welcome page only.
 
 ## Limits (the effect budget)
-- Effects live in chrome only: title bar, header, Welcome, empty states, tiles. Never on Editor, Notes, forms or tables.
-- Settings → Appearance → Effects turns scanlines and cursors off (`data-effects="off"`); reduced motion stops the blinking.
+- The signal layer (ticks, index numbers, frames) stays out of the Editor, Notes text, forms and tables.
+- No scanlines, blinking cursors or typewriter effects.
 - No drop shadows, glow, gradients or rounded corners. Buttons are flat.
 - Every theme must pass `themeWarnings` (readable text, visible fills); new themes are added to the test automatically.
 

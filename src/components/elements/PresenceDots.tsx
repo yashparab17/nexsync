@@ -11,7 +11,7 @@ export default function PresenceDots({ names, doing = "here" }: { names: string[
 			{shown.map((n) => (
 				<Avatar key={n} name={n} className="size-4 text-xs ring-1 ring-background" />
 			))}
-			{names.length > shown.length && <span className="pl-1.5 text-xs text-muted-foreground">+{names.length - shown.length}</span>}
+			{names.length > shown.length && <span className="pl-2 text-xs text-muted-foreground">+{names.length - shown.length}</span>}
 		</span>
 	);
 }

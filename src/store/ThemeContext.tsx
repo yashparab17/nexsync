@@ -110,7 +110,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 	const all = useMemo(() => [...BUILTIN_THEMES, ...customThemes], [customThemes]);
 	const themesFor = (mode: ThemeMode) => all.filter((t) => t.mode === mode);
 	// A choice that no longer exists (a deleted custom theme) falls back to the original
-	const valid = (id: string, mode: ThemeMode) => (all.some((t) => t.id === id && t.mode === mode) ? id : DEFAULT_THEME);
+	const valid = (id: string, mode: ThemeMode) => (all.some((t) => t.id === id && t.mode === mode) ? id : FIRST_RUN_THEME);
 	const lightTheme = valid(lightId, "light");
 	const darkTheme = valid(darkId, "dark");
 	const themeId = theme === "dark" ? darkTheme : lightTheme;

@@ -37,7 +37,7 @@ export default function DraftsButton({ workspacePath, entity, record, members, o
 	const [open, setOpen] = useState(false);
 	return (
 		<>
-			<Button type="button" variant="outline" size="sm" onPress={() => setOpen(true)} className="gap-1.5">
+			<Button type="button" variant="outline" size="sm" onPress={() => setOpen(true)} className="gap-2">
 				<FilePen className="size-3.5" />
 				Drafts
 			</Button>
@@ -201,7 +201,7 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 						) : (
 							<>
 								{preview.changes.length === 0 && <p className="text-sm text-muted-foreground">Nothing. The draft matches the {entity} as it is now.</p>}
-								<ul className="space-y-1.5">
+								<ul className="space-y-2">
 									{preview.changes.map((c) => (
 										<li key={c.path} className="border px-3 py-2 text-sm">
 											<span className="text-xs font-semibold text-muted-foreground">{label(c.path)}</span>
@@ -231,7 +231,7 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 								Back to Editing
 							</Button>
 							{!preview.deleted && (
-								<Button isDisabled={busy} onPress={() => void merge()} className="gap-1.5">
+								<Button isDisabled={busy} onPress={() => void merge()} className="gap-2">
 									<GitMerge className="size-3.5" />
 									Merge into the {entity}
 								</Button>

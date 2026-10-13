@@ -151,7 +151,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 
 	const details = (
 		<aside aria-label="Asset details" className={cn("flex shrink-0 flex-col gap-5 overflow-y-auto border-border bg-muted/40 p-4", adaptive ? "w-80 border-l" : "max-h-[40%] w-full border-t")}>
-			<div className="flex flex-wrap gap-1.5">
+			<div className="flex flex-wrap gap-2">
 				{dataUrl && (
 					<Button variant="outline" size="sm" onPress={exportFile}>
 						<Download data-icon="inline-start" className="size-4" />
@@ -195,7 +195,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 						{copiedKey === "markdown" ? "Copied" : "Copy"}
 					</Button>
 				</div>
-				<code className="block break-all border bg-background p-2.5 font-mono text-xs select-all">{markdown}</code>
+				<code className="block break-all border bg-background p-3 font-mono text-xs select-all">{markdown}</code>
 				<p className="text-xs text-muted-foreground">Paste into a note or Markdown file to embed it.</p>
 			</section>
 
@@ -207,7 +207,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 						{copiedKey === "path" ? "Copied" : "Copy"}
 					</Button>
 				</div>
-				<code className="block break-all border bg-background p-2.5 font-mono text-xs select-all">{relPath}</code>
+				<code className="block break-all border bg-background p-3 font-mono text-xs select-all">{relPath}</code>
 			</section>
 		</aside>
 	);
@@ -222,7 +222,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 				<div style={{ height: HEADER }} className="flex shrink-0 items-center gap-3 border-b px-4">
 					<KindIcon className="size-5 shrink-0 text-primary" />
 					<div className="min-w-0 flex-1">
-						<DialogTitle className="truncate text-base font-semibold">{asset.name}</DialogTitle>
+						<DialogTitle className="truncate text-sm font-semibold">{asset.name}</DialogTitle>
 						<DialogDescription className="truncate font-mono text-xs text-muted-foreground">
 							{formatBytes(asset.size)} · {relPath}
 						</DialogDescription>

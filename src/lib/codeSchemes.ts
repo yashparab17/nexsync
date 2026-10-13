@@ -35,8 +35,6 @@ const v = (keyword: string, string: string, number: string, fn: string, type: st
 export const BUILTIN_SCHEMES: CodeSchemeDef[] = [
 	{ id: "mocha", name: "Catppuccin Mocha", mode: "dark", vars: v("#cba6f7", "#a6e3a1", "#fab387", "#89b4fa", "#f9e2af", "#cdd6f4", "#f38ba8", "#f5c2e7", "#7f849c", "#89dceb") },
 	{ id: "solarized-dark", name: "Solarized Dark", mode: "dark", vars: v("#9aae1a", "#35b0a6", "#e0589a", "#4aa8e8", "#d6a21a", "#a4b1b1", "#ff6b66", "#e8683a", "#75898f", "#a4b1b1") },
-	{ id: "dracula", name: "Dracula", mode: "dark", vars: v("#ff79c6", "#f1fa8c", "#bd93f9", "#50fa7b", "#8be9fd", "#f8f8f2", "#ff79c6", "#bd93f9", "#8a93bc", "#ffb86c") },
-	{ id: "nord", name: "Nord", mode: "dark", vars: v("#81a1c1", "#a3be8c", "#b48ead", "#88c0d0", "#8fbcbb", "#d8dee9", "#81a1c1", "#b48ead", "#7b88a1", "#81a1c1") },
 	{ id: "gruvbox-dark", name: "Gruvbox Dark", mode: "dark", vars: v("#fb4934", "#b8bb26", "#d3869b", "#83a598", "#fabd2f", "#ebdbb2", "#fb4934", "#fe8019", "#a89984", "#8ec07c") },
 	{ id: "github-dark", name: "GitHub Dark", mode: "dark", vars: v("#ff7b72", "#a5d6ff", "#79c0ff", "#d2a8ff", "#ffa657", "#e6edf3", "#7ee787", "#79c0ff", "#8b949e", "#79c0ff") },
 	{ id: "latte", name: "Catppuccin Latte", mode: "light", vars: v("#8839ef", "#2f7d1f", "#c2500a", "#1850c9", "#9a5f0a", "#4c4f69", "#b00d31", "#b8399b", "#6c6f85", "#0b78a8") },

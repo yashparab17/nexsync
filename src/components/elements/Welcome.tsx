@@ -21,7 +21,7 @@ export interface WelcomeItem {
 	run: () => void;
 }
 
-export const Kbd = ({ children }: { children: ReactNode }) => <kbd className="border bg-card px-1.5 py-0.5 font-mono text-[13px] text-muted-foreground">{children}</kbd>;
+export const Kbd = ({ children }: { children: ReactNode }) => <kbd className="border bg-card px-2 py-0.5 font-mono text-[13px] text-muted-foreground">{children}</kbd>;
 
 export default function Welcome({ logo, title, intro, actions, recentTitle, recent, recentEmpty, tip }: { logo?: string; title: string; intro: ReactNode; actions: WelcomeAction[]; recentTitle: string; recent: WelcomeItem[]; recentEmpty: string; tip?: string }) {
 	return (
@@ -41,7 +41,7 @@ export default function Welcome({ logo, title, intro, actions, recentTitle, rece
 						<ul className="divide-y">
 							{actions.map((a) => (
 								<li key={a.label}>
-									<button type="button" onClick={a.run} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
+									<button type="button" onClick={a.run} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
 										<span className="text-primary">{a.icon}</span>
 										<span className="flex-1">{a.label}</span>
 										{a.keys && <Kbd>{a.keys}</Kbd>}
@@ -57,7 +57,7 @@ export default function Welcome({ logo, title, intro, actions, recentTitle, rece
 							<ul className="divide-y">
 								{recent.map((r) => (
 									<li key={r.key}>
-										<button type="button" onClick={r.run} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
+										<button type="button" onClick={r.run} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
 											{r.icon}
 											<span className="min-w-0 flex-1 truncate">{r.label}</span>
 											{r.sub && <span className="max-w-[40%] shrink-0 truncate font-mono text-[13px] text-muted-foreground">{r.sub}</span>}

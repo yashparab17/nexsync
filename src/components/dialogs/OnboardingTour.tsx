@@ -44,7 +44,7 @@ export default function OnboardingTour({ open, onClose }: { open: boolean; onClo
 				<DialogTitle>{t(`tour.${step}.title` as const)}</DialogTitle>
 			</DialogHeader>
 			<p className="py-2 text-sm text-muted-foreground">{t(`tour.${step}.body` as const)}</p>
-			<div className="flex justify-center gap-1.5" aria-hidden>
+			<div className="flex justify-center gap-2" aria-hidden>
 				{STEPS.map((s, i) => (
 					<span key={s} className={i === index ? "size-2 bg-primary" : "size-2 bg-muted"} />
 				))}

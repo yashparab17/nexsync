@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BUILTIN_THEMES, TOKENS, cleanCustomThemes, contrast, isColor, textToVars, themeCss, themeWarnings, varsToText } from "./themes";
+import { BUILTIN_THEMES, TOKENS, cleanCustomThemes, contrast, isColor, textToVars, themeCss, secondaryShare, themeWarnings, THEME_FAMILIES, varsToText } from "./themes";
 
 describe("themes", () => {
 	it("has six light and six dark themes, each with every colour", () => {
@@ -24,8 +24,8 @@ describe("themes", () => {
 	});
 
 	it("scopes a dark theme to the dark class and fills in derived colours", () => {
-		const css = themeCss(BUILTIN_THEMES.find((t) => t.id === "dracula")!);
-		expect(css).toContain('.dark[data-theme="dracula"]');
+		const css = themeCss(BUILTIN_THEMES.find((t) => t.id === "gruvbox-dark")!);
+		expect(css).toContain('.dark[data-theme="gruvbox-dark"]');
 		expect(css).toContain("--chart-3:");
 	});
 
@@ -46,5 +46,19 @@ describe("themes", () => {
 		expect(contrast("#000000", "#ffffff")).toBeCloseTo(21, 0);
 		expect(themeWarnings({ ...base, foreground: base.background }).join(" ")).toContain("Text is hard to read");
 		expect(themeWarnings({ ...base, input: base.background }).join(" ")).toContain("blend into the page");
+	});
+
+	it("lets secondary text use more of the text colour where 66% is too faint", () => {
+		const get = (id: string, mode: string) => BUILTIN_THEMES.find((t) => t.id === id && t.mode === mode)!.vars;
+		expect(secondaryShare(get("cyber", "dark"))).toBe(66);
+		expect(secondaryShare(get("latte", "light"))).toBeGreaterThan(66);
+	});
+
+	it("only has themes in pairs, one light and one dark", () => {
+		for (const f of THEME_FAMILIES) {
+			expect(BUILTIN_THEMES.some((t) => t.id === f.light && t.mode === "light"), f.id).toBe(true);
+			expect(BUILTIN_THEMES.some((t) => t.id === f.dark && t.mode === "dark"), f.id).toBe(true);
+		}
+		expect(BUILTIN_THEMES).toHaveLength(THEME_FAMILIES.length * 2);
 	});
 });

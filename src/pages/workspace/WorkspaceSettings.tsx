@@ -176,9 +176,9 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 
 				<SectionCard id="you" title="You" icon={<User className="size-5" />}>
 					<div className="flex items-center gap-4">
-						<Avatar name={myName} className="size-12 text-lg" />
+						<Avatar name={myName} className="size-12 text-xl" />
 						<div className="min-w-0 flex-1">
-							<p className="truncate text-base font-semibold">{myName}</p>
+							<p className="truncate text-sm font-semibold">{myName}</p>
 							<p className="text-xs text-muted-foreground">
 								{myRole ? `${myRole}. ` : ""}Your name and picture are the same everywhere in the app. Change your name in Members.
 							</p>
@@ -354,7 +354,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 								{guestCount > 0 &&
 									` ${guestCount} connected collaborator${guestCount > 1 ? "s" : ""} will be told it was deleted; their copies stay on their devices.`}
 								{" "}Other files in the same folder are never touched.</>} />
-						<div className="space-y-1.5">
+						<div className="space-y-2">
 							<Label htmlFor="confirm-name" className="text-xs">
 								Type the workspace name to confirm
 							</Label>

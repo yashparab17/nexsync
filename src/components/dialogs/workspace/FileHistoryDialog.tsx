@@ -229,7 +229,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 											setConfirming(false);
 											setRestored(false);
 										}}
-										className={cn("w-full px-2 py-1.5 text-left text-xs hover:bg-muted/50", v.id === selected && "bg-primary/10")}
+										className={cn("w-full px-2 py-2 text-left text-xs hover:bg-muted/50", v.id === selected && "bg-primary/10")}
 									>
 										<span className="block font-medium">{new Date(v.createdAt).toLocaleString()}</span>
 										<span className="block text-muted-foreground">
@@ -254,7 +254,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 												Changes in This Version
 											</Button>
 										</div>
-										<label className="flex items-center gap-1.5">
+										<label className="flex items-center gap-2">
 											<input type="checkbox" checked={ignoreWhitespace} onChange={(e) => setIgnoreWhitespace(e.target.checked)} />
 											Ignore whitespace
 										</label>

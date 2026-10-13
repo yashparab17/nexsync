@@ -114,11 +114,11 @@ export default function WorkspaceInsights() {
 
 			<PageBody padded={false}>
 				{tab === "overview" ? (
-					<div className="grid gap-3 p-3 lg:grid-cols-6">
+					<div className="grid gap-4 p-4 lg:grid-cols-6">
 						<Panel index="01" title="Last 14 Days" className="ticks ticks-on lg:col-span-4 lg:row-span-2">
 							<DayColumns days={days} label={`Actions per day over the last ${DAYS} days`} tall />
 						</Panel>
-						<div className="grid grid-cols-2 gap-3 lg:col-span-2">
+						<div className="grid grid-cols-2 gap-4 lg:col-span-2">
 							<Stat label="Actions recorded" value={events.length} trend={days.map((d) => d.count)} />
 							<Stat label="People active" value={people} />
 							<Stat label="Tasks finished" value={finishedTotal} />
@@ -138,7 +138,7 @@ export default function WorkspaceInsights() {
 										]}
 										center={
 											<>
-												<span className="text-2xl font-semibold tabular-nums">{Math.round((done / tasks.length) * 100)}%</span>
+												<span className="text-xl font-semibold tabular-nums">{Math.round((done / tasks.length) * 100)}%</span>
 												<span className="text-sm text-muted-foreground">done</span>
 											</>
 										}
@@ -182,13 +182,13 @@ export default function WorkspaceInsights() {
 							/>
 							{load.length > 0 && (
 								<p className="mt-3 flex gap-4 text-sm text-muted-foreground">
-									<span className="flex items-center gap-1.5"><span className="size-3 bg-primary" aria-hidden />Tasks</span>
-									<span className="flex items-center gap-1.5"><span className="size-3 bg-info" aria-hidden />Cards</span>
+									<span className="flex items-center gap-2"><span className="size-3 bg-primary" aria-hidden />Tasks</span>
+									<span className="flex items-center gap-2"><span className="size-3 bg-info" aria-hidden />Cards</span>
 								</p>
 							)}
 						</Panel>
 						<Panel index="08" title="Where the Work Happens" className="lg:col-span-3">
-							{byKind.length === 0 ? <Empty>Nothing recorded yet.</Empty> : <Donut label="Actions by part of the app" parts={byKind.slice(0, SERIES.length).map(([label, value]) => ({ label, value }))} center={<><span className="text-2xl font-semibold tabular-nums">{events.length}</span><span className="text-sm text-muted-foreground">actions</span></>} />}
+							{byKind.length === 0 ? <Empty>Nothing recorded yet.</Empty> : <Donut label="Actions by part of the app" parts={byKind.slice(0, SERIES.length).map(([label, value]) => ({ label, value }))} center={<><span className="text-xl font-semibold tabular-nums">{events.length}</span><span className="text-sm text-muted-foreground">actions</span></>} />}
 						</Panel>
 					</div>
 				) : feed.length === 0 ? (
@@ -197,7 +197,7 @@ export default function WorkspaceInsights() {
 					<>
 						<ul className="divide-y">
 							{feed.slice(0, FEED_LIMIT).map((e) => (
-								<li key={e.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+								<li key={e.id} className="flex items-center gap-3 px-3 py-3 text-sm">
 									<Avatar name={authorOf(e)} className="size-6 text-xs" />
 									<div className="min-w-0 flex-1">
 										<p className="truncate font-medium">{e.action}</p>

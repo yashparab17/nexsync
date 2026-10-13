@@ -510,7 +510,7 @@ export default function WorkspaceKanban() {
 			</Toolbar>
 
 			{allTags.length > 0 && (
-				<Toolbar variant="sub" className="gap-1.5 overflow-x-auto">
+				<Toolbar variant="sub" className="gap-2 overflow-x-auto">
 					<span className="font-mono text-[13px] text-muted-foreground">tags</span>
 					{allTags.map((tag) => (
 						<TagChip key={tag} tag={tag} active={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)} />
@@ -537,7 +537,7 @@ export default function WorkspaceKanban() {
 					Your board is empty. Add a column to get started.
 				</EmptyState>
 			) : (
-				<div className="flex min-h-0 flex-1 overflow-x-auto">
+				<div className="flex min-h-0 flex-1 gap-4 overflow-x-auto p-4">
 					{columns.map((col, colIndex) => {
 						const prevCol = colIndex > 0 ? columns[colIndex - 1] : null;
 						const nextCol =
@@ -546,11 +546,12 @@ export default function WorkspaceKanban() {
 						return (
 							<div
 								key={col.id}
-								className="group/col flex min-h-0 min-w-72 flex-1 basis-72 flex-col border-r bg-panel last:border-r-0"
+								className="group/col frame flex min-h-0 min-w-72 flex-1 basis-72 flex-col bg-panel"
 							>
 								{/* Column Header */}
-								<div className="flex h-10 shrink-0 items-center justify-between border-b pr-2 pl-3">
+								<div className="flex h-12 shrink-0 items-center justify-between border-b pr-2 pl-3">
 									<div className="flex items-center gap-2">
+										<span className="font-mono text-[13px] text-primary" aria-hidden>{String(colIndex + 1).padStart(2, "0")}</span>
 										<h3 className="truncate text-sm font-semibold text-foreground">
 											{col.title}
 										</h3>
@@ -612,7 +613,7 @@ export default function WorkspaceKanban() {
 											<div
 												key={card.id}
 												className={cn(
-													"group relative border border-l-2 border-l-transparent bg-card p-3 transition-colors hover:border-l-primary",
+													"group frame ticks relative border-l-2 border-l-transparent bg-card p-3 transition-colors hover:border-l-primary",
 													dragId === card.id && "opacity-40",
 													drop?.colId === col.id && drop.index === col.cards.indexOf(card) && "border-t-2 border-t-primary",
 													drop?.colId === col.id &&
@@ -676,7 +677,7 @@ export default function WorkspaceKanban() {
 												</div>
 
 												{card.description && (
-													<p className="mt-1.5 line-clamp-3 text-sm text-muted-foreground">
+													<p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
 														{card.description}
 													</p>
 												)}
@@ -686,7 +687,7 @@ export default function WorkspaceKanban() {
 													card.assignee_id ||
 													(card.checklist ?? []).length > 0 ||
 													(card.violations ?? []).length > 0) && (
-													<div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+													<div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
 														<RuleFlag violations={card.violations} />
 															<DueBadge due={card.due_date} done={colIndex === columns.length - 1} />
 														{(card.checklist ?? []).length > 0 && (
@@ -758,7 +759,7 @@ export default function WorkspaceKanban() {
 											openNewCard(col.id);
 										}}
 									>
-										<Plus className="size-3.5 mr-1.5" />
+										<Plus className="size-3.5 mr-2" />
 										Add a Card
 									</Button>
 								)}

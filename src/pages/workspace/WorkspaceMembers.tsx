@@ -271,8 +271,8 @@ export default function WorkspaceMembers() {
 			</Toolbar>
 
 			{/* Members Grid & Roles Overview */}
-			<PageBody className="grid content-start grid-cols-1 gap-3 lg:grid-cols-3">
-				<Panel title="People" className="lg:col-span-2">
+			<PageBody className="grid content-start grid-cols-1 gap-4 lg:grid-cols-3">
+				<Panel index="01" title="People" className="lg:col-span-2">
 					<div className="space-y-3">
 							{isJoinedCopy && (
 								<p className="text-xs text-muted-foreground">
@@ -304,7 +304,7 @@ export default function WorkspaceMembers() {
 									return (
 										<div
 											key={member.id}
-											className="flex items-center justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted"
+											className="flex items-center justify-between gap-3 px-3 py-3 transition-colors hover:bg-muted"
 										>
 											<div className="flex items-center gap-3">
 												<span className="relative">
@@ -424,10 +424,10 @@ export default function WorkspaceMembers() {
 					</div>
 				</Panel>
 
-				<Panel title="Roles" className="self-start">
+				<Panel index="02" title="Roles" className="self-start">
 					<div className="space-y-4 text-sm">
 							<div className="border-l-2 border-border py-1 pl-4">
-								<div className="flex items-center gap-1.5 font-semibold text-warning">
+								<div className="flex items-center gap-2 font-semibold text-warning">
 									<Crown className="size-3.5" />
 									Owner
 								</div>
@@ -437,7 +437,7 @@ export default function WorkspaceMembers() {
 							</div>
 
 							<div className="border-l-2 border-border py-1 pl-4">
-								<div className="flex items-center gap-1.5 font-semibold text-info">
+								<div className="flex items-center gap-2 font-semibold text-info">
 									<ShieldCheck className="size-3.5" />
 									Admin
 								</div>
@@ -448,7 +448,7 @@ export default function WorkspaceMembers() {
 							</div>
 
 							<div className="border-l-2 border-border py-1 pl-4">
-								<div className="flex items-center gap-1.5 font-semibold text-info">
+								<div className="flex items-center gap-2 font-semibold text-info">
 									<Shield className="size-3.5" />
 									Editor
 								</div>
@@ -458,7 +458,7 @@ export default function WorkspaceMembers() {
 							</div>
 
 							<div className="border-l-2 border-border py-1 pl-4">
-								<div className="flex items-center gap-1.5 font-semibold text-success">
+								<div className="flex items-center gap-2 font-semibold text-success">
 									<UserCheck className="size-3.5" />
 									Viewer
 								</div>

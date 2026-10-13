@@ -506,7 +506,7 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 								type="button"
 								aria-current={i === crumbs.length - 1 ? "page" : undefined}
 								className={cn(
-									"max-w-[16rem] truncate px-1.5 py-0.5 font-mono outline-none transition-colors focus-visible:bg-muted",
+									"max-w-[16rem] truncate px-2 py-0.5 font-mono outline-none transition-colors focus-visible:bg-muted",
 									i === crumbs.length - 1 ? "font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
 								)}
 								onClick={() => navigateToDir(crumb.dir)}
@@ -608,7 +608,7 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 												: cn("grid grid-cols-[minmax(0,1fr)_7rem_6rem_11rem] items-center gap-4 border-b px-4 py-2", active ? "bg-primary/10 shadow-[inset_2px_0_0_var(--primary)]" : "hover:bg-muted/50"),
 										)}
 									>
-										<span className={cn("flex min-w-0 items-center gap-2.5", view === "grid" && "w-full flex-col")}>
+										<span className={cn("flex min-w-0 items-center gap-3", view === "grid" && "w-full flex-col")}>
 											{entry.is_dir ? <FolderKindIcon name={entry.name} className={view === "grid" ? "size-10" : "size-5"} /> : <FileKindIcon name={entry.name} className={view === "grid" ? "size-10" : "size-5"} />}
 											<span title={entry.name} className={cn("min-w-0 text-sm", view === "grid" ? "line-clamp-2 w-full text-center break-all" : "truncate font-medium")}>{entry.name}</span>
 										</span>

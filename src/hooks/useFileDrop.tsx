@@ -45,7 +45,7 @@ export function DropOverlay({ show, title, hint, className }: { show: boolean; t
 	return (
 		<div className={cn("pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center gap-1 border-2 border-dashed border-primary bg-background/85 text-center backdrop-blur-sm animate-in fade-in duration-150 motion-reduce:animate-none", className)}>
 			<UploadCloud className="mb-2 size-10 text-primary" />
-			<p className="px-4 text-base font-semibold">{title}</p>
+			<p className="px-4 text-sm font-semibold">{title}</p>
 			{hint && <p className="px-4 text-sm text-muted-foreground">{hint}</p>}
 		</div>
 	);

@@ -5,7 +5,7 @@ import { isColor } from "./themes";
 
 describe("code schemes", () => {
 	it("has ready-made schemes for both modes, each with every colour", () => {
-		expect(BUILTIN_SCHEMES.filter((s) => s.mode === "dark").length).toBeGreaterThanOrEqual(5);
+		expect(BUILTIN_SCHEMES.filter((s) => s.mode === "dark").length).toBeGreaterThanOrEqual(4);
 		expect(BUILTIN_SCHEMES.filter((s) => s.mode === "light").length).toBeGreaterThanOrEqual(4);
 		for (const s of BUILTIN_SCHEMES) for (const { key } of SYNTAX_TOKENS) expect(isColor(s.vars[key]), `${s.id} ${key}`).toBe(true);
 	});

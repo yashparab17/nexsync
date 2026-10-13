@@ -189,7 +189,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 					<span className="truncate font-medium">{noteTitle(fileName)}</span>
 					{isMarkdown && <span className="shrink-0 font-mono text-xs text-muted-foreground">.md</span>}
 					{dirty || saving ? (
-						<span className="flex shrink-0 items-center gap-1.5 text-xs text-warning" role="status">
+						<span className="flex shrink-0 items-center gap-2 text-xs text-warning" role="status">
 							<span className="size-1.5 animate-pulse bg-warning motion-reduce:animate-none" />
 							{saving ? "Saving…" : "Unsaved"}
 						</span>
@@ -273,7 +273,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 			</div>
 
 			{branch && (
-				<div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-1.5 text-xs">
+				<div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-2 text-xs">
 					<GitBranch className="size-3.5 shrink-0 text-primary" />
 					<span className="min-w-0 flex-1">
 						You are working on the branch <span className="font-semibold">{branch.name}</span>. {fileName} does not change until the branch is merged.

@@ -1,4 +1,4 @@
-// The themes. Each is the same eighteen colours; everything else (card text, sidebar, charts, the scrim) is worked out from
+// The themes. Each is the same seventeen colours; everything else (card text, sidebar, charts, the scrim) is worked out from
 // them by themeCss, so a theme someone makes can stay short. The two "default" themes are written out in index.css as well, so
 // the app is never unstyled before this runs; the copy here is what the picker shows and what a custom theme starts from.
 
@@ -12,7 +12,6 @@ export const TOKENS = [
 	{ key: "primary-foreground", label: "Text on accent", hint: "On accent buttons" },
 	{ key: "secondary", label: "Secondary surface", hint: "Chips and buttons" },
 	{ key: "muted", label: "Muted surface", hint: "Hover and inactive areas" },
-	{ key: "muted-foreground", label: "Muted text", hint: "Hints and secondary text" },
 	{ key: "accent", label: "Hover surface", hint: "Highlighted rows" },
 	{ key: "border", label: "Border", hint: "Lines between things" },
 	{ key: "input", label: "Field fill", hint: "Fill of text fields" },
@@ -43,27 +42,17 @@ export const FIRST_RUN_THEME = "cyber";
 const light = (id: string, name: string, vars: ThemeVars): ThemeDef => ({ id, name, mode: "light", vars });
 const dark = (id: string, name: string, vars: ThemeVars): ThemeDef => ({ id, name, mode: "dark", vars });
 
+// Themes come in pairs, one for each mode, so switching between light and dark keeps the same look
+export const THEME_FAMILIES = [
+	{ id: "cyber", name: "Cyber", light: "cyber", dark: "cyber" },
+	{ id: "legacy", name: "Legacy", light: "default", dark: "default" },
+	{ id: "catppuccin", name: "Catppuccin", light: "latte", dark: "mocha" },
+	{ id: "solarized", name: "Solarized", light: "solarized-light", dark: "solarized-dark" },
+	{ id: "gruvbox", name: "Gruvbox", light: "gruvbox-light", dark: "gruvbox-dark" },
+	{ id: "github", name: "GitHub", light: "github-light", dark: "github-dark" },
+] as const;
+
 export const BUILTIN_THEMES: ThemeDef[] = [
-	light("default", "Original light", {
-		"background": "#ffffff",
-		"foreground": "#09090b",
-		"card": "#ffffff",
-		"popover": "#ffffff",
-		"primary": "#0f766e",
-		"primary-foreground": "#f0fdfa",
-		"secondary": "#f4f4f5",
-		"muted": "#f4f4f5",
-		"muted-foreground": "#696972",
-		"accent": "#f4f4f5",
-		"destructive": "#dc2626",
-		"success": "#15803d",
-		"warning": "#a16207",
-		"info": "#1d4ed8",
-		"border": "#e4e4e7",
-		"input": "#e4e4e7",
-		"ring": "#a1a1aa",
-		"sidebar": "#fafafa",
-	}),
 	light("cyber", "Cyber Light", {
 		"background": "#e4ebf5",
 		"foreground": "#0a1220",
@@ -73,7 +62,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"primary-foreground": "#f5f8ff",
 		"secondary": "#d6dfec",
 		"muted": "#d9e1ee",
-		"muted-foreground": "#4a586d",
 		"accent": "#cfdbee",
 		"destructive": "#c62828",
 		"success": "#0f7a5c",
@@ -84,6 +72,25 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"ring": "#0a9a9a",
 		"sidebar": "#f0f4fa",
 	}),
+	light("default", "Legacy Light", {
+		"background": "#ffffff",
+		"foreground": "#09090b",
+		"card": "#ffffff",
+		"popover": "#ffffff",
+		"primary": "#0f766e",
+		"primary-foreground": "#f0fdfa",
+		"secondary": "#f4f4f5",
+		"muted": "#f4f4f5",
+		"accent": "#f4f4f5",
+		"destructive": "#dc2626",
+		"success": "#15803d",
+		"warning": "#a16207",
+		"info": "#1d4ed8",
+		"border": "#e4e4e7",
+		"input": "#e4e4e7",
+		"ring": "#a1a1aa",
+		"sidebar": "#fafafa",
+	}),
 	light("latte", "Catppuccin Latte", {
 		"background": "#dce0e8",
 		"foreground": "#4c4f69",
@@ -93,7 +100,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"primary-foreground": "#eff1f5",
 		"secondary": "#ccd0da",
 		"muted": "#ccd0da",
-		"muted-foreground": "#52556d",
 		"accent": "#ccd0da",
 		"destructive": "#b00d31",
 		"success": "#26701a",
@@ -113,7 +119,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"primary-foreground": "#fdf6e3",
 		"secondary": "#e8e1cb",
 		"muted": "#e8e1cb",
-		"muted-foreground": "#4f656c",
 		"accent": "#e8e1cb",
 		"destructive": "#b8262a",
 		"success": "#5f6f00",
@@ -133,7 +138,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"primary-foreground": "#fbf1c7",
 		"secondary": "#d5c4a1",
 		"muted": "#d5c4a1",
-		"muted-foreground": "#5a4f48",
 		"accent": "#d5c4a1",
 		"destructive": "#9d0006",
 		"success": "#5f5c0a",
@@ -153,7 +157,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"primary-foreground": "#ffffff",
 		"secondary": "#dfe4ea",
 		"muted": "#dfe4ea",
-		"muted-foreground": "#4b5560",
 		"accent": "#dfe4ea",
 		"destructive": "#cf222e",
 		"success": "#17702f",
@@ -164,26 +167,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"ring": "#0969da",
 		"sidebar": "#f6f8fa",
 	}),
-	dark("default", "Original dark", {
-		"background": "#09090b",
-		"foreground": "#fafafa",
-		"card": "#18181b",
-		"popover": "#18181b",
-		"primary": "#2dd4bf",
-		"primary-foreground": "#042f2e",
-		"secondary": "#27272a",
-		"muted": "#27272a",
-		"muted-foreground": "#a1a1aa",
-		"accent": "#27272a",
-		"destructive": "#ff6467",
-		"success": "#4ade80",
-		"warning": "#fbbf24",
-		"info": "#7aa7ff",
-		"border": "#2a2a2e",
-		"input": "#3a3a3e",
-		"ring": "#71717a",
-		"sidebar": "#18181b",
-	}),
 	dark("cyber", "Cyber Dark", {
 		"background": "#05070d",
 		"foreground": "#e6edf7",
@@ -193,7 +176,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"primary-foreground": "#04070d",
 		"secondary": "#121a27",
 		"muted": "#101826",
-		"muted-foreground": "#8a97ad",
 		"accent": "#14203a",
 		"destructive": "#ff5d6c",
 		"success": "#2de3a0",
@@ -204,6 +186,25 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"ring": "#19d3e6",
 		"sidebar": "#0a0f18",
 	}),
+	dark("default", "Legacy Dark", {
+		"background": "#09090b",
+		"foreground": "#fafafa",
+		"card": "#18181b",
+		"popover": "#18181b",
+		"primary": "#2dd4bf",
+		"primary-foreground": "#042f2e",
+		"secondary": "#27272a",
+		"muted": "#27272a",
+		"accent": "#27272a",
+		"destructive": "#ff6467",
+		"success": "#4ade80",
+		"warning": "#fbbf24",
+		"info": "#7aa7ff",
+		"border": "#2a2a2e",
+		"input": "#3a3a3e",
+		"ring": "#71717a",
+		"sidebar": "#18181b",
+	}),
 	dark("mocha", "Catppuccin Mocha", {
 		"background": "#11111b",
 		"foreground": "#cdd6f4",
@@ -213,7 +214,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"primary-foreground": "#11111b",
 		"secondary": "#313244",
 		"muted": "#313244",
-		"muted-foreground": "#a6adc8",
 		"accent": "#313244",
 		"destructive": "#f38ba8",
 		"success": "#a6e3a1",
@@ -233,7 +233,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"primary-foreground": "#00212b",
 		"secondary": "#0e4552",
 		"muted": "#0e4552",
-		"muted-foreground": "#a4b1b1",
 		"accent": "#0e4552",
 		"destructive": "#ff6b66",
 		"success": "#9aae1a",
@@ -244,45 +243,43 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"ring": "#2aa198",
 		"sidebar": "#073642",
 	}),
-	dark("dracula", "Dracula", {
-		"background": "#1e1f29",
-		"foreground": "#f8f8f2",
-		"card": "#282a36",
-		"popover": "#282a36",
-		"primary": "#bd93f9",
-		"primary-foreground": "#1e1f29",
-		"secondary": "#343746",
-		"muted": "#343746",
-		"muted-foreground": "#aab1d4",
-		"accent": "#343746",
-		"destructive": "#ff6e6e",
-		"success": "#50fa7b",
-		"warning": "#f1fa8c",
-		"info": "#8be9fd",
-		"border": "#44475a",
-		"input": "#4d5066",
-		"ring": "#bd93f9",
-		"sidebar": "#282a36",
+	dark("gruvbox-dark", "Gruvbox Dark", {
+		"background": "#1d2021",
+		"foreground": "#ebdbb2",
+		"card": "#282828",
+		"popover": "#32302f",
+		"primary": "#fabd2f",
+		"primary-foreground": "#1d2021",
+		"secondary": "#3c3836",
+		"muted": "#32302f",
+		"accent": "#3c3836",
+		"destructive": "#fb4934",
+		"success": "#b8bb26",
+		"warning": "#fe8019",
+		"info": "#83a598",
+		"border": "#3c3836",
+		"input": "#504945",
+		"ring": "#fabd2f",
+		"sidebar": "#282828",
 	}),
-	dark("nord", "Nord", {
-		"background": "#242933",
-		"foreground": "#eceff4",
-		"card": "#2e3440",
-		"popover": "#3b4252",
-		"primary": "#88c0d0",
-		"primary-foreground": "#242933",
-		"secondary": "#3b4252",
-		"muted": "#3b4252",
-		"muted-foreground": "#b0b9cb",
-		"accent": "#3b4252",
-		"destructive": "#e08790",
-		"success": "#a3be8c",
-		"warning": "#ebcb8b",
-		"info": "#93b4dc",
-		"border": "#3b4252",
-		"input": "#4c566a",
-		"ring": "#88c0d0",
-		"sidebar": "#2e3440",
+	dark("github-dark", "GitHub Dark", {
+		"background": "#0d1117",
+		"foreground": "#e6edf3",
+		"card": "#161b22",
+		"popover": "#161b22",
+		"primary": "#58a6ff",
+		"primary-foreground": "#0d1117",
+		"secondary": "#21262d",
+		"muted": "#21262d",
+		"accent": "#21262d",
+		"destructive": "#f85149",
+		"success": "#3fb950",
+		"warning": "#d29922",
+		"info": "#79c0ff",
+		"border": "#30363d",
+		"input": "#30363d",
+		"ring": "#58a6ff",
+		"sidebar": "#161b22",
 	}),
 ];
 
@@ -290,7 +287,7 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 // rule and start another
 export const isColor = (value: string) => /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value) || /^(?:rgb|rgba|hsl|hsla|oklch|oklab|lab|lch|hwb)\([0-9a-z%.,\s/+-]{1,80}\)$/i.test(value);
 
-const DERIVED = (mode: ThemeMode): [string, string][] => [
+const DERIVED = (mode: ThemeMode, share: number): [string, string][] => [
 	["card-foreground", "var(--foreground)"],
 	["popover-foreground", "var(--foreground)"],
 	["secondary-foreground", "var(--foreground)"],
@@ -307,12 +304,15 @@ const DERIVED = (mode: ThemeMode): [string, string][] => [
 	["chart-3", "color-mix(in oklch, var(--primary) 62%, var(--background))"],
 	["chart-4", "color-mix(in oklch, var(--primary) 46%, var(--background))"],
 	["chart-5", "color-mix(in oklch, var(--primary) 32%, var(--background))"],
+	// Text hierarchy by opacity of the text colour: 100% text, 66% secondary, 45% tertiary; rules are 16% (--rule, in index.css)
+	["muted-foreground", `color-mix(in srgb, var(--foreground) ${share}%, var(--background))`],
+	["fg-3", "color-mix(in srgb, var(--foreground) 45%, var(--background))"],
 	["scrim", mode === "dark" ? "color-mix(in srgb, black 70%, transparent)" : "color-mix(in srgb, var(--foreground) 45%, transparent)"],
 ];
 
 // Every variable a theme sets, as name and value, including the ones worked out from its colours
 export function themeEntries(def: Pick<ThemeDef, "mode" | "vars">): [string, string][] {
-	return [...Object.entries(def.vars).map(([k, v]): [string, string] => [k, v]), ...DERIVED(def.mode)];
+	return [...Object.entries(def.vars).map(([k, v]): [string, string] => [k, v]), ...DERIVED(def.mode, secondaryShare(def.vars as ThemeVars))];
 }
 
 // The style rule for a theme: it applies when <html> has data-theme set to its id, and for the dark ones the dark class too
@@ -338,6 +338,30 @@ export function contrast(a: string, b: string): number | null {
 	return (hi + 0.05) / (lo + 0.05);
 }
 
+// The colour a given share of `fg` gives when laid over `bg` (both hex), as hex; used for the opacity tiers of text
+export function mixHex(fg: string, bg: string, share: number): string | null {
+	const rgb = (h: string) => {
+		const m = /^#([0-9a-f]{6})$/i.exec(h.trim());
+		return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null;
+	};
+	const [a, b] = [rgb(fg), rgb(bg)];
+	if (!a || !b) return null;
+	return "#" + a.map((v, i) => Math.round(v * share + b[i] * (1 - share)).toString(16).padStart(2, "0")).join("");
+}
+
+// How much of the text colour the secondary text (hints, labels) uses: 66% unless that is too faint on the page or on muted
+// surfaces, then as much more as it takes to reach 4.5:1. Colours not written as hex keep 66%.
+export function secondaryShare(v: ThemeVars): number {
+	for (let share = 66; share < 100; share += 2) {
+		const mixed = mixHex(v.foreground, v.background, share / 100);
+		if (!mixed) return 66;
+		const onBg = contrast(mixed, v.background);
+		const onMuted = contrast(mixed, v.muted);
+		if (onBg === null || onMuted === null || (onBg >= 4.5 && onMuted >= 4.5)) return share;
+	}
+	return 100;
+}
+
 // Plain-words problems with a set of colours: text that is hard to read, or fields and panels that vanish into the page
 export function themeWarnings(v: ThemeVars): string[] {
 	const out: string[] = [];
@@ -346,7 +370,7 @@ export function themeWarnings(v: ThemeVars): string[] {
 		return c !== null && c < min;
 	};
 	if (low("foreground", "background", 4.5)) out.push("Text is hard to read on the page background.");
-	if (low("muted-foreground", "background", 4.5)) out.push("Muted text is hard to read on the page background.");
+	if (low("foreground", "muted", 4.5)) out.push("Text is hard to read on muted surfaces.");
 	if (low("primary-foreground", "primary", 4.5)) out.push("Text on the accent is hard to read.");
 	if (low("input", "background", 1.15)) out.push("Text fields blend into the page. Pick a field fill that differs from the page background.");
 	if (low("muted", "background", 1.05)) out.push("Muted surfaces blend into the page, so hover and inactive areas will be hard to see.");

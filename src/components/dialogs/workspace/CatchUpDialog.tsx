@@ -93,7 +93,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 						</p>
 					</div>
 					{canRevertField(e) && (
-						<Button size="sm" variant="outline" isDisabled={busy} onPress={() => void revertField(e)} className="gap-1.5">
+						<Button size="sm" variant="outline" isDisabled={busy} onPress={() => void revertField(e)} className="gap-2">
 							<Undo2 className="size-3.5" />
 							Undo
 						</Button>
@@ -107,7 +107,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 							{undone.has(`${e.id}:${index}`) ? (
 								<span className="text-xs text-muted-foreground">Undone</span>
 							) : (
-								<Button size="sm" variant="outline" isDisabled={busy || e.state === "reverted"} onPress={() => void revertHunkOf(e, index)} className="h-6 gap-1.5 px-2 text-xs">
+								<Button size="sm" variant="outline" isDisabled={busy || e.state === "reverted"} onPress={() => void revertHunkOf(e, index)} className="h-6 gap-2 px-2 text-xs">
 									<Undo2 className="size-3" />
 									Undo This Change
 								</Button>
@@ -159,7 +159,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 												</span>
 											)}
 										</h3>
-										<Button size="sm" variant="ghost" isDisabled={busy} onPress={() => void markReviewed(group.entries)} className="gap-1.5">
+										<Button size="sm" variant="ghost" isDisabled={busy} onPress={() => void markReviewed(group.entries)} className="gap-2">
 											<Check className="size-3.5" />
 											Mark Reviewed
 										</Button>

@@ -12,7 +12,8 @@
     --font-sans: 'Onest Variable', system-ui, sans-serif;
     --text-xs: 0.8125rem;
     --text-sm: 0.9375rem;
-    --text-base: 1.0625rem;
+    --text-base: 0.9375rem;
+    --text-4xl: 2rem;
     --color-scrim: var(--scrim);
     --color-success: var(--success);
     --color-warning: var(--warning);
@@ -38,6 +39,7 @@
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
+    --color-fg-3: var(--fg-3);
     --color-muted: var(--muted);
     --color-secondary-foreground: var(--secondary-foreground);
     --color-secondary: var(--secondary);
@@ -72,7 +74,7 @@
     --secondary: oklch(0.967 0.001 286.375);
     --secondary-foreground: oklch(0.21 0.006 285.885);
     --muted: oklch(0.967 0.001 286.375);
-    --muted-foreground: oklch(0.52 0.016 285.938);
+    --muted-foreground: color-mix(in srgb, var(--foreground) 66%, var(--background));
     --accent: oklch(0.967 0.001 286.375);
     --accent-foreground: oklch(0.21 0.006 285.885);
     --destructive: oklch(0.577 0.245 27.325);
@@ -112,7 +114,7 @@
     --secondary: oklch(0.274 0.006 286.033);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.274 0.006 286.033);
-    --muted-foreground: oklch(0.705 0.015 286.067);
+    --muted-foreground: color-mix(in srgb, var(--foreground) 66%, var(--background));
     --accent: oklch(0.274 0.006 286.033);
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.704 0.191 22.216);
@@ -363,9 +365,8 @@ button, a, select, summary, label, [role="button"] { touch-action: manipulation;
   border-color: var(--primary);
 }
 
-/* Terminal / HUD layer. Rules frame the tiles; the effects below belong to chrome only (title bar, Welcome, empty states, tiles),
-   never to text people read or write, and the Effects switch in Settings → Appearance turns them off (data-effects="off"). */
-:root { --rule: color-mix(in oklch, var(--foreground) 16%, transparent); }
+/* Terminal / HUD layer. Rules frame the tiles and corner ticks mark hover, focus and selection. */
+:root { --fg-3: color-mix(in srgb, var(--foreground) 45%, var(--background)); --rule: color-mix(in oklch, var(--foreground) 16%, transparent); }
 
 /* A thin rule round a tile, in place of a border. The accent takes over on hover and focus. */
 .frame { box-shadow: none; outline: 1px solid var(--rule); outline-offset: -1px; }
@@ -387,13 +388,3 @@ button, a, select, summary, label, [role="button"] { touch-action: manipulation;
     linear-gradient(var(--primary), var(--primary)) right bottom / var(--w) var(--t) no-repeat;
 }
 .ticks:is(button, a):hover::after, .ticks:focus-visible::after, .ticks[aria-current="true"]::after, .ticks.ticks-on::after { opacity: 1; }
-
-/* A faint scanline pattern over a surface, and a block cursor that blinks after a line of text */
-:root:not([data-effects="off"]) .scanlines { position: relative; }
-:root:not([data-effects="off"]) .scanlines::before {
-  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-  background: repeating-linear-gradient(to bottom, transparent 0 2px, color-mix(in oklch, var(--foreground) 4%, transparent) 2px 3px);
-}
-:root:not([data-effects="off"]) .cursor::after { content: "▍"; margin-left: 0.25em; color: var(--primary); animation: cursor-blink 1.1s steps(1) infinite; }
-@keyframes cursor-blink { 50% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .cursor::after { animation: none !important; } }

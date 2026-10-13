@@ -12,14 +12,14 @@ export default function ShortcutsDialog({ onClose }: { onClose: () => void }) {
 				<div className="grid max-h-[60vh] gap-x-8 gap-y-4 overflow-y-auto sm:grid-cols-2">
 					{SHORTCUT_GROUPS.map((g) => (
 						<section key={g.title} aria-label={g.title}>
-							<h3 className="mb-1.5 font-mono text-[13px] text-muted-foreground">{g.title}</h3>
+							<h3 className="mb-2 font-mono text-[13px] text-muted-foreground">{g.title}</h3>
 							<ul className="space-y-1">
 								{g.items.map((s) => (
 									<li key={s.keys.join("+") + s.label} className="flex items-center justify-between gap-3 text-sm">
 										<span>{s.label}</span>
 										<span className="flex shrink-0 gap-1">
 											{s.keys.map((k) => (
-												<kbd key={k} className="min-w-6 border border-b-2 bg-muted px-1.5 text-center font-mono text-[13px] leading-5">{k}</kbd>
+												<kbd key={k} className="min-w-6 border border-b-2 bg-muted px-2 text-center font-mono text-[13px] leading-5">{k}</kbd>
 											))}
 										</span>
 									</li>

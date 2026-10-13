@@ -50,7 +50,7 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 	return (
 		<SectionCard id="diagnostics" title="Error Log" icon={<Bug className="size-5" />}>
 				<div className="flex flex-wrap gap-2">
-					<Button variant="outline" size="sm" onPress={refresh} className="gap-1.5">
+					<Button variant="outline" size="sm" onPress={refresh} className="gap-2">
 						<RefreshCw className="size-3.5" />
 						Refresh
 					</Button>
@@ -59,12 +59,12 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 						size="sm"
 						onPress={() => copy(asText(), "log")}
 						isDisabled={records.length === 0}
-						className="gap-1.5"
+						className="gap-2"
 					>
 						{copiedKey === "log" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
 						{copiedKey === "log" ? "Copied" : "Copy All"}
 					</Button>
-					<Button variant="outline" size="sm" onPress={copyDiagnostics} className="gap-1.5">
+					<Button variant="outline" size="sm" onPress={copyDiagnostics} className="gap-2">
 						{copiedKey === "diagnostics" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
 						{copiedKey === "diagnostics" ? "Copied" : "Copy Diagnostics"}
 					</Button>
@@ -73,7 +73,7 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 						size="sm"
 						onPress={handleClear}
 						isDisabled={records.length === 0}
-						className="gap-1.5"
+						className="gap-2"
 					>
 						<Trash2 className="size-3.5" />
 						Clear

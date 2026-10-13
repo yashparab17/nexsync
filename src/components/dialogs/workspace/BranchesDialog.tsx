@@ -127,7 +127,7 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 									</p>
 									{canEdit && review.branch.status === "open" && (
 										<div className="flex gap-2">
-											<Button size="sm" onPress={merge} className="gap-1.5">
+											<Button size="sm" onPress={merge} className="gap-2">
 												<GitMerge className="size-3.5" />
 												Merge into the File
 											</Button>

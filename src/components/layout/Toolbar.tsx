@@ -3,7 +3,7 @@
 
 import type { ComponentProps, ReactNode } from "react";
 
-import { Search, X } from "@/components/animate-icons";
+import { X } from "@/components/animate-icons";
 import { cn } from "@/lib/utils";
 
 const VARIANTS = {
@@ -33,7 +33,7 @@ export function ToolbarTabs<T extends string>({ label, value, onChange, tabs }: 
 					aria-selected={value === tab.key}
 					onClick={() => onChange(tab.key)}
 					className={cn(
-						"flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-sm whitespace-nowrap outline-none transition-colors focus-visible:bg-muted",
+						"flex cursor-pointer items-center gap-2 px-3 py-2 text-sm whitespace-nowrap outline-none transition-colors focus-visible:bg-muted",
 						value === tab.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
 					)}
 				>
@@ -49,7 +49,7 @@ export function ToolbarTabs<T extends string>({ label, value, onChange, tabs }: 
 export function ToolbarSearch({ label, value, onChange, placeholder, className }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; className?: string }) {
 	return (
 		<div className={cn("relative w-44", className)}>
-			<Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+			<span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 font-mono text-[13px] text-primary" aria-hidden>&gt;</span>
 			<input
 				type="search"
 				value={value}
@@ -99,7 +99,7 @@ export function ToolbarSwitch<T extends string>({ label, value, onChange, option
 					aria-label={o.title}
 					title={o.title}
 					onClick={() => onChange(o.value)}
-					className={cn("flex h-8 min-w-8 items-center justify-center px-1.5 font-mono text-[13px] outline-none focus-visible:bg-muted", value === o.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
+					className={cn("flex h-8 min-w-8 items-center justify-center px-2 font-mono text-[13px] outline-none focus-visible:bg-muted", value === o.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
 				>
 					{o.label}
 				</button>

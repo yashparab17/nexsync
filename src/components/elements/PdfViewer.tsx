@@ -109,7 +109,7 @@ export default function PdfViewer({ base64, name }: { base64: string; name: stri
 	const pageWidth = Math.max(120, Math.min(available - 32, 1400) * factor);
 	return (
 		<div className="flex h-full min-h-0 w-full flex-col">
-			<div className="flex shrink-0 items-center gap-2 border-b bg-card/60 px-3 py-1.5 text-sm">
+			<div className="flex shrink-0 items-center gap-2 border-b bg-card/60 px-3 py-2 text-sm">
 				<span className="font-mono text-xs text-muted-foreground">
 					{doc.numPages} {doc.numPages === 1 ? "page" : "pages"}
 				</span>

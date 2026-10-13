@@ -43,7 +43,7 @@ export default forwardRef<TerminalPanelHandle, EditorPanelProps>(function Editor
 						>
 							{t.icon}
 							{t.label}
-							{t.count ? <span className="bg-destructive/15 px-1.5 font-mono text-xs text-destructive">{t.count}</span> : null}
+							{t.count ? <span className="bg-destructive/15 px-2 font-mono text-xs text-destructive">{t.count}</span> : null}
 						</button>
 					))}
 				</div>
@@ -65,7 +65,7 @@ export default forwardRef<TerminalPanelHandle, EditorPanelProps>(function Editor
 					<ul className="h-full overflow-y-auto py-1">
 						{problemLines.map((line) => (
 							<li key={line}>
-								<button type="button" onClick={() => onGoToLine(line)} className="flex w-full items-center gap-3 px-4 py-1.5 text-left text-sm hover:bg-muted">
+								<button type="button" onClick={() => onGoToLine(line)} className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm hover:bg-muted">
 									<AlertTriangle className="size-4 shrink-0 text-destructive" />
 									<span>Syntax error</span>
 									<span className="font-mono text-xs text-muted-foreground">

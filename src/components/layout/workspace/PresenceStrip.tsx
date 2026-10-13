@@ -33,7 +33,7 @@ export default function PresenceStrip() {
 	if (peers.length === 0) return null;
 
 	return (
-		<div className="flex items-center gap-1.5">
+		<div className="flex items-center gap-2">
 			<div className="flex items-center -space-x-1">
 				{peers.map((peer) => {
 					const who = nameOf(peer.id);

@@ -179,7 +179,7 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(functi
 								role="tab"
 								aria-selected={item.key === active}
 								onClick={() => setActive(item.key)}
-								className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left text-sm outline-none focus-visible:bg-muted"
+								className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm outline-none focus-visible:bg-muted"
 							>
 								<Terminal className={cn("size-4 shrink-0", item.ended ? "text-muted-foreground" : "text-success")} />
 								<span className="truncate">{item.title}</span>

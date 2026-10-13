@@ -423,7 +423,7 @@ export default function WorkspaceNotes() {
 					onContextMenu={(e) => noteMenu(e, n.path)}
 					aria-current={active ? "true" : undefined}
 					className={cn(
-						"flex w-full cursor-pointer flex-col gap-0.5 border-b px-3 py-2.5 text-left outline-none transition-colors focus-visible:bg-muted",
+						"flex w-full cursor-pointer flex-col gap-0.5 border-b px-3 py-3 text-left outline-none transition-colors focus-visible:bg-muted",
 						active ? "bg-primary/10 shadow-[inset_2px_0_0_var(--primary)]" : "hover:bg-muted/50",
 					)}
 				>
@@ -496,9 +496,9 @@ export default function WorkspaceNotes() {
 								<>
 									{pinned.length > 0 && (
 										<>
-											<h2 className="border-b px-3 py-1.5 font-mono text-xs text-muted-foreground">Pinned</h2>
+											<h2 className="border-b px-3 py-2 font-mono text-xs text-muted-foreground">Pinned</h2>
 											<ul>{pinned.map(row)}</ul>
-											{unpinned.length > 0 && <h2 className="border-b px-3 py-1.5 font-mono text-xs text-muted-foreground">Notes</h2>}
+											{unpinned.length > 0 && <h2 className="border-b px-3 py-2 font-mono text-xs text-muted-foreground">Notes</h2>}
 										</>
 									)}
 									<ul>{unpinned.map(row)}</ul>
@@ -601,7 +601,7 @@ export default function WorkspaceNotes() {
 					const text = liveTexts[item.id] ?? texts[item.id] ?? "";
 					return (
 						<div className="h-full overflow-hidden p-4">
-							<h3 className="text-base font-semibold">{item.label}</h3>
+							<h3 className="text-sm font-semibold">{item.label}</h3>
 							<p className="mt-3 text-sm whitespace-pre-wrap text-muted-foreground">{text.slice(0, 700) || "This note is empty."}</p>
 						</div>
 					);

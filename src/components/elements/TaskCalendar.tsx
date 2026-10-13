@@ -68,7 +68,7 @@ export default function TaskCalendar({ tasks, onOpen }: { tasks: Task[]; onOpen:
 				{weeks.flat().map((day) => {
 					const inMonth = +day.slice(5, 7) - 1 === cursor.month;
 					return (
-						<div key={day} className={cn("min-h-24 bg-card p-1.5", !inMonth && "bg-muted/20 text-muted-foreground/60")}>
+						<div key={day} className={cn("min-h-24 bg-card p-2", !inMonth && "bg-muted/20 text-muted-foreground/60")}>
 							<div className={cn("mb-1 text-xs", day === today && "font-bold text-primary")}>{+day.slice(8, 10)}</div>
 							<div className="space-y-1">
 								{(byDay.get(day) ?? []).map((task) => {

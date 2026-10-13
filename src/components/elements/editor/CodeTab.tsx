@@ -314,7 +314,7 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 	return (
 		<div className={cn("flex h-full min-h-0 flex-col", !active && "hidden")}>
 			{notice && (
-				<div role="alert" className="flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">
+				<div role="alert" className="flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
 					<AlertTriangle className="size-3.5 shrink-0" />
 					<span className="min-w-0 flex-1 truncate">{notice}</span>
 					<Button variant="ghost" size="xs" onPress={() => setNotice(null)}>
@@ -324,7 +324,7 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 			)}
 
 			{branch && (
-				<div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-1.5 text-xs">
+				<div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-2 text-xs">
 					<GitBranch className="size-3.5 shrink-0 text-primary" />
 					<span className="min-w-0 flex-1">
 						You are working on the branch <span className="font-semibold">{branch.name}</span>. {fileName} does not change until the branch is merged.
@@ -339,7 +339,7 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 			)}
 
 			{mergeWarning !== null && (
-				<div className="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-1.5 text-xs text-warning">
+				<div className="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
 					<AlertTriangle className="size-3.5 shrink-0" />
 					<span className="min-w-0 flex-1">
 						A collaborator&apos;s edit merged with yours and added {mergeWarning} syntax error{mergeWarning > 1 ? "s" : ""}.
@@ -366,7 +366,7 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 				</div>
 			)}
 			{mergeWarning !== null && repair && (
-				<div className="flex items-center gap-2 border-b border-warning/30 bg-warning/5 px-3 py-1.5 text-xs">
+				<div className="flex items-center gap-2 border-b border-warning/30 bg-warning/5 px-3 py-2 text-xs">
 					{repair === "none" ? (
 						<span className="min-w-0 flex-1 text-muted-foreground">No part of their change can be kept without the errors, so it needs a manual fix.</span>
 					) : (

@@ -472,7 +472,7 @@ export default function WorkspaceTasks() {
 			</Toolbar>
 
 			{allTags.length > 0 && (
-				<Toolbar variant="sub" className="gap-1.5 overflow-x-auto">
+				<Toolbar variant="sub" className="gap-2 overflow-x-auto">
 					<span className="font-mono text-[13px] text-muted-foreground">tags</span>
 					{allTags.map((tag) => (
 						<TagChip key={tag} tag={tag} active={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)} />
@@ -518,7 +518,7 @@ export default function WorkspaceTasks() {
 								<li
 									key={task.id}
 									className={cn(
-										"group flex items-start gap-3 border-l-2 px-3 py-2.5 transition-colors hover:bg-muted/40",
+										"group flex items-start gap-3 border-l-2 px-3 py-3 transition-colors hover:bg-muted/40",
 										task.priority === "high" ? "border-l-destructive" : task.priority === "medium" ? "border-l-warning" : "border-l-transparent",
 										task.status === "done" && "opacity-60",
 									)}

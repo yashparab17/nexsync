@@ -81,7 +81,7 @@ function ContextMenu({ x, y, entries, onClose }: OpenMenu & { onClose: () => voi
 							onClose();
 							entry.onSelect();
 						}}
-						className={cn("flex w-full items-center gap-3 px-3 py-1.5 text-left outline-none hover:bg-muted focus-visible:bg-muted", entry.danger && "text-destructive", entry.disabled && "opacity-50")}
+						className={cn("flex w-full items-center gap-3 px-3 py-2 text-left outline-none hover:bg-muted focus-visible:bg-muted", entry.danger && "text-destructive", entry.disabled && "opacity-50")}
 					>
 						{entry.icon && <span className="shrink-0">{entry.icon}</span>}
 						<span className="flex-1">{entry.label}</span>

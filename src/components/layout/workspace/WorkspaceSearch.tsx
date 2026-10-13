@@ -216,7 +216,7 @@ export default function WorkspaceSearch() {
 						<X className="size-4" />
 					</button>
 				) : (
-					<kbd className="hidden shrink-0 border border-b-2 px-1.5 font-mono text-[13px] leading-5 text-muted-foreground sm:block">{mod} K</kbd>
+					<kbd className="hidden shrink-0 border border-b-2 px-2 font-mono text-[13px] leading-5 text-muted-foreground sm:block">{mod} K</kbd>
 				)}
 			</div>
 
@@ -236,7 +236,7 @@ export default function WorkspaceSearch() {
 					</div>
 					<ul id={listId} role="listbox" aria-label="Results" className="max-h-96 overflow-y-auto py-1">
 						{!q && results.length > 0 && (
-							<li role="presentation" className="flex items-center gap-1.5 px-3 pt-1.5 pb-1 font-mono text-[13px] text-muted-foreground">
+							<li role="presentation" className="flex items-center gap-2 px-3 pt-2 pb-1 font-mono text-[13px] text-muted-foreground">
 								<Clock className="size-3.5" /> Recent
 							</li>
 						)}
@@ -271,7 +271,7 @@ export default function WorkspaceSearch() {
 							})
 						)}
 					</ul>
-					<p className="flex items-center gap-3 border-t px-3 py-1.5 font-mono text-[13px] text-muted-foreground">
+					<p className="flex items-center gap-3 border-t px-3 py-2 font-mono text-[13px] text-muted-foreground">
 						<span>↑↓ move</span>
 						<span>↵ open</span>
 						<span>esc close</span>

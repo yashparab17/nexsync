@@ -194,11 +194,11 @@ export default function NoteBoard({ notes, positions, edges, activePath, onMove,
 							onKeyDown={(e) => e.key === "Enter" && onOpen(note.path)}
 							style={{ left: at.x, top: at.y, width: CARD_W, height: CARD_H }}
 							className={cn(
-								"group absolute flex cursor-pointer flex-col gap-1.5 overflow-hidden border bg-muted/40 p-3 text-card-foreground outline-none transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-ring",
+								"group absolute flex cursor-pointer flex-col gap-2 overflow-hidden border bg-muted/40 p-3 text-card-foreground outline-none transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-ring",
 								activePath === note.path && "border-primary ring-1 ring-primary",
 							)}
 						>
-							<div className="flex items-start gap-1.5">
+							<div className="flex items-start gap-2">
 								<h3 className="min-w-0 flex-1 truncate text-sm font-semibold">{noteTitle(note.name)}</h3>
 								<PresenceDots names={here} />
 								<div className="flex shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100" onPointerDown={(e) => e.stopPropagation()}>

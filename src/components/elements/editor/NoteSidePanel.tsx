@@ -21,8 +21,8 @@ interface NoteSidePanelProps {
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
 	return (
-		<section className="space-y-1.5">
-			<h3 className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
+		<section className="space-y-2">
+			<h3 className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
 				{icon}
 				{title}
 			</h3>
@@ -55,7 +55,7 @@ export default function NoteSidePanel({ workspacePath, current, notes, text, onO
 	}, [workspacePath, noteKey, current.path]);
 
 	const empty = (message: string) => <p className="text-xs text-muted-foreground">{message}</p>;
-	const rowClass = "flex w-full cursor-pointer items-center gap-1 truncate px-1.5 py-1 text-left text-xs hover:bg-muted";
+	const rowClass = "flex w-full cursor-pointer items-center gap-1 truncate px-2 py-1 text-left text-xs hover:bg-muted";
 
 	return (
 		<aside aria-label="Outline and links" className="w-64 shrink-0 space-y-5 overflow-y-auto border-l p-3">
@@ -86,7 +86,7 @@ export default function NoteSidePanel({ workspacePath, current, notes, text, onO
 									<span className="truncate">{target}</span>
 								</button>
 							) : (
-								<p key={target} className="truncate px-1.5 py-1 text-xs text-muted-foreground">
+								<p key={target} className="truncate px-2 py-1 text-xs text-muted-foreground">
 									{target} <span className="text-xs">(no such note)</span>
 								</p>
 							);

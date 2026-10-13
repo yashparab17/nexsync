@@ -169,7 +169,7 @@ export default function FileExplorer({
 								type="button"
 								data-explorer-row
 								title={rel}
-								className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 pl-3 text-left outline-none focus-visible:bg-muted"
+								className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-3 text-left outline-none focus-visible:bg-muted"
 								onClick={() => (entry.is_dir ? onToggleDir(rel) : onOpenFile(rel))}
 								onKeyDown={(e) => (e.key === "Enter" && e.ctrlKey && !entry.is_dir ? onOpenSide?.(rel) : onRowKey(e, entry, rel, isOpen))}
 							>
@@ -215,7 +215,7 @@ export default function FileExplorer({
 							)}
 						</div>
 						{entry.is_dir && isOpen && (
-							<div className="ml-3.5 border-l">
+							<div className="ml-4 border-l">
 								{(entries[rel] ?? []).length === 0 && !filtering ? (
 									<p className="py-1 pl-3 text-xs text-muted-foreground">Empty folder</p>
 								) : (
@@ -265,7 +265,7 @@ export default function FileExplorer({
 			<Toolbar variant="sub">
 				<ToolbarSearch label="Filter files" placeholder="Filter files" value={query} onChange={setQuery} className="w-full" />
 				{notice && (
-					<p role={notice.ok ? "status" : "alert"} className={cn("mt-1.5 break-words text-xs", notice.ok ? "text-success" : "text-destructive")}>
+					<p role={notice.ok ? "status" : "alert"} className={cn("mt-2 break-words text-xs", notice.ok ? "text-success" : "text-destructive")}>
 						{notice.text}
 					</p>
 				)}
@@ -281,7 +281,7 @@ export default function FileExplorer({
 								<button
 									type="button"
 									data-explorer-row
-									className="flex min-w-0 flex-1 items-center gap-1.5 px-3 py-1.5 text-left text-sm font-semibold text-muted-foreground outline-none focus-visible:bg-muted"
+									className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-muted-foreground outline-none focus-visible:bg-muted"
 									onClick={() => onToggleDir(root)}
 									onKeyDown={(e) => onRowKey(e, null, root, isOpen)}
 								>

@@ -95,7 +95,7 @@ export default function WorkspaceTrash() {
 				) : (
 					<ul className="divide-y">
 						{items.map((item) => (
-							<li key={item.id} className="group flex items-center gap-3 px-3 py-2.5">
+							<li key={item.id} className="group flex items-center gap-3 px-3 py-3">
 								{item.isDir ? <Folder className="size-4 shrink-0 text-warning" /> : <FileText className="size-4 shrink-0 text-info" />}
 								<div className="min-w-0 flex-1">
 									<p className="truncate font-mono text-xs">{item.relPath}</p>
