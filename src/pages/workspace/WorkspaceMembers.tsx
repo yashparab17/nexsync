@@ -484,7 +484,7 @@ export default function WorkspaceMembers() {
 					className="max-w-md"
 				>
 					<form onSubmit={handleAddMemberSubmit} className="space-y-4">
-						<DialogHeading icon={<Plus className="size-6" />} title="Add member" />
+						<DialogHeading icon={<Plus className="size-6" />} title="Add Member" />
 
 						<div className="space-y-3">
 							<div>
@@ -544,7 +544,7 @@ export default function WorkspaceMembers() {
 					className="max-w-md"
 				>
 					<form onSubmit={handleEditRoleSubmit} className="space-y-4">
-						<DialogHeading icon={<Pencil className="size-6" />} title="Edit member" />
+						<DialogHeading icon={<Pencil className="size-6" />} title="Edit Member" />
 
 						{!isJoinedCopy && (
 						<div>
@@ -611,7 +611,7 @@ export default function WorkspaceMembers() {
 						}}
 						className="space-y-4"
 					>
-						<DialogHeading icon={<Pencil className="size-6" />} title="Change my name here" />
+						<DialogHeading icon={<Pencil className="size-6" />} title="Change My Name Here" />
 						<div>
 							<Label htmlFor="my-workspace-name">Name in this workspace</Label>
 							<Input
@@ -665,7 +665,7 @@ export default function WorkspaceMembers() {
 					onOpenChange={(open) => !open && setDeletingMember(null)}
 				>
 					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Remove collaborator" description={<>Are you sure you want to remove{" "}
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Remove Collaborator" description={<>Are you sure you want to remove{" "}
 								<span className="font-semibold text-foreground">
 									{deletingMember.name}
 								</span>{" "}

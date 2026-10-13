@@ -83,7 +83,7 @@ export default function AssetUploadDialog({ workspacePath, isOpen, onClose, onUp
 			<div className="min-w-0 space-y-5">
 				<DialogHeading
 					icon={<UploadCloud className="size-6" />}
-					title="Upload assets"
+					title="Upload Assets"
 				/>
 
 				{/* Drop zone */}

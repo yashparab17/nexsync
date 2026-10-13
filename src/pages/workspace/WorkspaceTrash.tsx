@@ -89,7 +89,7 @@ export default function WorkspaceTrash() {
 						<Loader2 className="size-5 animate-spin text-muted-foreground" />
 					</div>
 				) : items.length === 0 ? (
-					<EmptyState icon={<Trash2 />} title="Trash is empty">
+					<EmptyState icon={<Trash2 />} title="Trash Is Empty">
 						Deleted files and folders wait here until you restore them or remove them for good.
 					</EmptyState>
 				) : (
@@ -131,7 +131,7 @@ export default function WorkspaceTrash() {
 					}}
 				>
 					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete permanently" description={<>{confirm === "all"
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Permanently" description={<>{confirm === "all"
 									? "Everything in the trash will be removed for good."
 									: `${confirm.relPath} will be removed for good.`}{" "}
 								This cannot be undone.</>} />

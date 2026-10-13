@@ -261,7 +261,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 								<div className="m-auto flex max-w-sm flex-col items-center gap-4 border bg-muted/40 p-8 text-center">
 									<Sparkles className="size-8 text-warning" />
 									<div>
-										<h4 className="font-semibold">Not downloaded yet</h4>
+										<h4 className="font-semibold">Not Downloaded Yet</h4>
 										<p className="mt-1 text-sm text-muted-foreground">This file belongs to the workspace but has not reached this device yet.</p>
 									</div>
 									<Button onPress={fetchRemote} isDisabled={isSyncing}>

@@ -173,7 +173,7 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 			{confirming && (
 				<Dialog isOpen onOpenChange={setConfirming}>
 					<div className="space-y-4">
-						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Run a command on this device?" description={<>The command runs with your permissions and can change files on this computer. Files from
+						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Run a Command on This Device?" description={<>The command runs with your permissions and can change files on this computer. Files from
 								collaborators can contain code too, so run only what you trust.</>} />
 						<p className="break-all border bg-muted/30 p-2 font-mono text-xs">{command}</p>
 						<DialogFooter>

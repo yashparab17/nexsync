@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { Moon, Sun, Trash2, AlertTriangle, Download, FolderOpen, Save, SlidersHorizontal, Undo2, User } from "@/components/animate-icons";
+import { Trash2, AlertTriangle, Download, FolderOpen, Save, SlidersHorizontal, Undo2, User } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -9,14 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import Avatar from "@/components/elements/Avatar";
-import { Row, SectionCard, SettingsShell, Segmented } from "@/components/elements/SettingsParts";
+import { Row, SectionCard, SettingsShell } from "@/components/elements/SettingsParts";
 import RulesCard from "@/components/elements/RulesCard";
 import HostRequiredCard from "@/components/elements/HostRequiredCard";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useLeaveWorkspace } from "@/hooks/useLeaveWorkspace";
 import { exportFolders } from "@/lib/export";
-import { errorText } from "@/lib/utils";
+import { cleanPath, errorText } from "@/lib/utils";
 import { removeRecentWorkspace, writeWorkspaceMetadata } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -45,7 +45,6 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 		metadata?.settings.autosave ?? true,
 	);
 	const [sync, setSync] = useState(metadata?.settings.sync ?? true);
-	const [theme, setTheme] = useState(metadata?.settings.theme ?? "dark");
 
 	const [exporting, setExporting] = useState(false);
 	const [exportResult, setExportResult] = useState<{ ok: boolean; text: string } | null>(null);
@@ -69,14 +68,12 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 		(name !== (workspace?.name || "") ||
 			description !== (workspace?.description || "") ||
 			autosave !== (metadata?.settings.autosave ?? true) ||
-			sync !== (metadata?.settings.sync ?? true) ||
-			theme !== (metadata?.settings.theme ?? "dark"));
+			sync !== (metadata?.settings.sync ?? true));
 	const discard = () => {
 		setName(workspace?.name || "");
 		setDescription(workspace?.description || "");
 		setAutosave(metadata?.settings.autosave ?? true);
 		setSync(metadata?.settings.sync ?? true);
-		setTheme(metadata?.settings.theme ?? "dark");
 	};
 
 	// Leaves (guest) or deletes (owner) the workspace; the page unmounts once it succeeds
@@ -109,7 +106,6 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					...metadata.settings,
 					autosave,
 					sync,
-					theme,
 				},
 			};
 
@@ -151,7 +147,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 	return (
 		<>
 			<SettingsShell
-				title="Workspace settings"
+				title="Workspace Settings"
 				onClose={() => (onClose ? (dirty ? setLeaving(true) : onClose()) : undefined)}
 				className={onClose ? "h-[85vh]" : "h-full"}
 				footer={
@@ -201,7 +197,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					</div>
 					<div>
 						<Label htmlFor="workspace-path">Local path</Label>
-						<Input id="workspace-path" readOnly value={workspace?.path || ""} className="mt-1 bg-muted/40 font-mono text-xs text-muted-foreground" />
+						<Input id="workspace-path" readOnly value={cleanPath(workspace?.path || "")} className="mt-1 bg-muted/40 font-mono text-xs text-muted-foreground" />
 						<p className="mt-1 text-xs text-muted-foreground">Your files are saved in this folder on your computer.</p>
 					</div>
 				</SectionCard>
@@ -212,17 +208,6 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					</Row>
 					<Row title="Share changes live" hint="Let collaborators connect and see changes live">
 						<input type="checkbox" aria-label="Share changes live" checked={sync} disabled={isJoinedCopy} onChange={(e) => setSync(e.target.checked)} />
-					</Row>
-					<Row title="Workspace theme">
-						<Segmented
-							label="Workspace theme"
-							value={theme}
-							onChange={(value) => !isJoinedCopy && setTheme(value)}
-							options={[
-								{ value: "dark", label: "Dark", icon: <Moon className="size-3.5" /> },
-								{ value: "light", label: "Light", icon: <Sun className="size-3.5" /> },
-							]}
-						/>
 					</Row>
 				</SectionCard>
 
@@ -266,7 +251,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 
 				<SectionCard
 					id="danger"
-					title="Danger zone"
+					title="Danger Zone"
 					icon={<AlertTriangle className="size-5" />}
 					className="border-destructive/30"
 					titleClassName="text-destructive"
@@ -301,7 +286,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 			{leaving && (
 				<Dialog isOpen onOpenChange={(open) => !open && setLeaving(false)}>
 					<div className="space-y-4">
-						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Leave without saving?" description={<>Your changes to these settings will be lost.</>} />
+						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Leave Without Saving?" description={<>Your changes to these settings will be lost.</>} />
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setLeaving(false)}>Keep Editing</Button>
 							<Button variant="destructive" onPress={() => onClose?.()}>Discard and Leave</Button>
@@ -317,7 +302,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					onOpenChange={setIsRemoveConfirmOpen}
 				>
 					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Remove workspace" description={<>Are you sure you want to remove{" "}
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Remove Workspace" description={<>Are you sure you want to remove{" "}
 								<span className="font-semibold text-foreground">
 									{workspace?.name}
 								</span>{" "}
@@ -342,7 +327,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 			{isLeaveOpen && (
 				<Dialog className="sm:max-w-xl" isOpen={isLeaveOpen} onOpenChange={(o) => !busy && setIsLeaveOpen(o)}>
 					<div className="space-y-4">
-						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="danger" title="Leave workspace" description={<>You will disconnect from the host and this workspace will disappear from the app.
+						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="danger" title="Leave Workspace" description={<>You will disconnect from the host and this workspace will disappear from the app.
 								Choose what happens to your copy of the files.</>} />
 						{actionError && <p className="text-xs text-destructive">{actionError}</p>}
 						<DialogFooter>
@@ -364,7 +349,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 			{isDeleteOpen && (
 				<Dialog isOpen={isDeleteOpen} onOpenChange={(o) => !busy && setIsDeleteOpen(o)}>
 					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete workspace" description={<><span className="font-semibold text-foreground">{workspace?.name}</span> will be moved to
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Workspace" description={<><span className="font-semibold text-foreground">{workspace?.name}</span> will be moved to
 								the recycle bin, so you can still restore it from there.
 								{guestCount > 0 &&
 									` ${guestCount} connected collaborator${guestCount > 1 ? "s" : ""} will be told it was deleted; their copies stay on their devices.`}

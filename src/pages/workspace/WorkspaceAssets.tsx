@@ -680,7 +680,7 @@ export default function WorkspaceAssets() {
 					className="max-w-sm p-5 bg-card border-border"
 				>
 					<div className="space-y-4">
-						<DialogHeading icon={<Pencil className="size-6" />} title="Rename asset" />
+						<DialogHeading icon={<Pencil className="size-6" />} title="Rename Asset" />
 
 						<div className="space-y-2">
 							<Label htmlFor="rename-input">New name</Label>
@@ -725,7 +725,7 @@ export default function WorkspaceAssets() {
 					className="max-w-sm p-5 bg-card border-border"
 				>
 					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete asset" description={<>Move{" "}
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Asset" description={<>Move{" "}
 								<span className="font-semibold text-foreground">
 									{assetToDelete.name}
 								</span>{" "}

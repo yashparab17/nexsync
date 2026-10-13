@@ -134,7 +134,7 @@ export default function JoinWorkspaceDialog({
 			{children}
 
 			<Dialog className="sm:max-w-xl">
-				<DialogHeading icon={<UsersRound className="size-6" />} title="Join with a ticket" />
+				<DialogHeading icon={<UsersRound className="size-6" />} title="Join with a Ticket" />
 
 				<p className="flex items-center gap-2 text-sm text-muted-foreground">
 					<Lock className="size-4 shrink-0 text-primary" />

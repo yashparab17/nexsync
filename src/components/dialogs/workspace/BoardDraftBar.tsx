@@ -120,7 +120,7 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 			{choosing && (
 				<Dialog isOpen onOpenChange={(open) => !open && setChoosing(false)} className="sm:max-w-lg">
 					<div className="flex flex-col gap-4">
-						<DialogHeading icon={<GitBranch className="size-6" />} title="Try a reorganisation" description={<>Move cards between lists and reorder them without changing the real board. When it looks right, review what it would change and merge it. Nothing reaches your collaborators until then,
+						<DialogHeading icon={<GitBranch className="size-6" />} title="Try a Reorganisation" description={<>Move cards between lists and reorder them without changing the real board. When it looks right, review what it would change and merge it. Nothing reaches your collaborators until then,
 								and anything they change meanwhile is kept.</>} />
 						{error && (
 							<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">

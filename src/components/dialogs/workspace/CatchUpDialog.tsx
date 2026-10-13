@@ -123,7 +123,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 	return (
 		<Dialog isOpen onOpenChange={(open) => !open && onClose()} className="sm:max-w-3xl">
 			<div className="flex max-h-[75vh] min-h-0 flex-col gap-4">
-				<DialogHeading icon={<History className="size-6" />} title="Catch up" />
+				<DialogHeading icon={<History className="size-6" />} title="Catch Up" />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">

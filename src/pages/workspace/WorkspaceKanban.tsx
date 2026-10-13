@@ -524,7 +524,7 @@ export default function WorkspaceKanban() {
 			) : columns.length === 0 ? (
 				<EmptyState
 					icon={<Columns3 />}
-					title="No columns yet"
+					title="No Columns Yet"
 					action={
 						canChange && (
 							<Button size="sm" onPress={() => setIsCreateColOpen(true)}>
@@ -776,7 +776,7 @@ export default function WorkspaceKanban() {
 					className="max-w-md"
 				>
 					<form onSubmit={handleCreateColumnSubmit} className="space-y-4">
-						<DialogHeading icon={<Plus className="size-6" />} title="Add a column" />
+						<DialogHeading icon={<Plus className="size-6" />} title="Add a Column" />
 
 						<div>
 							<Label htmlFor="col-title">Column Title *</Label>
@@ -820,7 +820,7 @@ export default function WorkspaceKanban() {
 					className="max-h-[90vh] max-w-md overflow-y-auto"
 				>
 					<form onSubmit={handleCreateCardSubmit} className="space-y-4">
-						<DialogHeading icon={<Plus className="size-6" />} title="Add a card" />
+						<DialogHeading icon={<Plus className="size-6" />} title="Add a Card" />
 
 						<div className="space-y-3">
 							<div>
@@ -941,7 +941,7 @@ export default function WorkspaceKanban() {
 					onOpenChange={(open) => !open && setDeletingColId(null)}
 				>
 					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete column" description={<>Are you sure you want to delete this column and all of its
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Column" description={<>Are you sure you want to delete this column and all of its
 								cards? This action cannot be undone.</>} />
 
 						<DialogFooter>
@@ -968,7 +968,7 @@ export default function WorkspaceKanban() {
 					}}
 				>
 					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete card" description={<>Are you sure you want to delete this card?</>} />
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Card" description={<>Are you sure you want to delete this card?</>} />
 						<EraseOption checked={eraseCard} onChange={setEraseCard} what="the card" />
 
 						<DialogFooter>

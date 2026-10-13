@@ -733,7 +733,7 @@ export default function WorkspaceEditor() {
 							void createItem();
 						}}
 					>
-						<DialogHeading icon={<Plus className="size-6" />} title={`New ${newItem.kind === "file" ? "file" : "folder"}`} description={<>Created in /{newItem.dir}/</>} />
+						<DialogHeading icon={<Plus className="size-6" />} title={`New ${newItem.kind === "file" ? "File" : "Folder"}`} description={<>Created in /{newItem.dir}/</>} />
 						<Input
 							aria-label={newItem.kind === "file" ? "File name" : "Folder name"}
 							value={newItem.value}
@@ -762,7 +762,7 @@ export default function WorkspaceEditor() {
 							void renameItem();
 						}}
 					>
-						<DialogHeading icon={<Pencil className="size-6" />} title={`Rename ${renaming.entry.is_dir ? "folder" : "file"}`} description={<>{toRel(renaming.entry.path)}</>} />
+						<DialogHeading icon={<Pencil className="size-6" />} title={`Rename ${renaming.entry.is_dir ? "Folder" : "File"}`} description={<>{toRel(renaming.entry.path)}</>} />
 						<Input
 							value={renaming.value}
 							onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
@@ -784,7 +784,7 @@ export default function WorkspaceEditor() {
 			{closing && (
 				<Dialog isOpen onOpenChange={(open) => !open && setClosing(null)}>
 					<div className="space-y-4">
-						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Unsaved changes" description={<><span className="font-semibold text-foreground">{closing.split("/").pop()}</span> has changes that are
+						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Unsaved Changes" description={<><span className="font-semibold text-foreground">{closing.split("/").pop()}</span> has changes that are
 								not saved to the file. Close it anyway?</>} />
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setClosing(null)}>
@@ -801,7 +801,7 @@ export default function WorkspaceEditor() {
 			{deleting && (
 				<Dialog isOpen onOpenChange={(open) => !open && setDeleting(null)}>
 					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title={`Delete ${deleting.is_dir ? "folder" : "file"}`} description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title={`Delete ${deleting.is_dir ? "Folder" : "File"}`} description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can
 								restore it from there.</>} />
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setDeleting(null)}>

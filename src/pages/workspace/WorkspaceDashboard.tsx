@@ -89,7 +89,7 @@ export default function WorkspaceDashboard() {
 
 			{/* A bento grid: tile size follows importance, with where to continue largest */}
 			<PageBody className="grid content-start gap-3 md:grid-cols-6 xl:grid-cols-12">
-				<Panel title="Pick up where you left off" flush={recent.length > 0} className="md:col-span-6 xl:col-span-5 xl:row-span-2">
+				<Panel title="Pick Up Where You Left Off" flush={recent.length > 0} className="md:col-span-6 xl:col-span-5 xl:row-span-2">
 					{recent.length === 0 ? (
 						<p className="text-sm text-muted-foreground">Files you open show up here, so you can jump back in.</p>
 					) : (
@@ -126,7 +126,7 @@ export default function WorkspaceDashboard() {
 					</span>
 				</Tile>
 
-				<Panel title="Due soon" flush={due.length > 0} className="md:col-span-3 xl:col-span-4">
+				<Panel title="Due Soon" flush={due.length > 0} className="md:col-span-3 xl:col-span-4">
 					{due.length === 0 ? (
 						<p className="text-sm text-muted-foreground">No dates set. Give a task a due date and it appears here.</p>
 					) : (

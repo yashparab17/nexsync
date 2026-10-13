@@ -569,7 +569,7 @@ export default function WorkspaceNotes() {
 								{ label: "Go to a note", keys: "Ctrl O", icon: <Search className="size-4" />, run: () => { setSwitcherQuery(""); setSwitcher(true); } },
 								...(isViewer ? [] : [{ label: "Open today’s note", keys: today(), icon: <CalendarPlus className="size-4" />, run: openToday }]),
 							]}
-							recentTitle="Recent notes"
+							recentTitle="Recent Notes"
 							recent={notes.slice(0, 6).map((n) => ({ key: n.path, label: noteTitle(n.name), icon: <FileText className="size-4 text-muted-foreground" />, run: () => openNote(n.path) }))}
 							recentEmpty="Notes you write are listed here."
 							tip={"Hide the list with Ctrl \\ for more room to write."}
@@ -625,7 +625,7 @@ export default function WorkspaceNotes() {
 						}}
 						className="space-y-4"
 					>
-						<DialogHeading icon={<Plus className="size-6" />} title="New note" />
+						<DialogHeading icon={<Plus className="size-6" />} title="New Note" />
 						<Input aria-label="Note title" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Architecture overview, Meeting notes" aria-invalid={!!validateFileName(newTitle)} autoFocus />
 						{validateFileName(newTitle) && <p role="alert" className="text-xs text-destructive">{validateFileName(newTitle)}</p>}
 						<DialogFooter className="mt-2">
@@ -649,7 +649,7 @@ export default function WorkspaceNotes() {
 						}}
 						className="space-y-4"
 					>
-						<DialogHeading icon={<Pencil className="size-6" />} title="Rename note" description={<>{renaming.note.name}</>} />
+						<DialogHeading icon={<Pencil className="size-6" />} title="Rename Note" description={<>{renaming.note.name}</>} />
 						<Input aria-label="New name" value={renaming.value} onChange={(e) => setRenaming({ ...renaming, value: e.target.value })} aria-invalid={!!validateFileName(renaming.value)} autoFocus />
 						{(validateFileName(renaming.value) ?? renameError) && <p role="alert" className="text-xs text-destructive">{validateFileName(renaming.value) ?? renameError}</p>}
 						<DialogFooter className="mt-2">
@@ -665,7 +665,7 @@ export default function WorkspaceNotes() {
 			{deleting && (
 				<Dialog isOpen onOpenChange={(open) => !open && setDeleting(null)}>
 					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete note" description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can restore it from there.</>} />
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Note" description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can restore it from there.</>} />
 						<DialogFooter className="mt-2">
 							<Button variant="outline" onPress={() => setDeleting(null)}>
 								Cancel

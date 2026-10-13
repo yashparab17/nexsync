@@ -104,7 +104,7 @@ export default function CreateWorkspaceDialog({
 
 			{/* Dialog */}
 			<Dialog className="sm:max-w-3xl">
-				<DialogHeading icon={<FolderPlus className="size-6" />} title="Create a workspace" />
+				<DialogHeading icon={<FolderPlus className="size-6" />} title="Create a Workspace" />
 
 				<div className="grid gap-8 md:grid-cols-[3fr_2fr]">
 					<div className="flex flex-col gap-5">

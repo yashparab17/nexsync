@@ -37,7 +37,7 @@ export default function Welcome({ logo, title, intro, actions, recentTitle, rece
 					<p className="mt-1 text-sm text-muted-foreground">{intro}</p>
 				</header>
 				<div className="grid gap-3 md:grid-cols-2">
-					<Panel title="Get started" flush>
+					<Panel title="Get Started" flush>
 						<ul className="divide-y">
 							{actions.map((a) => (
 								<li key={a.label}>

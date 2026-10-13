@@ -38,7 +38,7 @@ export default function RulesCard({ workspacePath }: { workspacePath: string }) 
 	};
 
 	return (
-		<SectionCard id="rules" title="Rules for tasks and cards" icon={<ShieldCheck className="size-5" />}>
+		<SectionCard id="rules" title="Rules for Tasks and Cards" icon={<ShieldCheck className="size-5" />}>
 				{error && (
 					<p role="alert" className="text-xs text-destructive">
 						{error}

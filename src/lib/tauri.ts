@@ -150,7 +150,7 @@ export function importWorkspace(path: string): Promise<WorkspaceInfo> {
 export function readWorkspaceMetadata(
 	path: string,
 ): Promise<WorkspaceMetadata> {
-	return invoke("read_workspace_metadata", { path });
+	return invoke<WorkspaceMetadata>("read_workspace_metadata", { path }).then((m) => ({ ...m, workspace: { ...m.workspace, path: cleanPath(m.workspace.path) } }));
 }
 
 // Persist updated workspace metadata to database
@@ -515,7 +515,7 @@ export function clearLastWorkspace(): Promise<void> {
 
 // Load application security configuration
 export function loadConfig(): Promise<NexsyncConfig> {
-	return invoke("load_config_cmd");
+	return invoke<NexsyncConfig>("load_config_cmd").then((c) => ({ ...c, allowed_workspace_roots: (c.allowed_workspace_roots ?? []).map(cleanPath) }));
 }
 
 // Save application security configuration

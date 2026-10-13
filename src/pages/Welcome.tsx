@@ -157,7 +157,7 @@ export default function Welcome() {
 						{/* Opening a workspace is the common case, so the list comes first and the last one used leads it */}
 						<section aria-labelledby="recent-heading" className="flex flex-col gap-4">
 							<h2 id="recent-heading" className="font-mono text-xs text-muted-foreground">
-								workspaces / {recentWorkspaces.length}
+								Workspaces / {recentWorkspaces.length}
 							</h2>
 
 							{loading ?
@@ -196,7 +196,7 @@ export default function Welcome() {
 
 					<aside className="flex flex-col gap-8">
 						<section className="flex flex-col gap-3">
-							<h2 className="font-mono text-xs text-muted-foreground">start</h2>
+							<h2 className="font-mono text-xs text-muted-foreground">Start</h2>
 							<CreateWorkspaceDialog>
 								<Button className={tile}>
 									<FolderPlus className="size-6 shrink-0" />
@@ -220,7 +220,7 @@ export default function Welcome() {
 						</section>
 
 						<section className="flex flex-col gap-3">
-							<h2 className="font-mono text-xs text-muted-foreground">shortcuts</h2>
+							<h2 className="font-mono text-xs text-muted-foreground">Shortcuts</h2>
 							<dl className="flex flex-col gap-2 text-sm">
 								{shortcuts.map(([keys, what]) => (
 									<div key={what} className="flex items-center justify-between gap-4">
@@ -232,7 +232,7 @@ export default function Welcome() {
 						</section>
 
 						<section className="flex flex-col gap-3">
-							<h2 className="font-mono text-xs text-muted-foreground">your data</h2>
+							<h2 className="font-mono text-xs text-muted-foreground">Your Data</h2>
 							<ul className="flex flex-col gap-2 text-sm text-muted-foreground">
 								<li className="flex gap-3"><HardDrive className="size-4 shrink-0 text-primary" />Files stay as plain files in folders you choose.</li>
 								<li className="flex gap-3"><Lock className="size-4 shrink-0 text-primary" />Connections between devices are end-to-end encrypted.</li>

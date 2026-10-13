@@ -75,7 +75,7 @@ export default function NoteSidePanel({ workspacePath, current, notes, text, onO
 						))}
 			</Section>
 
-			<Section icon={<Link2 className="size-3" />} title="Links in this note">
+			<Section icon={<Link2 className="size-3" />} title="Links in This Note">
 				{links.length === 0
 					? empty("Write [[Note name]] to link to another note. Ctrl+click a link to open it.")
 					: links.map((target) => {

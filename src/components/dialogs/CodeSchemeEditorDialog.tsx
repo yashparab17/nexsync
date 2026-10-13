@@ -43,7 +43,7 @@ export default function CodeSchemeEditorDialog({ mode, initial, onClose }: { mod
 	return (
 		<Dialog isOpen onOpenChange={(o) => !o && onClose()} className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
 			<div className="space-y-4">
-				<DialogHeading icon={<Palette className="size-6" />} title={initial ? "Edit code colours" : "New code colours"} />
+				<DialogHeading icon={<Palette className="size-6" />} title={initial ? "Edit Code Colours" : "New Code Colours"} />
 
 				<div className="grid gap-3 sm:grid-cols-2">
 					<div>

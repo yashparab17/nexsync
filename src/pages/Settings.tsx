@@ -520,7 +520,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 			{leaving && (
 				<Dialog isOpen onOpenChange={(isOpen) => !isOpen && setLeaving(false)}>
 					<div className="space-y-4">
-						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Leave without saving?" description={<>Your changes to the profile or storage folders will be lost.</>} />
+						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Leave Without Saving?" description={<>Your changes to the profile or storage folders will be lost.</>} />
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setLeaving(false)}>
 								Keep Editing

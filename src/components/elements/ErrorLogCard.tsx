@@ -48,7 +48,7 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 			.join("\n\n");
 
 	return (
-		<SectionCard id="diagnostics" title="Error log" icon={<Bug className="size-5" />}>
+		<SectionCard id="diagnostics" title="Error Log" icon={<Bug className="size-5" />}>
 				<div className="flex flex-wrap gap-2">
 					<Button variant="outline" size="sm" onPress={refresh} className="gap-1.5">
 						<RefreshCw className="size-3.5" />

@@ -585,7 +585,7 @@ export default function WorkspaceTasks() {
 					className="max-w-lg"
 				>
 					<form onSubmit={handleCreateSubmit} className="space-y-4">
-						<DialogHeading icon={<Plus className="size-6" />} title="New task" />
+						<DialogHeading icon={<Plus className="size-6" />} title="New Task" />
 
 						<div className="space-y-3">
 							<div>
@@ -795,7 +795,7 @@ export default function WorkspaceTasks() {
 					}}
 				>
 					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete task" description={<>Are you sure you want to delete this task? This action cannot be
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Task" description={<>Are you sure you want to delete this task? This action cannot be
 								undone.</>} />
 						<EraseOption checked={eraseTask} onChange={setEraseTask} what="the task" />
 

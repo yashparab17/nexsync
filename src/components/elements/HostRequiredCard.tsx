@@ -26,7 +26,7 @@ export default function HostRequiredCard() {
 	};
 
 	return (
-		<SectionCard id="collaboration" title="Host availability" icon={<Radio className="size-5" />}>
+		<SectionCard id="collaboration" title="Host Availability" icon={<Radio className="size-5" />}>
 				{error && (
 					<p role="alert" className="text-xs text-destructive">
 						{error}

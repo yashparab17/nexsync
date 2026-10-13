@@ -51,7 +51,7 @@ export default function EditorDashboard({ workspaceName, recent, readOnly, onOpe
 			title={workspaceName ? `${workspaceName} editor` : "Editor"}
 			intro="Open a file from the explorer, or pick one of these."
 			actions={actions}
-			recentTitle="Recent files"
+			recentTitle="Recent Files"
 			recent={recent.slice(0, 6).map((path) => ({ key: path, label: baseName(path), sub: folderOf(path), icon: <FileKindIcon name={baseName(path)} />, run: () => onOpen(path) }))}
 			recentEmpty="Files you open are listed here."
 			tip={tip}
