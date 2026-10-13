@@ -31,7 +31,7 @@ export default function NotificationBell() {
 			{open && (
 				<>
 					<button type="button" aria-label="Close notifications" className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
-					<div role="region" aria-label="Notifications" className="absolute right-0 z-20 mt-1 w-80 border bg-popover shadow-md">
+					<div role="region" aria-label="Notifications" className="absolute right-0 z-20 mt-1 w-80 border bg-popover ring-1 ring-foreground/10">
 						<div className="flex items-center justify-between border-b px-3 py-2">
 							<span className="text-xs font-semibold ">Notifications</span>
 							{items.length > 0 && (

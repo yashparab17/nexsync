@@ -9,7 +9,7 @@ export default function TransferTray() {
 	if (transfers.length === 0) return null;
 
 	return (
-		<div className="fixed bottom-3 right-3 z-50 w-72 max-w-[calc(100vw-1.5rem)] space-y-2 border bg-card p-3 text-xs shadow-lg">
+		<div className="fixed bottom-3 right-3 z-50 w-72 max-w-[calc(100vw-1.5rem)] space-y-2 border bg-card p-3 text-xs ring-1 ring-foreground/10">
 			<div className="flex items-center justify-between">
 				<span className="font-semibold">Downloading {transfers.length} file{transfers.length > 1 ? "s" : ""}</span>
 				{transfers.length > 1 && (

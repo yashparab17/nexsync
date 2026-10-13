@@ -61,7 +61,7 @@ export function useDropNotice() {
 		timer.current = setTimeout(() => setText(null), 5000);
 	};
 	const node = text && (
-		<p role="status" className="pointer-events-none absolute inset-x-3 bottom-3 z-40 mx-auto w-fit max-w-full truncate border bg-popover px-3 py-2 text-sm shadow-md">
+		<p role="status" className="pointer-events-none absolute inset-x-3 bottom-3 z-40 mx-auto w-fit max-w-full truncate border bg-popover px-3 py-2 text-sm ring-1 ring-foreground/10">
 			{text}
 		</p>
 	);

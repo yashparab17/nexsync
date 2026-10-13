@@ -217,7 +217,7 @@ export default function WorkspaceSearch() {
 			</div>
 
 			{showList && (
-				<div className="absolute top-full right-0 left-0 z-40 mt-2 bg-popover shadow-lg ring-1 ring-foreground/10">
+				<div className="absolute top-full right-0 left-0 z-40 mt-2 bg-popover ring-1 ring-foreground/10">
 					<div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b p-2">
 						<div role="group" aria-label="Filter results" className="flex flex-wrap gap-1">
 							{FILTERS.map((f) => (

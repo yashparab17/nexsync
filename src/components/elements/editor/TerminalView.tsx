@@ -215,7 +215,7 @@ const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function Term
 		<div className="relative h-full w-full bg-background pl-3">
 			<div ref={host} className="h-full w-full" />
 			{searching && (
-				<div role="search" className="absolute top-1 right-3 z-10 flex items-center gap-1 border bg-popover p-1 shadow-md">
+				<div role="search" className="absolute top-1 right-3 z-10 flex items-center gap-1 border bg-popover p-1 ring-1 ring-foreground/10">
 					<Search className="ml-1 size-3.5 text-muted-foreground" />
 					<input
 						autoFocus

@@ -251,7 +251,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 								{exportMenu && (
 									<>
 										<button type="button" aria-label="Close export menu" className="fixed inset-0 z-10 cursor-default" onClick={() => setExportMenu(false)} />
-										<div className="absolute right-0 z-20 mt-1 w-44 border bg-popover p-1 shadow-md">
+										<div className="absolute right-0 z-20 mt-1 w-44 border bg-popover p-1 ring-1 ring-foreground/10">
 											<Button variant="ghost" size="sm" className="w-full justify-start" onPress={() => void runExport("md")}>
 												Markdown (.md)
 											</Button>

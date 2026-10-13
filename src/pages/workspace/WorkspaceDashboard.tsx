@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { FilePlus, FileText, FolderOpen, ListTodo, StickyNote, Upload, UsersRound, Calendar, AnimateIcon } from "@/components/animate-icons";
@@ -73,13 +73,10 @@ export default function WorkspaceDashboard() {
 	);
 	const today = new Date().toISOString().slice(0, 10);
 
-	const counts: [string, number, string][] = [
-		["files", stats?.files ?? 0, "/workspace/files"],
-		["assets", stats?.assets ?? 0, "/workspace/assets"],
-		["tasks", stats?.tasks ?? 0, "/workspace/tasks"],
-		["cards", stats?.kanban_cards ?? 0, "/workspace/kanban"],
-		["members", stats?.members ?? 0, "/workspace/members"],
-	];
+	const open = tasks.filter((t) => t.status !== "done");
+	const doneShare = tasks.length ? Math.round(((tasks.length - open.length) / tasks.length) * 100) : 0;
+	const late = open.filter((t) => t.due_date && t.due_date < today).length;
+	const goTo = (path: string) => () => navigate(path);
 
 	return (
 		<Page>
@@ -88,112 +85,135 @@ export default function WorkspaceDashboard() {
 				{workspace?.description && <span className="ml-1 hidden min-w-0 flex-1 truncate border-l pl-3 text-sm text-muted-foreground md:block">{workspace.description}</span>}
 			</Toolbar>
 
-			<PageBody className="grid content-start gap-3 xl:grid-cols-[minmax(0,1fr)_24rem]">
-				<dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:col-span-2">
-					{counts.map(([label, value, path]) => (
-						<button key={label} type="button" onClick={() => navigate(path)} className="border bg-muted/40 p-4 text-left outline-none transition-colors hover:border-primary focus-visible:border-primary">
-							<dd className="font-mono text-3xl font-semibold tabular-nums">{value}</dd>
-							<dt className="text-sm text-muted-foreground">{label}</dt>
-						</button>
-					))}
-				</dl>
+			{/* A bento grid: tile size follows importance, with where to continue largest */}
+			<PageBody className="grid content-start gap-3 md:grid-cols-6 xl:grid-cols-12">
+				<Panel title="Pick up where you left off" hint={recent.length ? `${Math.min(recent.length, 6)} recent` : undefined} flush={recent.length > 0} className="md:col-span-6 xl:col-span-5 xl:row-span-2">
+					{recent.length === 0 ? (
+						<p className="text-sm text-muted-foreground">Files you open show up here, so you can jump back in.</p>
+					) : (
+						<ul className="divide-y">
+							{recent.slice(0, 6).map((file) => (
+								<li key={file}>
+									<AnimateIcon animateOnHover asChild>
+										<button type="button" onClick={() => navigate(openPath(file))} className="flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
+											<FileText className="size-5 shrink-0 text-muted-foreground" />
+											<span className="min-w-0">
+												<span className="block truncate text-sm font-medium">{file.split("/").pop()}</span>
+												<span className="block truncate font-mono text-[13px] text-muted-foreground">{file}</span>
+											</span>
+										</button>
+									</AnimateIcon>
+								</li>
+							))}
+						</ul>
+					)}
+				</Panel>
 
-				<div className="flex min-w-0 flex-col gap-3">
-					<Panel title="Pick up where you left off" hint={recent.length ? `${Math.min(recent.length, 5)} recent` : undefined} flush={recent.length > 0}>
-						{recent.length === 0 ? (
-							<p className="text-sm text-muted-foreground">Files you open show up here, so you can jump back in.</p>
-						) : (
-							<ul className="divide-y">
-								{recent.slice(0, 5).map((file) => (
-									<li key={file}>
+				<Tile label="Open tasks" value={open.length} onClick={goTo("/workspace/tasks")} className="md:col-span-3 xl:col-span-4">
+					<span className="block h-2 bg-muted" role="img" aria-label={`${doneShare}% of tasks done`}>
+						<span className="block h-full bg-success" style={{ width: `${doneShare}%` }} />
+					</span>
+					<span className="text-sm text-muted-foreground">
+						{tasks.length === 0 ? "No tasks yet" : `${doneShare}% of ${tasks.length} done`}
+						{late > 0 && <span className="text-destructive"> · {late} overdue</span>}
+					</span>
+				</Tile>
+				<Tile label="Files" value={stats?.files ?? 0} onClick={goTo("/workspace/files")} className="md:col-span-3 xl:col-span-3">
+					<span className="text-sm text-muted-foreground">
+						{stats?.assets ?? 0} assets · {stats?.kanban_cards ?? 0} cards
+					</span>
+				</Tile>
+
+				<Panel title="Due soon" flush={due.length > 0} className="md:col-span-3 xl:col-span-4">
+					{due.length === 0 ? (
+						<p className="text-sm text-muted-foreground">No dates set. Give a task a due date and it appears here.</p>
+					) : (
+						<ul className="divide-y">
+							{due.slice(0, 4).map((task) => {
+								const overdue = task.due_date! < today;
+								return (
+									<li key={task.id}>
 										<AnimateIcon animateOnHover asChild>
-											<button type="button" onClick={() => navigate(openPath(file))} className="flex w-full items-center gap-3 px-4 py-2.5 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
-												<FileText className="size-5 shrink-0 text-muted-foreground" />
-												<span className="min-w-0">
-													<span className="block truncate text-sm font-medium">{file.split("/").pop()}</span>
-													<span className="block truncate font-mono text-[13px] text-muted-foreground">{file}</span>
+											<button type="button" onClick={() => navigate(`/workspace/tasks?open=${encodeURIComponent(task.id)}`)} className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
+												<span className="truncate font-medium">{task.title}</span>
+												<span className={cn("flex shrink-0 items-center gap-1.5 font-mono text-[13px] tabular-nums", overdue ? "text-destructive" : task.due_date === today ? "text-warning" : "text-muted-foreground")}>
+													<Calendar className="size-3.5" />
+													{task.due_date === today ? "today" : task.due_date}
 												</span>
 											</button>
 										</AnimateIcon>
 									</li>
-								))}
-							</ul>
-						)}
-					</Panel>
+								);
+							})}
+						</ul>
+					)}
+				</Panel>
 
-					<Panel title="Activity" hint="The latest changes" flush={activity.length > 0}>
-						{activity.length === 0 ? (
-							<p className="text-sm text-muted-foreground">Nothing has changed yet. Create a note, file or task to get started.</p>
-						) : (
-							<ul className="divide-y">
-								{activity.slice(0, 8).map((event) => {
-									const Icon = eventIcon(event.target_type, event.action);
-									return (
-										<li key={event.id} className="flex items-center gap-3 px-4 py-2.5">
-											{event.author ? <Avatar name={event.author} className="size-7 text-xs" /> : <span className="flex size-7 shrink-0 items-center justify-center bg-muted text-muted-foreground"><Icon className="size-4" /></span>}
-											<div className="min-w-0 flex-1">
-												<p className="truncate text-sm">
-													<span className="font-medium">{event.author ?? formatAction(event.action)}</span>
-													{event.author && <span className="text-muted-foreground"> {formatAction(event.action).toLowerCase()}</span>}
-												</p>
-												<p className="truncate text-sm text-muted-foreground">{event.detail}</p>
-											</div>
-											<span className="shrink-0 font-mono text-[13px] tabular-nums text-muted-foreground">{formatRelative(event.timestamp)}</span>
-										</li>
-									);
-								})}
-							</ul>
+				<Panel title="People" hint={`${[...online].filter((n) => members.some((m) => m.name === n)).length} online`} flush className="md:col-span-3 xl:col-span-3">
+					<ul className="divide-y">
+						{members.slice(0, 4).map((m) => {
+							const here = online.has(m.name);
+							return (
+								<li key={m.id} className="flex items-center gap-3 px-4 py-2.5">
+									<span className="relative">
+										<Avatar name={m.name} className={cn("size-8", !here && "opacity-50")} />
+										<span className={cn("absolute -right-0.5 -bottom-0.5 size-2.5 ring-2 ring-background", here ? "bg-success" : "bg-muted-foreground/50")} />
+									</span>
+									<span className={cn("min-w-0 flex-1 truncate text-sm font-medium", !here && "text-muted-foreground")}>{m.name}</span>
+									<span className="font-mono text-[13px] text-muted-foreground">{m.role.toLowerCase()}</span>
+								</li>
+							);
+						})}
+						{members.length > 4 && (
+							<li>
+								<button type="button" onClick={goTo("/workspace/members")} className="w-full px-4 py-2.5 text-left text-sm text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted">
+									and {members.length - 4} more
+								</button>
+							</li>
 						)}
-					</Panel>
-				</div>
+					</ul>
+				</Panel>
 
-				<aside className="flex flex-col gap-3">
-					<Panel title="People" hint={`${[...online].filter((n) => members.some((m) => m.name === n)).length} online`} flush>
+				<Panel title="Activity" hint="The latest changes" flush={activity.length > 0} className="md:col-span-6 xl:col-span-8">
+					{activity.length === 0 ? (
+						<p className="text-sm text-muted-foreground">Nothing has changed yet. Create a note, file or task to get started.</p>
+					) : (
 						<ul className="divide-y">
-							{members.map((m) => {
-								const here = online.has(m.name);
+							{activity.slice(0, 6).map((event) => {
+								const Icon = eventIcon(event.target_type, event.action);
 								return (
-									<li key={m.id} className="flex items-center gap-3 px-4 py-2.5">
-										<span className="relative">
-											<Avatar name={m.name} className={cn("size-8", !here && "opacity-50")} />
-											<span className={cn("absolute -right-0.5 -bottom-0.5 size-2.5 ring-2 ring-card", here ? "bg-success" : "bg-muted-foreground/50")} />
-										</span>
-										<span className="min-w-0 flex-1">
-											<span className={cn("block truncate text-sm font-medium", !here && "text-muted-foreground")}>{m.name}</span>
-										</span>
-										<span className="font-mono text-[13px] text-muted-foreground">{m.role.toLowerCase()}</span>
+									<li key={event.id} className="flex items-center gap-3 px-4 py-2.5">
+										{event.author ? <Avatar name={event.author} className="size-7 text-xs" /> : <span className="flex size-7 shrink-0 items-center justify-center bg-muted text-muted-foreground"><Icon className="size-4" /></span>}
+										<div className="min-w-0 flex-1">
+											<p className="truncate text-sm">
+												<span className="font-medium">{event.author ?? formatAction(event.action)}</span>
+												{event.author && <span className="text-muted-foreground"> {formatAction(event.action).toLowerCase()}</span>}
+											</p>
+											<p className="truncate text-sm text-muted-foreground">{event.detail}</p>
+										</div>
+										<span className="shrink-0 font-mono text-[13px] tabular-nums text-muted-foreground">{formatRelative(event.timestamp)}</span>
 									</li>
 								);
 							})}
 						</ul>
-					</Panel>
+					)}
+				</Panel>
 
-					<Panel title="Due soon" flush={due.length > 0}>
-						{due.length === 0 ? (
-							<p className="text-sm text-muted-foreground">No dates set. Give a task a due date and it appears here.</p>
-						) : (
-							<ul className="divide-y">
-								{due.map((task) => {
-									const late = task.due_date! < today;
-									return (
-										<li key={task.id}>
-											<AnimateIcon animateOnHover asChild>
-												<button type="button" onClick={() => navigate(`/workspace/tasks?open=${encodeURIComponent(task.id)}`)} className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
-													<span className="truncate font-medium">{task.title}</span>
-													<span className={cn("flex shrink-0 items-center gap-1.5 font-mono text-[13px] tabular-nums", late ? "text-destructive" : task.due_date === today ? "text-warning" : "text-muted-foreground")}>
-														<Calendar className="size-3.5" />
-														{task.due_date === today ? "today" : task.due_date}
-													</span>
-												</button>
-											</AnimateIcon>
-										</li>
-									);
-								})}
-							</ul>
-						)}
-					</Panel>
-				</aside>
+				<Tile label="Kanban cards" value={stats?.kanban_cards ?? 0} onClick={goTo("/workspace/kanban")} className="md:col-span-6 xl:col-span-4">
+					<span className="text-sm text-muted-foreground">{members.length} {members.length === 1 ? "member" : "members"} share this board</span>
+				</Tile>
 			</PageBody>
 		</Page>
+	);
+}
+
+// A number worth a glance, big, with a line of context under it; the whole tile opens its page
+function Tile({ label, value, onClick, className, children }: { label: string; value: number; onClick: () => void; className?: string; children?: ReactNode }) {
+	return (
+		<button type="button" onClick={onClick} className={cn("flex min-w-0 flex-col justify-between gap-4 bg-muted/40 p-4 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted", className)}>
+			<span className="text-sm text-muted-foreground">{label}</span>
+			<span className="text-5xl font-semibold tabular-nums">{value}</span>
+			<span className="flex flex-col gap-2">{children}</span>
+		</button>
 	);
 }

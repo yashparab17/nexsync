@@ -39,7 +39,7 @@ export default function Toaster() {
 	return (
 		<div role="status" aria-live="polite" className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
 			{toasts.map((toast) => (
-				<div key={toast.id} className="pointer-events-auto flex items-start justify-between gap-2 border bg-popover p-3 text-sm shadow-md animate-in fade-in slide-in-from-bottom-2 motion-reduce:animate-none">
+				<div key={toast.id} className="pointer-events-auto flex items-start justify-between gap-2 border bg-popover p-3 text-sm ring-1 ring-foreground/10 animate-in fade-in slide-in-from-bottom-2 motion-reduce:animate-none">
 					<p className="min-w-0 break-words">{toast.text}</p>
 					<button
 						type="button"

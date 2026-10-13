@@ -46,7 +46,7 @@ function Page({ doc, index, width, ratio }: { doc: PDFDocumentProxy; index: numb
 	}, [near, doc, index, width]);
 
 	return (
-		<div ref={holder} style={{ width, height: width * ratio }} className="mx-auto mb-3 bg-white shadow-md">
+		<div ref={holder} style={{ width, height: width * ratio }} className="mx-auto mb-3 bg-white ring-1 ring-foreground/10">
 			<canvas ref={canvas} aria-label={`Page ${index + 1}`} className="block h-full w-full" />
 		</div>
 	);

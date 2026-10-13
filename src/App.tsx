@@ -18,7 +18,7 @@ export default function App() {
 
 			<a
 				href="#main-content"
-				className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow-md"
+				className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:ring-1 focus:ring-foreground/10"
 			>
 				{t("app.skipToContent")}
 			</a>

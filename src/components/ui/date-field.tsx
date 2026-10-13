@@ -75,7 +75,7 @@ export function DateField({
 					<CalendarIcon className="size-4" />
 				</Button>
 			</Group>
-			<Popover placement="bottom end" className="z-[70] border border-border bg-popover p-3 text-popover-foreground shadow-md">
+			<Popover placement="bottom end" className="z-[70] border border-border bg-popover p-3 text-popover-foreground ring-1 ring-foreground/10">
 				<Dialog className="outline-none">
 					<Calendar>
 						<header className="mb-2 flex items-center justify-between">
