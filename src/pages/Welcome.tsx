@@ -178,7 +178,6 @@ export default function Welcome() {
 												>
 													<span className="flex items-start justify-between gap-3">
 														<span className={`font-semibold text-xl`}>{ws.name}</span>
-														{last && <span className="shrink-0 bg-primary px-2 py-0.5 text-sm font-medium text-primary-foreground">Continue</span>}
 													</span>
 													{ws.description && <span className="line-clamp-2 text-muted-foreground">{ws.description}</span>}
 													<span className="mt-auto flex flex-col gap-1 font-mono text-xs text-muted-foreground">

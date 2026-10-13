@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { FilePlus, FileText, FolderOpen, ListTodo, StickyNote, Upload, UsersRound, Calendar, AnimateIcon } from "@/components/animate-icons";
+import { ArrowUpRight, FilePlus, FileText, FolderOpen, ListTodo, StickyNote, Upload, UsersRound, Calendar, AnimateIcon } from "@/components/animate-icons";
 
 import Avatar from "@/components/elements/Avatar";
 import { Page, PageBody, Panel } from "@/components/layout/Page";
@@ -106,7 +106,7 @@ export default function WorkspaceDashboard() {
 					)}
 				</Panel>
 
-				<Tile label="02 / open tasks" value={open.length} onClick={goTo("/workspace/tasks")} className="md:col-span-3 xl:col-span-4">
+				<Tile index="02" title="Open Tasks" value={open.length} onClick={goTo("/workspace/tasks")} className="md:col-span-3 xl:col-span-4">
 					<span className="block h-2 bg-muted" role="img" aria-label={`${doneShare}% of tasks done`}>
 						<span className="block h-full bg-success" style={{ width: `${doneShare}%` }} />
 					</span>
@@ -115,7 +115,7 @@ export default function WorkspaceDashboard() {
 						{late > 0 && <span className="text-destructive"> · {late} overdue</span>}
 					</span>
 				</Tile>
-				<Tile label="03 / files" value={stats?.files ?? 0} onClick={goTo("/workspace/files")} className="md:col-span-3 xl:col-span-3">
+				<Tile index="03" title="Files" value={stats?.files ?? 0} onClick={goTo("/workspace/files")} className="md:col-span-3 xl:col-span-3">
 					<span className="text-sm text-muted-foreground">
 						{stats?.assets ?? 0} assets · {stats?.kanban_cards ?? 0} cards
 					</span>
@@ -196,7 +196,7 @@ export default function WorkspaceDashboard() {
 					)}
 				</Panel>
 
-				<Tile label="07 / kanban cards" value={stats?.kanban_cards ?? 0} onClick={goTo("/workspace/kanban")} className="md:col-span-6 xl:col-span-4">
+				<Tile index="07" title="Kanban Cards" value={stats?.kanban_cards ?? 0} onClick={goTo("/workspace/kanban")} className="md:col-span-6 xl:col-span-4">
 					<span className="text-sm text-muted-foreground">{members.length} {members.length === 1 ? "member" : "members"} share this board</span>
 				</Tile>
 			</PageBody>
@@ -204,13 +204,22 @@ export default function WorkspaceDashboard() {
 	);
 }
 
-// A number worth a glance, big, with a line of context under it; the whole tile opens its page
-function Tile({ label, value, onClick, className, children }: { label: string; value: number; onClick: () => void; className?: string; children?: ReactNode }) {
+// A number worth a glance with a line of context under it. The header is the same as a panel's (number, title); the arrow says
+// the whole tile opens its page.
+function Tile({ index, title, value, onClick, className, children }: { index: string; title: string; value: number; onClick: () => void; className?: string; children?: ReactNode }) {
 	return (
-		<button type="button" onClick={onClick} className={cn("frame ticks flex min-w-0 flex-col justify-between gap-4 bg-muted/40 p-4 text-left transition-colors hover:bg-muted focus-visible:bg-muted", className)}>
-			<span className="font-mono text-[13px] text-muted-foreground">{label}</span>
-			<span className="text-5xl font-semibold tabular-nums">{value}</span>
-			<span className="flex flex-col gap-2">{children}</span>
+		<button type="button" onClick={onClick} className={cn("frame ticks flex min-w-0 flex-col bg-muted/40 text-left transition-colors hover:bg-muted focus-visible:bg-muted", className)}>
+			<span className="flex h-12 shrink-0 items-center gap-3 border-b px-4">
+				<span className="font-mono text-[13px] text-primary" aria-hidden>
+					{index}
+				</span>
+				<span className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</span>
+				<ArrowUpRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+			</span>
+			<span className="flex flex-1 flex-col justify-between gap-4 p-4">
+				<span className="text-4xl font-semibold tabular-nums">{value}</span>
+				<span className="flex flex-col gap-2">{children}</span>
+			</span>
 		</button>
 	);
 }
