@@ -19,7 +19,7 @@ export function Panel({ title, hint, children, className, right, flush, icon, id
 		<section id={id} className={cn("frame flex min-w-0 flex-col bg-muted/40", className)}>
 			<header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b px-4">
 				{index && <span className="shrink-0 font-mono text-[13px] text-primary" aria-hidden>{index}</span>}
-				{icon && <span className={cn("shrink-0 [&>svg]:size-5", titleClassName?.includes("destructive") ? "text-destructive" : "text-primary")}>{icon}</span>}
+				{icon && <span className={cn("flex size-5 shrink-0 items-center justify-center [&>svg]:size-5", titleClassName?.includes("destructive") ? "text-destructive" : "text-primary")}>{icon}</span>}
 				<div className="min-w-0 flex-1">
 					<h2 className={cn("text-sm font-semibold text-foreground", titleClassName)}>{title}</h2>
 					{hint && <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{hint}</p>}
@@ -30,6 +30,16 @@ export function Panel({ title, hint, children, className, right, flush, icon, id
 		</section>
 	);
 }
+
+// A numbered title for one part of a form or dialog: the number in the accent, then the title
+export const SectionTitle = ({ n, title }: { n: string; title: string }) => (
+	<h3 className="flex h-8 items-center gap-2 text-sm font-semibold">
+		<span className="font-mono text-[13px] text-primary" aria-hidden>
+			{n}
+		</span>
+		{title}
+	</h3>
+);
 
 // What a page shows when there is nothing to list: an icon, a title, a sentence and maybe a button
 export function EmptyState({ icon, title, children, action, className }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode; className?: string }) {

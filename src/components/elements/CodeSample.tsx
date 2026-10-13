@@ -8,7 +8,7 @@ const c = (k: string) => ({ color: `var(--syn-${k})` });
 export default function CodeSample({ vars, className }: { vars?: SyntaxVars; className?: string }) {
 	const style = vars ? (Object.fromEntries(SYNTAX_TOKENS.map((t) => [`--syn-${t.key}`, vars[t.key]])) as React.CSSProperties) : undefined;
 	return (
-		<pre style={style} aria-label="Sample code" className={cn("overflow-x-auto border bg-background p-3 font-mono text-[13px] leading-relaxed text-foreground", className)}>
+		<pre style={style} aria-label="Sample code" className={cn("frame overflow-x-auto bg-background p-3 font-mono text-[13px] leading-relaxed text-foreground", className)}>
 			<span style={c("comment")}>{"// Adds up the open tasks"}</span>
 			{"\n"}
 			<span style={c("keyword")}>export function</span> <span style={c("function")}>countOpen</span>

@@ -361,7 +361,7 @@ button, a, select, summary, label, [role="button"] { touch-action: manipulation;
   border-color: transparent;
 }
 .border:focus-visible,
-.border:focus-within {
+.border:focus-within:not([data-slot="dialog-content"], [role="dialog"]) {
   border-color: var(--primary);
 }
 
@@ -388,3 +388,6 @@ button, a, select, summary, label, [role="button"] { touch-action: manipulation;
     linear-gradient(var(--primary), var(--primary)) right bottom / var(--w) var(--t) no-repeat;
 }
 .ticks:is(button, a):hover::after, .ticks:focus-visible::after, .ticks[aria-current="true"]::after, .ticks.ticks-on::after { opacity: 1; }
+
+/* Dialogs take focus as a whole (so Escape and Tab work) but do not draw a ring round themselves */
+[data-slot="dialog"]:focus-visible, [data-slot="dialog-content"]:focus-visible { outline: none; }

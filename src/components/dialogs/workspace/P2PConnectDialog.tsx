@@ -279,7 +279,7 @@ export default function P2PConnectDialog({
 										<div className="flex flex-wrap items-center gap-x-5 gap-y-2 border bg-muted/30 p-3 text-sm">
 											<label className="flex items-center gap-2">
 												Lasts
-												<select value={expiry} onChange={(e) => setExpiry(e.target.value)} className="h-8 border border-input bg-background px-2">
+												<select value={expiry} onChange={(e) => setExpiry(e.target.value)} className="h-8 border border-input bg-input px-2">
 													<option value="600">10 minutes</option>
 													<option value="3600">1 hour</option>
 													<option value="86400">1 day</option>

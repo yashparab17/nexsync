@@ -159,7 +159,7 @@ export function ChecklistEditor({ value, onChange }: { value: ChecklistItem[]; o
 					}}
 					aria-label="New checklist item"
 					placeholder="Add an item"
-					className="h-8 flex-1 rounded-none border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+					className="h-8 flex-1 rounded-none border border-input bg-input px-2 text-sm outline-none focus:ring-2 focus:ring-ring"
 				/>
 				<button
 					type="button"

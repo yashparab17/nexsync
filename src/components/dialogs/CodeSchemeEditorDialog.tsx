@@ -8,6 +8,7 @@ import CodeSample from "@/components/elements/CodeSample";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { SectionTitle } from "@/components/layout/Page";
 import { Label } from "@/components/ui/label";
 import { BUILTIN_SCHEMES, MAX_SCHEME_NAME, SYNTAX_TOKENS, syntaxToText, textToSyntax, type CodeSchemeDef, type SyntaxVars } from "@/lib/codeSchemes";
 import { isColor, type ThemeMode } from "@/lib/themes";
@@ -42,68 +43,78 @@ export default function CodeSchemeEditorDialog({ mode, initial, onClose }: { mod
 
 	return (
 		<Dialog isOpen onOpenChange={(o) => !o && onClose()} className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-			<div className="space-y-4">
+			<div className="space-y-6">
 				<DialogHeading icon={<Palette className="size-6" />} title={initial ? "Edit Code Colours" : "New Code Colours"} />
 
-				<div className="grid gap-3 sm:grid-cols-2">
-					<div>
-						<Label htmlFor="scheme-name">Name</Label>
-						<Input id="scheme-name" value={name} maxLength={MAX_SCHEME_NAME} onChange={(e) => setName(e.target.value)} placeholder="My colours" className="mt-1" autoFocus />
+				<section className="space-y-2">
+					<SectionTitle n="01" title="Name" />
+					<div className="grid gap-4 sm:grid-cols-2">
+						<div>
+							<Label htmlFor="scheme-name">Name</Label>
+							<Input id="scheme-name" value={name} maxLength={MAX_SCHEME_NAME} onChange={(e) => setName(e.target.value)} placeholder="My colours" className="mt-1" autoFocus />
+						</div>
+						<div>
+							<Label htmlFor="scheme-start">Start from</Label>
+							<select id="scheme-start" defaultValue="" onChange={(e) => e.target.value && apply(starts.find((s) => s.id === e.target.value)!.vars)} className="mt-1 h-10 w-full border border-input bg-input px-2 text-sm">
+								<option value="">{initial ? "Keep these colours" : starts[0].name}</option>
+								{starts.map((s) => (
+									<option key={s.id} value={s.id}>
+										{s.name}
+									</option>
+								))}
+							</select>
+						</div>
 					</div>
-					<div>
-						<Label htmlFor="scheme-start">Start from</Label>
-						<select id="scheme-start" defaultValue="" onChange={(e) => e.target.value && apply(starts.find((s) => s.id === e.target.value)!.vars)} className="mt-1 h-10 w-full border border-input bg-background px-2 text-sm">
-							<option value="">{initial ? "Keep these colours" : starts[0].name}</option>
-							{starts.map((s) => (
-								<option key={s.id} value={s.id}>
-									{s.name}
-								</option>
-							))}
-						</select>
-					</div>
-				</div>
+				</section>
 
-				<CodeSample vars={vars} />
+				<section className="space-y-2">
+					<SectionTitle n="02" title="Preview" />
+					<CodeSample vars={vars} />
+				</section>
 
-				<div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-					{SYNTAX_TOKENS.map((t) => {
-						const value = typing[t.key] ?? vars[t.key];
-						const ok = isColor(value);
-						return (
-							<div key={t.key} className="flex items-center gap-2">
-								{isHex6(vars[t.key]) ? (
-									<input type="color" aria-label={`${t.label} colour`} value={vars[t.key].toLowerCase()} onChange={(e) => apply({ ...vars, [t.key]: e.target.value })} className="h-8 w-9 shrink-0 cursor-pointer border bg-transparent p-0.5" />
-								) : (
-									<span aria-hidden className="h-8 w-9 shrink-0 border" style={{ background: ok ? value : "transparent" }} />
-								)}
-								<div className="min-w-0 flex-1">
-									<p className="truncate text-sm font-semibold">{t.label}</p>
-									<p className="truncate text-[13px] text-muted-foreground">{t.hint}</p>
+				<section className="space-y-2">
+					<SectionTitle n="03" title="Colours" />
+					<div className="frame grid gap-px bg-[var(--rule)] sm:grid-cols-2">
+						{SYNTAX_TOKENS.map((t) => {
+							const value = typing[t.key] ?? vars[t.key];
+							const ok = isColor(value);
+							return (
+								<div key={t.key} className="flex items-center gap-3 bg-popover p-3">
+									{isHex6(vars[t.key]) ? (
+										<input type="color" aria-label={`${t.label} colour`} value={vars[t.key].toLowerCase()} onChange={(e) => apply({ ...vars, [t.key]: e.target.value })} className="h-8 w-8 shrink-0 cursor-pointer bg-transparent p-0" />
+									) : (
+										<span aria-hidden className="h-8 w-8 shrink-0" style={{ background: ok ? value : "transparent" }} />
+									)}
+									<div className="min-w-0 flex-1">
+										<p className="truncate text-sm font-semibold">{t.label}</p>
+										<p className="truncate text-[13px] text-muted-foreground">{t.hint}</p>
+									</div>
+									<input
+										aria-label={`${t.label} value`}
+										value={value}
+										spellCheck={false}
+										onChange={(e) => {
+											const v = e.target.value.trim();
+											setTyping((p) => ({ ...p, [t.key]: e.target.value }));
+											if (isColor(v)) {
+												setVars((prev) => ({ ...prev, [t.key]: v }));
+												setText(syntaxToText({ ...vars, [t.key]: v }));
+											}
+										}}
+										onBlur={() => setTyping((p) => Object.fromEntries(Object.entries(p).filter(([k]) => k !== t.key)))}
+										className={cn("h-8 w-28 bg-input px-2 font-mono text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40", !ok && "ring-1 ring-destructive")}
+									/>
 								</div>
-								<input
-									aria-label={`${t.label} value`}
-									value={value}
-									spellCheck={false}
-									onChange={(e) => {
-										const v = e.target.value.trim();
-										setTyping((p) => ({ ...p, [t.key]: e.target.value }));
-										if (isColor(v)) {
-											setVars((prev) => ({ ...prev, [t.key]: v }));
-											setText(syntaxToText({ ...vars, [t.key]: v }));
-										}
-									}}
-									onBlur={() => setTyping((p) => Object.fromEntries(Object.entries(p).filter(([k]) => k !== t.key)))}
-									className={cn("h-8 w-28 border bg-background px-2 font-mono text-[13px] outline-none focus-visible:border-ring", !ok && "border-destructive")}
-								/>
-							</div>
-						);
-					})}
-				</div>
+							);
+						})}
+					</div>
+				</section>
 
-				<div>
-					<Label htmlFor="scheme-css">As CSS</Label>
+				<section className="space-y-2">
+					<SectionTitle n="04" title="As CSS" />
 					<textarea
 						id="scheme-css"
+						aria-label="As CSS"
 						value={text}
 						spellCheck={false}
 						onChange={(e) => {
@@ -113,12 +124,12 @@ export default function CodeSchemeEditorDialog({ mode, initial, onClose }: { mod
 							setSkipped(r.skipped);
 						}}
 						rows={6}
-						className="mt-1 w-full resize-y border border-input bg-background p-2 font-mono text-[13px] outline-none focus-visible:border-ring"
+						className="w-full resize-y bg-input p-3 font-mono text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 					/>
-					<p className={cn("mt-1 text-[13px]", skipped ? "text-warning" : "text-muted-foreground")}>
+					<p className={cn("text-[13px]", skipped ? "text-warning" : "text-muted-foreground")}>
 						{skipped ? `${skipped} ${skipped === 1 ? "line was" : "lines were"} not used: names must be ones listed above and values hex, rgb(), hsl() or oklch() colours.` : "One --syn-name: value; per line. Paste a whole scheme here to import it."}
 					</p>
-				</div>
+				</section>
 
 				<DialogFooter>
 					<Button variant="outline" onPress={onClose}>

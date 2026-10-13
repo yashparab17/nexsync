@@ -24,7 +24,7 @@ function Group({ mode, label }: { mode: ThemeMode; label: string }) {
 				<label htmlFor={`code-${mode}`} className="mr-auto text-sm font-semibold">
 					{label}
 				</label>
-				<select id={`code-${mode}`} value={value} onChange={(e) => setCodeScheme(mode, e.target.value)} className="h-8 border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring">
+				<select id={`code-${mode}`} value={value} onChange={(e) => setCodeScheme(mode, e.target.value)} className="h-8 border border-input bg-input px-2 text-sm outline-none focus-visible:border-ring">
 					<option value={AUTO_SCHEME}>Match the theme</option>
 					<optgroup label="Ready-made">
 						{schemes.filter((s) => !s.custom).map((s) => (

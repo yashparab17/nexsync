@@ -216,8 +216,8 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						title="Profile"
 						icon={<User className="size-5" />}
 					>
-						<div className="flex items-center gap-4">
-							<Avatar name={name} className="size-12 text-xl" />
+						<div className="flex items-stretch gap-4">
+							<Avatar name={name} className="h-auto w-16 text-xl" />
 							<div className="min-w-0 flex-1 space-y-1">
 								<Input
 									value={name}

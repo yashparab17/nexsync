@@ -36,16 +36,14 @@ export interface ThemeDef {
 }
 
 export const DEFAULT_THEME = "default";
-// What a new install starts on; the original light and dark stay available
-export const FIRST_RUN_THEME = "cyber";
 
 const light = (id: string, name: string, vars: ThemeVars): ThemeDef => ({ id, name, mode: "light", vars });
 const dark = (id: string, name: string, vars: ThemeVars): ThemeDef => ({ id, name, mode: "dark", vars });
 
 // Themes come in pairs, one for each mode, so switching between light and dark keeps the same look
 export const THEME_FAMILIES = [
+	{ id: "default", name: "Default", light: "default", dark: "default" },
 	{ id: "cyber", name: "Cyber", light: "cyber", dark: "cyber" },
-	{ id: "legacy", name: "Legacy", light: "default", dark: "default" },
 	{ id: "catppuccin", name: "Catppuccin", light: "latte", dark: "mocha" },
 	{ id: "solarized", name: "Solarized", light: "solarized-light", dark: "solarized-dark" },
 	{ id: "gruvbox", name: "Gruvbox", light: "gruvbox-light", dark: "gruvbox-dark" },
@@ -53,6 +51,25 @@ export const THEME_FAMILIES = [
 ] as const;
 
 export const BUILTIN_THEMES: ThemeDef[] = [
+	light("default", "Default Light", {
+		"background": "#ffffff",
+		"foreground": "#09090b",
+		"card": "#ffffff",
+		"popover": "#ffffff",
+		"primary": "#0f766e",
+		"primary-foreground": "#f0fdfa",
+		"secondary": "#f4f4f5",
+		"muted": "#f4f4f5",
+		"accent": "#f4f4f5",
+		"destructive": "#dc2626",
+		"success": "#15803d",
+		"warning": "#a16207",
+		"info": "#1d4ed8",
+		"border": "#e4e4e7",
+		"input": "#e4e4e7",
+		"ring": "#a1a1aa",
+		"sidebar": "#fafafa",
+	}),
 	light("cyber", "Cyber Light", {
 		"background": "#e4ebf5",
 		"foreground": "#0a1220",
@@ -71,25 +88,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"input": "#c5d1e3",
 		"ring": "#0a9a9a",
 		"sidebar": "#f0f4fa",
-	}),
-	light("default", "Legacy Light", {
-		"background": "#ffffff",
-		"foreground": "#09090b",
-		"card": "#ffffff",
-		"popover": "#ffffff",
-		"primary": "#0f766e",
-		"primary-foreground": "#f0fdfa",
-		"secondary": "#f4f4f5",
-		"muted": "#f4f4f5",
-		"accent": "#f4f4f5",
-		"destructive": "#dc2626",
-		"success": "#15803d",
-		"warning": "#a16207",
-		"info": "#1d4ed8",
-		"border": "#e4e4e7",
-		"input": "#e4e4e7",
-		"ring": "#a1a1aa",
-		"sidebar": "#fafafa",
 	}),
 	light("latte", "Catppuccin Latte", {
 		"background": "#dce0e8",
@@ -167,6 +165,25 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"ring": "#0969da",
 		"sidebar": "#f6f8fa",
 	}),
+	dark("default", "Default Dark", {
+		"background": "#09090b",
+		"foreground": "#fafafa",
+		"card": "#18181b",
+		"popover": "#18181b",
+		"primary": "#2dd4bf",
+		"primary-foreground": "#042f2e",
+		"secondary": "#27272a",
+		"muted": "#27272a",
+		"accent": "#27272a",
+		"destructive": "#ff6467",
+		"success": "#4ade80",
+		"warning": "#fbbf24",
+		"info": "#7aa7ff",
+		"border": "#2a2a2e",
+		"input": "#3a3a3e",
+		"ring": "#71717a",
+		"sidebar": "#18181b",
+	}),
 	dark("cyber", "Cyber Dark", {
 		"background": "#05070d",
 		"foreground": "#e6edf7",
@@ -185,25 +202,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"input": "#172033",
 		"ring": "#19d3e6",
 		"sidebar": "#0a0f18",
-	}),
-	dark("default", "Legacy Dark", {
-		"background": "#09090b",
-		"foreground": "#fafafa",
-		"card": "#18181b",
-		"popover": "#18181b",
-		"primary": "#2dd4bf",
-		"primary-foreground": "#042f2e",
-		"secondary": "#27272a",
-		"muted": "#27272a",
-		"accent": "#27272a",
-		"destructive": "#ff6467",
-		"success": "#4ade80",
-		"warning": "#fbbf24",
-		"info": "#7aa7ff",
-		"border": "#2a2a2e",
-		"input": "#3a3a3e",
-		"ring": "#71717a",
-		"sidebar": "#18181b",
 	}),
 	dark("mocha", "Catppuccin Mocha", {
 		"background": "#11111b",

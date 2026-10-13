@@ -175,8 +175,8 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 				)}
 
 				<SectionCard id="you" title="You" icon={<User className="size-5" />}>
-					<div className="flex items-center gap-4">
-						<Avatar name={myName} className="size-12 text-xl" />
+					<div className="flex items-stretch gap-4">
+						<Avatar name={myName} className="h-auto w-16 text-xl" />
 						<div className="min-w-0 flex-1">
 							<p className="truncate text-sm font-semibold">{myName}</p>
 							<p className="text-xs text-muted-foreground">

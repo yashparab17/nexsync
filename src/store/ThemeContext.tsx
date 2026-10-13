@@ -9,7 +9,7 @@ import {
 } from "react";
 
 import { AUTO_SCHEME, BUILTIN_SCHEMES, cleanCustomSchemes, schemeCss, type CodeSchemeDef } from "@/lib/codeSchemes";
-import { BUILTIN_THEMES, DEFAULT_THEME, FIRST_RUN_THEME, cleanCustomThemes, themeCss, type ThemeDef, type ThemeMode } from "@/lib/themes";
+import { BUILTIN_THEMES, DEFAULT_THEME, cleanCustomThemes, themeCss, type ThemeDef, type ThemeMode } from "@/lib/themes";
 
 type Theme = ThemeMode;
 // What the person picked; "system" follows the operating system
@@ -89,8 +89,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 	});
 	const [system, setSystem] = useState<Theme>(systemTheme);
 	const [customThemes, setCustomThemes] = useState<ThemeDef[]>(readCustom);
-	const [lightId, setLightTheme] = useState(() => readString("theme.light") ?? FIRST_RUN_THEME);
-	const [darkId, setDarkTheme] = useState(() => readString("theme.dark") ?? FIRST_RUN_THEME);
+	const [lightId, setLightTheme] = useState(() => readString("theme.light") ?? DEFAULT_THEME);
+	const [darkId, setDarkTheme] = useState(() => readString("theme.dark") ?? DEFAULT_THEME);
 
 	const [customSchemes, setCustomSchemes] = useState<CodeSchemeDef[]>(readCustomSchemes);
 	const [codeLightId, setCodeLightId] = useState(() => readString("code.light") ?? AUTO_SCHEME);
@@ -110,7 +110,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 	const all = useMemo(() => [...BUILTIN_THEMES, ...customThemes], [customThemes]);
 	const themesFor = (mode: ThemeMode) => all.filter((t) => t.mode === mode);
 	// A choice that no longer exists (a deleted custom theme) falls back to the original
-	const valid = (id: string, mode: ThemeMode) => (all.some((t) => t.id === id && t.mode === mode) ? id : FIRST_RUN_THEME);
+	const valid = (id: string, mode: ThemeMode) => (all.some((t) => t.id === id && t.mode === mode) ? id : DEFAULT_THEME);
 	const lightTheme = valid(lightId, "light");
 	const darkTheme = valid(darkId, "dark");
 	const themeId = theme === "dark" ? darkTheme : lightTheme;

@@ -401,7 +401,7 @@ export default function WorkspaceTasks() {
 					id={`${prefix}-assignee`}
 					value={formAssignee}
 					onChange={(e) => setFormAssignee(e.target.value)}
-					className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+					className="mt-1 flex h-10 w-full rounded-none border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 				>
 					<option value="">Unassigned</option>
 					{members.map((m) => (
@@ -623,7 +623,7 @@ export default function WorkspaceTasks() {
 										onChange={(e) =>
 											setFormStatus(e.target.value as TaskStatus)
 										}
-										className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+										className="mt-1 flex h-10 w-full rounded-none border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 									>
 										<option value="todo">To Do</option>
 										<option value="in_progress">In Progress</option>
@@ -639,7 +639,7 @@ export default function WorkspaceTasks() {
 										onChange={(e) =>
 											setFormPriority(e.target.value as TaskPriority)
 										}
-										className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+										className="mt-1 flex h-10 w-full rounded-none border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 									>
 										<option value="low">Low</option>
 										<option value="medium">Medium</option>
@@ -720,7 +720,7 @@ export default function WorkspaceTasks() {
 										onChange={(e) =>
 											setFormStatus(e.target.value as TaskStatus)
 										}
-										className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+										className="mt-1 flex h-10 w-full rounded-none border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 									>
 										<option value="todo">To Do</option>
 										<option value="in_progress">In Progress</option>
@@ -736,7 +736,7 @@ export default function WorkspaceTasks() {
 										onChange={(e) =>
 											setFormPriority(e.target.value as TaskPriority)
 										}
-										className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+										className="mt-1 flex h-10 w-full rounded-none border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 									>
 										<option value="low">Low</option>
 										<option value="medium">Medium</option>

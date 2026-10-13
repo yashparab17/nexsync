@@ -51,7 +51,7 @@ export function DateField({
 		<DatePicker aria-label={ariaLabel} minValue={noPast ? today(getLocalTimeZone()) : undefined} value={toDate(value)} onChange={(d) => onChange(d ? d.toString() : "")} className={cn("group", className)}>
 			<Group
 				id={id}
-				className="flex h-10 w-full items-center border border-input bg-background pl-3 text-sm focus-within:ring-2 focus-within:ring-ring"
+				className="flex h-10 w-full items-center border border-input bg-input pl-3 text-sm focus-within:ring-2 focus-within:ring-ring"
 			>
 				<DateInput className="flex flex-1 items-center">
 					{(segment) => (

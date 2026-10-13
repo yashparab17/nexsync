@@ -507,7 +507,7 @@ export default function WorkspaceMembers() {
 									id="mem-role"
 									value={newMemberRole}
 									onChange={(e) => setNewMemberRole(e.target.value)}
-									className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+									className="mt-1 flex h-10 w-full rounded-none border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 								>
 									{ASSIGNABLE_ROLES.map((r) => (
 										<option key={r} value={r}>{r}</option>
@@ -572,7 +572,7 @@ export default function WorkspaceMembers() {
 								id="edit-role-select"
 								value={editRole}
 								onChange={(e) => setEditRole(e.target.value)}
-								className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+								className="mt-1 flex h-10 w-full rounded-none border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 							>
 								{rolesFor(editingMember).map((r) => (
 									<option key={r} value={r}>{r}</option>

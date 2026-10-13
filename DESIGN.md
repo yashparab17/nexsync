@@ -12,7 +12,7 @@ small touches, and minimalism decides what is left out. It is a work tool first:
 - Fills tell panels apart; thin rules (`.frame`, a 1px outline in `--rule`) frame tiles, and single-side lines separate areas.
 
 ## Terminal / HUD: the signal layer
-- Accent: electric blue with teal as its partner. Themes come only in pairs, one light and one dark, applied together: Cyber (first, the first-run theme), Legacy (the original light and dark), Catppuccin, Solarized, Gruvbox, GitHub. Custom themes are made per mode.
+- Accent: electric blue with teal as its partner. Themes come only in pairs, one light and one dark, applied together: Default (the original light and dark, first and the first-run theme), Cyber, Catppuccin, Solarized, Gruvbox, GitHub. Custom themes are made per mode.
 - Readouts are mono, 13px or smaller: numbers, paths, times, status, shortcuts, tile labels. Display numbers stay in Onest.
 - Section index numbers (`01`, `02`…) on tiles and Kanban columns, a `>` prompt in every search box, ASCII logos.
 - Corner ticks (`.ticks`) mark hover, focus and selection like a HUD reticle; `.ticks-on` keeps them showing on a hero tile.
