@@ -6,6 +6,7 @@ import { FilePlus, FileText, FolderOpen, ListTodo, StickyNote, Upload, UsersRoun
 import Avatar from "@/components/elements/Avatar";
 import { Page, PageBody, Panel } from "@/components/layout/Page";
 import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
+import { readRecent } from "@/lib/recentFiles";
 import { getTasks, loadConfig } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -42,7 +43,7 @@ function eventIcon(targetType?: string, action?: string) {
 }
 
 // Notes open in the notes page, everything else in the code editor
-const openPath = (file: string) => `/workspace/${/\.(md|txt)$/i.test(file) ? "notes" : "editor"}?open=${encodeURIComponent(file)}`;
+const openPath = (file: string) => `/workspace/${/\.(md|txt)$/i.test(file) ? "notes" : "editor"}?open=${encodeURIComponent(`/${file.replace(/^\/+/, "")}`)}`;
 
 // Workspace overview: where to continue, who is here, what is due, what changed
 export default function WorkspaceDashboard() {
@@ -64,7 +65,8 @@ export default function WorkspaceDashboard() {
 	}, [workspace]);
 
 	const activity = metadata?.activity.events ?? [];
-	const recent = metadata?.history.recent_files ?? [];
+	// Files opened in the Editor or Notes on this device, newest first
+	const recent = useMemo(() => (workspace ? readRecent(workspace.path) : []), [workspace]);
 	const members = metadata?.members.members ?? [];
 	const online = useMemo(() => new Set([me, ...peers.filter((p) => p.status === "connected").map((p) => nameOf(p.id))]), [me, peers, nameOf]);
 	const due = useMemo(

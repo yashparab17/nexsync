@@ -307,7 +307,7 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allo
 
 /* Native selects match the text fields */
 select {
-  background-color: var(--card);
+  background-color: var(--input);
   color: inherit;
   border: 1px solid var(--input);
   padding-inline: 0.75rem;

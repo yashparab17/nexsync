@@ -19,6 +19,7 @@ import { Dialog, DialogTrigger, DialogHeading, DialogFooter } from "@/components
 import { open } from "@tauri-apps/plugin-dialog";
 import { documentDir } from "@tauri-apps/api/path";
 import { createWorkspace } from "@/lib/tauri";
+import { cleanPath } from "@/lib/utils";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -63,7 +64,7 @@ export default function CreateWorkspaceDialog({
 		});
 
 		if (selected && typeof selected === "string") {
-			setWorkspacePath(selected);
+			setWorkspacePath(cleanPath(selected));
 		}
 	};
 

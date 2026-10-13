@@ -79,8 +79,8 @@ export function SettingsShell({ title, description, onClose, footer, className, 
 				</Button>
 			</Toolbar>
 			<div className="flex min-h-0 flex-1">
-				<div data-settings-scroll className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-3">
-					<div className="mx-auto max-w-3xl space-y-3">{children}</div>
+				<div data-settings-scroll className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain py-3">
+					<div className="space-y-3">{children}</div>
 				</div>
 			</div>
 			{footer && <div className="shrink-0 border-t bg-card/40">{footer}</div>}

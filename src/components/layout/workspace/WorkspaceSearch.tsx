@@ -92,8 +92,12 @@ export default function WorkspaceSearch() {
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	// Rebuild the index each time the box is focused so results are never stale
+	// ... but not more than every 20 seconds, so a big workspace is not re-read on every click into the box
+	const builtAt = useRef({ path: "", at: 0 });
 	const loadIndex = async () => {
 		if (!workspace?.path) return;
+		if (builtAt.current.path === workspace.path && Date.now() - builtAt.current.at < 20_000) return;
+		builtAt.current = { path: workspace.path, at: Date.now() };
 		const [files, tasks, columns] = await Promise.all([
 			searchWorkspaceFiles(workspace.path).catch(() => []),
 			getTasks(workspace.path).catch(() => []),
@@ -189,7 +193,7 @@ export default function WorkspaceSearch() {
 
 	return (
 		<div ref={box} className="relative w-full max-w-xl">
-			<div className={cn("flex h-9 items-center gap-2 bg-muted/60 px-3 transition-shadow", open ? "shadow-[0_0_0_2px_var(--primary)]" : "hover:bg-muted")}>
+			<div className={cn("flex h-9 items-center gap-2 bg-input px-3 transition-shadow", open ? "shadow-[0_0_0_2px_var(--primary)]" : "hover:bg-muted")}>
 				<Search className="size-4 shrink-0 text-muted-foreground" />
 				<input
 					ref={inputRef}

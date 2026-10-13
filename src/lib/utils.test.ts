@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { colorForName } from "@/lib/collabColor";
-import { errorText, formatBytes, getMimeType } from "@/lib/utils";
+import { cleanPath, errorText, formatBytes, getMimeType } from "@/lib/utils";
 
 describe("utils", () => {
 	it("maps extensions to MIME types case-insensitively", () => {
@@ -25,5 +25,13 @@ describe("utils", () => {
 	it("gives a collaborator the same color every time", () => {
 		expect(colorForName("Ada")).toBe(colorForName("Ada"));
 		expect(colorForName("Ada")).toMatch(/^#[0-9a-f]{6}$/);
+	});
+});
+
+describe("cleanPath", () => {
+	it("drops the Windows extended-length prefix and leaves other paths alone", () => {
+		expect(cleanPath("\\\\?\\E:\\nexsynctest\\Test 123")).toBe("E:\\nexsynctest\\Test 123");
+		expect(cleanPath("\\\\?\\UNC\\srv\\share\\w")).toBe("\\\\srv\\share\\w");
+		expect(cleanPath("/home/yash/code")).toBe("/home/yash/code");
 	});
 });

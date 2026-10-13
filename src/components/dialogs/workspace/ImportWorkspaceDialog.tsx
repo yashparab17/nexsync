@@ -11,7 +11,7 @@ import { FolderOpen, FolderUp } from "@/components/animate-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
+import { cleanPath } from "@/lib/utils";
 import { Dialog, DialogTrigger, DialogHeading, DialogFooter } from "@/components/ui/dialog";
 
 // Tauri API
@@ -45,7 +45,7 @@ export default function ImportWorkspaceDialog({
 		});
 
 		if (selected && typeof selected === "string") {
-			setWorkspacePath(selected);
+			setWorkspacePath(cleanPath(selected));
 		}
 	};
 

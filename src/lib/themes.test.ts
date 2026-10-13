@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BUILTIN_THEMES, TOKENS, cleanCustomThemes, isColor, textToVars, themeCss, varsToText } from "./themes";
+import { BUILTIN_THEMES, TOKENS, cleanCustomThemes, contrast, isColor, textToVars, themeCss, themeWarnings, varsToText } from "./themes";
 
 describe("themes", () => {
 	it("has five light and five dark themes, each with every colour", () => {
@@ -35,5 +35,16 @@ describe("themes", () => {
 		expect(rest).toHaveLength(0);
 		expect(t.vars.primary).toBe("#ff0000");
 		expect(t.vars.border).not.toBe("evil;}");
+	});
+
+	it("keeps text readable and fills visible without borders, in every built-in theme", () => {
+		for (const t of BUILTIN_THEMES) expect(themeWarnings(t.vars), t.id).toEqual([]);
+	});
+
+	it("warns about a theme someone makes unreadable", () => {
+		const base = BUILTIN_THEMES[0].vars;
+		expect(contrast("#000000", "#ffffff")).toBeCloseTo(21, 0);
+		expect(themeWarnings({ ...base, foreground: base.background }).join(" ")).toContain("Text is hard to read");
+		expect(themeWarnings({ ...base, input: base.background }).join(" ")).toContain("blend into the page");
 	});
 });

@@ -4,6 +4,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { cleanPath } from "@/lib/utils";
 
 import type {
 	WorkspaceInfo,
@@ -123,6 +124,8 @@ export function emptyTrash(path: string): Promise<void> {
 	return invoke("empty_trash", { path });
 }
 
+const tidy = (w: WorkspaceInfo): WorkspaceInfo => ({ ...w, path: cleanPath(w.path) });
+
 // ────────────────────────────
 // Workspace creation & import
 // ────────────────────────────
@@ -131,12 +134,12 @@ export function emptyTrash(path: string): Promise<void> {
 export function createWorkspace(
 	request: CreateWorkspaceRequest,
 ): Promise<WorkspaceInfo> {
-	return invoke("create_workspace", { request });
+	return invoke<WorkspaceInfo>("create_workspace", { request: { ...request, path: cleanPath(request.path) } }).then(tidy);
 }
 
 // Import an existing workspace from disk
 export function importWorkspace(path: string): Promise<WorkspaceInfo> {
-	return invoke("import_workspace", { path });
+	return invoke<WorkspaceInfo>("import_workspace", { path: cleanPath(path) }).then(tidy);
 }
 
 // ────────────────────────────
@@ -474,7 +477,7 @@ export function getWorkspaceStats(path: string): Promise<WorkspaceStats> {
 
 // Get list of recent workspaces from app registry
 export function getRecentWorkspaces(): Promise<WorkspaceInfo[]> {
-	return invoke("get_recent_workspaces");
+	return invoke<WorkspaceInfo[]>("get_recent_workspaces").then((list) => list.map(tidy));
 }
 
 // Add workspace to recent workspaces list
@@ -493,7 +496,7 @@ export function removeRecentWorkspace(id: string): Promise<void> {
 
 // Get last opened workspace for automatic restoration
 export function getLastWorkspace(): Promise<WorkspaceInfo | null> {
-	return invoke("get_last_workspace");
+	return invoke<WorkspaceInfo | null>("get_last_workspace").then((w) => (w ? tidy(w) : w));
 }
 
 // Persist last opened workspace

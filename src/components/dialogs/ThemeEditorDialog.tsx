@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BUILTIN_THEMES, MAX_THEME_NAME, TOKENS, isColor, textToVars, themeEntries, varsToText, type ThemeDef, type ThemeMode, type ThemeVars } from "@/lib/themes";
+import { BUILTIN_THEMES, MAX_THEME_NAME, TOKENS, isColor, textToVars, themeEntries, themeWarnings, varsToText, type ThemeDef, type ThemeMode, type ThemeVars } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 import { useThemeContext } from "@/store/ThemeContext";
 
@@ -98,6 +98,13 @@ export default function ThemeEditorDialog({ mode, initial, onClose }: { mode: Th
 				</div>
 
 				<Sample mode={mode} vars={vars} />
+				{themeWarnings(vars).length > 0 && (
+					<ul role="status" className="space-y-0.5 bg-warning/10 p-2 text-sm text-warning">
+						{themeWarnings(vars).map((w) => (
+							<li key={w}>{w}</li>
+						))}
+					</ul>
+				)}
 
 				<div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
 					{TOKENS.map((t) => {

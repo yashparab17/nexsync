@@ -27,6 +27,7 @@ import { useReportItem } from "@/hooks/usePresence";
 import { isNoteFile } from "@/lib/editor/languages";
 import { positionsFor, summarize } from "@/lib/notes/board";
 import { noteTitle } from "@/lib/notes/links";
+import { pushRecent } from "@/lib/recentFiles";
 import { readPins, writePins } from "@/lib/notes/pins";
 import { validateFileName } from "@/lib/validation";
 import { buildEdges, type Point } from "@/lib/notes/graph";
@@ -189,7 +190,8 @@ export default function WorkspaceNotes() {
 		setTabs((prev) => (prev.includes(path) ? prev : [...prev, path]));
 		setSelectedPath(path);
 		setView("note");
-	}, []);
+		if (workspacePath) pushRecent(workspacePath, rel(path));
+	}, [workspacePath]);
 
 	// Deep link from workspace search or a [[link]] chip; Markdown notes open in the Editor
 	useOpenParam((path) => {

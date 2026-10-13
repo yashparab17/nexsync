@@ -5,7 +5,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { Settings as SettingsIcon, UsersRound, FolderOpen, FolderPlus, HardDrive, Lock, UserX } from "@/components/animate-icons";
+import { AnimateIcon, Settings as SettingsIcon, UsersRound, FolderClose, FolderPlus, HardDrive, Lock, UserX } from "@/components/animate-icons";
 
 // Hooks
 import { useThemeContext } from "@/store/ThemeContext";
@@ -211,8 +211,10 @@ export default function Welcome() {
 							</JoinWorkspaceDialog>
 							<ImportWorkspaceDialog>
 								<Button variant="outline" className={tile}>
-									<FolderOpen className="size-6 shrink-0" />
-									<span><span className="block font-semibold">Import a folder</span><span className="block text-sm font-normal text-muted-foreground">Use files you already have</span></span>
+									<AnimateIcon animateOnHover className="flex items-center gap-4">
+										<FolderClose className="size-6 shrink-0" />
+										<span><span className="block font-semibold">Import a folder</span><span className="block text-sm font-normal text-muted-foreground">Use files you already have</span></span>
+									</AnimateIcon>
 								</Button>
 							</ImportWorkspaceDialog>
 						</section>

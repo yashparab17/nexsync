@@ -11,7 +11,7 @@ import { Dialog, DialogTrigger, DialogHeading, DialogFooter } from "@/components
 import { open } from "@tauri-apps/plugin-dialog";
 import { documentDir } from "@tauri-apps/api/path";
 import { createWorkspace, importWorkspace, loadConfig } from "@/lib/tauri";
-import { errorText } from "@/lib/utils";
+import { cleanPath, errorText } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { p2p } from "@/lib/p2p";
@@ -61,7 +61,7 @@ export default function JoinWorkspaceDialog({
 			});
 
 			if (selected && typeof selected === "string") {
-				setWorkspaceParentPath(selected);
+				setWorkspaceParentPath(cleanPath(selected));
 			}
 		} catch (err) {
 			console.error("Folder picker error:", err);
