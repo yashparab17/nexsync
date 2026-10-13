@@ -15,6 +15,7 @@ import { ChecklistEditor, DueBadge, TagChip, TagInput } from "@/components/eleme
 import { collectTags, endPosition, planMove } from "@/lib/planning";
 import { cn } from "@/lib/utils";
 
+import { useListKeys } from "@/hooks/useListKeys";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
 import {
@@ -98,6 +99,7 @@ export default function WorkspaceKanban() {
 		setCardChecklist([]);
 		setActiveColIdForNewCard(colId);
 	};
+	useListKeys(canChange && columns[0] ? () => openNewCard(columns[0].id) : undefined);
 
 	// Fetch Kanban board data
 	const loadKanban = useCallback(async () => {
@@ -342,6 +344,13 @@ export default function WorkspaceKanban() {
 				return;
 			}
 
+			// Shown at once; the file write follows, and the board is read back if it fails
+			setColumns((prev) =>
+				prev.map((c) => ({
+					...c,
+					cards: c.id === targetColId ? [...c.cards.filter((x) => x.id !== card.id), { ...card, column_id: targetColId, position: newPos }] : c.cards.filter((x) => x.id !== card.id),
+				})),
+			);
 			await moveKanbanCard({
 				path: workspace.path,
 				card_id: card.id,
@@ -364,6 +373,7 @@ export default function WorkspaceKanban() {
 		} catch (err) {
 			console.error("Failed to move card:", err);
 			logError(err, { source: "kanban" });
+			await loadKanban();
 		}
 	};
 
@@ -536,7 +546,7 @@ export default function WorkspaceKanban() {
 						return (
 							<div
 								key={col.id}
-								className="flex min-h-0 min-w-72 flex-1 basis-72 flex-col border-r bg-sidebar last:border-r-0"
+								className="group/col flex min-h-0 min-w-72 flex-1 basis-72 flex-col border-r bg-panel last:border-r-0"
 							>
 								{/* Column Header */}
 								<div className="flex h-10 shrink-0 items-center justify-between border-b pr-2 pl-3">
@@ -554,6 +564,15 @@ export default function WorkspaceKanban() {
 											<Button
 												variant="ghost"
 												size="icon-xs"
+												onPress={() => setDeletingColId(col.id)}
+												aria-label="Delete column"
+												className="opacity-0 transition-opacity focus-visible:opacity-100 group-hover/col:opacity-100"
+											>
+												<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+											</Button>
+											<Button
+												variant="ghost"
+												size="icon-xs"
 												onPress={() => {
 													setCardTitle("");
 													setCardDesc("");
@@ -562,14 +581,6 @@ export default function WorkspaceKanban() {
 												aria-label="Add card"
 											>
 												<Plus className="size-3.5" />
-											</Button>
-											<Button
-												variant="ghost"
-												size="icon-xs"
-												onPress={() => setDeletingColId(col.id)}
-												aria-label="Delete column"
-											>
-												<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
 											</Button>
 										</div>
 									)}
@@ -647,6 +658,7 @@ export default function WorkspaceKanban() {
 																variant="ghost"
 																size="icon-xs"
 																onPress={() => handleOpenEditCard(card)}
+																data-nav
 																aria-label="Edit card"
 															>
 																<Pencil className="size-3" />

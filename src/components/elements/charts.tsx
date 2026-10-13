@@ -98,19 +98,20 @@ export function BarRows({ rows, empty, lead }: { rows: { label: string; parts: {
 }
 
 // Columns for a run of days, with a few gridlines so the height means something
-export function DayColumns({ days, label }: { days: { day: string; count: number }[]; label: string }) {
+export function DayColumns({ days, label, tall }: { days: { day: string; count: number }[]; label: string; tall?: boolean }) {
 	const peak = Math.max(1, ...days.map((d) => d.count));
 	const top = peak <= 4 ? peak : Math.ceil(peak / 4) * 4;
+	const h = tall ? "h-80" : "h-40";
 	const ticks = peak <= 4 ? [top, 0] : [top, (top * 3) / 4, top / 2, top / 4, 0];
 	return (
 		<div role="img" aria-label={label} className="flex gap-2">
-			<div className="flex h-40 flex-col justify-between text-right font-mono text-[13px] leading-none text-muted-foreground">
+			<div className={cn("flex flex-col justify-between text-right font-mono text-[13px] leading-none text-muted-foreground", h)}>
 				{ticks.map((t) => (
 					<span key={t}>{t}</span>
 				))}
 			</div>
 			<div className="min-w-0 flex-1">
-				<div className="relative flex h-40 items-end gap-1 border-b">
+				<div className={cn("relative flex items-end gap-1 border-b", h)}>
 					<div className="pointer-events-none absolute inset-0 flex flex-col justify-between" aria-hidden>
 						{ticks.slice(0, -1).map((t) => (
 							<span key={t} className="border-t border-dashed border-border/60" />

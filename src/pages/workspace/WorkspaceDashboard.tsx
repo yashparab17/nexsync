@@ -6,7 +6,6 @@ import { FilePlus, FileText, FolderOpen, ListTodo, StickyNote, Upload, UsersRoun
 import Avatar from "@/components/elements/Avatar";
 import { Page, PageBody, Panel } from "@/components/layout/Page";
 import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
-import { Button } from "@/components/ui/button";
 import { getTasks, loadConfig } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -87,10 +86,6 @@ export default function WorkspaceDashboard() {
 			<Toolbar>
 				<ToolbarTitle name={workspace?.name ?? "Dashboard"} />
 				{workspace?.description && <span className="ml-1 hidden min-w-0 flex-1 truncate border-l pl-3 text-sm text-muted-foreground md:block">{workspace.description}</span>}
-				<span className="flex-1 md:hidden" />
-				<Button variant="outline" size="sm" onPress={() => navigate("/workspace/notes")}><StickyNote className="size-4" />Notes</Button>
-				<Button variant="outline" size="sm" onPress={() => navigate("/workspace/tasks")}><ListTodo className="size-4" />Tasks</Button>
-				<Button variant="outline" size="sm" onPress={() => navigate("/workspace/files")}><FilePlus className="size-4" />Files</Button>
 			</Toolbar>
 
 			<PageBody className="grid content-start gap-3 xl:grid-cols-[minmax(0,1fr)_24rem]">

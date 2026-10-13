@@ -30,6 +30,16 @@ export const SHORTCUT_GROUPS: { title: string; items: Shortcut[] }[] = [
 			{ keys: ["Esc"], label: "Close a popup or clear a search" },
 		],
 	},
+	{
+		title: "In lists (Tasks, Kanban, Notes, Assets)",
+		items: [
+			{ keys: ["J"], label: "Next item" },
+			{ keys: ["K"], label: "Previous item" },
+			{ keys: ["Enter"], label: "Open the item" },
+			{ keys: ["N"], label: "New item" },
+			{ keys: ["/"], label: "Go to search" },
+		],
+	},
 	{ title: "Go to a page", items: PAGE_KEYS.map(([name], i) => ({ keys: ["Alt", "Shift", String(i + 1)], label: name })) },
 	{
 		title: "Editor",

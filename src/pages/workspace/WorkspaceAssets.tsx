@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { EmptyState } from "@/components/layout/Page";
 import Toolbar, { ToolbarTitle, ToolbarSearch, ToolbarSelect, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
-import { Copy, Check, Play, Trash2, FileText, Film, Headphones, Image as ImageIcon, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
+import { SlidersHorizontal, Copy, Check, Play, Trash2, FileText, Film, Headphones, Image as ImageIcon, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
 import { displaySize } from "@/lib/assets/displaySize";
 import { justify } from "@/lib/assets/justify";
 import { validateFileName } from "@/lib/validation";
@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import AssetPreviewModal from "@/components/dialogs/workspace/AssetPreviewModal";
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import AssetUploadDialog from "@/components/dialogs/workspace/AssetUploadDialog";
+import { useListKeys } from "@/hooks/useListKeys";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
@@ -100,6 +101,7 @@ export default function WorkspaceAssets() {
 	const [sort, setSort] = useState<SortKey>("newest");
 	const [sizeBand, setSizeBand] = useState<SizeBand>("any");
 	const [age, setAge] = useState<Age>("any");
+	const [showFilters, setShowFilters] = useState(false);
 	// How big the tiles are drawn, and each picture's own size once it is known
 	const [tile, setTile] = useState<"s" | "m" | "l">("m");
 	const [sizes, setSizes] = useState<Record<string, { w: number; h: number }>>({});
@@ -121,6 +123,7 @@ export default function WorkspaceAssets() {
 
 	// Dialog states
 	const [isUploadOpen, setIsUploadOpen] = useState(false);
+	useListKeys(isViewer ? undefined : () => setIsUploadOpen(true));
 	const [previewAsset, setPreviewAsset] = useState<AssetItem | null>(null);
 
 	// Deep link from workspace search
@@ -454,30 +457,44 @@ export default function WorkspaceAssets() {
 			<Toolbar>
 				<ToolbarTitle name="Assets" meta={assets.length || undefined} />
 				<ToolbarTabs label="Kind of asset" value={selectedCategory} onChange={setSelectedCategory} tabs={tabs as { key: AssetCategory; label: string; count: number }[]} />
-				<div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-					<ToolbarSearch label="Search assets" placeholder="Search assets" value={searchQuery} onChange={setSearchQuery} />
-					<ToolbarSelect label="Size" value={sizeBand} onChange={setSizeBand} active={sizeBand !== "any"} options={Object.entries(SIZE_BANDS).map(([value, label]) => ({ value: value as SizeBand, label }))} />
-					<ToolbarSelect label="Modified" value={age} onChange={setAge} active={age !== "any"} options={Object.entries(AGES).map(([value, label]) => ({ value: value as Age, label }))} />
-					<ToolbarSelect label="Sort by" value={sort} onChange={setSort} options={Object.entries(SORTS).map(([value, label]) => ({ value: value as SortKey, label }))} />
-					<ToolbarSwitch
-						label="Tile size"
-						value={tile}
-						onChange={setTile}
-						options={[
-							{ value: "s", label: "S", title: "Small tiles" },
-							{ value: "m", label: "M", title: "Medium tiles" },
-							{ value: "l", label: "L", title: "Large tiles" },
-						]}
-					/>
-					{!isViewer && (
-						<>
-							<Button size="sm" onPress={() => setIsUploadOpen(true)}>
-								<Upload data-icon="inline-start" className="size-4" />
-								Upload
+				<span className="flex-1" />
+				{!isViewer && (
+					<Button size="sm" onPress={() => setIsUploadOpen(true)}>
+						<Upload data-icon="inline-start" className="size-4" />
+						Upload
+					</Button>
+				)}
+			</Toolbar>
+			<Toolbar variant="sub" className="h-auto min-h-10 flex-wrap gap-2 py-1">
+				<ToolbarSearch label="Search assets" placeholder="Search assets" value={searchQuery} onChange={setSearchQuery} />
+				<Button variant={showFilters || narrowed ? "secondary" : "outline"} size="sm" aria-expanded={showFilters} onPress={() => setShowFilters((v) => !v)}>
+					<SlidersHorizontal className="size-4" />
+					Filters
+					{narrowed && <span className="font-mono text-[13px]">{Number(sizeBand !== "any") + Number(age !== "any")}</span>}
+				</Button>
+				{showFilters && (
+					<>
+						<ToolbarSelect label="Size" value={sizeBand} onChange={setSizeBand} active={sizeBand !== "any"} options={Object.entries(SIZE_BANDS).map(([value, label]) => ({ value: value as SizeBand, label }))} />
+						<ToolbarSelect label="Modified" value={age} onChange={setAge} active={age !== "any"} options={Object.entries(AGES).map(([value, label]) => ({ value: value as Age, label }))} />
+						{narrowed && (
+							<Button variant="ghost" size="sm" onPress={() => { setSizeBand("any"); setAge("any"); }}>
+								Clear
 							</Button>
-						</>
-					)}
-				</div>
+						)}
+					</>
+				)}
+				<span className="flex-1" />
+				<ToolbarSelect label="Sort by" value={sort} onChange={setSort} options={Object.entries(SORTS).map(([value, label]) => ({ value: value as SortKey, label }))} />
+				<ToolbarSwitch
+					label="Tile size"
+					value={tile}
+					onChange={setTile}
+					options={[
+						{ value: "s", label: "S", title: "Small tiles" },
+						{ value: "m", label: "M", title: "Medium tiles" },
+						{ value: "l", label: "L", title: "Large tiles" },
+					]}
+				/>
 			</Toolbar>
 
 			{/* Assets */}
@@ -521,6 +538,7 @@ export default function WorkspaceAssets() {
 								>
 									<button
 										type="button"
+										data-nav
 										onClick={() => setPreviewAsset(asset)}
 										aria-label={`${asset.name}, ${asset.category}, ${formatBytes(asset.size)}${isRemote ? ", not downloaded" : ""}`}
 										className="relative block h-full w-full cursor-pointer overflow-hidden bg-card text-left outline-none after:pointer-events-none after:absolute after:inset-0 after:ring-1 after:ring-inset after:ring-foreground/10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"

@@ -14,6 +14,7 @@ import { DueBadge, TagChip, TagInput } from "@/components/elements/PlanningField
 import TaskCalendar from "@/components/elements/TaskCalendar";
 import { collectTags } from "@/lib/planning";
 
+import { useListKeys } from "@/hooks/useListKeys";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
 import { createTask, deleteTask, eraseRecordForGood, getTasks, resolveTaskConflict, updateTask } from "@/lib/tauri";
@@ -156,6 +157,7 @@ export default function WorkspaceTasks() {
 		setFormAssignee("");
 		setIsCreateOpen(true);
 	};
+	useListKeys(isViewer ? undefined : handleOpenCreate);
 
 	// Open Edit Modal
 	const handleOpenEdit = (task: Task) => {
@@ -266,6 +268,8 @@ export default function WorkspaceTasks() {
 			status: nextStatus[task.status],
 			updated_at: new Date().toISOString(),
 		};
+		// Shown at once; the file write follows, and the list is read back if it fails
+		setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
 		try {
 			await updateTask({ path: workspace.path, task: updated });
 			publishDataChange({ entity: "task", op: "upsert", task: updated });
@@ -280,6 +284,7 @@ export default function WorkspaceTasks() {
 		} catch (err) {
 			console.error("Failed to toggle task status:", err);
 			logError(err, { source: "tasks" });
+			await loadTasks();
 		}
 	};
 
@@ -533,7 +538,7 @@ export default function WorkspaceTasks() {
 										<StatusIcon className="size-3.5" />
 									</button>
 
-									<button type="button" onClick={() => handleOpenEdit(task)} className="min-w-0 flex-1 cursor-pointer text-left outline-none focus-visible:bg-muted">
+									<button type="button" data-nav onClick={() => handleOpenEdit(task)} className="min-w-0 flex-1 cursor-pointer text-left outline-none focus-visible:bg-muted">
 										<span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
 											<span className={cn("text-sm font-medium [overflow-wrap:anywhere]", task.status === "done" && "text-muted-foreground line-through")}>{task.title}</span>
 											<PresenceDots names={viewersAt("tasks", task.id)} doing="editing this task" />

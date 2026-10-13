@@ -116,16 +116,15 @@ export default function WorkspaceInsights() {
 			<PageBody padded={false}>
 				{tab === "overview" ? (
 					<div className="grid gap-3 p-3 lg:grid-cols-6">
-						<div className="grid grid-cols-2 gap-3 lg:col-span-6 lg:grid-cols-4">
+						<Panel title="Last 14 days" hint="Actions per day, today on the right" className="lg:col-span-4 lg:row-span-2">
+							<DayColumns days={days} label={`Actions per day over the last ${DAYS} days`} tall />
+						</Panel>
+						<div className="grid grid-cols-2 gap-3 lg:col-span-2">
 							<Stat label="Actions recorded" value={events.length} trend={days.map((d) => d.count)} />
 							<Stat label="People active" value={people} />
 							<Stat label="Tasks finished" value={finishedTotal} />
 							<Stat label="Tasks still open" value={openTasks} />
 						</div>
-
-						<Panel title="Last 14 days" hint="Actions per day, today on the right" className="lg:col-span-4">
-							<DayColumns days={days} label={`Actions per day over the last ${DAYS} days`} />
-						</Panel>
 						<Panel title="Task progress" hint={`${tasks.length} tasks, ${cards} cards`} className="lg:col-span-2">
 							{tasks.length === 0 ? (
 								<Empty>No tasks yet.</Empty>

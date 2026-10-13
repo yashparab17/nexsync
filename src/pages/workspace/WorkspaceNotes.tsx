@@ -19,6 +19,7 @@ import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
 import { useCollabDoc } from "@/hooks/useCollabDoc";
+import { useListKeys } from "@/hooks/useListKeys";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
 import { useSidePanelWidth } from "@/hooks/usePanelSize";
@@ -96,6 +97,7 @@ export default function WorkspaceNotes() {
 	const selected = useMemo(() => notes.find((n) => n.path === selectedPath) ?? null, [notes, selectedPath]);
 
 	const [isNewOpen, setIsNewOpen] = useState(false);
+	useListKeys(isViewer ? undefined : () => { setNewTitle(""); setIsNewOpen(true); });
 	const [newTitle, setNewTitle] = useState("");
 	const [deleting, setDeleting] = useState<WorkspaceFile | null>(null);
 	const [renaming, setRenaming] = useState<{ note: WorkspaceFile; value: string } | null>(null);
@@ -414,6 +416,7 @@ export default function WorkspaceNotes() {
 			<li key={n.path}>
 				<button
 					type="button"
+					data-nav
 					onClick={() => openNote(n.path)}
 					onContextMenu={(e) => noteMenu(e, n.path)}
 					aria-current={active ? "true" : undefined}
