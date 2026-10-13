@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { BUILTIN_THEMES, TOKENS, cleanCustomThemes, contrast, isColor, textToVars, themeCss, themeWarnings, varsToText } from "./themes";
 
 describe("themes", () => {
-	it("has five light and five dark themes, each with every colour", () => {
-		for (const mode of ["light", "dark"] as const) expect(BUILTIN_THEMES.filter((t) => t.mode === mode)).toHaveLength(5);
+	it("has six light and six dark themes, each with every colour", () => {
+		for (const mode of ["light", "dark"] as const) expect(BUILTIN_THEMES.filter((t) => t.mode === mode)).toHaveLength(6);
 		for (const t of BUILTIN_THEMES) for (const { key } of TOKENS) expect(isColor(t.vars[key]), `${t.id} ${key}`).toBe(true);
 	});
 

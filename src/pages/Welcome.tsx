@@ -144,11 +144,11 @@ export default function Welcome() {
 			</header>
 
 			{/* The window is the canvas: content fills it up to a wide cap, centred in both directions */}
-			<main className="flex flex-1 items-center justify-center py-12">
+			<main className="scanlines flex flex-1 items-center justify-center py-12">
 				<div className="grid w-full max-w-[88rem] gap-12 xl:grid-cols-[minmax(0,1fr)_24rem] xl:gap-16">
 					<div className="flex min-w-0 flex-col gap-10">
 						<div>
-							<h1 className="text-5xl font-bold tracking-tight 2xl:text-6xl">{greeting}</h1>
+							<h1 className="cursor text-5xl font-bold tracking-tight 2xl:text-6xl">{greeting}</h1>
 							<p className="mt-3 max-w-prose text-lg text-muted-foreground">
 								Notes, tasks and code, shared with your team and kept on your own computer.
 							</p>
@@ -174,7 +174,7 @@ export default function Welcome() {
 												<button
 													type="button"
 													onClick={() => handleOpenWorkspace(ws)}
-													className={`flex h-full min-h-44 w-full flex-col gap-3 border bg-muted/40 p-6 text-left transition-colors hover:border-primary active:translate-y-0.5 active:shadow-none ${last ? "border-primary" : ""}`}
+													className={`frame ticks flex h-full min-h-44 w-full flex-col gap-3 bg-muted/40 p-6 text-left transition-colors hover:bg-muted ${last ? "ticks-on" : ""}`}
 												>
 													<span className="flex items-start justify-between gap-3">
 														<span className={`font-semibold text-xl`}>{ws.name}</span>

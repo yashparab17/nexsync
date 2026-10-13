@@ -6,6 +6,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { Loader2 } from "lucide-react";
 import { Check, Moon, Plus, Sun, Trash2, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, Undo2, User, AlertTriangle } from "@/components/animate-icons";
 
+import { readEffects, setEffects } from "@/lib/effects";
 import { Row, Segmented, SectionCard, SettingsShell } from "@/components/elements/SettingsParts";
 import CodeSchemePicker from "@/components/elements/CodeSchemePicker";
 import ThemePicker from "@/components/elements/ThemePicker";
@@ -43,6 +44,7 @@ const sameList = (a: string[], b: string[]) => a.length === b.length && a.every(
 export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 	const navigate = useNavigate();
 	const { preference, setPreference } = useThemeContext();
+	const [effects, setEffectsOn] = useState(readEffects);
 	const logError = useErrorLog();
 	const updater = useAppUpdater();
 	const editorPrefs = useEditorPrefs();
@@ -279,6 +281,20 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 									{ value: "light", label: "Light", icon: <Sun className="size-3.5" /> },
 									{ value: "dark", label: "Dark", icon: <Moon className="size-3.5" /> },
 									{ value: "system", label: "System", icon: <Monitor className="size-3.5" /> },
+								]}
+							/>
+						</Row>
+						<Row title="Effects" hint="Scanlines and blinking cursors">
+							<Segmented<"on" | "off">
+								label="Effects"
+								value={effects ? "on" : "off"}
+								onChange={(v) => {
+									setEffects(v === "on");
+									setEffectsOn(v === "on");
+								}}
+								options={[
+									{ value: "on", label: "On" },
+									{ value: "off", label: "Off" },
 								]}
 							/>
 						</Row>

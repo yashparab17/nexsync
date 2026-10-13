@@ -220,10 +220,10 @@ export function MonthCalendar({ days, label }: { days: { day: string; count: num
 export function Stat({ label, value, trend }: { label: string; value: number; trend?: number[] }) {
 	const max = Math.max(1, ...(trend ?? []));
 	return (
-		<div className="flex items-end justify-between gap-3 border bg-muted/40 p-4">
+		<div className="frame flex items-end justify-between gap-3 bg-muted/40 p-4">
 			<div>
-				<p className="font-mono text-3xl font-semibold tabular-nums">{value}</p>
-				<p className="text-sm text-muted-foreground">{label}</p>
+				<p className="text-4xl font-semibold tabular-nums">{value}</p>
+				<p className="font-mono text-[13px] text-muted-foreground">{label}</p>
 			</div>
 			{trend && (
 				<svg viewBox={`0 0 ${trend.length * 6} 24`} className="h-8 w-20 shrink-0 text-primary" aria-hidden preserveAspectRatio="none">

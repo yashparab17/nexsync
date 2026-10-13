@@ -362,3 +362,38 @@ button, a, select, summary, label, [role="button"] { touch-action: manipulation;
 .border:focus-within {
   border-color: var(--primary);
 }
+
+/* Terminal / HUD layer. Rules frame the tiles; the effects below belong to chrome only (title bar, Welcome, empty states, tiles),
+   never to text people read or write, and the Effects switch in Settings → Appearance turns them off (data-effects="off"). */
+:root { --rule: color-mix(in oklch, var(--foreground) 16%, transparent); }
+
+/* A thin rule round a tile, in place of a border. The accent takes over on hover and focus. */
+.frame { box-shadow: none; outline: 1px solid var(--rule); outline-offset: -1px; }
+.frame:is(button, a):hover, .frame:focus-visible { outline-color: var(--primary); }
+
+/* Corner ticks, like a HUD reticle: four L-shaped marks in the accent that show on hover, focus and selection (always, with .ticks-on). */
+.ticks { position: relative; }
+.ticks::after {
+  --t: 10px; --w: 2px;
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 120ms;
+  background:
+    linear-gradient(var(--primary), var(--primary)) left top / var(--t) var(--w) no-repeat,
+    linear-gradient(var(--primary), var(--primary)) left top / var(--w) var(--t) no-repeat,
+    linear-gradient(var(--primary), var(--primary)) right top / var(--t) var(--w) no-repeat,
+    linear-gradient(var(--primary), var(--primary)) right top / var(--w) var(--t) no-repeat,
+    linear-gradient(var(--primary), var(--primary)) left bottom / var(--t) var(--w) no-repeat,
+    linear-gradient(var(--primary), var(--primary)) left bottom / var(--w) var(--t) no-repeat,
+    linear-gradient(var(--primary), var(--primary)) right bottom / var(--t) var(--w) no-repeat,
+    linear-gradient(var(--primary), var(--primary)) right bottom / var(--w) var(--t) no-repeat;
+}
+.ticks:is(button, a):hover::after, .ticks:focus-visible::after, .ticks[aria-current="true"]::after, .ticks.ticks-on::after { opacity: 1; }
+
+/* A faint scanline pattern over a surface, and a block cursor that blinks after a line of text */
+:root:not([data-effects="off"]) .scanlines { position: relative; }
+:root:not([data-effects="off"]) .scanlines::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, color-mix(in oklch, var(--foreground) 4%, transparent) 2px 3px);
+}
+:root:not([data-effects="off"]) .cursor::after { content: "▍"; margin-left: 0.25em; color: var(--primary); animation: cursor-blink 1.1s steps(1) infinite; }
+@keyframes cursor-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cursor::after { animation: none !important; } }

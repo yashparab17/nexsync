@@ -89,7 +89,7 @@ export default function WorkspaceDashboard() {
 
 			{/* A bento grid: tile size follows importance, with where to continue largest */}
 			<PageBody className="grid content-start gap-3 md:grid-cols-6 xl:grid-cols-12">
-				<Panel title="Pick Up Where You Left Off" flush={recent.length > 0} className="md:col-span-6 xl:col-span-5 xl:row-span-2">
+				<Panel index="01" title="Pick Up Where You Left Off" flush={recent.length > 0} className="md:col-span-6 xl:col-span-5 xl:row-span-2">
 					{recent.length === 0 ? (
 						<p className="text-sm text-muted-foreground">Files you open show up here, so you can jump back in.</p>
 					) : (
@@ -111,7 +111,7 @@ export default function WorkspaceDashboard() {
 					)}
 				</Panel>
 
-				<Tile label="Open tasks" value={open.length} onClick={goTo("/workspace/tasks")} className="md:col-span-3 xl:col-span-4">
+				<Tile label="02 / open tasks" value={open.length} onClick={goTo("/workspace/tasks")} className="md:col-span-3 xl:col-span-4">
 					<span className="block h-2 bg-muted" role="img" aria-label={`${doneShare}% of tasks done`}>
 						<span className="block h-full bg-success" style={{ width: `${doneShare}%` }} />
 					</span>
@@ -120,13 +120,13 @@ export default function WorkspaceDashboard() {
 						{late > 0 && <span className="text-destructive"> · {late} overdue</span>}
 					</span>
 				</Tile>
-				<Tile label="Files" value={stats?.files ?? 0} onClick={goTo("/workspace/files")} className="md:col-span-3 xl:col-span-3">
+				<Tile label="03 / files" value={stats?.files ?? 0} onClick={goTo("/workspace/files")} className="md:col-span-3 xl:col-span-3">
 					<span className="text-sm text-muted-foreground">
 						{stats?.assets ?? 0} assets · {stats?.kanban_cards ?? 0} cards
 					</span>
 				</Tile>
 
-				<Panel title="Due Soon" flush={due.length > 0} className="md:col-span-3 xl:col-span-4">
+				<Panel index="04" title="Due Soon" flush={due.length > 0} className="md:col-span-3 xl:col-span-4">
 					{due.length === 0 ? (
 						<p className="text-sm text-muted-foreground">No dates set. Give a task a due date and it appears here.</p>
 					) : (
@@ -151,7 +151,7 @@ export default function WorkspaceDashboard() {
 					)}
 				</Panel>
 
-				<Panel title="People" hint={`${[...online].filter((n) => members.some((m) => m.name === n)).length} online`} flush className="md:col-span-3 xl:col-span-3">
+				<Panel index="05" title="People" hint={`${[...online].filter((n) => members.some((m) => m.name === n)).length} online`} flush className="md:col-span-3 xl:col-span-3">
 					<ul className="divide-y">
 						{members.slice(0, 4).map((m) => {
 							const here = online.has(m.name);
@@ -176,7 +176,7 @@ export default function WorkspaceDashboard() {
 					</ul>
 				</Panel>
 
-				<Panel title="Activity" flush={activity.length > 0} className="md:col-span-6 xl:col-span-8">
+				<Panel index="06" title="Activity" flush={activity.length > 0} className="md:col-span-6 xl:col-span-8">
 					{activity.length === 0 ? (
 						<p className="text-sm text-muted-foreground">Nothing has changed yet. Create a note, file or task to get started.</p>
 					) : (
@@ -201,7 +201,7 @@ export default function WorkspaceDashboard() {
 					)}
 				</Panel>
 
-				<Tile label="Kanban cards" value={stats?.kanban_cards ?? 0} onClick={goTo("/workspace/kanban")} className="md:col-span-6 xl:col-span-4">
+				<Tile label="07 / kanban cards" value={stats?.kanban_cards ?? 0} onClick={goTo("/workspace/kanban")} className="md:col-span-6 xl:col-span-4">
 					<span className="text-sm text-muted-foreground">{members.length} {members.length === 1 ? "member" : "members"} share this board</span>
 				</Tile>
 			</PageBody>
@@ -212,8 +212,8 @@ export default function WorkspaceDashboard() {
 // A number worth a glance, big, with a line of context under it; the whole tile opens its page
 function Tile({ label, value, onClick, className, children }: { label: string; value: number; onClick: () => void; className?: string; children?: ReactNode }) {
 	return (
-		<button type="button" onClick={onClick} className={cn("flex min-w-0 flex-col justify-between gap-4 bg-muted/40 p-4 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted", className)}>
-			<span className="text-sm text-muted-foreground">{label}</span>
+		<button type="button" onClick={onClick} className={cn("frame ticks flex min-w-0 flex-col justify-between gap-4 bg-muted/40 p-4 text-left transition-colors hover:bg-muted focus-visible:bg-muted", className)}>
+			<span className="font-mono text-[13px] text-muted-foreground">{label}</span>
 			<span className="text-5xl font-semibold tabular-nums">{value}</span>
 			<span className="flex flex-col gap-2">{children}</span>
 		</button>

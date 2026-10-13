@@ -300,7 +300,7 @@ export default function P2PConnectDialog({
 						{shortCode && (
 							<div className="space-y-4 border bg-muted/40 p-5 text-center">
 								<p className="text-sm text-muted-foreground">Tell {hostRole === "Viewer" ? "the person you are inviting" : "your collaborator"} this code</p>
-								<div className="font-mono text-5xl font-bold tracking-[0.25em] text-primary select-all" aria-label={`Code ${shortCode.code.split("").join(" ")}`}>
+								<div className="text-5xl tabular-nums font-bold tracking-[0.25em] text-primary select-all" aria-label={`Code ${shortCode.code.split("").join(" ")}`}>
 									{shortCode.code.slice(0, 3)} {shortCode.code.slice(3)}
 								</div>
 								<p className="text-sm text-muted-foreground" aria-live="off">

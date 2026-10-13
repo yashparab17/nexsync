@@ -14,10 +14,11 @@ export const PageBody = ({ children, className, padded = true }: { children: Rea
 );
 
 // A titled block: a title (with an icon if it has one) and a line of context, then its content. `flush` lets a list touch the edges.
-export function Panel({ title, hint, children, className, right, flush, icon, id, titleClassName }: { title: string; hint?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; flush?: boolean; icon?: ReactNode; id?: string; titleClassName?: string }) {
+export function Panel({ title, hint, children, className, right, flush, icon, id, titleClassName, index }: { index?: string; title: string; hint?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; flush?: boolean; icon?: ReactNode; id?: string; titleClassName?: string }) {
 	return (
-		<section id={id} className={cn("flex min-w-0 flex-col border bg-muted/40", className)}>
+		<section id={id} className={cn("frame flex min-w-0 flex-col bg-muted/40", className)}>
 			<header className="flex items-center justify-between gap-3 border-b px-4 py-2.5">
+				{index && <span className="shrink-0 font-mono text-[13px] text-primary" aria-hidden>{index}</span>}
 				{icon && <span className={cn("shrink-0 [&>svg]:size-5", titleClassName?.includes("destructive") ? "text-destructive" : "text-primary")}>{icon}</span>}
 				<div className="min-w-0 flex-1">
 					<h2 className={cn("text-sm font-semibold text-foreground", titleClassName)}>{title}</h2>
@@ -35,7 +36,7 @@ export function EmptyState({ icon, title, children, action, className }: { icon?
 	return (
 		<div className={cn("flex h-full min-h-48 flex-col items-center justify-center gap-2 p-8 text-center", className)}>
 			{icon && <span className="text-muted-foreground [&>svg]:size-10">{icon}</span>}
-			<h3 className="text-base font-semibold">{title}</h3>
+			<h3 className="cursor text-base font-semibold">{title}</h3>
 			{children && <p className="max-w-sm text-sm text-muted-foreground">{children}</p>}
 			{action && <div className="mt-2">{action}</div>}
 		</div>

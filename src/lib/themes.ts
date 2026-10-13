@@ -37,6 +37,8 @@ export interface ThemeDef {
 }
 
 export const DEFAULT_THEME = "default";
+// What a new install starts on; the original light and dark stay available
+export const FIRST_RUN_THEME = "cyber";
 
 const light = (id: string, name: string, vars: ThemeVars): ThemeDef => ({ id, name, mode: "light", vars });
 const dark = (id: string, name: string, vars: ThemeVars): ThemeDef => ({ id, name, mode: "dark", vars });
@@ -61,6 +63,26 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"input": "#e4e4e7",
 		"ring": "#a1a1aa",
 		"sidebar": "#fafafa",
+	}),
+	light("cyber", "Cyber Light", {
+		"background": "#e4ebf5",
+		"foreground": "#0a1220",
+		"card": "#f7f9fd",
+		"popover": "#ffffff",
+		"primary": "#1252d6",
+		"primary-foreground": "#f5f8ff",
+		"secondary": "#d6dfec",
+		"muted": "#d9e1ee",
+		"muted-foreground": "#4a586d",
+		"accent": "#cfdbee",
+		"destructive": "#c62828",
+		"success": "#0f7a5c",
+		"warning": "#8f5400",
+		"info": "#00748a",
+		"border": "#c3cfe0",
+		"input": "#c5d1e3",
+		"ring": "#0a9a9a",
+		"sidebar": "#f0f4fa",
 	}),
 	light("latte", "Catppuccin Latte", {
 		"background": "#dce0e8",
@@ -161,6 +183,26 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"input": "#3a3a3e",
 		"ring": "#71717a",
 		"sidebar": "#18181b",
+	}),
+	dark("cyber", "Cyber Dark", {
+		"background": "#05070d",
+		"foreground": "#e6edf7",
+		"card": "#0b1018",
+		"popover": "#0d1420",
+		"primary": "#3d8bff",
+		"primary-foreground": "#04070d",
+		"secondary": "#121a27",
+		"muted": "#101826",
+		"muted-foreground": "#8a97ad",
+		"accent": "#14203a",
+		"destructive": "#ff5d6c",
+		"success": "#2de3a0",
+		"warning": "#ffc247",
+		"info": "#19d3e6",
+		"border": "#1b2638",
+		"input": "#172033",
+		"ring": "#19d3e6",
+		"sidebar": "#0a0f18",
 	}),
 	dark("mocha", "Catppuccin Mocha", {
 		"background": "#11111b",

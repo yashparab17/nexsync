@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { SquareKanban as KanbanSquare, Search, Clock, Code2, Compass, File, FileText, ListTodo, X } from "@/components/animate-icons";
+import { SquareKanban as KanbanSquare, Clock, Code2, Compass, File, FileText, ListTodo, X } from "@/components/animate-icons";
 
 import { cn } from "@/lib/utils";
 import { isBinaryFile, isDocumentFile, isNoteFile } from "@/lib/editor/languages";
@@ -194,7 +194,7 @@ export default function WorkspaceSearch() {
 	return (
 		<div ref={box} className="relative w-full max-w-xl">
 			<div className={cn("flex h-9 items-center gap-2 bg-input px-3 transition-shadow", open ? "shadow-[0_0_0_2px_var(--primary)]" : "hover:bg-muted")}>
-				<Search className="size-4 shrink-0 text-muted-foreground" />
+				<span className="shrink-0 font-mono text-sm text-primary" aria-hidden>&gt;</span>
 				<input
 					ref={inputRef}
 					style={{ outline: "none" }}

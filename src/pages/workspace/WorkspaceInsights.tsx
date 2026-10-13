@@ -115,7 +115,7 @@ export default function WorkspaceInsights() {
 			<PageBody padded={false}>
 				{tab === "overview" ? (
 					<div className="grid gap-3 p-3 lg:grid-cols-6">
-						<Panel title="Last 14 Days" className="lg:col-span-4 lg:row-span-2">
+						<Panel index="01" title="Last 14 Days" className="ticks ticks-on lg:col-span-4 lg:row-span-2">
 							<DayColumns days={days} label={`Actions per day over the last ${DAYS} days`} tall />
 						</Panel>
 						<div className="grid grid-cols-2 gap-3 lg:col-span-2">
@@ -124,7 +124,7 @@ export default function WorkspaceInsights() {
 							<Stat label="Tasks finished" value={finishedTotal} />
 							<Stat label="Tasks still open" value={openTasks} />
 						</div>
-						<Panel title="Task Progress" className="lg:col-span-2">
+						<Panel index="02" title="Task Progress" className="lg:col-span-2">
 							{tasks.length === 0 ? (
 								<Empty>No tasks yet.</Empty>
 							) : (
@@ -138,7 +138,7 @@ export default function WorkspaceInsights() {
 										]}
 										center={
 											<>
-												<span className="font-mono text-2xl font-semibold tabular-nums">{Math.round((done / tasks.length) * 100)}%</span>
+												<span className="text-2xl font-semibold tabular-nums">{Math.round((done / tasks.length) * 100)}%</span>
 												<span className="text-sm text-muted-foreground">done</span>
 											</>
 										}
@@ -155,20 +155,20 @@ export default function WorkspaceInsights() {
 							)}
 						</Panel>
 
-						<Panel title="Activity Calendar" className="lg:col-span-3">
+						<Panel index="03" title="Activity Calendar" className="lg:col-span-3">
 							<MonthCalendar days={year} label="Actions per day, by month" />
 						</Panel>
-						<Panel title="Last 16 Weeks" className="lg:col-span-3">
+						<Panel index="04" title="Last 16 Weeks" className="lg:col-span-3">
 							<Heatmap days={weeks} label={`Actions per day over the last ${WEEKS} weeks`} />
 						</Panel>
 
-						<Panel title="Actions by Person" className="lg:col-span-3">
+						<Panel index="05" title="Actions by Person" className="lg:col-span-3">
 							<BarRows rows={byPerson.map(([label, n]) => ({ label, parts: [{ value: n, bg: "bg-primary", title: "Actions" }] }))} lead={(l) => <Avatar name={l} className="size-6 text-xs" />} empty="Nothing recorded yet." />
 						</Panel>
-						<Panel title="Tasks Finished" className="lg:col-span-3">
+						<Panel index="06" title="Tasks Finished" className="lg:col-span-3">
 							<BarRows rows={finished.map(([label, n]) => ({ label, parts: [{ value: n, bg: "bg-success", title: "Finished" }] }))} lead={(l) => <Avatar name={l} className="size-6 text-xs" />} empty="No task has been finished yet." />
 						</Panel>
-						<Panel title="Open Work by Person" className="lg:col-span-3">
+						<Panel index="07" title="Open Work by Person" className="lg:col-span-3">
 							<BarRows
 								rows={load.map((w) => ({
 									label: w.name,
@@ -187,8 +187,8 @@ export default function WorkspaceInsights() {
 								</p>
 							)}
 						</Panel>
-						<Panel title="Where the Work Happens" className="lg:col-span-3">
-							{byKind.length === 0 ? <Empty>Nothing recorded yet.</Empty> : <Donut label="Actions by part of the app" parts={byKind.slice(0, SERIES.length).map(([label, value]) => ({ label, value }))} center={<><span className="font-mono text-2xl font-semibold tabular-nums">{events.length}</span><span className="text-sm text-muted-foreground">actions</span></>} />}
+						<Panel index="08" title="Where the Work Happens" className="lg:col-span-3">
+							{byKind.length === 0 ? <Empty>Nothing recorded yet.</Empty> : <Donut label="Actions by part of the app" parts={byKind.slice(0, SERIES.length).map(([label, value]) => ({ label, value }))} center={<><span className="text-2xl font-semibold tabular-nums">{events.length}</span><span className="text-sm text-muted-foreground">actions</span></>} />}
 						</Panel>
 					</div>
 				) : feed.length === 0 ? (
