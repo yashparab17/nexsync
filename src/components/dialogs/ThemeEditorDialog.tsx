@@ -1,4 +1,4 @@
-// Making or changing a custom theme: a name, a starting point, the nineteen colours (each a picker and a field), and the same
+// Making or changing a custom theme: a name, a starting point, the eighteen colours (each a picker and a field), and the same
 // colours as CSS that can be copied out or pasted in. A sample shows the result as it is edited.
 
 import { useMemo, useState } from "react";
@@ -30,8 +30,8 @@ function Sample({ mode, vars }: { mode: ThemeMode; vars: ThemeVars }) {
 					<p className="text-sm font-semibold">A panel</p>
 					<p className="text-[13px] text-muted-foreground">Hints and secondary text</p>
 					<div className="mt-2 flex gap-1.5">
-						<span className="border bg-primary px-2 py-0.5 text-[13px] text-primary-foreground shadow-[0_2px_0_var(--edge)]">Save</span>
-						<span className="border bg-secondary px-2 py-0.5 text-[13px] shadow-[0_2px_0_var(--edge)]">Cancel</span>
+						<span className="border bg-primary px-2 py-0.5 text-[13px] text-primary-foreground">Save</span>
+						<span className="border bg-secondary px-2 py-0.5 text-[13px]">Cancel</span>
 						<span className="border border-input bg-background px-2 py-0.5 font-mono text-[13px] text-muted-foreground">field</span>
 					</div>
 				</div>

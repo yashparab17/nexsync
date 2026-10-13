@@ -21,7 +21,7 @@ export interface WelcomeItem {
 	run: () => void;
 }
 
-export const Kbd = ({ children }: { children: ReactNode }) => <kbd className="border bg-card px-1.5 py-0.5 font-mono text-[13px] text-muted-foreground shadow-[0_2px_0_var(--edge)]">{children}</kbd>;
+export const Kbd = ({ children }: { children: ReactNode }) => <kbd className="border bg-card px-1.5 py-0.5 font-mono text-[13px] text-muted-foreground">{children}</kbd>;
 
 export default function Welcome({ logo, title, intro, actions, recentTitle, recent, recentEmpty, tip }: { logo?: string; title: string; intro: ReactNode; actions: WelcomeAction[]; recentTitle: string; recent: WelcomeItem[]; recentEmpty: string; tip?: string }) {
 	return (

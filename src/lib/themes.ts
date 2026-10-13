@@ -1,4 +1,4 @@
-// The themes. Each is the same nineteen colours; everything else (card text, sidebar, charts, the scrim) is worked out from
+// The themes. Each is the same eighteen colours; everything else (card text, sidebar, charts, the scrim) is worked out from
 // them by themeCss, so a theme someone makes can stay short. The two "default" themes are written out in index.css as well, so
 // the app is never unstyled before this runs; the copy here is what the picker shows and what a custom theme starts from.
 
@@ -10,14 +10,13 @@ export const TOKENS = [
 	{ key: "sidebar", label: "Sidebar", hint: "Navigation side" },
 	{ key: "primary", label: "Accent", hint: "Buttons, links, selection" },
 	{ key: "primary-foreground", label: "Text on accent", hint: "On accent buttons" },
-	{ key: "secondary", label: "Secondary surface", hint: "Chips and keycaps" },
+	{ key: "secondary", label: "Secondary surface", hint: "Chips and buttons" },
 	{ key: "muted", label: "Muted surface", hint: "Hover and inactive areas" },
 	{ key: "muted-foreground", label: "Muted text", hint: "Hints and secondary text" },
 	{ key: "accent", label: "Hover surface", hint: "Highlighted rows" },
 	{ key: "border", label: "Border", hint: "Lines between things" },
 	{ key: "input", label: "Field border", hint: "Around text fields" },
 	{ key: "ring", label: "Focus ring", hint: "Keyboard focus" },
-	{ key: "edge", label: "Button lip", hint: "The keycap edge under buttons" },
 	{ key: "destructive", label: "Danger", hint: "Errors and delete" },
 	{ key: "success", label: "Success", hint: "Done and online" },
 	{ key: "warning", label: "Warning", hint: "Due soon and caution" },
@@ -61,7 +60,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"border": "#e4e4e7",
 		"input": "#e4e4e7",
 		"ring": "#a1a1aa",
-		"edge": "#d4d4d8",
 		"sidebar": "#fafafa",
 	}),
 	light("latte", "Catppuccin Latte", {
@@ -82,7 +80,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"border": "#bcc0cc",
 		"input": "#bcc0cc",
 		"ring": "#0e6269",
-		"edge": "#acb0be",
 		"sidebar": "#e6e9ef",
 	}),
 	light("solarized-light", "Solarized Light", {
@@ -103,7 +100,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"border": "#d3cbb0",
 		"input": "#cbc3a6",
 		"ring": "#1b7a74",
-		"edge": "#c3bb9e",
 		"sidebar": "#f5eedb",
 	}),
 	light("gruvbox-light", "Gruvbox Light", {
@@ -124,7 +120,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"border": "#bdae93",
 		"input": "#a89984",
 		"ring": "#076678",
-		"edge": "#a89984",
 		"sidebar": "#f2e5bc",
 	}),
 	light("github-light", "GitHub Light", {
@@ -145,7 +140,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"border": "#cdd4db",
 		"input": "#c3cad2",
 		"ring": "#0969da",
-		"edge": "#b8c0c9",
 		"sidebar": "#f6f8fa",
 	}),
 	dark("default", "Original dark", {
@@ -166,7 +160,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"border": "#2a2a2e",
 		"input": "#3a3a3e",
 		"ring": "#71717a",
-		"edge": "#000000",
 		"sidebar": "#18181b",
 	}),
 	dark("mocha", "Catppuccin Mocha", {
@@ -187,7 +180,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"border": "#313244",
 		"input": "#45475a",
 		"ring": "#94e2d5",
-		"edge": "#000000",
 		"sidebar": "#181825",
 	}),
 	dark("solarized-dark", "Solarized Dark", {
@@ -208,7 +200,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"border": "#14505e",
 		"input": "#2a6573",
 		"ring": "#2aa198",
-		"edge": "#001419",
 		"sidebar": "#073642",
 	}),
 	dark("dracula", "Dracula", {
@@ -229,7 +220,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"border": "#44475a",
 		"input": "#4d5066",
 		"ring": "#bd93f9",
-		"edge": "#14151c",
 		"sidebar": "#282a36",
 	}),
 	dark("nord", "Nord", {
@@ -250,7 +240,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
 		"border": "#3b4252",
 		"input": "#4c566a",
 		"ring": "#88c0d0",
-		"edge": "#1b1f27",
 		"sidebar": "#2e3440",
 	}),
 ];
