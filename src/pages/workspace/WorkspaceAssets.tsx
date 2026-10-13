@@ -504,7 +504,7 @@ export default function WorkspaceAssets() {
 				) : filteredAssets.length === 0 ? (
 					<EmptyState
 						icon={<ImageIcon />}
-						title={searchQuery || narrowed ? "No matching assets" : "Nothing here yet"}
+						title={searchQuery || narrowed ? "No Matching Assets" : "Nothing Here Yet"}
 						action={
 							!searchQuery && !narrowed && !isViewer && (
 								<Button size="sm" onPress={() => setIsUploadOpen(true)}>

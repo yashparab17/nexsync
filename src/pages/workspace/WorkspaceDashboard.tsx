@@ -6,6 +6,7 @@ import { FilePlus, FileText, FolderOpen, ListTodo, StickyNote, Upload, UsersRoun
 import Avatar from "@/components/elements/Avatar";
 import { Page, PageBody, Panel } from "@/components/layout/Page";
 import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
+import { formatAction } from "@/lib/insights";
 import { readRecent } from "@/lib/recentFiles";
 import { getTasks, loadConfig } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
@@ -24,12 +25,6 @@ function formatRelative(iso: string): string {
 	const days = Math.floor(hours / 24);
 	return days < 7 ? `${days}d ago` : new Date(iso).toLocaleDateString();
 }
-
-// "note_created" becomes "Note created"
-const formatAction = (action: string) => {
-	const s = action.replace(/_/g, " ").trim();
-	return s.charAt(0).toUpperCase() + s.slice(1);
-};
 
 // The icon for what an event touched; neutral, so colour is saved for what needs attention
 function eventIcon(targetType?: string, action?: string) {

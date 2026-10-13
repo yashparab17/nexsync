@@ -490,7 +490,7 @@ export default function WorkspaceTasks() {
 				) : filteredTasks.length === 0 ? (
 					<EmptyState
 						icon={<Sparkles />}
-						title={filtering ? "No matching tasks" : "No tasks yet"}
+						title={filtering ? "No Matching Tasks" : "No Tasks Yet"}
 						action={
 							filtering ? (
 								<Button variant="outline" size="sm" onPress={clearFilters}>

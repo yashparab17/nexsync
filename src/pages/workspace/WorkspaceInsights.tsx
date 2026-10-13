@@ -9,6 +9,7 @@ import {
 	authorOf,
 	countBy,
 	filterEvents,
+	formatAction,
 	isCompletion,
 	KINDS,
 	kindOf,
@@ -198,9 +199,12 @@ export default function WorkspaceInsights() {
 						<ul className="divide-y">
 							{feed.slice(0, FEED_LIMIT).map((e) => (
 								<li key={e.id} className="flex items-center gap-3 px-3 py-3 text-sm">
-									<Avatar name={authorOf(e)} className="size-6 text-xs" />
+									<Avatar name={authorOf(e)} className="size-8 text-xs" />
 									<div className="min-w-0 flex-1">
-										<p className="truncate font-medium">{e.action}</p>
+										<p className="truncate">
+											<span className="font-medium">{e.author ?? formatAction(e.action)}</span>
+											{e.author && <span className="text-muted-foreground"> {formatAction(e.action).toLowerCase()}</span>}
+										</p>
 										<p className="truncate text-muted-foreground">{e.detail}</p>
 									</div>
 									<div className="flex shrink-0 items-center gap-3 text-muted-foreground">
@@ -210,7 +214,6 @@ export default function WorkspaceInsights() {
 												History
 											</button>
 										)}
-										<span className="hidden sm:inline">{authorOf(e)}</span>
 										<span className="font-mono text-[13px]" title={e.timestamp}>{new Date(e.timestamp).toLocaleString()}</span>
 									</div>
 								</li>

@@ -86,3 +86,9 @@ export function workload(tasks: Task[], columns: KanbanColumn[], members: Member
 	}
 	return [...rows.values()].sort((a, b) => b.tasks + b.cards - (a.tasks + a.cards) || a.name.localeCompare(b.name));
 }
+
+// "uploaded_asset" becomes "Uploaded asset"; actions already written as words are left as they are
+export const formatAction = (action: string) => {
+	const s = action.replace(/_/g, " ").trim();
+	return s.charAt(0).toUpperCase() + s.slice(1);
+};
