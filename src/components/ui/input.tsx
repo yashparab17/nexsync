@@ -19,7 +19,7 @@ function Input({
       autoComplete="off"
       className={composeRenderProps(className, (className) =>
         cn(
-          "h-10 w-full min-w-0 border border-input bg-input px-3 py-1 text-sm transition-[color,border-color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive",
+          "h-10 w-full min-w-0 border border-input bg-input px-3 py-1 text-sm transition-[color,border-color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive",
           className
         )
       )}

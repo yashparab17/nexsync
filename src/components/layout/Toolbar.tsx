@@ -57,7 +57,7 @@ export function ToolbarSearch({ label, value, onChange, placeholder, className }
 				onKeyDown={(e) => e.key === "Escape" && value && (e.stopPropagation(), onChange(""))}
 				aria-label={label}
 				placeholder={placeholder ?? label}
-				className="h-8 w-full border bg-input pr-8 pl-8 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring [&::-webkit-search-cancel-button]:hidden"
+				className="h-8 w-full border bg-input pr-8 pl-8 text-sm text-foreground outline-none placeholder:text-muted-foreground  [&::-webkit-search-cancel-button]:hidden"
 			/>
 			{value && (
 				<button type="button" aria-label={`Clear ${label.toLowerCase()}`} onClick={() => onChange("")} className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground">
@@ -76,7 +76,7 @@ export function ToolbarSelect<T extends string>({ label, value, onChange, option
 			title={label}
 			value={value}
 			onChange={(e) => onChange(e.target.value as T)}
-			className={cn("h-8 cursor-pointer border bg-input px-2 text-sm outline-none focus-visible:border-ring", active ? "border-primary text-foreground" : "text-muted-foreground hover:text-foreground")}
+			className={cn("h-8 cursor-pointer border bg-input px-2 text-sm", active ? "border-primary text-foreground" : "text-muted-foreground hover:text-foreground")}
 		>
 			{options.map((o) => (
 				<option key={o.value} value={o.value}>

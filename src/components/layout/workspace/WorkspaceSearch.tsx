@@ -193,7 +193,7 @@ export default function WorkspaceSearch() {
 
 	return (
 		<div ref={box} className="relative w-full max-w-md">
-			<div className={cn("flex h-9 items-center gap-2 rounded-md bg-input px-3 transition-shadow", open ? "shadow-[0_0_0_2px_var(--primary)]" : "hover:bg-muted")}>
+			<div className={cn("flex h-9 items-center gap-2 rounded-md bg-input px-3 field-focus", "hover:bg-muted")}>
 				<span className="shrink-0 font-mono text-sm text-primary" aria-hidden>&gt;</span>
 				<input
 					ref={inputRef}

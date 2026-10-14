@@ -315,10 +315,6 @@ select {
   padding-inline: 0.75rem;
   outline: none;
 }
-select:focus-visible {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 30%, transparent);
-}
 
 /* Native controls (scrollbars, form widgets) follow the theme; headings do not leave a single word on the last line */
 :root { color-scheme: light; }
@@ -360,10 +356,6 @@ button, a, select, summary, label, [role="button"] { touch-action: manipulation;
 .border:not(.border-dashed, .border-primary, .border-destructive, .border-success, .border-warning, .border-info, .border-ring, .border-foreground, [class*="border-primary/"], [class*="border-destructive/"], [class*="border-warning/"]) {
   border-color: transparent;
 }
-.border:focus-visible,
-.border:focus-within:not([data-slot="dialog-content"], [role="dialog"]) {
-  border-color: var(--primary);
-}
 
 /* Terminal / HUD layer. Rules frame the tiles; the accent takes over on hover and focus. */
 :root { --fg-3: color-mix(in srgb, var(--foreground) 45%, var(--background)); --rule: color-mix(in oklch, var(--foreground) 16%, transparent); }
@@ -374,3 +366,14 @@ button, a, select, summary, label, [role="button"] { touch-action: manipulation;
 
 /* Dialogs take focus as a whole (so Escape and Tab work) but do not draw a ring round themselves */
 [data-slot="dialog"]:focus-visible, [data-slot="dialog-content"]:focus-visible { outline: none; }
+
+/* One focus look for every text field and search box: a single 1px accent outline, no glow, no inner box */
+input:not([type="checkbox"], [type="radio"], [type="color"], [type="range"]):focus-visible, textarea:focus-visible, select:focus-visible, .field-focus:focus-within {
+  outline: 1px solid var(--primary);
+  outline-offset: 0;
+}
+.field-focus input:focus-visible { outline: none; }
+
+/* The edge of the page card: drawn on top of whatever a page paints, so no page can cover it */
+.window-edge { position: relative; }
+.window-edge::after { content: ""; position: absolute; inset: 0; z-index: 30; pointer-events: none; border: 1px solid var(--rule); border-radius: inherit; }

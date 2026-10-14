@@ -94,7 +94,7 @@ export default function Workspace() {
 			)}
 
 			{/* Main content area */}
-			<div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-xl bg-background outline outline-1 -outline-offset-1 outline-foreground/15">
+			<div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-xl bg-background window-edge">
 				{/* Header */}
 				<WorkspaceHeader onOpenMenu={() => setNavOpen(true)} menuOpen={navOpen} />
 
