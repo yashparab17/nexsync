@@ -473,7 +473,7 @@ export default function WorkspaceKanban() {
 						id={`${prefix}-assignee`}
 						value={cardAssignee}
 						onChange={(e) => setCardAssignee(e.target.value)}
-						className="mt-1 flex h-10 w-full rounded-none border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+						className="mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 					>
 						<option value="">Unassigned</option>
 						{members.map((m) => (
@@ -613,7 +613,7 @@ export default function WorkspaceKanban() {
 											<div
 												key={card.id}
 												className={cn(
-													"group frame ticks relative border-l-2 border-l-transparent bg-card p-3 transition-colors hover:border-l-primary",
+													"group frame relative border-l-2 border-l-transparent bg-card p-3 transition-colors hover:border-l-primary",
 													dragId === card.id && "opacity-40",
 													drop?.colId === col.id && drop.index === col.cards.indexOf(card) && "border-t-2 border-t-primary",
 													drop?.colId === col.id &&

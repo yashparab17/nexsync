@@ -254,7 +254,7 @@ export default function WorkspaceMembers() {
 				<Button variant="outline" size="sm" onPress={() => setIsInviteOpen(true)}>
 					<KeyRound className="size-4 text-info" />
 					Sharing & Invites
-					{peers.length > 0 && <span className="ml-1 flex size-2 animate-ping rounded-none bg-success" />}
+					{peers.length > 0 && <span className="ml-1 flex size-2 animate-ping rounded-md bg-success" />}
 				</Button>
 				<Button
 					size="sm"
@@ -323,7 +323,7 @@ export default function WorkspaceMembers() {
 														)}
 														{isOnline && (
 															<span className={cn("inline-flex items-center gap-1 text-xs", here?.away ? "text-warning" : "text-success")}>
-																<span className={cn("size-1.5 rounded-none", here?.away ? "bg-warning" : "bg-success")} />
+																<span className={cn("size-1.5 rounded-md", here?.away ? "bg-warning" : "bg-success")} />
 																{here?.away ? "Away" : "Online"}
 																{here && !here.away && ` · ${placeLabel(here)}`}
 															</span>
@@ -507,7 +507,7 @@ export default function WorkspaceMembers() {
 									id="mem-role"
 									value={newMemberRole}
 									onChange={(e) => setNewMemberRole(e.target.value)}
-									className="mt-1 flex h-10 w-full rounded-none border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+									className="mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 								>
 									{ASSIGNABLE_ROLES.map((r) => (
 										<option key={r} value={r}>{r}</option>
@@ -572,7 +572,7 @@ export default function WorkspaceMembers() {
 								id="edit-role-select"
 								value={editRole}
 								onChange={(e) => setEditRole(e.target.value)}
-								className="mt-1 flex h-10 w-full rounded-none border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+								className="mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 							>
 								{rolesFor(editingMember).map((r) => (
 									<option key={r} value={r}>{r}</option>

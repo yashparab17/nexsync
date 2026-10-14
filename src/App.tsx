@@ -13,7 +13,7 @@ export default function App() {
 	const screen = useLocation().pathname.split("/")[1] ?? "";
 	return (
 		<MotionConfig reducedMotion="user">
-		<div className="flex h-screen flex-col">
+		<div className="flex h-screen flex-col bg-sidebar">
 			<TitleBar />
 
 			<a

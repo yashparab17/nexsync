@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { cn } from "@/lib/utils";
-import { APP_VERSION } from "@/lib/version";
 
 // macOS keeps its own traffic-light buttons (the window is configured to draw them over this bar, see
 // tauri.macos.conf.json), so the bar only leaves room for them; they also give macOS its native full screen and tiling.
@@ -90,14 +89,8 @@ export default function TitleBar() {
 	];
 
 	return (
-		<header className="relative z-[60] flex h-9 shrink-0 select-none items-center border-b bg-background">
+		<header className="relative z-[60] flex h-9 shrink-0 select-none items-center">
 			<div data-tauri-drag-region className={cn("flex h-full min-w-0 flex-1 items-center gap-2", IS_MAC ? "pl-20" : "pl-3")}>
-				<span data-tauri-drag-region className="font-mono text-sm font-semibold">
-					nexsync
-				</span>
-				<span data-tauri-drag-region className="font-mono text-sm text-muted-foreground">
-					v{APP_VERSION}
-				</span>
 			</div>
 			{!IS_MAC &&
 				controls.map(({ label, icon, run, danger, snap }) => (

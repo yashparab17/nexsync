@@ -31,7 +31,7 @@ interface DraftsButtonProps {
 }
 
 const SELECT =
-	"mt-1 flex h-10 w-full rounded-none border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring";
+	"mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring";
 
 export default function DraftsButton({ workspacePath, entity, record, members, onMerged }: DraftsButtonProps) {
 	const [open, setOpen] = useState(false);

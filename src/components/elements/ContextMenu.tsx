@@ -66,7 +66,7 @@ function ContextMenu({ x, y, entries, onClose }: OpenMenu & { onClose: () => voi
 	};
 
 	return (
-		<div ref={ref} role="menu" onKeyDown={onKeyDown} style={{ left: at.x, top: at.y }} className="fixed z-[80] min-w-52 border bg-popover p-1 text-sm text-popover-foreground ring-1 ring-foreground/10">
+		<div ref={ref} role="menu" onKeyDown={onKeyDown} style={{ left: at.x, top: at.y }} className="fixed z-[80] min-w-52 border bg-popover p-1 text-sm text-popover-foreground rounded-lg ring-1 ring-foreground/10">
 			{entries.map((entry, i) =>
 				entry === "separator" ? (
 					<div key={i} role="separator" className="my-1 border-t" />

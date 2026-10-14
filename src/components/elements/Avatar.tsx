@@ -15,7 +15,7 @@ export default function Avatar({ name, className }: { name: string; className?: 
 			aria-hidden
 			data-slot="avatar"
 			style={{ background: colorForName(name.trim() || NO_NAME) }}
-			className={cn("flex size-8 shrink-0 items-center justify-center text-sm font-bold text-white", className)}
+			className={cn("flex size-8 shrink-0 items-center justify-center rounded-md text-sm font-bold text-white", className)}
 		>
 			{initialOf(name)}
 		</span>

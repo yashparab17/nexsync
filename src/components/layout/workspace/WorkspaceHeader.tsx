@@ -48,7 +48,7 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 				: { label: "Collaborate: online, ready to invite", short: "Online", dot: "bg-success" };
 
 	return (
-		<header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 lg:px-6">
+		<header className="flex h-12 shrink-0 items-center gap-3 border-b px-4">
 			{/* Opens the navigation drawer when the sidebar is hidden */}
 			{onOpenMenu && (
 				<Button variant="ghost" size="icon" onPress={onOpenMenu} aria-label={t("nav.open")} aria-expanded={menuOpen} className="md:hidden">
@@ -57,7 +57,7 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 			)}
 
 			{/* Search */}
-			<div className="flex min-w-0 flex-1 justify-center">
+			<div className="flex min-w-0 flex-1 justify-end">
 				<WorkspaceSearch />
 			</div>
 

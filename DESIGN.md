@@ -15,12 +15,11 @@ small touches, and minimalism decides what is left out. It is a work tool first:
 - Accent: electric blue with teal as its partner. Themes come only in pairs, one light and one dark, applied together: Default (the original light and dark, first and the first-run theme), Cyber, Catppuccin, Solarized, Gruvbox, GitHub. Custom themes are made per mode.
 - Readouts are mono, 13px or smaller: numbers, paths, times, status, shortcuts, tile labels. Display numbers stay in Onest.
 - Section index numbers (`01`, `02`…) on tiles and Kanban columns, a `>` prompt in every search box, ASCII logos.
-- Corner ticks (`.ticks`) mark hover, focus and selection like a HUD reticle; `.ticks-on` keeps them showing on a hero tile.
 
 ## Limits (the effect budget)
 - The signal layer (ticks, index numbers, frames) stays out of the Editor, Notes text, forms and tables.
 - No scanlines, blinking cursors or typewriter effects.
-- No drop shadows, glow, gradients or rounded corners. Buttons are flat.
+- No drop shadows, glow or gradients. Corners are slightly rounded (6 to 12px). Buttons are flat.
 - Every theme must pass `themeWarnings` (readable text, visible fills); new themes are added to the test automatically.
 
 ## Per page

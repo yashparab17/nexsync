@@ -1,9 +1,9 @@
 // React
-import { AnimateIcon, Code2, Files, FolderClose, FolderTree, ListTodo, StickyNote } from "@/components/animate-icons";
+import { AnimateIcon, Settings, Code2, Files, FolderClose, FolderTree, ListTodo, StickyNote } from "@/components/animate-icons";
 import { useCallback, useState, type ElementType } from "react";
 
 // React Router
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 
 // Icons
 import { ArrowLeft, ChartColumn as BarChart3, SquareKanban as KanbanSquare, LayoutDashboard, ChevronDown, Trash2, UsersRound } from "@/components/animate-icons";
@@ -14,6 +14,8 @@ import { t, type MessageKey } from "@/i18n";
 import Splitter from "@/components/elements/Splitter";
 import { usePanelSize } from "@/hooks/usePanelSize";
 import { cn } from "@/lib/utils";
+import Avatar from "@/components/elements/Avatar";
+import { myName } from "@/lib/p2p/selfName";
 import PresenceDots from "@/components/elements/PresenceDots";
 import { pageOf } from "@/lib/p2p/presence";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -150,7 +152,7 @@ function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; 
 				onBlur={() => setHot(false)}
 				className={({ isActive }) =>
 					cn(
-						"relative flex w-full items-center gap-3 overflow-hidden rounded-none px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
+						"relative flex w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
 						expanded ? "justify-start" : "justify-center",
 						isActive ? "bg-primary/10 text-primary before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:bg-primary" : "text-foreground hover:bg-muted",
 					)
@@ -171,6 +173,30 @@ function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; 
 }
 
 // Left sidebar navigation bar for workspace views
+// The bottom card of the sidebar, like a chat app's: your avatar, name and role, and a button for the workspace settings
+function UserCard({ showLabels }: { showLabels: boolean }) {
+	const { workspace, metadata } = useWorkspace();
+	const navigate = useNavigate();
+	const { pathname } = useLocation();
+	const members = metadata?.members.members ?? [];
+	const name = myName(workspace?.id, members.find((m) => m.role === "Owner")?.name);
+	const role = members.find((m) => m.name === name)?.role;
+	return (
+		<div className={cn("m-2 flex items-center gap-2 rounded-lg bg-muted/40 p-2", !showLabels && "flex-col")}>
+			<Avatar name={name} className="size-8 text-xs" />
+			{showLabels && (
+				<span className="min-w-0 flex-1">
+					<span className="block truncate text-sm font-semibold">{name}</span>
+					{role && <span className="block truncate font-mono text-[13px] text-muted-foreground">{role.toLowerCase()}</span>}
+				</span>
+			)}
+			<Button variant="ghost" size="icon-sm" aria-label="Workspace settings" onPress={() => navigate(`${pathname}?settings=1`)}>
+				<Settings className="size-4" />
+			</Button>
+		</div>
+	);
+}
+
 // `expanded` is the drawer on small windows: full width with labels, and `onNavigate` closes it after a choice
 export default function WorkspaceSidebar({ expanded = false, onNavigate }: { expanded?: boolean; onNavigate?: () => void }) {
 	const { workspace, clearWorkspace } = useWorkspace();
@@ -207,7 +233,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 			className={cn("flex h-full shrink-0 flex-col overflow-hidden bg-sidebar", expanded && "w-64 border-r")}
 		>
 			{/* Workspace identity */}
-			<div className={cn("flex h-16 shrink-0 items-center gap-2 border-b", showLabels ? "justify-start px-3" : "justify-center")}>
+			<div className={cn("flex h-12 shrink-0 items-center gap-2 border-b", showLabels ? "justify-start px-3" : "justify-center")}>
 				<Button
 					variant="ghost"
 					size="icon"
@@ -249,6 +275,9 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 					<NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />
 				))}
 			</nav>
+
+			{/* You: who this device is in the workspace, with a way to its settings */}
+			<UserCard showLabels={showLabels} />
 		</aside>
 
 			{/* The sidebar edge: drag it to change the width, narrow enough and it folds to icons; double-click to reset */}

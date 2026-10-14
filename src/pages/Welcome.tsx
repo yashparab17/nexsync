@@ -78,7 +78,6 @@ export default function Welcome() {
 	);
 	const [loading, setLoading] = useState(true);
 	// The workspace that was open when the app was last used
-	const [lastId, setLastId] = useState<string | null>(null);
 	// The name from Settings, for the greeting; empty until loaded or when none is set
 	const [userName, setUserName] = useState("");
 
@@ -105,7 +104,6 @@ export default function Welcome() {
 			const workspaces = await getRecentWorkspaces();
 			// Only used to lead the list; not knowing it must not hide the list
 			const last = (await getLastWorkspace().catch(() => null))?.id ?? null;
-			setLastId(last);
 			setRecentWorkspaces([...workspaces].sort((x, y) => Number(y.id === last) - Number(x.id === last)));
 		} catch (err) {
 			console.error("Failed to load recent workspaces:", err);
@@ -127,7 +125,7 @@ export default function Welcome() {
 	};
 
 	return (
-		<div className="flex min-h-full flex-col px-8 py-6 2xl:px-16">
+		<div className="flex min-h-full flex-col rounded-t-xl bg-background px-8 py-6 2xl:px-16">
 			<header className="flex items-center justify-between">
 				<div className="flex items-center gap-3">
 					<img src={isDark ? logo_white : logo_black} alt="" className="size-9" />
@@ -168,13 +166,12 @@ export default function Welcome() {
 								</p>
 							:	<ul className="grid grid-cols-[repeat(auto-fill,minmax(20rem,1fr))] gap-4">
 									{recentWorkspaces.map((ws) => {
-										const last = ws.id === lastId;
 										return (
 											<li key={ws.id}>
 												<button
 													type="button"
 													onClick={() => handleOpenWorkspace(ws)}
-													className={`frame ticks flex h-full min-h-44 w-full flex-col gap-3 bg-muted/40 p-6 text-left transition-colors hover:bg-muted ${last ? "ticks-on" : ""}`}
+													className={`frame flex h-full min-h-44 w-full flex-col gap-3 bg-muted/40 p-6 text-left transition-colors hover:bg-muted`}
 												>
 													<span className="flex items-start justify-between gap-3">
 														<span className={`font-semibold text-xl`}>{ws.name}</span>

@@ -208,7 +208,7 @@ export default function WorkspaceDashboard() {
 // the whole tile opens its page.
 function Tile({ index, title, value, onClick, className, children }: { index: string; title: string; value: number; onClick: () => void; className?: string; children?: ReactNode }) {
 	return (
-		<button type="button" onClick={onClick} className={cn("frame ticks flex min-w-0 flex-col bg-muted/40 text-left transition-colors hover:bg-muted focus-visible:bg-muted", className)}>
+		<button type="button" onClick={onClick} className={cn("frame flex min-w-0 flex-col overflow-hidden bg-muted/40 text-left transition-colors hover:bg-muted focus-visible:bg-muted", className)}>
 			<span className="flex h-12 shrink-0 items-center gap-3 border-b px-4">
 				<span className="font-mono text-[13px] text-primary" aria-hidden>
 					{index}

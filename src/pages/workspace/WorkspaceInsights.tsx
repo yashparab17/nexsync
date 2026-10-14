@@ -116,7 +116,7 @@ export default function WorkspaceInsights() {
 			<PageBody padded={false}>
 				{tab === "overview" ? (
 					<div className="grid gap-4 p-4 lg:grid-cols-6">
-						<Panel index="01" title="Last 14 Days" className="ticks ticks-on lg:col-span-4 lg:row-span-2">
+						<Panel index="01" title="Last 14 Days" className="lg:col-span-4 lg:row-span-2">
 							<DayColumns days={days} label={`Actions per day over the last ${DAYS} days`} tall />
 						</Panel>
 						<div className="grid grid-cols-2 gap-4 lg:col-span-2">

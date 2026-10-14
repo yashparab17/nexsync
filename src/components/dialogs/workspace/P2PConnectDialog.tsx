@@ -374,7 +374,7 @@ export default function P2PConnectDialog({
 								value={ticketInput}
 								onChange={(e) => setTicketInput(e.target.value)}
 								rows={4}
-								className="rounded-none border border-input px-3 py-2 font-mono text-xs break-all"
+								className="rounded-md border border-input px-3 py-2 font-mono text-xs break-all"
 								autoFocus
 							/>
 							<p className="text-sm text-muted-foreground">Their workspace is copied into the one you have open, and kept up to date.</p>

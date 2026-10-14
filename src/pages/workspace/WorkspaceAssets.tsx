@@ -541,7 +541,7 @@ export default function WorkspaceAssets() {
 										data-nav
 										onClick={() => setPreviewAsset(asset)}
 										aria-label={`${asset.name}, ${asset.category}, ${formatBytes(asset.size)}${isRemote ? ", not downloaded" : ""}`}
-										className="frame ticks relative block h-full w-full cursor-pointer overflow-hidden bg-card text-left"
+										className="frame relative block h-full w-full cursor-pointer overflow-hidden bg-card text-left"
 									>
 										{asset.category === "image" && thumbnail && !isRemote ? (
 											<img

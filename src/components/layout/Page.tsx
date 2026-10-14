@@ -16,7 +16,7 @@ export const PageBody = ({ children, className, padded = true }: { children: Rea
 // A titled block: a title (with an icon if it has one) and a line of context, then its content. `flush` lets a list touch the edges.
 export function Panel({ title, hint, children, className, right, flush, icon, id, titleClassName, index }: { index?: string; title: string; hint?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; flush?: boolean; icon?: ReactNode; id?: string; titleClassName?: string }) {
 	return (
-		<section id={id} className={cn("frame flex min-w-0 flex-col bg-muted/40", className)}>
+		<section id={id} className={cn("frame flex min-w-0 flex-col overflow-hidden bg-muted/40", className)}>
 			<header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b px-4">
 				{index && <span className="shrink-0 font-mono text-[13px] text-primary" aria-hidden>{index}</span>}
 				{icon && <span className={cn("flex size-5 shrink-0 items-center justify-center [&>svg]:size-5", titleClassName?.includes("destructive") ? "text-destructive" : "text-primary")}>{icon}</span>}
