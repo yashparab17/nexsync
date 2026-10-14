@@ -233,7 +233,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 			className={cn("flex h-full shrink-0 flex-col overflow-hidden bg-sidebar", expanded && "w-64 border-r")}
 		>
 			{/* Workspace identity */}
-			<div className={cn("flex h-12 shrink-0 items-center gap-2 border-b", showLabels ? "justify-start px-3" : "justify-center")}>
+			<div className={cn("flex h-12 shrink-0 items-center gap-2", showLabels ? "justify-start px-3" : "justify-center")}>
 				<Button
 					variant="ghost"
 					size="icon"
@@ -251,7 +251,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 				{navGroups.map((group, i) => {
 					const open = !group.label || !showLabels || !folded.includes(group.id);
 					return (
-						<div key={group.id} className={cn("flex flex-col gap-0.5", !showLabels && i > 0 && "border-t pt-2")}>
+						<div key={group.id} className={cn("flex flex-col gap-0.5", !showLabels && i > 0 && "pt-2")}>
 							{group.label && showLabels && (
 								<button
 									type="button"
@@ -270,7 +270,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 			</nav>
 
 			{/* Bottom Navigation */}
-			<nav className={cn("flex flex-col gap-1 border-t", showLabels ? "p-3" : "p-2")}>
+			<nav className={cn("flex flex-col gap-1", showLabels ? "p-3" : "p-2")}>
 				{bottomNavigation.map((item) => (
 					<NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />
 				))}
