@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Recolours unDraw illustrations (https://undraw.co, via github.com/balazser/undraw-svg-collection) into theme tokens so they
 follow every Nexsync theme: the original primary colour becomes the accent, everything else a neutral from the theme.
+Download the scenes by hand from undraw.co (keep their default colour) into a folder named like the files below, then run:
 Usage: scripts/recolour-art.py <svgs dir> (reads the NAMES below, writes src/assets/art/<key>.svg)"""
 import re, sys, pathlib
 NAMES = {
@@ -9,7 +10,7 @@ NAMES = {
     "members": "collaboration", "welcome": "connecting-teams", "search": "searching",
 }
 MAP = {
-    "var(--primary-svg-color)": "var(--primary)",
+    "var(--primary-svg-color)": "var(--primary)", "#6c63ff": "var(--primary)",  # the mirror's variable, or unDraw's default colour when downloaded from the site
     "#fff": "var(--card)", "#ffffff": "var(--card)",
     "#f2f2f2": "var(--muted)", "#e6e6e6": "var(--secondary)", "#e4e4e4": "var(--secondary)", "#ccc": "var(--input)", "#cccccc": "var(--input)",
     "#ffb8b8": "var(--fg-3)", "#ffb6b6": "var(--fg-3)", "#feb8b8": "var(--fg-3)",
