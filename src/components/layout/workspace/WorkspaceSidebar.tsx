@@ -1,9 +1,9 @@
 // React
-import { AnimateIcon, Settings, Code2, Files, FolderClose, FolderTree, ListTodo, StickyNote } from "@/components/animate-icons";
+import { AnimateIcon, Code2, Files, FolderClose, FolderTree, ListTodo, StickyNote } from "@/components/animate-icons";
 import { useCallback, useState, type ElementType } from "react";
 
 // React Router
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 
 // Icons
 import { ArrowLeft, ChartColumn as BarChart3, SquareKanban as KanbanSquare, LayoutDashboard, ChevronDown, Trash2, UsersRound } from "@/components/animate-icons";
@@ -173,11 +173,9 @@ function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; 
 }
 
 // Left sidebar navigation bar for workspace views
-// The bottom card of the sidebar, like a chat app's: your avatar, name and role, and a button for the workspace settings
+// The bottom card of the sidebar, like a chat app's: your avatar, name and role
 function UserCard({ showLabels }: { showLabels: boolean }) {
 	const { workspace, metadata } = useWorkspace();
-	const navigate = useNavigate();
-	const { pathname } = useLocation();
 	const members = metadata?.members.members ?? [];
 	const name = myName(workspace?.id, members.find((m) => m.role === "Owner")?.name);
 	const role = members.find((m) => m.name === name)?.role;
@@ -190,9 +188,6 @@ function UserCard({ showLabels }: { showLabels: boolean }) {
 					{role && <span className="block truncate font-mono text-[13px] text-muted-foreground">{role.toLowerCase()}</span>}
 				</span>
 			)}
-			<Button variant="ghost" size="icon-sm" aria-label="Workspace settings" onPress={() => navigate(`${pathname}?settings=1`)}>
-				<Settings className="size-4" />
-			</Button>
 		</div>
 	);
 }
@@ -276,7 +271,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 				))}
 			</nav>
 
-			{/* You: who this device is in the workspace, with a way to its settings */}
+			{/* You: who this device is in the workspace */}
 			<UserCard showLabels={showLabels} />
 		</aside>
 
