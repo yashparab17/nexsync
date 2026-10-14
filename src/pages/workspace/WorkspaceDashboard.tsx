@@ -6,6 +6,7 @@ import { ArrowUpRight, FilePlus, FileText, FolderOpen, ListTodo, StickyNote, Upl
 import Avatar from "@/components/elements/Avatar";
 import { Page, PageBody, Panel } from "@/components/layout/Page";
 import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
+import Art from "@/components/elements/Art";
 import { formatAction } from "@/lib/insights";
 import { readRecent } from "@/lib/recentFiles";
 import { getTasks, loadConfig } from "@/lib/tauri";
@@ -83,10 +84,13 @@ export default function WorkspaceDashboard() {
 			</Toolbar>
 
 			{/* A bento grid: tile size follows importance, with where to continue largest */}
-			<PageBody className="grid content-start gap-4 md:grid-cols-6 xl:grid-cols-12">
+			<PageBody className="grid bg-dots content-start gap-4 md:grid-cols-6 xl:grid-cols-12">
 				<Panel index="01" title="Pick Up Where You Left Off" flush={recent.length > 0} className="md:col-span-6 xl:col-span-5 xl:row-span-2">
 					{recent.length === 0 ? (
-						<p className="text-sm text-muted-foreground">Files you open show up here, so you can jump back in.</p>
+						<div className="bg-dots flex h-full flex-col items-center justify-center gap-4 py-6 text-center">
+							<Art name="recent" className="h-40 w-64 max-w-full" />
+							<p className="text-sm text-muted-foreground">Files you open show up here, so you can jump back in.</p>
+						</div>
 					) : (
 						<ul className="divide-y">
 							{recent.slice(0, 6).map((file) => (

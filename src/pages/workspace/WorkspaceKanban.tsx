@@ -1,6 +1,6 @@
 import { MAX_TITLE } from "@/lib/validation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Plus, Trash2, AlertTriangle, ArrowRight, CheckSquare, Columns3, Pencil } from "@/components/animate-icons";
+import { ArrowLeft, Plus, Trash2, AlertTriangle, ArrowRight, CheckSquare, Pencil } from "@/components/animate-icons";
 
 import { EmptyState } from "@/components/layout/Page";
 import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
@@ -523,7 +523,7 @@ export default function WorkspaceKanban() {
 				<Loading fill className="flex-1" />
 			) : columns.length === 0 ? (
 				<EmptyState
-					icon={<Columns3 />}
+					art="kanban"
 					title="No Columns Yet"
 					action={
 						canChange && (

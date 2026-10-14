@@ -1,6 +1,6 @@
 import { MAX_TITLE } from "@/lib/validation";
 import { useCallback, useEffect, useMemo, useState, type ElementType } from "react";
-import { Plus, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, Sparkles } from "@/components/animate-icons";
+import { Plus, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, } from "@/components/animate-icons";
 
 import { EmptyState } from "@/components/layout/Page";
 import Toolbar, { ToolbarTitle, ToolbarSearch, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
@@ -489,7 +489,7 @@ export default function WorkspaceTasks() {
 					</div>
 				) : filteredTasks.length === 0 ? (
 					<EmptyState
-						icon={<Sparkles />}
+						art={filtering ? "search" : "tasks"}
 						title={filtering ? "No Matching Tasks" : "No Tasks Yet"}
 						action={
 							filtering ? (

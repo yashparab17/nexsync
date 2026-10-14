@@ -570,6 +570,7 @@ export default function WorkspaceNotes() {
 								...(isViewer ? [] : [{ label: "Open today’s note", keys: today(), icon: <CalendarPlus className="size-4" />, run: openToday }]),
 							]}
 							recentTitle="Recent Notes"
+							art="notes"
 							recent={notes.slice(0, 6).map((n) => ({ key: n.path, label: noteTitle(n.name), icon: <FileText className="size-4 text-muted-foreground" />, run: () => openNote(n.path) }))}
 							recentEmpty="Notes you write are listed here."
 							tip={"Hide the list with Ctrl \\ for more room to write."}

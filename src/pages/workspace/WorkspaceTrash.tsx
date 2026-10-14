@@ -89,7 +89,7 @@ export default function WorkspaceTrash() {
 						<Loader2 className="size-5 animate-spin text-muted-foreground" />
 					</div>
 				) : items.length === 0 ? (
-					<EmptyState icon={<Trash2 />} title="Trash Is Empty">
+					<EmptyState art="trash" title="Trash Is Empty">
 						Deleted files and folders wait here until you restore them or remove them for good.
 					</EmptyState>
 				) : (

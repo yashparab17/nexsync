@@ -377,3 +377,12 @@ input:not([type="checkbox"], [type="radio"], [type="color"], [type="range"]):foc
 /* The edge of the page card: drawn on top of whatever a page paints, so no page can cover it */
 .window-edge { position: relative; }
 .window-edge::after { content: ""; position: absolute; inset: 0; z-index: 30; pointer-events: none; border: 1px solid var(--rule); border-radius: inherit; }
+
+/* A faint dot grid behind empty areas and backgrounds, fading out towards the edges (drawn on a layer so the content is not faded) */
+.bg-dots { position: relative; isolation: isolate; }
+.bg-dots::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background-image: radial-gradient(circle, var(--rule) 1px, transparent 1.5px);
+  background-size: 16px 16px;
+  mask-image: radial-gradient(ellipse at center, black 35%, transparent 80%);
+}

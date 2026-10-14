@@ -550,7 +550,7 @@ export default function WorkspaceFiles({ mode = "explorer" }: { mode?: "explorer
 				) : shown.length === 0 ? (
 					<div className="h-full" onContextMenu={(e) => entryMenu(e, null)}>
 						<EmptyState
-							icon={<FolderPlus />}
+							art={filter ? "search" : "files"}
 							title={filter ? "No Matches" : !atRoot ? "Empty Folder" : "No Files Yet"}
 							action={
 								!filter && !isViewer && (

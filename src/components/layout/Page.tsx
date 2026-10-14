@@ -3,6 +3,7 @@
 
 import type { ReactNode } from "react";
 
+import Art, { type ArtName } from "@/components/elements/Art";
 import { cn } from "@/lib/utils";
 
 // The page itself: fills the space under the header and never scrolls as a whole
@@ -40,10 +41,11 @@ export const SectionTitle = ({ n, title }: { n: string; title: string }) => (
 );
 
 // What a page shows when there is nothing to list: an icon, a title, a sentence and maybe a button
-export function EmptyState({ icon, title, children, action, className }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode; className?: string }) {
+export function EmptyState({ icon, art, title, children, action, className }: { art?: ArtName; icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode; className?: string }) {
 	return (
-		<div className={cn("flex h-full min-h-48 flex-col items-center justify-center gap-2 p-8 text-center", className)}>
-			{icon && <span className="text-muted-foreground [&>svg]:size-10">{icon}</span>}
+		<div className={cn("flex h-full min-h-48 flex-col items-center justify-center gap-2 p-8 text-center", art && "bg-dots", className)}>
+			{art && <Art name={art} className="mb-4 h-44 w-72 max-w-full" />}
+			{!art && icon && <span className="text-muted-foreground [&>svg]:size-10">{icon}</span>}
 			<h3 className="text-sm font-semibold">{title}</h3>
 			{children && <p className="max-w-sm text-sm text-muted-foreground">{children}</p>}
 			{action && <div className="mt-2">{action}</div>}

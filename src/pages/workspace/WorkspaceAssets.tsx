@@ -503,7 +503,7 @@ export default function WorkspaceAssets() {
 					<Loading className="py-24" />
 				) : filteredAssets.length === 0 ? (
 					<EmptyState
-						icon={<ImageIcon />}
+						art={searchQuery || narrowed ? "search" : "assets"}
 						title={searchQuery || narrowed ? "No Matching Assets" : "Nothing Here Yet"}
 						action={
 							!searchQuery && !narrowed && !isViewer && (
