@@ -43,7 +43,7 @@ export const SectionTitle = ({ n, title }: { n: string; title: string }) => (
 // What a page shows when there is nothing to list: an icon, a title, a sentence and maybe a button
 export function EmptyState({ icon, art, title, children, action, className }: { art?: ArtName; icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode; className?: string }) {
 	return (
-		<div className={cn("flex h-full min-h-48 flex-col items-center justify-center gap-2 p-8 text-center", art && "bg-dots", className)}>
+		<div className={cn("flex h-full min-h-48 flex-col items-center justify-center gap-2 p-8 text-center", art && "", className)}>
 			{art && <Art name={art} className="mb-4 h-44 w-72 max-w-full" />}
 			{!art && icon && <span className="text-muted-foreground [&>svg]:size-10">{icon}</span>}
 			<h3 className="text-sm font-semibold">{title}</h3>

@@ -53,7 +53,7 @@ export default function Welcome({ logo, title, intro, actions, recentTitle, rece
 					</Panel>
 					<Panel title={recentTitle} flush={recent.length > 0}>
 						{recent.length === 0 ? (
-							<div className="bg-dots flex flex-col items-center gap-3 py-2 text-center">
+							<div className="flex flex-col items-center gap-3 py-2 text-center">
 								{art && <Art name={art} className="h-32 w-52" />}
 								<p className="text-sm text-muted-foreground">{recentEmpty}</p>
 							</div>
