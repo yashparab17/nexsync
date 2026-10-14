@@ -246,7 +246,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 				{navGroups.map((group, i) => {
 					const open = !group.label || !showLabels || !folded.includes(group.id);
 					return (
-						<div key={group.id} className={cn("flex flex-col gap-0.5", !showLabels && i > 0 && "pt-2")}>
+						<div key={group.id} className={cn("flex flex-col gap-0.5", !showLabels && i > 0 && "border-t border-foreground/15 pt-2")}>
 							{group.label && showLabels && (
 								<button
 									type="button"
