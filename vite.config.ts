@@ -46,6 +46,30 @@ export default defineConfig(async () => ({
 		],
 	},
 
+	// Split the big libraries out of the app code so each is cached on its own and the first screen loads only what it uses. The editors
+	// (CodeMirror, BlockNote) and the terminal are loaded when their pages open.
+	build: {
+		rollupOptions: {
+			output: {
+				manualChunks(id: string) {
+					if (!id.includes("node_modules")) return undefined;
+					const pkg = (re: RegExp) => re.test(id);
+					if (pkg(/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//)) return "react";
+					if (pkg(/node_modules\/(react-aria|react-aria-components|react-stately|@react-aria|@react-stately|@react-types|@internationalized)\//)) return "aria";
+					if (pkg(/node_modules\/(motion|motion-dom|motion-utils|framer-motion)\//)) return "motion";
+					if (pkg(/node_modules\/(yjs|lib0|y-protocols|y-codemirror\.next)\//)) return "yjs";
+					if (pkg(/node_modules\/@tauri-apps\//)) return "tauri";
+					// The rich-text notes editor, in four pieces so none is huge
+					if (pkg(/node_modules\/(prosemirror-[a-z-]+|@tiptap|orderedmap|rope-sequence|w3c-keyname|y-prosemirror)\//)) return "prosemirror";
+					if (pkg(/node_modules\/@mantine\//)) return "mantine";
+					if (pkg(/node_modules\/(@floating-ui|@emoji-mart|tabbable|react-remove-scroll|react-remove-scroll-bar|react-style-singleton|use-callback-ref|use-sidecar|aria-hidden|get-nonce)\//)) return "popovers";
+					if (pkg(/node_modules\/@blocknote\//)) return "blocknote";
+					return undefined;
+				},
+			},
+		},
+	},
+
 	test: {
 		environment: "jsdom",
 		include: ["src/**/*.test.{ts,tsx}"],

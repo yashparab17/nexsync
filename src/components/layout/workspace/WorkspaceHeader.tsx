@@ -13,10 +13,11 @@ import NotificationBell from "@/components/layout/workspace/NotificationBell";
 import CatchUp from "@/components/layout/workspace/CatchUp";
 import PresenceStrip from "@/components/layout/workspace/PresenceStrip";
 import { useP2P } from "@/store/p2p/P2PContext";
-import P2PConnectDialog from "@/components/dialogs/workspace/P2PConnectDialog";
 import { cn } from "@/lib/utils";
 import { t } from "@/i18n";
 
+// Both dialogs load the first time they are opened
+const P2PConnectDialog = lazy(() => import("@/components/dialogs/workspace/P2PConnectDialog"));
 const WorkspaceSettings = lazy(() => import("@/pages/workspace/WorkspaceSettings"));
 
 // Header component for the workspace layout
@@ -84,7 +85,11 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 				</Button>
 			</div>
 
-			<P2PConnectDialog open={isP2POpen} onOpenChange={setIsP2POpen} />
+			{isP2POpen && (
+				<Suspense fallback={null}>
+					<P2PConnectDialog open onOpenChange={setIsP2POpen} />
+				</Suspense>
+			)}
 
 			{/* The popup asks before closing with unsaved edits, so Escape and a click outside are off */}
 			<Dialog isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} showCloseButton={false} isDismissable={false} isKeyboardDismissDisabled className="overflow-hidden p-0 sm:max-w-5xl">

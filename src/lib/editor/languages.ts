@@ -1,8 +1,6 @@
 // Which files are notes, which are documents for other apps, and how to highlight code
 
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { LanguageDescription, type LanguageSupport } from "@codemirror/language";
-import { languages } from "@codemirror/language-data";
+import type { LanguageSupport } from "@codemirror/language";
 
 // Rich-text notes; Markdown files are code-editor files and open in the Editor
 const NOTE_EXTENSIONS = ["txt", "text"];
@@ -38,6 +36,12 @@ export interface LoadedLanguage {
 
 // Loads the CodeMirror language for a file name; the grammar is fetched only when a file of that type is opened
 export async function loadLanguage(fileName: string): Promise<LoadedLanguage> {
+	// Imported here, not at the top, so the pages that only ask what kind of file something is do not carry CodeMirror along
+	const [{ markdown, markdownLanguage }, { LanguageDescription }, { languages }] = await Promise.all([
+		import("@codemirror/lang-markdown"),
+		import("@codemirror/language"),
+		import("@codemirror/language-data"),
+	]);
 	const ext = extensionOf(fileName);
 	if (ext === "md" || ext === "markdown") {
 		// Fenced code blocks inside Markdown get their own language highlighting
