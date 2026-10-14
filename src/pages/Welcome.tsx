@@ -125,7 +125,7 @@ export default function Welcome() {
 	};
 
 	return (
-		<div className="flex min-h-full flex-col rounded-t-xl bg-background px-8 py-6 2xl:px-16">
+		<div className="flex min-h-full flex-col rounded-t-xl bg-background outline outline-1 -outline-offset-1 outline-foreground/15 px-8 py-6 2xl:px-16">
 			<header className="flex items-center justify-between">
 				<div className="flex items-center gap-3">
 					<img src={isDark ? logo_white : logo_black} alt="" className="size-9" />

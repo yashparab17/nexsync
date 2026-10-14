@@ -281,7 +281,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 		</aside>
 
 			{/* The sidebar edge: drag it to change the width, narrow enough and it folds to icons; double-click to reset */}
-			{!expanded && <Splitter orientation="vertical" grows="right" size={shownWidth} onResize={(next) => setWidth(next === 0 ? DEFAULT_WIDTH : next)} label="Resize the sidebar" />}
+			{!expanded && <Splitter orientation="vertical" grows="right" size={shownWidth} onResize={(next) => setWidth(next === 0 ? DEFAULT_WIDTH : next)} label="Resize the sidebar" className="bg-transparent" />}
 		</div>
 	);
 }
