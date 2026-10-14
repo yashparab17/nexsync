@@ -1,4 +1,5 @@
 # Illustrations
 
-The scenes in this folder come from [unDraw](https://undraw.co) (via the MIT-licensed mirror github.com/balazser/undraw-svg-collection) and are recoloured to theme
-tokens by `scripts/recolour-art.py`, so they follow every theme. Re-run the script to change the set.
+The scenes are from [unDraw](https://undraw.co), downloaded from the site in its default colour and kept untouched in
+`scripts/undraw/`. `scripts/recolour-art.py scripts/undraw` turns them into the files here by swapping every colour for a theme
+token (the original purple becomes the accent, the rest neutrals), so they follow every theme. Re-run it to change the set.
