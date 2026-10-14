@@ -129,7 +129,8 @@ const readFolded = (): string[] => {
 };
 
 // Dragging the edge narrower than this folds the sidebar to its icons; dragging it wider opens it again
-const RAIL = 72;
+// Wide enough that a rail icon sits exactly where it does when the sidebar is open (12px nav padding + 12px item padding each side)
+const RAIL = 68;
 const COLLAPSE_BELOW = 150;
 const MIN_OPEN = 200;
 
@@ -153,8 +154,7 @@ function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; 
 				className={({ isActive }) =>
 					cn(
 						"relative flex w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
-						expanded ? "justify-start" : "justify-center",
-						isActive ? "bg-primary/10 text-primary before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:bg-primary" : "text-foreground hover:bg-muted",
+												isActive ? "bg-primary/10 text-primary before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:bg-primary" : "text-foreground hover:bg-muted",
 					)
 				}
 				title={t(item.label)}
@@ -180,8 +180,8 @@ function UserCard({ showLabels }: { showLabels: boolean }) {
 	const name = myName(workspace?.id, members.find((m) => m.role === "Owner")?.name);
 	const role = members.find((m) => m.name === name)?.role;
 	return (
-		<div className={cn("m-2 flex items-center gap-2 rounded-lg bg-muted/40 p-2", !showLabels && "flex-col")}>
-			<Avatar name={name} className="size-8 text-xs" />
+		<div className={cn("m-3 flex items-center gap-3", showLabels ? "rounded-lg bg-muted/40 p-2" : "ml-[14px]")}>
+			<Avatar name={name} className="size-10 text-sm" />
 			{showLabels && (
 				<span className="min-w-0 flex-1">
 					<span className="block truncate text-sm font-semibold">{name}</span>
@@ -228,7 +228,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 			className={cn("flex h-full shrink-0 flex-col overflow-hidden bg-sidebar", expanded && "w-64 border-r")}
 		>
 			{/* Workspace identity */}
-			<div className={cn("flex h-12 shrink-0 items-center gap-2", showLabels ? "justify-start px-3" : "justify-center")}>
+			<div className={cn("flex h-12 shrink-0 items-center gap-2", "justify-start pl-[14px]")}>
 				<Button
 					variant="ghost"
 					size="icon"
@@ -242,7 +242,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 			</div>
 
 			{/* Main Navigation */}
-			<nav aria-label={t("nav.main")} className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden", showLabels ? "gap-4 p-3" : "gap-2 p-2")}>
+			<nav aria-label={t("nav.main")} className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden", showLabels ? "gap-4 p-3" : "gap-2 p-3")}>
 				{navGroups.map((group, i) => {
 					const open = !group.label || !showLabels || !folded.includes(group.id);
 					return (
@@ -265,7 +265,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 			</nav>
 
 			{/* Bottom Navigation */}
-			<nav className={cn("flex flex-col gap-1", showLabels ? "p-3" : "p-2")}>
+			<nav className="flex flex-col gap-1 p-3">
 				{bottomNavigation.map((item) => (
 					<NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />
 				))}
@@ -276,7 +276,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 		</aside>
 
 			{/* The sidebar edge: drag it to change the width, narrow enough and it folds to icons; double-click to reset */}
-			{!expanded && <Splitter orientation="vertical" grows="right" size={shownWidth} onResize={(next) => setWidth(next === 0 ? DEFAULT_WIDTH : next)} label="Resize the sidebar" className="bg-transparent" />}
+			{!expanded && <Splitter orientation="vertical" grows="right" size={shownWidth} onResize={(next) => setWidth(next === 0 ? DEFAULT_WIDTH : next)} label="Resize the sidebar" className="bg-transparent" quiet />}
 		</div>
 	);
 }

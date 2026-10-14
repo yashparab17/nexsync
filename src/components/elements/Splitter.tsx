@@ -14,9 +14,11 @@ interface SplitterProps {
 	grows: "right" | "left" | "down" | "up";
 	label: string;
 	className?: string;
+	// No highlight on hover or while dragging (the cursor still changes)
+	quiet?: boolean;
 }
 
-export default function Splitter({ orientation, size, onResize, grows, label, className }: SplitterProps) {
+export default function Splitter({ orientation, size, onResize, grows, label, className, quiet }: SplitterProps) {
 	const drag = useRef<{ start: number; size: number } | null>(null);
 	const vertical = orientation === "vertical";
 	const sign = grows === "right" || grows === "down" ? 1 : -1;
@@ -59,7 +61,7 @@ export default function Splitter({ orientation, size, onResize, grows, label, cl
 			)}
 		>
 			{/* A wider grab area than the one-pixel line */}
-			<span className={cn("absolute transition-colors group-hover:bg-primary/40 group-focus-visible:bg-primary/60 group-active:bg-primary/60", vertical ? "-inset-x-1 inset-y-0" : "inset-x-0 -inset-y-1")} />
+			<span className={cn("absolute transition-colors", !quiet && "group-hover:bg-primary/40 group-focus-visible:bg-primary/60 group-active:bg-primary/60", vertical ? "-inset-x-1 inset-y-0" : "inset-x-0 -inset-y-1")} />
 		</div>
 	);
 }
