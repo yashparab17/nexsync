@@ -377,3 +377,7 @@ input:not([type="checkbox"], [type="radio"], [type="color"], [type="range"]):foc
 /* The edge of the page card: drawn on top of whatever a page paints, so no page can cover it */
 .window-edge { position: relative; }
 .window-edge::after { content: ""; position: absolute; inset: 0; z-index: 30; pointer-events: none; border: 1px solid var(--rule); border-radius: inherit; }
+
+/* The list a dropdown opens is drawn by the system: give it the theme's popup colours so the text can be read in every theme */
+select option, select optgroup { background-color: var(--popover); color: var(--foreground); }
+select option:checked { background-color: var(--accent); color: var(--foreground); }
