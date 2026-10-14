@@ -30,7 +30,7 @@ const en = {
 	"welcome.morningNoName": "Good morning.",
 	"welcome.afternoonNoName": "Good afternoon.",
 	"welcome.eveningNoName": "Good evening.",
-	"welcome.tour": "Take the tour",
+	"welcome.tour": "Take the Tour",
 
 	"tour.title": "Welcome to Nexsync",
 	"tour.step": "Step {current} of {total}",

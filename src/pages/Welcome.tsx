@@ -89,6 +89,8 @@ export default function Welcome() {
 
 	// The introduction opens by itself the first time, and from the link below after that
 	const [tourOpen, setTourOpen] = useState(() => !tourSeen());
+	// The folder icon opens while anything on its button is hovered or focused, not only the icon
+	const [importHot, setImportHot] = useState(false);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 
 	// Load recent workspaces on mount
@@ -208,8 +210,8 @@ export default function Welcome() {
 								</Button>
 							</JoinWorkspaceDialog>
 							<ImportWorkspaceDialog>
-								<Button variant="outline" className={tile}>
-									<AnimateIcon animateOnHover className="flex items-center gap-4">
+								<Button variant="outline" className={tile} onHoverStart={() => setImportHot(true)} onHoverEnd={() => setImportHot(false)} onFocus={() => setImportHot(true)} onBlur={() => setImportHot(false)}>
+									<AnimateIcon animate={importHot} className="flex items-center gap-4">
 										<FolderClose className="size-6 shrink-0" />
 										<span><span className="block font-semibold">Import a Folder</span><span className="block text-sm font-normal text-muted-foreground">Use files you already have</span></span>
 									</AnimateIcon>
