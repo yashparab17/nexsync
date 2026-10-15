@@ -64,8 +64,6 @@ yarn.lock
 # Research and paper (the whole folder, plus the notes)
 research/
 RESEARCH.md
-RESEARCH_PAPER.md
-LITERATURE_REVIEW.md
 HOSTLESS_SYNC_SCOPE.md
 
 # Planning and internal documentation
@@ -73,6 +71,7 @@ PROJECT_GUIDE.md
 COMMENT_STYLE_GUIDE.md
 IMPLEMENTATION_PLAN.md
 ALPHA_CHECKLIST.md
+DESIGN_STYLE.md
 nexsync-synopsis.pdf
 
 # Agent skills (installed locally)
@@ -82,6 +81,3 @@ skills-lock.json
 # Local agent notes
 CLAUDE.md
 PRODUCT.md
-
-# Local design notes (kept out of the repo)
-DESIGN_STYLE.md
