@@ -55,6 +55,8 @@ pub fn erase_record(conn: &Connection, ws_id: &str, entity: &str, id: &str) -> R
     let records = conn.execute(&format!("DELETE FROM {table} WHERE id = ?1"), [id]).map_err(err)?;
     let mut out = scrub_record(conn, entity, id)?;
     out.records = records;
+    // Comments on it go with it
+    out.journal += super::chatlog::erase_channel(conn, &format!("{entity}:{id}"))?;
     conn.execute(
         "INSERT OR REPLACE INTO tombstones (workspace_id, entity, id, deleted_at, erased) VALUES (?1, ?2, ?3, ?4, 1)",
         params![ws_id, entity, id, chrono::Utc::now().to_rfc3339()],
@@ -126,6 +128,8 @@ pub fn erase_file(db: &WorkspaceDb, workspace: &str, rel: &str, doc_ids: &[Strin
         out.journal += db.conn.execute("DELETE FROM catchup_log WHERE entity = 'file' AND target = ?1", [doc]).map_err(err)?;
     }
     out.journal += db.conn.execute("DELETE FROM catchup_log WHERE entity = 'file' AND target = ?1", [rel]).map_err(err)?;
+    // Comments on the file, or on anything inside an erased folder
+    out.journal += super::chatlog::erase_channel(&db.conn, &format!("doc:{rel}"))?;
     out.activity = db
         .conn
         .execute("DELETE FROM activity_events WHERE target = ?1 OR target = ?2", params![rel, format!("file:{rel}")])

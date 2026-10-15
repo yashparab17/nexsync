@@ -356,6 +356,115 @@ CREATE TABLE IF NOT EXISTS erased_paths (
 );
 "##,
 	},
+	Migration {
+		version: 20,
+		description: "signed log of chat messages and comments, read markers, and the notification inbox",
+		up: r##"
+CREATE TABLE IF NOT EXISTS log_entries (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    parent TEXT NOT NULL DEFAULT '',
+    author TEXT NOT NULL,
+    name TEXT NOT NULL,
+    ts INTEGER NOT NULL,
+    body TEXT NOT NULL,
+    sig TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_log_channel_ts ON log_entries (channel, ts);
+CREATE INDEX IF NOT EXISTS idx_log_parent ON log_entries (parent);
+
+CREATE TABLE IF NOT EXISTS log_read (
+    channel TEXT PRIMARY KEY,
+    last_ts INTEGER NOT NULL DEFAULT 0,
+    muted INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS inbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    reference TEXT NOT NULL DEFAULT '',
+    channel TEXT NOT NULL DEFAULT '',
+    author TEXT NOT NULL DEFAULT '',
+    snippet TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL,
+    read INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (kind, reference)
+);
+"##,
+	},
+	Migration {
+		version: 21,
+		description: "task and card writes held for an Admin",
+		up: r##"
+CREATE TABLE IF NOT EXISTS held_writes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity TEXT NOT NULL,
+    record TEXT NOT NULL,
+    path TEXT NOT NULL,
+    replica TEXT NOT NULL,
+    counter INTEGER NOT NULL,
+    by_key TEXT NOT NULL DEFAULT '',
+    who TEXT NOT NULL DEFAULT '',
+    ts INTEGER NOT NULL,
+    value TEXT NOT NULL,
+    sibling TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    held_at INTEGER NOT NULL,
+    UNIQUE (entity, record, path, replica, counter)
+);
+"##,
+	},
+	Migration {
+		version: 22,
+		description: "when this device first held each log entry, for the arrived-late marker",
+		up: r##"
+CREATE TABLE IF NOT EXISTS log_seen (
+    id TEXT PRIMARY KEY,
+    at INTEGER NOT NULL
+);
+"##,
+	},
+	Migration {
+		version: 23,
+		description: "small per-device settings of the chat log",
+		up: r##"
+CREATE TABLE IF NOT EXISTS log_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+"##,
+	},
+	Migration {
+		version: 24,
+		description: "every genuine version of the member list this device has held, so a write can be judged under the version it names",
+		up: r##"
+CREATE TABLE IF NOT EXISTS membership_history (
+    epoch INTEGER PRIMARY KEY,
+    doc TEXT NOT NULL
+);
+"##,
+	},
+	Migration {
+		version: 25,
+		description: "every value a task or card field has held on this device, for replaying how a record got its values",
+		up: r##"
+CREATE TABLE IF NOT EXISTS write_log (
+    entity TEXT NOT NULL,
+    record TEXT NOT NULL,
+    path TEXT NOT NULL,
+    replica TEXT NOT NULL,
+    counter INTEGER NOT NULL,
+    ts INTEGER NOT NULL,
+    who TEXT NOT NULL DEFAULT '',
+    by_key TEXT NOT NULL DEFAULT '',
+    value TEXT NOT NULL,
+    seen_at INTEGER NOT NULL,
+    PRIMARY KEY (entity, record, path, replica, counter)
+);
+CREATE INDEX IF NOT EXISTS idx_write_log_record ON write_log (entity, record, ts);
+"##,
+	},
 ];
 
 /// The newest schema version this build knows how to read and write

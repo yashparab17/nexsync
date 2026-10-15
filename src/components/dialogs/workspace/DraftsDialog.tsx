@@ -15,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { discardDraft, getDraft, listDrafts, mergeDraft, previewDraft, saveDraft, startDraft } from "@/lib/tauri";
 import { errorText } from "@/lib/utils";
 import { useNotifications } from "@/store/notifications/NotificationContext";
+import DiscussToggle from "@/components/elements/DiscussToggle";
+import { useChat } from "@/store/chat/ChatContext";
 import { useP2P } from "@/store/p2p/P2PContext";
 import type { Draft, DraftPreview, KanbanCard, Member, Task, TaskPriority, TaskStatus } from "@/types/workspace";
 
@@ -48,6 +50,7 @@ export default function DraftsButton({ workspacePath, entity, record, members, o
 
 function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClose }: DraftsButtonProps & { onClose: () => void }) {
 	const { publishDataChange, refreshData } = useP2P();
+	const chat = useChat();
 	const { notify } = useNotifications();
 	const [drafts, setDrafts] = useState<Draft[]>([]);
 	const [name, setName] = useState("");
@@ -292,6 +295,7 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 								</select>
 							</div>
 						</div>
+						<DiscussToggle channel={`draft:${active.id}`} canComment={chat.canPost} />
 						<div className="flex flex-wrap justify-between gap-2">
 							<Button
 								type="button"

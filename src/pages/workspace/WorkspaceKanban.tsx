@@ -32,7 +32,10 @@ import {
 	updateKanbanCard,
 } from "@/lib/tauri";
 import BoardDraftBar from "@/components/dialogs/workspace/BoardDraftBar";
+import CommentCount, { useThreadCounts } from "@/components/elements/CommentCount";
 import ConflictPanel from "@/components/elements/ConflictPanel";
+import RecordTimeline from "@/components/elements/RecordTimeline";
+import FieldDiscussion from "@/components/elements/FieldDiscussion";
 import RuleFlag from "@/components/elements/RuleFlag";
 import DraftsButton from "@/components/dialogs/workspace/DraftsDialog";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -51,6 +54,7 @@ export default function WorkspaceKanban() {
 	const members = metadata?.members.members ?? [];
 	const memberName = (id: string) => members.find((m) => m.id === id)?.name ?? "a removed member";
 	const { dataVersion, publishDataChange, viewersAt } = useP2P();
+	const threadCounts = useThreadCounts();
 	const isViewer = useIsViewer();
 	const logError = useErrorLog();
 
@@ -648,6 +652,7 @@ export default function WorkspaceKanban() {
 												<div className="flex items-start justify-between gap-2">
 													<h4 className="text-sm font-medium leading-snug text-foreground">
 														{card.title}
+														<span className="ml-1 align-middle"><CommentCount entity="card" id={card.id} legacy={card.comments?.length ?? 0} counts={threadCounts} /></span>
 														{(card.conflicts?.length ?? 0) > 0 && (
 															<AlertTriangle className="ml-1 inline size-3.5 text-warning" aria-label="Has a change to sort out" />
 														)}
@@ -907,7 +912,8 @@ export default function WorkspaceKanban() {
 							{renderCardExtras("edit-card")}
 						</div>
 
-						<ConflictPanel conflicts={editingCard.conflicts ?? []} violations={editingCard.violations} show={showValue} canChoose={!isViewer} onChoose={resolveConflict} />
+						<ConflictPanel conflicts={editingCard.conflicts ?? []} violations={editingCard.violations} show={showValue} canChoose={!isViewer} onChoose={resolveConflict} record={{ entity: "card", id: editingCard.id }} />
+						{workspace && <RecordTimeline workspacePath={workspace.path} entity="card" id={editingCard.id} title={editingCard.title} show={showValue} />}
 						{!isViewer && workspace && <DraftsButton workspacePath={workspace.path} entity="card" record={editingCard} members={members} onMerged={() => setEditingCard(null)} />}
 
 						<Comments
@@ -917,6 +923,10 @@ export default function WorkspaceKanban() {
 							canComment={!isViewer}
 							onChange={saveComments}
 						/>
+						<section aria-label="Discussion" className="space-y-1">
+							<h3 className="text-sm font-semibold">Discussion</h3>
+							<FieldDiscussion channel={`card:${editingCard.id}`} field="" canComment={!isViewer} placeholder="Say something about this card" label="Discuss this card" />
+						</section>
 
 						<DialogFooter>
 							<Button

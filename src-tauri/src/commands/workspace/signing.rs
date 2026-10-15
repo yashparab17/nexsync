@@ -34,6 +34,15 @@ pub struct Write<'a> {
 }
 
 impl Write<'_> {
+    /// The same write, naming the version of the member list it was made under. A second signature over this travels with
+    /// the first (which an older app still checks), so the version cannot be stripped or swapped without it showing.
+    pub fn payload_under(&self, epoch: u64) -> Vec<u8> {
+        let mut bytes = self.payload();
+        bytes.splice(0..b"nexsync write v1".len(), *b"nexsync write v2");
+        bytes.extend_from_slice(format!("\nlist {epoch}").as_bytes());
+        bytes
+    }
+
     /// The bytes that are signed. The prefix keeps a signature made for this purpose from being valid for any other.
     pub fn payload(&self) -> Vec<u8> {
         let Write { entity, record, path, replica, counter, ts, who, value } = self;
@@ -57,9 +66,41 @@ pub fn sign_with(key: &SecretKey, write: &Write) -> (String, String) {
     (key.public().to_string(), to_hex(&key.sign(&write.payload()).to_bytes()))
 }
 
+/// Signs the write together with the member list version it was made under
+pub fn sign_under(write: &Write, epoch: u64) -> Option<String> {
+    KEY.get().map(|key| to_hex(&key.sign(&write.payload_under(epoch)).to_bytes()))
+}
+
+/// Whether `sig` is `by`'s signature of the write made under that version of the list
+pub fn verify_under(by: &str, sig: &str, write: &Write, epoch: u64) -> bool {
+    verify_bytes(by, sig, &write.payload_under(epoch))
+}
+
 /// Signs with this device's key, if it was set
 pub fn sign(write: &Write) -> Option<(String, String)> {
     KEY.get().map(|key| sign_with(key, write))
+}
+
+/// This device's secret key, for the one thing besides signing it is used for: sealing direct messages (`dm.rs`)
+pub(crate) fn device_secret() -> Option<&'static SecretKey> {
+    KEY.get()
+}
+
+/// Signs any bytes with this device's key (the log of messages and comments uses this): the public key and the signature
+pub fn sign_bytes(payload: &[u8]) -> Option<(String, String)> {
+    KEY.get().map(|key| (key.public().to_string(), to_hex(&key.sign(payload).to_bytes())))
+}
+
+/// Whether `sig` is `by`'s signature of exactly these bytes
+pub fn verify_bytes(by: &str, sig: &str, payload: &[u8]) -> bool {
+    let Ok(public) = PublicKey::from_str(by) else { return false };
+    let Some(bytes) = from_hex(sig).and_then(|b| <[u8; Signature::LENGTH]>::try_from(b).ok()) else { return false };
+    public.verify(payload, &Signature::from_bytes(&bytes)).is_ok()
+}
+
+/// This device's public key as text, when the signing key was set
+pub fn device_key() -> Option<String> {
+    KEY.get().map(|key| key.public().to_string())
 }
 
 /// Whether `sig` is `by`'s signature of the write

@@ -506,7 +506,7 @@ export default function WorkspaceNotes() {
 							)}
 						</div>
 					</aside>
-					<Splitter orientation="vertical" size={listWidth} onResize={setListWidth} grows="right" label="Resize notes list" />
+					<Splitter orientation="vertical" size={listWidth} onResize={setListWidth} grows="right" label="Resize notes list" quiet />
 				</>
 			)}
 

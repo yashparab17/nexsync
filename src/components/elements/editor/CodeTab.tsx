@@ -12,6 +12,9 @@ import { Button } from "@/components/ui/button";
 import { useAutoSnapshot } from "@/hooks/useAutoSnapshot";
 import BranchesDialog from "@/components/dialogs/workspace/BranchesDialog";
 import SuggestEditDialog from "@/components/dialogs/workspace/SuggestEditDialog";
+import { useChat } from "@/store/chat/ChatContext";
+import { useFileComments } from "@/components/elements/editor/useFileComments";
+import { useCanComment } from "@/store/p2p/P2PContext";
 import { proposalMarks } from "@/lib/editor/proposalsView";
 import { useCollabDoc } from "@/hooks/useCollabDoc";
 import { useSeededText } from "@/hooks/useSeededText";
@@ -31,6 +34,7 @@ import { canFormat, formatCode, minimalChange } from "@/lib/editor/format";
 import type { LoadedLanguage } from "@/lib/editor/languages";
 import { hunksFromDelta, suggestRepair, type Hunk, type Suggestion } from "@/lib/editor/mergeRepair";
 import { countSyntaxErrors, errorRanges } from "@/lib/editor/syntax";
+import { canTypeCheck, firstNewError, loadTypeScript, typeErrors } from "@/lib/editor/typecheck";
 import { readWorkspaceFile, writeWorkspaceFile } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -82,6 +86,8 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 	const [problemLines, setProblemLines] = useState<number[]>([]);
 	const [notice, setNotice] = useState<string | null>(null);
 	const [mergeWarning, setMergeWarning] = useState<number | null>(null);
+	// A merge that parses but no longer type-checks: how many errors it added, where the first is, and what it says
+	const [typeWarning, setTypeWarning] = useState<{ added: number; line: number; message: string } | null>(null);
 	// The last remote change that added errors, and the repair found for it ("none" when no part of it can be kept)
 	const lastMerge = useRef<{ before: string; merged: string; hunks: Hunk[] } | null>(null);
 	const [repair, setRepair] = useState<Suggestion | "none" | null>(null);
@@ -89,7 +95,11 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 	// The part of the text a person is writing a suggestion for
 	const [suggesting, setSuggesting] = useState<{ from: number; to: number } | null>(null);
 	// Open suggestions of this file show inside the editor, for whoever has the file open
-	const suggestionMarks = useMemo(() => (collab ? [proposalMarks(collab.doc, collab.doc.getText("content"), userName, !readOnly)] : []), [collab, userName, readOnly]);
+	// Comments on the file: highlighted in the text and listed in a panel beside it
+	const canComment = useCanComment();
+	const { removedNames } = useChat();
+	const comments = useFileComments({ path, doc: mainCollab && !branch ? mainCollab.doc : null, canComment });
+	const suggestionMarks = useMemo(() => [comments.extension, ...(collab ? [proposalMarks(collab.doc, collab.doc.getText("content"), userName, !readOnly)] : [])], [collab, userName, readOnly, comments.extension]);
 	const [blame, setBlame] = useState<{ ranges: BlameRange[]; people: Contribution[] } | null>(null);
 
 	// Read the file from disk; the shared document is seeded from it the first time it is opened
@@ -192,7 +202,9 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 		const merge = lastMerge.current;
 		const support = language?.support;
 		if (!merge || !support) return;
-		setRepair(suggestRepair(merge.before, merge.hunks, { errors: (t) => countSyntaxErrors(t, support) }) ?? "none");
+		// With only a type warning showing, the repair looks for the part of their change that breaks the types
+		const byTypes = mergeWarning === null && typeWarning !== null;
+		setRepair(suggestRepair(merge.before, merge.hunks, { errors: (t) => (byTypes ? (typeErrors(fileName, t)?.length ?? null) : countSyntaxErrors(t, support)) }) ?? "none");
 	};
 
 	// Applying it is an ordinary edit, so it reaches everyone like any other
@@ -212,6 +224,7 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 			if (change.insert) ytext.insert(change.from, change.insert);
 		});
 		setRepair(null);
+		setTypeWarning(null);
 	};
 
 	const jumpToLine = (line: number) => {
@@ -287,6 +300,49 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 		ytext.observe(observer);
 		return () => ytext.unobserve(observer);
 	}, [collab, language, refreshProblems]);
+
+	// A merge can also leave code that parses but does not type-check; the compiler is loaded the first time it is needed
+	useEffect(() => {
+		if (!collab || !canTypeCheck(fileName)) return;
+		const ytext = collab.doc.getText("content");
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let previous = ytext.toString();
+		let from: string | null = null; // The text before the first change of a burst
+		let hunks: Hunk[] = [];
+		let live = true;
+		const observer = (event: Y.YTextEvent, tr: Y.Transaction) => {
+			if (tr.local) {
+				previous = ytext.toString();
+				return;
+			}
+			if (from === null) from = previous;
+			previous = ytext.toString();
+			hunks = hunksFromDelta(event.changes.delta);
+			clearTimeout(timer);
+			timer = setTimeout(async () => {
+				const before = from;
+				from = null;
+				if (before === null) return;
+				await loadTypeScript().catch(() => undefined);
+				const text = ytext.toString();
+				const a = typeErrors(fileName, before);
+				const b = typeErrors(fileName, text);
+				if (!live || !a || !b) return;
+				if (b.length > a.length) {
+					const first = firstNewError(a, b);
+					setTypeWarning({ added: b.length - a.length, line: first?.line ?? 1, message: first?.message ?? "" });
+					lastMerge.current = { before, merged: text, hunks };
+					setRepair(null);
+				}
+			}, 700);
+		};
+		ytext.observe(observer);
+		return () => {
+			live = false;
+			clearTimeout(timer);
+			ytext.unobserve(observer);
+		};
+	}, [collab, fileName]);
 
 	// Blame and contributions come from the shared document, so they are the same on every device
 	useEffect(() => {
@@ -365,7 +421,26 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 					</Button>
 				</div>
 			)}
-			{mergeWarning !== null && repair && (
+			{typeWarning !== null && mergeWarning === null && (
+				<div className="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+					<AlertTriangle className="size-3.5 shrink-0" />
+					<span className="min-w-0 flex-1">
+						A collaborator&apos;s edit merged with yours and the file no longer type-checks: {typeWarning.added} new error{typeWarning.added > 1 ? "s" : ""}. The first is on line {typeWarning.line}: {typeWarning.message}
+					</span>
+					<Button variant="ghost" size="xs" onPress={() => jumpToLine(typeWarning.line)}>
+						Show First
+					</Button>
+					{!readOnly && !repair && (
+						<Button variant="ghost" size="xs" onPress={findRepair}>
+							Find the Change
+						</Button>
+					)}
+					<Button variant="ghost" size="xs" onPress={() => { setTypeWarning(null); setRepair(null); }}>
+						Dismiss
+					</Button>
+				</div>
+			)}
+			{(mergeWarning !== null || typeWarning !== null) && repair && (
 				<div className="flex items-center gap-2 border-b border-warning/30 bg-warning/5 px-3 py-2 text-xs">
 					{repair === "none" ? (
 						<span className="min-w-0 flex-1 text-muted-foreground">No part of their change can be kept without the errors, so it needs a manual fix.</span>
@@ -394,7 +469,8 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 			)}
 
 			<div className="flex min-h-0 flex-1">
-				<div className="min-w-0 flex-1">
+				<div className="relative min-w-0 flex-1">
+					{saved !== null && collab && seeded && !branch && comments.controls}
 					{saved === null || !collab || !seeded ? (
 						<Loading fill />
 					) : (
@@ -407,7 +483,10 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 							collab={collab}
 							userName={userName}
 							minHeight="0px"
-							onReady={(view) => (viewRef.current = view)}
+							onReady={(view) => {
+								viewRef.current = view;
+								comments.onReady(view);
+							}}
 							onLanguage={setLanguage}
 							extraExtensions={suggestionMarks}
 							onCursor={(info) => onCursor?.(path, info)}
@@ -416,6 +495,8 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 						/>
 					)}
 				</div>
+
+				{!branch && comments.panel}
 
 				{showBlame && (
 					<aside className="w-64 shrink-0 space-y-4 overflow-y-auto border-l p-3 text-xs">
@@ -428,7 +509,10 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 									{blame.people.map((person) => (
 										<div key={person.author} className="space-y-1">
 											<div className="flex justify-between gap-2">
-												<span className="truncate font-medium">{person.author}</span>
+												<span className="truncate font-medium">
+													{person.author}
+													{removedNames.has(person.author) && <span className="ml-1 rounded-sm bg-destructive/15 px-1 font-mono text-[13px] text-destructive">Removed</span>}
+												</span>
 												<span className="shrink-0 text-muted-foreground">
 													{person.percent}% · {person.lines} line{person.lines === 1 ? "" : "s"}
 												</span>
@@ -477,6 +561,8 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 					onClose={() => setBranchesOpen(false)}
 				/>
 			)}
+
+			{comments.dialog}
 
 			{suggesting && collab && <SuggestEditDialog doc={collab.doc} userName={userName} from={suggesting.from} to={suggesting.to} onClose={() => setSuggesting(null)} />}
 

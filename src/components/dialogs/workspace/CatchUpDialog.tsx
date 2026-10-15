@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Check, ChevronRight, ChevronDown, History, ShieldCheck, Undo2 } from "@/components/animate-icons";
 
+import DiscussToggle from "@/components/elements/DiscussToggle";
 import { DiffView } from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogHeading } from "@/components/ui/dialog";
@@ -8,6 +9,7 @@ import { canRevertField, describe, groupByAuthor, previewText, revertValue, rowK
 import { diffLines } from "@/lib/diff";
 import { markCatchup, resolveCardConflict, resolveTaskConflict } from "@/lib/tauri";
 import { useP2P } from "@/store/p2p/P2PContext";
+import { useChat } from "@/store/chat/ChatContext";
 import type { CatchupEntry } from "@/types/workspace";
 
 interface CatchUpDialogProps {
@@ -27,6 +29,8 @@ const when = (at: number) => new Date(at).toLocaleString(undefined, { dateStyle:
 // A person's edits to one file are folded into one line, with the detail a click away, so small changes stay small.
 export default function CatchUpDialog({ workspacePath, entries, lookups, members, onChanged, onClose }: CatchUpDialogProps) {
 	const { publishDataChange, refreshData, revertTextHunk } = useP2P();
+	const chat = useChat();
+	const { removed } = chat;
 	const groups = useMemo(() => groupByAuthor(entries, members), [entries, members]);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
@@ -99,6 +103,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 						</Button>
 					)}
 				</div>
+				<DiscussToggle channel={`catchup:${e.id}`} canComment={chat.canPost} />
 				{e.kind === "text" && !hunks && <p className="text-xs text-muted-foreground">This change is too large to show here. Open the file's history to see it.</p>}
 				{hunks?.map((hunk, index) => (
 					<div key={index} className="border">
@@ -142,6 +147,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 									<div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
 										<h3 className="flex flex-wrap items-center gap-x-2 text-sm font-semibold">
 											{group.who}
+											{group.entries.some((e) => e.signer && removed.has(e.signer)) && <span className="rounded-sm bg-destructive/15 px-1 font-mono text-[13px] font-normal text-destructive">Removed</span>}
 											<span className="font-normal text-muted-foreground">
 												· {rows.length} {rows.length === 1 ? "change" : "changes"}
 											</span>

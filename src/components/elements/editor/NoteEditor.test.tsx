@@ -19,7 +19,7 @@ vi.mock("@/hooks/useCollabDoc", async () => {
 		},
 	};
 });
-vi.mock("@/store/p2p/P2PContext", () => ({ useP2P: () => ({ peers: [], selfName: null }) }));
+vi.mock("@/store/p2p/P2PContext", () => ({ useP2P: () => ({ peers: [], selfName: null }), useCanComment: () => true, useSelfRole: () => "Owner" }));
 vi.mock("@/store/workspace/WorkspaceContext", () => ({ useWorkspace: () => ({ metadata: null }) }));
 vi.mock("@/store/ThemeContext", () => ({ useThemeContext: () => ({ isDark: true }) }));
 

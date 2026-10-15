@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 
 import NotificationBell from "@/components/layout/workspace/NotificationBell";
 import { MAX_NOTIFICATIONS, NotificationProvider, useNotifications } from "./NotificationContext";
@@ -13,10 +14,12 @@ function Probe() {
 }
 const mount = () =>
 	render(
-		<NotificationProvider>
-			<Probe />
-			<NotificationBell />
-		</NotificationProvider>,
+		<MemoryRouter>
+			<NotificationProvider>
+				<Probe />
+				<NotificationBell />
+			</NotificationProvider>
+		</MemoryRouter>,
 	);
 
 describe("notifications", () => {

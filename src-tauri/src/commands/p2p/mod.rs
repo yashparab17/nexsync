@@ -6,13 +6,14 @@
 //! networking lives here in the backend; the frontend drives it through the
 //! commands below and listens to `p2p://*` events.
 
+pub mod chat;
 pub(crate) mod clock;
 mod files;
 #[cfg(test)]
 mod compat;
 #[cfg(test)]
 mod hostless_sim;
-mod membership;
+pub(crate) mod membership;
 #[cfg(test)]
 mod membership_sim;
 #[cfg(test)]

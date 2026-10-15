@@ -12,6 +12,8 @@ const en = {
 	"nav.tasks": "Tasks",
 	"nav.kanban": "Kanban",
 	"nav.insights": "Insights",
+	"nav.chat": "Chat",
+	"nav.groupTalk": "Talk",
 	"nav.groupWrite": "Write",
 	"nav.groupStorage": "Storage",
 	"nav.groupPlan": "Plan",

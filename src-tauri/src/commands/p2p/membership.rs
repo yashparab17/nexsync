@@ -27,7 +27,7 @@ use crate::database::WorkspaceDb;
 
 /// Most members one workspace can have; the merge state of a record has the same ceiling
 pub const MAX_MEMBERS: usize = 64;
-const ROLES: &[&str] = &["Admin", "Editor", "Viewer"];
+const ROLES: &[&str] = &["Admin", "Editor", "Commenter", "Viewer"];
 
 /// How long a version can be acted on after the owner signed it. A day cut the chance that a removed member got back in
 /// through a device that had not heard about it from 23% to 4% in the simulation in `hostless_sim.rs`, at the price of
@@ -262,6 +262,9 @@ pub fn store(workspace: &str, m: &Membership) -> Result<(), String> {
     db.conn
         .execute("INSERT OR REPLACE INTO membership (id, doc) VALUES (1, ?1)", [&doc])
         .map_err(|e| e.to_string())?;
+    // Kept, so a write can be judged under the version of the list it names (held.rs); the newest ones only
+    db.conn.execute("INSERT OR REPLACE INTO membership_history (epoch, doc) VALUES (?1, ?2)", rusqlite::params![m.epoch as i64, doc]).map_err(|e| e.to_string())?;
+    db.conn.execute("DELETE FROM membership_history WHERE epoch NOT IN (SELECT epoch FROM membership_history ORDER BY epoch DESC LIMIT 200)", []).map_err(|e| e.to_string())?;
     Ok(())
 }
 

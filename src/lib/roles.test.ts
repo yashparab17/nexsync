@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { bindGuestMember, canChangeRole, roleTable } from "./roles";
+import { bindGuestMember, canChangeRole, canCommentRole, canEditRole, roleTable } from "./roles";
 import type { Member } from "@/types/workspace";
 
 const owner: Member = { id: "o", name: "Owen", role: "Owner" };
@@ -18,6 +18,12 @@ describe("canChangeRole", () => {
 		expect(canChangeRole("Admin", "Editor", "Admin")).toBe(false);
 		expect(canChangeRole("Admin", "Admin", "Viewer")).toBe(false);
 		expect(canChangeRole("Admin", "Owner", "Viewer")).toBe(false);
+	});
+
+	it("lets an admin manage commenters too", () => {
+		expect(canChangeRole("Admin", "Commenter", "Viewer")).toBe(true);
+		expect(canChangeRole("Owner", "Viewer", "Commenter")).toBe(true);
+		expect(canChangeRole("Commenter", "Viewer", "Editor")).toBe(false);
 	});
 
 	it("gives editors and viewers no say", () => {
@@ -60,5 +66,15 @@ describe("roleTable", () => {
 			{ id: "b", name: "B", role: "Viewer" },
 		];
 		expect(roleTable(members)).toEqual([["d1", "Admin"]]);
+	});
+});
+
+describe("what a role may do", () => {
+	it("lets a commenter write messages and comments but not edit", () => {
+		expect(["Owner", "Admin", "Editor"].every(canEditRole)).toBe(true);
+		expect(canEditRole("Commenter")).toBe(false);
+		expect(canEditRole("Viewer")).toBe(false);
+		expect(["Owner", "Admin", "Editor", "Commenter"].every(canCommentRole)).toBe(true);
+		expect(canCommentRole("Viewer")).toBe(false);
 	});
 });

@@ -49,7 +49,7 @@ import {
 	receiveNamedVersion,
 } from "@/lib/tauri";
 import type { Member } from "@/types/workspace";
-import { bindGuestMember, canChangeRole, roleTable } from "@/lib/roles";
+import { bindGuestMember, canChangeRole, canCommentRole, canEditRole, roleTable } from "@/lib/roles";
 import { applyCatchUp, buildInventory, editDoc, updatesFor, type Inventory } from "@/lib/p2p/yjsCatchUp";
 import { replaceText, revertHunk, type TextHunk } from "@/lib/catchup";
 import { readSelfName, setSelfName } from "@/lib/p2p/selfName";
@@ -347,7 +347,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		(patch: Partial<Presence>) => {
 			const next = { ...myPresenceRef.current, ...patch };
 			const was = myPresenceRef.current;
-			if (next.page === was.page && next.item === was.item && next.away === was.away) return;
+			if (next.page === was.page && next.item === was.item && next.away === was.away && next.typing === was.typing) return;
 			myPresenceRef.current = next;
 			sharePresence();
 		},
@@ -1684,7 +1684,12 @@ export function useSelfRole(): string {
 	return me?.role ?? "Viewer";
 }
 
-// True if this device joined someone else's workspace with the Viewer role
+// True if this device may not change tasks, cards, files and notes: a Viewer, or a Commenter, who may only write messages and comments
 export function useIsViewer(): boolean {
-	return useSelfRole() === "Viewer";
+	return !canEditRole(useSelfRole());
+}
+
+// True if this device may post messages and comments (everyone but a Viewer)
+export function useCanComment(): boolean {
+	return canCommentRole(useSelfRole());
 }

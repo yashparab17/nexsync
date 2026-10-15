@@ -262,6 +262,12 @@ export const onReconnectFailed = (handler: () => void) =>
 export const onNetwork = (handler: (status: NetworkStatus) => void) =>
 	subscribe<NetworkStatus>("p2p://network", handler);
 
+// Entries of the chat and comment log arrived from another device and are stored; the app reloads what it shows
+export const onLogChanged = (handler: () => void) => subscribe<unknown>("p2p://log-changed", () => handler());
+
+// What is in force (timeouts, bans, kicks to carry out, approvals waiting) changed
+export const onModerationChanged = (handler: () => void) => subscribe<unknown>("p2p://moderation-changed", () => handler());
+
 export const onMessage = (handler: (event: IncomingMessage) => void) =>
 	subscribe<IncomingMessage>("p2p://message", handler);
 

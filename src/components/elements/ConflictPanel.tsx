@@ -2,7 +2,13 @@
 // are kept and anyone can choose), or the merged record breaks a rule the workspace turned on (nothing to choose between;
 // someone has to fix the record)
 
-import { AlertTriangle, ShieldAlert } from "@/components/animate-icons";
+import { useState } from "react";
+
+import { AlertTriangle, MessageSquareText, ShieldAlert } from "@/components/animate-icons";
+import FieldDiscussion from "@/components/elements/FieldDiscussion";
+import { buildThreads, itemChannel } from "@/lib/chat/entries";
+import { whyConflict } from "@/lib/conflictWhy";
+import { useChat } from "@/store/chat/ChatContext";
 
 import { Button } from "@/components/ui/button";
 import type { Conflict, Violation } from "@/types/workspace";
@@ -26,9 +32,24 @@ interface ConflictPanelProps {
 	show: (field: string, value: unknown) => string;
 	canChoose: boolean;
 	onChoose: (field: string, value: unknown) => void;
+	// The task or card these belong to: when given, each conflict has a short discussion, and the choice is written into it
+	record?: { entity: "task" | "card"; id: string };
 }
 
-export default function ConflictPanel({ conflicts, violations = [], show, canChoose, onChoose }: ConflictPanelProps) {
+export default function ConflictPanel({ conflicts, violations = [], show, canChoose, onChoose, record }: ConflictPanelProps) {
+	const chat = useChat();
+	const [discussing, setDiscussing] = useState<string | null>(null);
+	const channel = record ? itemChannel(record.entity, record.id) : null;
+
+	// Choosing a value says so in the discussion of that field, so the others see why it changed
+	const choose = (field: string, value: unknown) => {
+		onChoose(field, value);
+		if (!channel || !chat.canPost) return;
+		const thread = buildThreads(chat.entries, channel).find((t) => t.field === field && !t.resolved);
+		const text = `Kept “${show(field, value) || "(empty)"}”`;
+		void chat.post({ kind: "comment", channel, parent: thread?.id ?? "", body: JSON.stringify({ text, ...(thread ? {} : { field }) }) }).catch(() => {});
+	};
+
 	if (conflicts.length === 0 && violations.length === 0) return null;
 	return (
 		<>
@@ -54,7 +75,16 @@ export default function ConflictPanel({ conflicts, violations = [], show, canCho
 					</p>
 					{conflicts.map((c) => (
 						<div key={c.field} className="space-y-2">
-							<p className="text-xs font-semibold text-muted-foreground">{fieldName(c.field)}</p>
+							<div className="flex items-center justify-between gap-2">
+								<p className="text-xs font-semibold text-muted-foreground">{fieldName(c.field)}</p>
+								{channel && (
+									<button type="button" aria-expanded={discussing === c.field} onClick={() => setDiscussing(discussing === c.field ? null : c.field)} className="flex cursor-pointer items-center gap-1 font-mono text-[13px] text-muted-foreground hover:text-foreground">
+										<MessageSquareText className="size-3.5" aria-hidden />
+										Discuss
+									</button>
+								)}
+							</div>
+							<p className="text-xs text-muted-foreground">{whyConflict(c.options, (v) => show(c.field, v))}</p>
 							<ul className="space-y-2">
 								{c.options.map((o, i) => (
 									<li key={i} className="flex items-center justify-between gap-2 border border-border/60 bg-background px-2 py-2 text-sm">
@@ -68,13 +98,14 @@ export default function ConflictPanel({ conflicts, violations = [], show, canCho
 											</span>
 										</span>
 										{canChoose && (
-											<Button type="button" size="sm" variant={i === 0 ? "default" : "outline"} onPress={() => onChoose(c.field, o.value)}>
+											<Button type="button" size="sm" variant={i === 0 ? "default" : "outline"} onPress={() => choose(c.field, o.value)}>
 												Keep This
 											</Button>
 										)}
 									</li>
 								))}
 							</ul>
+							{channel && discussing === c.field && <FieldDiscussion channel={channel} field={c.field} canComment={chat.canPost} />}
 						</div>
 					))}
 				</section>

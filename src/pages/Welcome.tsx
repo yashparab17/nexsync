@@ -5,7 +5,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { AnimateIcon, Settings as SettingsIcon, UsersRound, FolderClose, FolderPlus, HardDrive, Lock, UserX } from "@/components/animate-icons";
+import { AnimateIcon, Settings as SettingsIcon, UsersRound, FolderClose, FolderPlus } from "@/components/animate-icons";
 
 // Hooks
 import { useThemeContext } from "@/store/ThemeContext";
@@ -229,15 +229,6 @@ export default function Welcome() {
 									</div>
 								))}
 							</dl>
-						</section>
-
-						<section className="flex flex-col gap-3">
-							<h2 className="font-mono text-xs text-muted-foreground">Your Data</h2>
-							<ul className="flex flex-col gap-2 text-sm text-muted-foreground">
-								<li className="flex gap-3"><HardDrive className="size-4 shrink-0 text-primary" />Files stay as plain files in folders you choose.</li>
-								<li className="flex gap-3"><Lock className="size-4 shrink-0 text-primary" />Connections between devices are end-to-end encrypted.</li>
-								<li className="flex gap-3"><UserX className="size-4 shrink-0 text-primary" />No account and no server holds your work.</li>
-							</ul>
 						</section>
 					</aside>
 				</div>

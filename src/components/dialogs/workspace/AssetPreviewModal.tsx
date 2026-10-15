@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Check, ChevronRight, Copy, Download, FileText, Film, Headphones, History, Image as ImageIcon, Maximize2, Minimize2, Pencil, RefreshCw, Sparkles, Trash2, Volume2, X } from "@/components/animate-icons";
 
@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import Loading from "@/components/Loading";
 import PdfViewer from "@/components/elements/PdfViewer";
+import FieldDiscussion from "@/components/elements/FieldDiscussion";
+import { buildThreads, docChannel } from "@/lib/chat/entries";
+import { useChat } from "@/store/chat/ChatContext";
+import { useIsViewer } from "@/store/p2p/P2PContext";
 
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { displaySize } from "@/lib/assets/displaySize";
@@ -54,6 +58,24 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClose, onDownloadLazy, onStep, position, onHistory, onRename, onDelete }: AssetPreviewModalProps) {
+	const isViewer = useIsViewer();
+	const chat = useChat();
+	// Comments pinned to a place in a picture
+	const [pinMode, setPinMode] = useState(false);
+	const [draftPoint, setDraftPoint] = useState<{ x: number; y: number } | null>(null);
+	const [openPin, setOpenPin] = useState<string | null>(null);
+	const [box, setBox] = useState<{ left: number; top: number; w: number; h: number } | null>(null);
+	const imgRef = useRef<HTMLImageElement>(null);
+	const pins = useMemo(() => (asset ? buildThreads(chat.entries, docChannel(asset.path)).filter((t) => t.point && !t.resolved) : []), [chat.entries, asset]);
+	const measure = () => {
+		const el = imgRef.current;
+		if (el) setBox({ left: el.offsetLeft, top: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
+	};
+	useEffect(() => {
+		setPinMode(false);
+		setDraftPoint(null);
+		setOpenPin(null);
+	}, [asset?.path]);
 	const [dataUrl, setDataUrl] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -70,6 +92,13 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 	}, []);
 	const [fit, setFit] = useState(true);
 	const [isSyncing, setIsSyncing] = useState(false);
+	useEffect(() => {
+		const el = imgRef.current;
+		if (!el) return;
+		const watcher = new ResizeObserver(measure);
+		watcher.observe(el);
+		return () => watcher.disconnect();
+	}, [dataUrl, fit, asset?.path]);
 
 	useEffect(() => {
 		setDimensions(null);
@@ -187,6 +216,18 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 				</dl>
 			</section>
 
+			<section className="space-y-1">
+				<h3 className="font-mono text-xs text-muted-foreground">Comments</h3>
+				{isImage && !isViewer && (
+					<Button variant={pinMode ? "default" : "outline"} size="sm" aria-pressed={pinMode} onPress={() => setPinMode((v) => !v)}>
+						{pinMode ? "Click the picture to place a comment" : "Pin a comment on the picture"}
+					</Button>
+				)}
+				{draftPoint && <FieldDiscussion channel={docChannel(asset.path)} field="" point={draftPoint} canComment placeholder="Comment on this spot" label="Comment on this spot" onPosted={() => setDraftPoint(null)} />}
+				{openPin && !draftPoint && <FieldDiscussion channel={docChannel(asset.path)} field="" threadId={openPin} canComment={!isViewer} placeholder={`Reply to comment ${pins.findIndex((p) => p.id === openPin) + 1}`} label="Reply" />}
+				<FieldDiscussion channel={docChannel(asset.path)} field="" canComment={!isViewer} placeholder="Comment on this file" label="Comment on this file" />
+			</section>
+
 			<section className="space-y-2">
 				<div className="flex items-center justify-between">
 					<h3 className="font-mono text-xs text-muted-foreground">{isImage ? "Markdown embed" : "Markdown link"}</h3>
@@ -274,14 +315,22 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 								<>
 									{isImage && (
 										<img
+											ref={imgRef}
 											src={dataUrl}
 											alt={asset.name}
+											onClick={(e) => {
+												if (!pinMode || isViewer) return;
+												const r = e.currentTarget.getBoundingClientRect();
+												setDraftPoint({ x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) });
+												setOpenPin(null);
+											}}
 											onLoad={(e) => {
+												measure();
 												const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
 												setDimensions({ width: w, height: h });
 												if (w > 0 && h > 0) setMedia({ w, h });
 											}}
-											className={cn("m-auto", fit ? "max-h-full max-w-full object-contain" : "max-w-none")}
+											className={cn("m-auto", pinMode && "cursor-crosshair", fit ? "max-h-full max-w-full object-contain" : "max-w-none")}
 										/>
 									)}
 									{isVideo && (
@@ -317,6 +366,26 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 								</>
 							)}
 						</div>
+						{isImage && box && (
+							<div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden={pins.length === 0}>
+								{pins.map((t, i) => (
+									<button
+										key={t.id}
+										type="button"
+										aria-label={`Comment ${i + 1}`}
+										onClick={() => {
+											setOpenPin(t.id);
+											setDraftPoint(null);
+										}}
+										style={{ left: box.left + t.point!.x * box.w, top: box.top + t.point!.y * box.h }}
+										className={cn("pointer-events-auto absolute flex size-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-primary font-mono text-[13px] text-primary-foreground ring-2 ring-background", openPin === t.id && "ring-warning")}
+									>
+										{i + 1}
+									</button>
+								))}
+								{draftPoint && <span style={{ left: box.left + draftPoint.x * box.w, top: box.top + draftPoint.y * box.h }} className="absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-warning ring-2 ring-background" />}
+							</div>
+						)}
 						{canZoom && (
 							<Button variant="outline" size="sm" onPress={() => setFit((f) => !f)} aria-pressed={!fit} className="absolute right-3 bottom-3 bg-background">
 								{fit ? <Maximize2 data-icon="inline-start" className="size-4" /> : <Minimize2 data-icon="inline-start" className="size-4" />}

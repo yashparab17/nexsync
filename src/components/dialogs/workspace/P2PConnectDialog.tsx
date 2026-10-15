@@ -151,6 +151,7 @@ export default function P2PConnectDialog({
 
 	const roles = [
 		{ id: "Editor", title: "Can edit", text: "Changes files, notes and tasks with you." },
+		{ id: "Commenter", title: "Can comment", text: "Reads everything and joins the chat and comment threads, but changes nothing." },
 		{ id: "Viewer", title: "Can view", text: "Reads everything, changes nothing." },
 	];
 

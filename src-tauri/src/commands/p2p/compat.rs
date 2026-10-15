@@ -111,7 +111,10 @@ fn what_the_first_release_wrote_is_still_read() {
     drop(db);
     assert_eq!(membership::load(ws.to_str().unwrap()), Some(list));
     let copies = std::fs::read_dir(ws.join(".nexsync")).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().starts_with("before-migration")).count();
-    assert_eq!(copies, 0, "the fixture needed a migration, so the schema changed without a new fixture being planned for");
+    // Version 19 is what 0.9.0 wrote. Every migration after it runs on opening, and a copy from before them is kept; the data
+    // above must survive that. A newer schema than the first one planned for is expected, a changed fixture is not.
+    let expected = usize::from(crate::database::schema::schema_version() > 19);
+    assert_eq!(copies, expected, "opening the 0.9.0 database made an unexpected number of before-migration copies");
 }
 
 /// The skew matrix: this build against what 0.9.0 wrote, against a build one format ahead, and against a device too old

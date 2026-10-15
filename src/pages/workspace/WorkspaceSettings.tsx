@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Trash2, AlertTriangle, Download, FolderOpen, Save, SlidersHorizontal, Undo2, User } from "@/components/animate-icons";
@@ -17,7 +17,8 @@ import { useErrorLog } from "@/hooks/useErrorLog";
 import { useLeaveWorkspace } from "@/hooks/useLeaveWorkspace";
 import { exportFolders } from "@/lib/export";
 import { cleanPath, errorText } from "@/lib/utils";
-import { removeRecentWorkspace, writeWorkspaceMetadata } from "@/lib/tauri";
+import { chatGetHistoryLimit, chatSetHistoryLimit, heldReviewGet, heldReviewSet, removeRecentWorkspace, writeWorkspaceMetadata } from "@/lib/tauri";
+import { useChat } from "@/store/chat/ChatContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
 
@@ -36,6 +37,21 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 	// Only the workspace owner may change settings; a joined copy's local edits would just
 	// get overwritten by the next full snapshot pull anyway, same rule as the Members page.
 	const isJoinedCopy = selfName !== null;
+	const chat = useChat();
+	// With the two-person rule on, deleting waits for another Admin to approve the request (a guard against a slip or a
+	// stolen session; the Owner can still remove the folder by hand, since it is theirs)
+	const twoState = chat.moderation.state;
+	const deleteAsked = twoState.awaiting.some((p) => p.action === "delete");
+	const deleteApproved = twoState.deleteApprovedAt > 0 && Date.now() - twoState.deleteApprovedAt < 24 * 3_600_000;
+	const deleteBlocked = twoState.requireTwo && !deleteApproved;
+	// How many messages per channel this device gives to a device that has none of them
+	const [history, setHistory] = useState(200);
+	const [review, setReview] = useState(false);
+	useEffect(() => {
+		if (!workspace?.path) return;
+		void chatGetHistoryLimit(workspace.path).then(setHistory).catch(() => {});
+		void heldReviewGet(workspace.path).then(setReview).catch(() => {});
+	}, [workspace?.path]);
 
 	const [name, setName] = useState(workspace?.name || "");
 	const [description, setDescription] = useState(
@@ -209,6 +225,36 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					<Row title="Share changes live" hint="Let collaborators connect and see changes live">
 						<input type="checkbox" aria-label="Share changes live" checked={sync} disabled={isJoinedCopy} onChange={(e) => setSync(e.target.checked)} />
 					</Row>
+					<Row title="Review changes before they apply" hint="Other people's changes to tasks and cards wait for you to accept them. Turn it off while joining a workspace">
+						<input
+							type="checkbox"
+							aria-label="Review changes before they apply"
+							checked={review}
+							onChange={(e) => {
+								setReview(e.target.checked);
+								if (workspace?.path) void heldReviewSet(workspace.path, e.target.checked).catch(() => {});
+							}}
+						/>
+					</Row>
+					<Row title="Chat history for new members" hint="Messages per channel this device gives to a device that has none of them yet">
+						<select
+							aria-label="Chat history for new members"
+							value={history}
+							onChange={(e) => {
+								const n = Number(e.target.value);
+								setHistory(n);
+								if (workspace?.path) void chatSetHistoryLimit(workspace.path, n).catch(() => {});
+							}}
+							className="h-9 cursor-pointer rounded-md bg-input px-2 text-sm"
+						>
+							{[50, 200, 1000, 5000].map((n) => (
+								<option key={n} value={n}>
+									Last {n}
+								</option>
+							))}
+							{![50, 200, 1000, 5000].includes(history) && <option value={history}>Last {history}</option>}
+						</select>
+					</Row>
 				</SectionCard>
 
 				{workspace && <RulesCard workspacePath={workspace.path} />}
@@ -271,10 +317,15 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 								</Button>
 							</Row>
 						) : (
-							<Row title="Delete workspace" hint="Moves it to the recycle bin. Collaborators keep their copies">
-								<Button variant="destructive" size="sm" onPress={() => setIsDeleteOpen(true)}>
+							<Row title="Delete workspace" hint={deleteBlocked ? "The two-person rule is on: another Admin must approve first. Collaborators keep their copies" : "Moves it to the recycle bin. Collaborators keep their copies"}>
+								<Button
+									variant="destructive"
+									size="sm"
+									isDisabled={deleteBlocked && deleteAsked}
+									onPress={() => (deleteBlocked ? void chat.act({ action: "delete" }) : setIsDeleteOpen(true))}
+								>
 									<Trash2 className="size-3.5" />
-									Delete
+									{deleteBlocked ? (deleteAsked ? "Waiting for a second Admin" : "Ask for approval") : "Delete"}
 								</Button>
 							</Row>
 						)}

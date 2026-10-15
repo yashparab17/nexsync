@@ -1,15 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { SquareKanban as KanbanSquare, Clock, Code2, Compass, File, FileText, ListTodo, X } from "@/components/animate-icons";
+import { SquareKanban as KanbanSquare, Clock, Code2, Compass, File, FileText, ListTodo, MessageSquareText, X } from "@/components/animate-icons";
 
 import { cn } from "@/lib/utils";
 import { isBinaryFile, isDocumentFile, isNoteFile } from "@/lib/editor/languages";
 import { getKanban, getTasks, searchWorkspaceFiles } from "@/lib/tauri";
+import { chatHits, hitTitle } from "@/lib/chat/search";
+import { channelLabel, routeForChannel } from "@/lib/chat/routes";
+import { useChat } from "@/store/chat/ChatContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
 interface Hit {
 	key: string;
-	kind: "Note" | "Code" | "File" | "Asset" | "Task" | "Card" | "Go to";
+	kind: "Note" | "Code" | "File" | "Asset" | "Task" | "Card" | "Message" | "Comment" | "Go to";
 	title: string;
 	sub: string;
 	to: string;
@@ -28,7 +31,7 @@ export function snippet(text: string, q: string): string {
 	return (s > 0 ? "…" : "") + text.slice(s, i + q.length + 60).replace(/\s+/g, " ");
 }
 
-const ICONS = { Note: FileText, Code: Code2, File, Asset: File, Task: ListTodo, Card: KanbanSquare, "Go to": Compass };
+const ICONS = { Note: FileText, Code: Code2, File, Asset: File, Task: ListTodo, Card: KanbanSquare, Message: MessageSquareText, Comment: MessageSquareText, "Go to": Compass };
 
 // Pages the palette can jump to
 const PAGES: [string, string][] = [
@@ -36,6 +39,7 @@ const PAGES: [string, string][] = [
 	["Notes", "/workspace/notes"],
 	["Tasks", "/workspace/tasks"],
 	["Kanban board", "/workspace/kanban"],
+	["Chat", "/workspace/chat"],
 	["Editor", "/workspace/editor"],
 	["Explorer", "/workspace/explorer"],
 	["Files", "/workspace/files"],
@@ -47,7 +51,7 @@ const PAGES: [string, string][] = [
 ];
 const COMMANDS: Hit[] = PAGES.map(([title, to]) => ({ key: `go:${to}`, kind: "Go to", title, sub: "Open page", to }));
 
-const FILTERS = ["All", "Note", "Task", "Card", "Code", "File", "Asset", "Go to"] as const;
+const FILTERS = ["All", "Note", "Task", "Card", "Message", "Comment", "Code", "File", "Asset", "Go to"] as const;
 type Filter = (typeof FILTERS)[number];
 
 // Where in an item the words must be found
@@ -80,6 +84,7 @@ function writeRecent(workspaceId: string | undefined, hit: Hit) {
 // Header search: matches file names, task and kanban card titles/descriptions
 export default function WorkspaceSearch() {
 	const { workspace } = useWorkspace();
+	const chat = useChat();
 	const navigate = useNavigate();
 	const [query, setQuery] = useState("");
 	const [index, setIndex] = useState<Hit[]>([]);
@@ -131,9 +136,16 @@ export default function WorkspaceSearch() {
 		]);
 	};
 
+	// Messages and comments, as they read now; found by their words (the title is only their first line)
+	const chatIndex = useMemo(
+		() =>
+			chatHits(chat.entries, chat.people).map((h): Hit => ({ key: `c:${h.id}`, kind: h.kind, title: hitTitle(h, chat.people), sub: `${channelLabel(h.channel)} · ${h.name}`, to: routeForChannel(h.channel), body: h.text })),
+		[chat.entries, chat.people],
+	);
+
 	const q = query.trim().toLowerCase();
 	const results = q
-		? [...COMMANDS, ...index]
+		? [...COMMANDS, ...index, ...chatIndex]
 				.filter((h) => filter === "All" || h.kind === filter)
 				.map((h) => {
 					const inTitle = h.title.toLowerCase().includes(q);

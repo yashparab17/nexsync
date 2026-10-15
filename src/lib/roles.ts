@@ -2,14 +2,20 @@ import { freeName } from "@/lib/memberNames";
 import type { Member } from "@/types/workspace";
 
 // Roles a member can be set to. Owner belongs to whoever created the workspace and is never handed out.
-export const ASSIGNABLE_ROLES = ["Admin", "Editor", "Viewer"] as const;
+export const ASSIGNABLE_ROLES = ["Admin", "Editor", "Commenter", "Viewer"] as const;
+
+// Whether a role may change tasks, cards, files and notes. A Commenter reads everything and writes messages and comments only.
+export const canEditRole = (role: string): boolean => role === "Owner" || role === "Admin" || role === "Editor";
+
+// Whether a role may post messages and comments: everyone but a Viewer
+export const canCommentRole = (role: string): boolean => role !== "Viewer";
 
 // Whether `actor` may change a member currently holding `target` to `next`.
 // The Owner manages everyone; an Admin manages Editors and Viewers but cannot create or touch other Admins.
 export function canChangeRole(actor: string, target: string, next: string): boolean {
 	if (!(ASSIGNABLE_ROLES as readonly string[]).includes(next)) return false;
 	if (actor === "Owner") return target !== "Owner";
-	if (actor === "Admin") return (target === "Editor" || target === "Viewer") && next !== "Admin";
+	if (actor === "Admin") return (target === "Editor" || target === "Commenter" || target === "Viewer") && next !== "Admin";
 	return false;
 }
 

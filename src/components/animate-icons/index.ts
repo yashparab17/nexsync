@@ -225,3 +225,16 @@ export const ListChecks = fromHandle(SrcListChecksIcon);
 export const Quote = fromHandle(SrcQuoteIcon);
 export const Code = fromHandle(SrcCodeIcon);
 export const Table = fromHandle(SrcTableIcon);
+
+// Chat and moderation: lucide icons Animate UI has no hand-built version of, each playing one small motion
+import { BellRing as LBellRing, ClipboardCheck as LClipboardCheck, CornerUpLeft as LCornerUpLeft, MessageSquare as LMessageSquare, MessageSquarePlus as LMessageSquarePlus, MessagesSquare as LMessagesSquare, Paperclip as LPaperclip, SendHorizontal as LSendHorizontal, SmilePlus as LSmilePlus, Timer as LTimer } from 'lucide-react';
+export const BellRing = motionIcon(LBellRing, 'tilt');
+export const ClipboardCheck = motionIcon(LClipboardCheck, 'pop');
+export const CornerUpLeft = motionIcon(LCornerUpLeft, 'slide');
+export const MessageSquare = motionIcon(LMessageSquare, 'pop');
+export const MessageSquarePlus = motionIcon(LMessageSquarePlus, 'pop');
+export const MessagesSquare = motionIcon(LMessagesSquare, 'pop');
+export const Paperclip = motionIcon(LPaperclip, 'tilt');
+export const SendHorizontal = motionIcon(LSendHorizontal, 'slide');
+export const SmilePlus = motionIcon(LSmilePlus, 'pop');
+export const Timer = motionIcon(LTimer, 'tilt');

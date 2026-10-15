@@ -1,5 +1,5 @@
 // React
-import { AnimateIcon, Code2, Files, FolderClose, FolderTree, ListTodo, StickyNote } from "@/components/animate-icons";
+import { AnimateIcon, Code2, Files, FolderClose, FolderTree, ListTodo, MessageSquareText, StickyNote } from "@/components/animate-icons";
 import { useCallback, useState, type ElementType } from "react";
 
 // React Router
@@ -19,6 +19,7 @@ import { myName } from "@/lib/p2p/selfName";
 import PresenceDots from "@/components/elements/PresenceDots";
 import { pageOf } from "@/lib/p2p/presence";
 import { useP2P } from "@/store/p2p/P2PContext";
+import { useChat } from "@/store/chat/ChatContext";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -71,6 +72,12 @@ const navigation: NavigationItem[] = [
 		icon: FolderClose,
 	},
 	{
+		name: "Chat",
+		label: "nav.chat",
+		path: "/workspace/chat",
+		icon: MessageSquareText,
+	},
+	{
 		name: "Tasks",
 		label: "nav.tasks",
 		path: "/workspace/tasks",
@@ -90,6 +97,7 @@ const byPath = (path: string) => navigation.find((item) => item.path === path)!;
 // items, then planning
 const navGroups: { id: string; label?: MessageKey; items: NavigationItem[] }[] = [
 	{ id: "top", items: [byPath("/workspace"), byPath("/workspace/explorer")] },
+	{ id: "talk", label: "nav.groupTalk", items: [byPath("/workspace/chat")] },
 	{ id: "write", label: "nav.groupWrite", items: [byPath("/workspace/notes"), byPath("/workspace/editor")] },
 	{ id: "storage", label: "nav.groupStorage", items: [byPath("/workspace/files"), byPath("/workspace/assets")] },
 	{ id: "plan", label: "nav.groupPlan", items: [byPath("/workspace/tasks"), byPath("/workspace/kanban")] },
@@ -138,6 +146,8 @@ const MIN_OPEN = 200;
 function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; expanded: boolean; onNavigate?: () => void }) {
 	const Icon = item.icon;
 	const { viewersAt } = useP2P();
+	const { totalUnread } = useChat();
+	const badge = item.path === "/workspace/chat" ? totalUnread : 0;
 	const page = pageOf(item.path);
 	const [hot, setHot] = useState(false);
 
@@ -162,6 +172,11 @@ function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; 
 			>
 				<Icon className="size-5 shrink-0" aria-hidden />
 				<span className={cn("whitespace-nowrap", expanded ? "inline" : "hidden")}>{t(item.label)}</span>
+				{badge > 0 && (
+					<span className={cn("flex items-center justify-center rounded-full bg-destructive font-mono text-[13px] font-bold text-white", expanded ? "ml-auto h-5 min-w-5 px-1.5" : "absolute right-1.5 top-1.5 size-2.5")} aria-label={`${badge} unread`}>
+						{expanded ? (badge > 99 ? "99+" : badge) : ""}
+					</span>
+				)}
 				{page && (
 					<span className={cn("ml-auto", !expanded && "hidden")}>
 						<PresenceDots names={viewersAt(page)} />

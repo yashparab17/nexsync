@@ -17,8 +17,12 @@ import HostHandoffDialog from "@/components/dialogs/workspace/HostHandoffDialog"
 import TransferTray from "@/components/layout/workspace/TransferTray";
 import HostGate from "@/components/layout/workspace/HostGate";
 import DueReminders from "@/components/layout/workspace/DueReminders";
+import FollowWatch from "@/components/layout/workspace/FollowWatch";
 import ShortcutsDialog from "@/components/dialogs/workspace/ShortcutsDialog";
 import { shortcutFor } from "@/lib/shortcuts";
+import { ChatProvider } from "@/store/chat/ChatContext";
+import { ModerationExecutor, RejoinWatch, TimeoutBanner } from "@/components/moderation/ModerationRuntime";
+import ReviewBanner from "@/components/moderation/ReviewBanner";
 
 // Shell layout for all workspace sub-routes
 export default function Workspace() {
@@ -77,6 +81,7 @@ export default function Workspace() {
 	}
 
 	return (
+		<ChatProvider>
 		<div className="flex h-full">
 			{/* Sidebar */}
 			<div className="hidden h-full md:block">
@@ -97,6 +102,8 @@ export default function Workspace() {
 			<div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-xl bg-background window-edge">
 				{/* Header */}
 				<WorkspaceHeader onOpenMenu={() => setNavOpen(true)} menuOpen={navOpen} />
+				<TimeoutBanner />
+				<ReviewBanner />
 
 				{/* Page content */}
 				<div className="min-h-0 flex-1 overflow-hidden">
@@ -108,8 +115,13 @@ export default function Workspace() {
 
 			{help && <ShortcutsDialog onClose={() => setHelp(false)} />}
 
+			{/* Takes people off the member list when an Admin kicked or the Owner banned them */}
+			<ModerationExecutor />
+			<RejoinWatch />
+
 			{/* Warns about work due today or late, whichever page is open */}
 			<DueReminders />
+			<FollowWatch />
 
 			{/* Guests joining with a short code wait here for the host to allow them */}
 			<JoinRequestDialog />
@@ -126,5 +138,6 @@ export default function Workspace() {
 			{/* Holds the screen while a workspace that needs its host waits for it */}
 			<HostGate />
 		</div>
+		</ChatProvider>
 	);
 }

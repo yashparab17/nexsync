@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { followPath, lastSeenText, pageOf, parsePresence, placeLabel, probeText, skewText, whoIsAt, type PeerPresence } from "@/lib/p2p/presence";
+import { whoIsTyping, followPath, lastSeenText, pageOf, parsePresence, placeLabel, probeText, skewText, whoIsAt, type PeerPresence } from "@/lib/p2p/presence";
 
 describe("presence messages", () => {
 	it("accepts a known page and drops anything else", () => {
@@ -61,5 +61,15 @@ describe("saying where", () => {
 		expect(skewText(-3 * 3_600_000)).toBe("3 hours behind");
 		expect(skewText(86_400_000)).toBe("1 day ahead");
 		expect(skewText(3 * 86_400_000)).toBe("3 days ahead");
+	});
+});
+
+describe("typing", () => {
+	it("reads the channel being typed in and counts it only briefly", () => {
+		expect(parsePresence('{"page":"chat","typing":"general"}')).toEqual({ page: "chat", item: null, away: false, typing: "general" });
+		expect(parsePresence('{"page":"chat","typing":7}')).toEqual({ page: "chat", item: null, away: false });
+		const all = { Ana: { page: "chat", item: null, away: false, typing: "general", at: 1_000 }, Bo: { page: "chat", item: null, away: false, typing: "ideas", at: 1_000 } };
+		expect(whoIsTyping(all, "general", 2_000)).toEqual(["Ana"]);
+		expect(whoIsTyping(all, "general", 20_000)).toEqual([]);
 	});
 });

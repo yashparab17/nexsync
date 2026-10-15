@@ -879,6 +879,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
 dependencies = [
  "generic-array",
+ "rand_core 0.6.4",
  "typenum",
 ]
 
@@ -3441,9 +3442,11 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 name = "nexsync"
 version = "0.9.0"
 dependencies = [
+ "aes-gcm",
  "base64 0.22.1",
  "blake3",
  "chrono",
+ "curve25519-dalek",
  "data-encoding",
  "dirs 5.0.1",
  "iroh",
@@ -3455,6 +3458,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "strum 0.26.3",
  "subtle",
  "tauri",

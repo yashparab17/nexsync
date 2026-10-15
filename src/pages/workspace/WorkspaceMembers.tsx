@@ -1,6 +1,6 @@
 import { MAX_WORKSPACE_NAME } from "@/lib/validation";
 import { useState } from "react";
-import { Activity, Trash2, Crown, KeyRound, Pencil, Shield, ShieldCheck, UserCheck, UserPlus, Plus } from "@/components/animate-icons";
+import { Activity, Trash2, Crown, KeyRound, MessageSquareText, Pencil, Shield, ShieldAlert, ShieldCheck, UserCheck, UserPlus, Plus } from "@/components/animate-icons";
 
 import { Page, PageBody, Panel } from "@/components/layout/Page";
 import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
@@ -21,6 +21,10 @@ import { cleanName, nameProblem } from "@/lib/memberNames";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useSelfRole } from "@/store/p2p/P2PContext";
 import P2PConnectDialog from "@/components/dialogs/workspace/P2PConnectDialog";
+import ModerateDialog from "@/components/moderation/ModerateDialog";
+import ModerationPanel from "@/components/moderation/ModerationPanel";
+import { canModerate, timeLeft } from "@/lib/moderation";
+import { useChat } from "@/store/chat/ChatContext";
 import type { Member } from "@/types/workspace";
 
 const ROLE_CONFIG: Record<
@@ -42,6 +46,12 @@ const ROLE_CONFIG: Record<
 	Editor: {
 		label: "Editor",
 		icon: Shield,
+		color: "text-info",
+		bg: "bg-info/10 border-info/20",
+	},
+	Commenter: {
+		label: "Commenter",
+		icon: MessageSquareText,
 		color: "text-info",
 		bg: "bg-info/10 border-info/20",
 	},
@@ -68,6 +78,9 @@ export default function WorkspaceMembers() {
 	const [editName, setEditName] = useState("");
 
 	const [deletingMember, setDeletingMember] = useState<Member | null>(null);
+	// The member being timed out, kicked or banned
+	const [moderating, setModerating] = useState<Member | null>(null);
+	const chat = useChat();
 	const [submitting, setSubmitting] = useState(false);
 	// A guest changing the name they go by in this workspace; the host applies it
 	const [renameOpen, setRenameOpen] = useState(false);
@@ -97,6 +110,8 @@ export default function WorkspaceMembers() {
 		try {
 			setHandoffBusy(true);
 			setHandoffError(null);
+			// Written while this device is still the Owner, which is who may sign it
+			await chat.act({ action: "handoff", target: hostTarget.deviceId, targetName: hostTarget.name }).catch(() => {});
 			await transferHost(hostTarget.deviceId);
 			setHostTarget(null);
 		} catch (err) {
@@ -197,6 +212,10 @@ export default function WorkspaceMembers() {
 				undefined,
 				"member",
 			);
+			// The change is written in the moderation log, signed by whoever made it
+			if (editingMember.deviceId && !isOwner && editRole !== editingMember.role) {
+				await chat.act({ action: "role", target: editingMember.deviceId, targetName: name, role: editRole }).catch(() => {});
+			}
 			setEditingMember(null);
 			await refreshMetadata();
 		} catch (err) {
@@ -242,7 +261,7 @@ export default function WorkspaceMembers() {
 	};
 
 	// Discord-style: people grouped under their role, highest first; a role the app does not know counts as Viewer
-	const roleGroups = ["Owner", "Admin", "Editor", "Viewer"]
+	const roleGroups = ["Owner", "Admin", "Editor", "Commenter", "Viewer"]
 		.map((role) => ({ role, list: members.filter((m) => (ROLE_CONFIG[m.role] ? m.role : "Viewer") === role) }))
 		.filter((g) => g.list.length > 0);
 
@@ -328,6 +347,10 @@ export default function WorkspaceMembers() {
 																{here && !here.away && ` · ${placeLabel(here)}`}
 															</span>
 														)}
+														{(() => {
+															const out = member.deviceId ? chat.moderation.state.timeouts.find((t) => t.key === member.deviceId) : undefined;
+															return out ? <span className="text-xs text-warning" title={out.reason || undefined}>Timed out for {timeLeft(out.until)}</span> : null;
+														})()}
 														{isOnline && peer?.appVersion && (
 															<span className="text-xs text-muted-foreground">v{peer.appVersion}</span>
 														)}
@@ -403,15 +426,26 @@ export default function WorkspaceMembers() {
 		<Crown className="size-3.5 text-muted-foreground hover:text-warning" />
 	</Button>
 )}
-{!isOwner && !isJoinedCopy && (
+{member.deviceId && !isYou && canModerate(selfRole, member.role) ? (
 														<Button
 															variant="ghost"
 															size="icon-xs"
-															onPress={() => setDeletingMember(member)}
-															aria-label="Remove Member"
+															onPress={() => setModerating(member)}
+															aria-label={`Moderate ${member.name}`}
 														>
-															<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+															<ShieldAlert className="size-3.5 text-muted-foreground hover:text-destructive" />
 														</Button>
+													) : (
+														!isOwner && !isJoinedCopy && (
+															<Button
+																variant="ghost"
+																size="icon-xs"
+																onPress={() => setDeletingMember(member)}
+																aria-label="Remove Member"
+															>
+																<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+															</Button>
+														)
 													)}
 												</div>
 											)}
@@ -424,7 +458,7 @@ export default function WorkspaceMembers() {
 					</div>
 				</Panel>
 
-				<Panel index="02" title="Roles" className="self-start">
+				<Panel index="02" title="Roles" className="self-start lg:row-span-2">
 					<div className="space-y-4 text-sm">
 							<div className="border-l-2 border-border py-1 pl-4">
 								<div className="flex items-center gap-2 font-semibold text-warning">
@@ -458,6 +492,16 @@ export default function WorkspaceMembers() {
 							</div>
 
 							<div className="border-l-2 border-border py-1 pl-4">
+								<div className="flex items-center gap-2 font-semibold text-info">
+									<MessageSquareText className="size-3.5" />
+									Commenter
+								</div>
+								<p className="mt-1 text-muted-foreground">
+									Reads everything and writes in chat and comment threads, but changes nothing else.
+								</p>
+							</div>
+
+							<div className="border-l-2 border-border py-1 pl-4">
 								<div className="flex items-center gap-2 font-semibold text-success">
 									<UserCheck className="size-3.5" />
 									Viewer
@@ -468,6 +512,7 @@ export default function WorkspaceMembers() {
 							</div>
 					</div>
 				</Panel>
+				{(selfRole === "Owner" || selfRole === "Admin") && <ModerationPanel />}
 			</PageBody>
 
 			{/* Real P2P WebRTC Connection & E2EE Handshake Dialog */}
@@ -659,6 +704,8 @@ export default function WorkspaceMembers() {
 )}
 
 {/* Remove Member Confirmation Dialog */}
+			{moderating && <ModerateDialog member={moderating} selfRole={selfRole} onClose={() => setModerating(null)} />}
+
 			{deletingMember && (
 				<Dialog
 					isOpen={!!deletingMember}

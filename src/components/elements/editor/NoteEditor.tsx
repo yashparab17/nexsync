@@ -7,6 +7,11 @@ import RichTextEditor from "./RichTextEditor";
 import NoteSidePanel from "./NoteSidePanel";
 import BranchesDialog from "@/components/dialogs/workspace/BranchesDialog";
 import SuggestEditDialog from "@/components/dialogs/workspace/SuggestEditDialog";
+import { buildThreads, docChannel, threadsMarkdown } from "@/lib/chat/entries";
+import { plainPreview } from "@/lib/chat/preview";
+import { useChat } from "@/store/chat/ChatContext";
+import { useFileComments } from "@/components/elements/editor/useFileComments";
+import { useCanComment } from "@/store/p2p/P2PContext";
 import { proposalMarks } from "@/lib/editor/proposalsView";
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
@@ -92,9 +97,13 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 	const linkExtensions = useMemo(() => wikiLinks((target) => openLinkRef.current(target)), []);
 	// Open suggestions show inside the editor for whoever has the note open; the button writes a new one
 	const [suggesting, setSuggesting] = useState<{ from: number; to: number } | null>(null);
+	// Comments on the note: highlighted in the text, listed in a panel beside it (Markdown notes only; they are shared text)
+	const canComment = useCanComment();
+	const chat = useChat();
+	const comments = useFileComments({ path: docId ?? fileName, doc: isMarkdown && mainCollab && !branch ? mainCollab.doc : null, canComment });
 	const markdownExtensions = useMemo(
-		() => [linkExtensions, ...(collab ? [proposalMarks(collab.doc, collab.doc.getText("content"), userName, !readOnly)] : [])],
-		[linkExtensions, collab, userName, readOnly],
+		() => [linkExtensions, comments.extension, ...(collab ? [proposalMarks(collab.doc, collab.doc.getText("content"), userName, !readOnly)] : [])],
+		[linkExtensions, comments.extension, collab, userName, readOnly],
 	);
 	const goToLine = (line: number) => {
 		const view = viewRef.current;
@@ -117,7 +126,9 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 	const save = useCallback(async () => {
 		if (saving || readOnly || !dirty || branch) return;
 		// A live Markdown document is the truth; the rich editor reports plain text as it changes
-		const text = isMarkdown && collab ? collab.doc.getText("content").toString() : content;
+		const body = isMarkdown && collab ? collab.doc.getText("content").toString() : content;
+		// The comments go at the end, so an exported note keeps what was said about it
+		const text = body + threadsMarkdown(buildThreads(chat.entries, docChannel(docId ?? fileName)), (c) => plainPreview(c, chat.people, 100_000));
 		try {
 			setSaving(true);
 			await onSave(text);
@@ -288,7 +299,8 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 			)}
 
 			<div className="flex min-h-0 flex-1">
-				<div className="min-h-0 min-w-0 flex-1">
+				<div className="relative min-h-0 min-w-0 flex-1">
+				{isMarkdown && !branch && collab && seeded && comments.controls}
 				{isMarkdown ? (
 					!collab || !seeded ? (
 						<Loading fill />
@@ -302,7 +314,10 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 							collab={collab}
 							userName={userName}
 							minHeight="0px"
-							onReady={(view) => (viewRef.current = view)}
+							onReady={(view) => {
+								viewRef.current = view;
+								comments.onReady(view);
+							}}
 							extraExtensions={markdownExtensions}
 						/>
 					)
@@ -320,6 +335,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 					/>
 				)}
 				</div>
+				{!branch && comments.panel}
 				{panelOpen && notes && onOpenNote && workspacePath && (
 					<NoteSidePanel
 						workspacePath={workspacePath}
@@ -337,6 +353,8 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 					{exportNotice.text}
 				</p>
 			)}
+
+			{comments.dialog}
 
 			{suggesting && collab && <SuggestEditDialog doc={collab.doc} userName={userName} from={suggesting.from} to={suggesting.to} onClose={() => setSuggesting(null)} />}
 

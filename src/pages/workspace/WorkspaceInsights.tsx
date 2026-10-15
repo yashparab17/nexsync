@@ -5,6 +5,9 @@ import Avatar from "@/components/elements/Avatar";
 import { BarRows, DayColumns, Donut, Empty, Heatmap, MonthCalendar, SERIES, Stat, StackBar } from "@/components/elements/charts";
 import { Page, PageBody, Panel } from "@/components/layout/Page";
 import Toolbar, { ToolbarTitle, ToolbarSearch, ToolbarTabs } from "@/components/layout/Toolbar";
+import ModerationLog from "@/components/moderation/ModerationLog";
+import { moderationLog } from "@/lib/moderation";
+import { useChat } from "@/store/chat/ChatContext";
 import {
 	authorOf,
 	countBy,
@@ -38,7 +41,9 @@ export default function WorkspaceInsights() {
 
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [columns, setColumns] = useState<KanbanColumn[]>([]);
-	const [tab, setTab] = useState<"overview" | "activity">("overview");
+	const [tab, setTab] = useState<"overview" | "activity" | "moderation">("overview");
+	const chat = useChat();
+	const moderated = useMemo(() => moderationLog(chat.entries).length, [chat.entries]);
 	const [filter, setFilter] = useState<ActivityFilter>({});
 	const set = (patch: ActivityFilter) => setFilter((f) => ({ ...f, ...patch }));
 
@@ -77,12 +82,13 @@ export default function WorkspaceInsights() {
 					tabs={[
 						{ key: "overview", label: "Overview" },
 						{ key: "activity", label: "Activity", count: events.length },
+						{ key: "moderation", label: "Moderation", count: moderated },
 					]}
 				/>
 				<span className="flex-1" />
 				{tab === "overview" ? (
 					<span className="text-sm text-muted-foreground">Latest {events.length} actions{events.some((e) => !e.author) ? " · some older ones have no name" : ""}</span>
-				) : (
+				) : tab === "moderation" ? null : (
 					<>
 						<ToolbarSearch label="Search activity" placeholder="Search activity" value={filter.query ?? ""} onChange={(query) => set({ query })} />
 						<select aria-label="Person" value={filter.author ?? ""} onChange={(e) => set({ author: e.target.value || undefined })} className={select}>
@@ -192,6 +198,8 @@ export default function WorkspaceInsights() {
 							{byKind.length === 0 ? <Empty>Nothing recorded yet.</Empty> : <Donut label="Actions by part of the app" parts={byKind.slice(0, SERIES.length).map(([label, value]) => ({ label, value }))} center={<><span className="text-xl font-semibold tabular-nums">{events.length}</span><span className="text-sm text-muted-foreground">actions</span></>} />}
 						</Panel>
 					</div>
+				) : tab === "moderation" ? (
+					<ModerationLog />
 				) : feed.length === 0 ? (
 					<Empty>{events.length === 0 ? "No activity yet." : "Nothing matches these filters."}</Empty>
 				) : (
@@ -203,6 +211,7 @@ export default function WorkspaceInsights() {
 									<div className="min-w-0 flex-1">
 										<p className="truncate">
 											<span className="font-medium">{e.author ?? formatAction(e.action)}</span>
+											{e.author && chat.removedNames.has(e.author) && <span className="ml-1 rounded-sm bg-destructive/15 px-1 font-mono text-[13px] text-destructive">Removed</span>}
 											{e.author && <span className="text-muted-foreground"> {formatAction(e.action).toLowerCase()}</span>}
 										</p>
 										<p className="truncate text-muted-foreground">{e.detail}</p>

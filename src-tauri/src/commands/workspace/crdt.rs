@@ -48,6 +48,12 @@ pub struct Sibling {
     pub by: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sig: Option<String>,
+    /// The version of the signed member list the writer held, and a second signature that covers it. Older apps keep both
+    /// as unknown fields and pass them on; a write without them is judged by the newest list alone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ep: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sig2: Option<String>,
     /// Anything a newer version of the app added to a write: kept and passed on untouched, so an older app never drops it
     #[serde(flatten, default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extra: BTreeMap<String, Value>,
@@ -183,7 +189,7 @@ impl RecordState {
         let mut state = RecordState::default();
         state.vv.insert(LEGACY.to_string(), 0);
         for (path, value) in values {
-            state.fields.insert(path, vec![Sibling { dot: Dot { r: LEGACY.to_string(), c: 0 }, ts, value, who: None, by: None, sig: None, extra: BTreeMap::new() }]);
+            state.fields.insert(path, vec![Sibling { dot: Dot { r: LEGACY.to_string(), c: 0 }, ts, value, who: None, by: None, sig: None, ep: None, sig2: None, extra: BTreeMap::new() }]);
         }
         state
     }
@@ -193,7 +199,7 @@ impl RecordState {
         let c = self.vv.get(replica).copied().unwrap_or(0) + 1;
         self.vv.insert(replica.to_string(), c);
         let ts = now.max(self.max_ts() + 1);
-        self.fields.insert(path.to_string(), vec![Sibling { dot: Dot { r: replica.to_string(), c }, ts, value, who: who.map(str::to_string), by: None, sig: None, extra: BTreeMap::new() }]);
+        self.fields.insert(path.to_string(), vec![Sibling { dot: Dot { r: replica.to_string(), c }, ts, value, who: who.map(str::to_string), by: None, sig: None, ep: None, sig2: None, extra: BTreeMap::new() }]);
     }
 
     /// Makes the record read as `desired`, writing only the paths that differ; returns whether anything was written.
@@ -225,6 +231,19 @@ impl RecordState {
             changed = true;
         }
         changed
+    }
+
+    /// Takes one write into the record as it is, without asking whether this device has already seen it: for a write that was
+    /// held and is now accepted (see `held.rs`). It sits beside whatever the path holds, so a concurrent write shows as a conflict.
+    pub fn adopt(&mut self, path: &str, sibling: Sibling) {
+        let list = self.fields.entry(path.to_string()).or_default();
+        if list.iter().any(|s| s.dot == sibling.dot) {
+            return;
+        }
+        let seen = self.vv.entry(sibling.dot.r.clone()).or_insert(0);
+        *seen = (*seen).max(sibling.dot.c);
+        list.push(sibling);
+        list.sort_by(|x, y| x.dot.cmp(&y.dot));
     }
 
     /// Combines two copies of the same record
@@ -268,10 +287,15 @@ impl RecordState {
     }
 
     /// Signs the writes this replica has made that are not signed yet, with this device's key
-    pub fn sign_own(&mut self, entity: &str, id: &str, replica: &str) {
+    /// `epoch` is the version of the member list this device holds (0 when it holds none); it is signed into the write.
+    pub fn sign_own(&mut self, entity: &str, id: &str, replica: &str, epoch: u64) {
         for (path, siblings) in self.fields.iter_mut() {
             for s in siblings.iter_mut().filter(|s| s.dot.r == replica && s.sig.is_none()) {
                 if let Some((by, sig)) = super::signing::sign(&Self::write_of(entity, id, path, s)) {
+                    if epoch > 0 {
+                        s.sig2 = super::signing::sign_under(&Self::write_of(entity, id, path, s), epoch);
+                        s.ep = s.sig2.as_ref().map(|_| epoch);
+                    }
                     s.by = Some(by);
                     s.sig = Some(sig);
                 }
@@ -285,7 +309,16 @@ impl RecordState {
         self.fields.iter().all(|(path, siblings)| {
             siblings.iter().all(|s| match (&s.by, &s.sig) {
                 (None, None) => true,
-                (Some(by), Some(sig)) => super::signing::verify(by, sig, &Self::write_of(entity, id, path, s)),
+                (Some(by), Some(sig)) => {
+                    let w = Self::write_of(entity, id, path, s);
+                    super::signing::verify(by, sig, &w)
+                        && match (s.ep, &s.sig2) {
+                            (None, None) => true,
+                            (Some(ep), Some(sig2)) => super::signing::verify_under(by, sig2, &w, ep),
+                            // A version without its signature, or a signature without its version, was tampered with
+                            _ => false,
+                        }
+                }
                 _ => false,
             })
         })
@@ -585,14 +618,66 @@ pub fn load(conn: &Connection, entity: &str, id: &str) -> Result<Option<RecordSt
     Ok(text.and_then(|t| serde_json::from_str(&t).ok()))
 }
 
+/// Most writes kept in the replay log of one record
+const WRITE_LOG_KEEP: i64 = 600;
+
 pub fn save(conn: &Connection, entity: &str, id: &str, state: &RecordState) -> Result<(), String> {
     let text = serde_json::to_string(state).map_err(|e| e.to_string())?;
-    conn.execute("INSERT OR REPLACE INTO crdt_meta (entity, id, state) VALUES (?1, ?2, ?3)", params![entity, id, text])
-        .map(|_| ())
-        .map_err(db_err)
+    conn.execute("INSERT OR REPLACE INTO crdt_meta (entity, id, state) VALUES (?1, ?2, ?3)", params![entity, id, text]).map_err(db_err)?;
+    log_writes(conn, entity, id, state)
+}
+
+/// Remembers every write the state holds, so that the values a field had before it was overwritten can be replayed
+fn log_writes(conn: &Connection, entity: &str, id: &str, state: &RecordState) -> Result<(), String> {
+    let now = now_ms() as i64;
+    let mut stmt = conn
+        .prepare_cached("INSERT OR IGNORE INTO write_log (entity, record, path, replica, counter, ts, who, by_key, value, seen_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)")
+        .map_err(db_err)?;
+    for (path, siblings) in &state.fields {
+        for s in siblings {
+            stmt.execute(params![entity, id, path, s.dot.r, s.dot.c as i64, s.ts as i64, s.who.clone().unwrap_or_default(), s.by.clone().unwrap_or_default(), s.value.to_string(), now]).map_err(db_err)?;
+        }
+    }
+    conn.execute(
+        "DELETE FROM write_log WHERE entity = ?1 AND record = ?2 AND rowid NOT IN (SELECT rowid FROM write_log WHERE entity = ?1 AND record = ?2 ORDER BY ts DESC, rowid DESC LIMIT ?3)",
+        params![entity, id, WRITE_LOG_KEEP],
+    )
+    .map(|_| ())
+    .map_err(db_err)
+}
+
+/// One value a field held, for the replay of a record
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoggedWrite {
+    pub path: String,
+    pub ts: u64,
+    pub who: String,
+    pub by: String,
+    pub replica: String,
+    /// The value, as JSON text
+    pub value: String,
+    /// When this device first held the write: a write held long after its stamp was made while apart
+    pub seen_at: u64,
+}
+
+/// Every write kept for a record, oldest first
+pub fn write_history(conn: &Connection, entity: &str, id: &str) -> Result<Vec<LoggedWrite>, String> {
+    let mut stmt = conn.prepare("SELECT path, ts, who, by_key, replica, value, seen_at FROM write_log WHERE entity = ?1 AND record = ?2 ORDER BY ts ASC, counter ASC").map_err(db_err)?;
+    let rows = stmt
+        .query_map(params![entity, id], |r| Ok(LoggedWrite { path: r.get(0)?, ts: r.get::<_, i64>(1)? as u64, who: r.get(2)?, by: r.get(3)?, replica: r.get(4)?, value: r.get(5)?, seen_at: r.get::<_, i64>(6)? as u64 }))
+        .map_err(db_err)?;
+    rows.collect::<Result<_, _>>().map_err(db_err)
+}
+
+#[tauri::command]
+pub fn record_history(app: tauri::AppHandle, path: String, entity: String, id: String) -> Result<Vec<LoggedWrite>, String> {
+    crate::commands::config::validate_allowed_root(&app, &path)?;
+    write_history(&crate::database::WorkspaceDb::open_existing(&path)?.conn, &entity, &id)
 }
 
 pub fn forget(conn: &Connection, entity: &str, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM write_log WHERE entity = ?1 AND record = ?2", params![entity, id]).map_err(db_err)?;
     conn.execute("DELETE FROM crdt_meta WHERE entity = ?1 AND id = ?2", params![entity, id]).map(|_| ()).map_err(db_err)
 }
 
@@ -620,7 +705,7 @@ pub fn apply_local<T: Crdt>(conn: &Connection, row: &T, existing: Option<&T>, ba
         None => existing.map(|e| RecordState::from_legacy(e.paths(false), ts_of(e.updated_at()))).unwrap_or_default(),
     };
     state.diff_write_from(&replica, &row.paths(false), base.map(|b| b.paths(false)).as_ref(), now_ms(), who);
-    state.sign_own(T::ENTITY, row.id(), &replica);
+    state.sign_own(T::ENTITY, row.id(), &replica, super::held::list_epoch(conn));
     save(conn, T::ENTITY, row.id(), &state)?;
     let mut out = T::materialize(existing.unwrap_or(row), &state.resolved());
     out.set_updated_at(rfc3339_of(state.max_ts()));
@@ -633,7 +718,7 @@ pub fn resolve_field<T: Crdt>(conn: &Connection, base: &T, field: &str, value: V
     let Some(mut state) = load(conn, T::ENTITY, base.id())? else { return Ok(None) };
     let replica = replica_id(conn)?;
     state.write(&replica, field, value, now_ms(), who);
-    state.sign_own(T::ENTITY, base.id(), &replica);
+    state.sign_own(T::ENTITY, base.id(), &replica, super::held::list_epoch(conn));
     save(conn, T::ENTITY, base.id(), &state)?;
     let mut row = T::materialize(base, &state.resolved());
     row.set_updated_at(rfc3339_of(state.max_ts()));
@@ -643,7 +728,7 @@ pub fn resolve_field<T: Crdt>(conn: &Connection, base: &T, field: &str, value: V
 /// The record a peer's copy turns this device's copy into, or `None` if the peer has nothing this device lacks.
 /// The state is saved; the caller writes the returned record into the row.
 pub fn merge_remote<T: Crdt>(conn: &Connection, remote: &T, local: Option<&T>, valid: impl Fn(&T) -> bool) -> Result<Option<T>, String> {
-    let theirs = remote.crdt().cloned().unwrap_or_else(|| RecordState::from_legacy(remote.paths(false), ts_of(remote.updated_at())));
+    let mut theirs = remote.crdt().cloned().unwrap_or_else(|| RecordState::from_legacy(remote.paths(false), ts_of(remote.updated_at())));
     // A write whose signature does not check out was altered, or never made by the key it names: the record is refused
     if !theirs.signatures_ok(T::ENTITY, remote.id()) {
         eprintln!("[sync] Refused {} {}: a write in it is not signed by the device it names", T::ENTITY, remote.id());
@@ -653,6 +738,46 @@ pub fn merge_remote<T: Crdt>(conn: &Connection, remote: &T, local: Option<&T>, v
     if !theirs.stamps_sane(now_ms()) {
         eprintln!("[sync] Refused {} {}: a write in it is stamped more than a day ahead of this device's clock", T::ENTITY, remote.id());
         return Ok(None);
+    }
+    // A write signed by a key that may not write is kept apart for an Admin, not merged (see `held.rs`)
+    let gate = super::held::Gate::load(conn, now_ms());
+    if gate.listed || gate.review {
+        // With review on, a write this device has not seen is also kept apart (the ones it already holds are not)
+        let known: std::collections::HashSet<(String, u64)> = if gate.review {
+            match load(conn, T::ENTITY, remote.id())? {
+                Some(s) => s,
+                None => local.map(|l| RecordState::from_legacy(l.paths(false), ts_of(l.updated_at()))).unwrap_or_default(),
+            }
+            .fields
+            .values()
+            .flatten()
+            .map(|s| (s.dot.r.clone(), s.dot.c))
+            .collect()
+        } else {
+            Default::default()
+        };
+        let mut held = Vec::new();
+        for (path, siblings) in theirs.fields.iter_mut() {
+            siblings.retain(|s| match if gate.listed { gate.verdict_of(s) } else { super::held::Verdict::Allow }.or_review(gate.review && !known.contains(&(s.dot.r.clone(), s.dot.c))) {
+                super::held::Verdict::Hold(why) => {
+                    held.push((path.clone(), s.clone(), why));
+                    false
+                }
+                // The write names a version of the member list under which its key could not write: nothing to keep
+                super::held::Verdict::Refuse(why) => {
+                    eprintln!("[sync] Dropped a write to {} {}: {why}", T::ENTITY, remote.id());
+                    false
+                }
+                super::held::Verdict::Allow => true,
+            });
+        }
+        theirs.fields.retain(|_, siblings| !siblings.is_empty());
+        for (path, sibling, why) in &held {
+            super::held::hold(conn, T::ENTITY, remote.id(), path, sibling, why, now_ms())?;
+        }
+        if !held.is_empty() && theirs.fields.is_empty() && local.is_none() {
+            return Ok(None);
+        }
     }
     let ours = match load(conn, T::ENTITY, remote.id())? {
         Some(s) => Some(s),
@@ -715,6 +840,25 @@ mod tests {
         s.write(replica, "title", val("t0"), 10, None);
         s.write(replica, "status", val("todo"), 10, None);
         s
+    }
+
+    #[test]
+    fn an_overwritten_value_stays_in_the_replay_log_until_the_record_is_forgotten() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::database::schema::init_schema(&conn).unwrap();
+        let mut s = base("a");
+        save(&conn, "task", "t1", &s).unwrap();
+        s.write("a", "title", val("second"), 20, Some("Ana"));
+        save(&conn, "task", "t1", &s).unwrap();
+        s.write("b", "title", val("third"), 30, Some("Bo"));
+        save(&conn, "task", "t1", &s).unwrap();
+        save(&conn, "task", "t1", &s).unwrap();
+        let log = write_history(&conn, "task", "t1").unwrap();
+        let titles: Vec<&str> = log.iter().filter(|w| w.path == "title").map(|w| w.value.as_str()).collect();
+        assert_eq!(titles, vec!["\"t0\"", "\"second\"", "\"third\""]);
+        assert!(write_history(&conn, "task", "other").unwrap().is_empty());
+        forget(&conn, "task", "t1").unwrap();
+        assert!(write_history(&conn, "task", "t1").unwrap().is_empty());
     }
 
     #[test]

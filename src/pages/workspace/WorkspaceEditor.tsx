@@ -592,7 +592,7 @@ export default function WorkspaceEditor() {
 								}}
 							/>
 						</div>
-						<Splitter orientation="vertical" grows="right" size={explorerWidth} onResize={setExplorerWidth} label="Resize the explorer" />
+						<Splitter orientation="vertical" grows="right" size={explorerWidth} onResize={setExplorerWidth} label="Resize the explorer" quiet />
 					</>
 				)}
 
@@ -671,7 +671,7 @@ export default function WorkspaceEditor() {
 									</div>
 								);
 							})}
-							{(rightPath || previewOpen) && <Splitter orientation="vertical" grows="right" size={splitWidth} onResize={setSplitWidth} label="Resize the split" className="[grid-column:2] [grid-row:1]" />}
+							{(rightPath || previewOpen) && <Splitter orientation="vertical" grows="right" size={splitWidth} onResize={setSplitWidth} label="Resize the split" quiet className="[grid-column:2] [grid-row:1]" />}
 							{previewOpen && (
 								<div style={{ gridColumn: 3, gridRow: 1 }} className="min-h-0 min-w-0 border-l bg-background">
 									<MarkdownPreview text={rightText} notes={noteRefs} />
@@ -682,7 +682,7 @@ export default function WorkspaceEditor() {
 
 					{/* Always mounted, so the shells in the terminal keep running while the panel is hidden */}
 					<div className={showPanel ? "contents" : "hidden"}>
-						<Splitter orientation="horizontal" grows="up" size={panelHeight} onResize={setPanelHeight} label="Resize the panel" />
+						<Splitter orientation="horizontal" grows="up" size={panelHeight} onResize={setPanelHeight} label="Resize the panel" quiet />
 						<div style={{ height: panelHeight }} className="shrink-0">
 							<EditorPanel
 								ref={terminalRef}

@@ -19,7 +19,10 @@ import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
 import { createTask, deleteTask, eraseRecordForGood, getTasks, resolveTaskConflict, updateTask } from "@/lib/tauri";
 import EraseOption from "@/components/elements/EraseOption";
+import CommentCount, { useThreadCounts } from "@/components/elements/CommentCount";
 import ConflictPanel from "@/components/elements/ConflictPanel";
+import RecordTimeline from "@/components/elements/RecordTimeline";
+import FieldDiscussion from "@/components/elements/FieldDiscussion";
 import RuleFlag from "@/components/elements/RuleFlag";
 import DraftsButton from "@/components/dialogs/workspace/DraftsDialog";
 import { cn } from "@/lib/utils";
@@ -91,6 +94,7 @@ export default function WorkspaceTasks() {
 	const members = metadata?.members.members ?? [];
 	const memberName = (id: string) => members.find((m) => m.id === id)?.name ?? "a removed member";
 	const { dataVersion, publishDataChange, viewersAt } = useP2P();
+	const threadCounts = useThreadCounts();
 	const isViewer = useIsViewer();
 	const logError = useErrorLog();
 
@@ -542,6 +546,7 @@ export default function WorkspaceTasks() {
 										<span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
 											<span className={cn("text-sm font-medium [overflow-wrap:anywhere]", task.status === "done" && "text-muted-foreground line-through")}>{task.title}</span>
 											<PresenceDots names={viewersAt("tasks", task.id)} doing="editing this task" />
+											<CommentCount entity="task" id={task.id} legacy={task.comments?.length ?? 0} counts={threadCounts} />
 											{(task.conflicts?.length ?? 0) > 0 && (
 												<span title="Two people changed this at the same time" className="text-warning">
 													<AlertTriangle className="size-3.5" aria-label="Has a change to sort out" />
@@ -752,7 +757,8 @@ export default function WorkspaceTasks() {
 							{renderExtras("edit")}
 						</div>
 
-						<ConflictPanel conflicts={editingTask.conflicts ?? []} violations={editingTask.violations} show={showValue} canChoose={!isViewer} onChoose={resolveConflict} />
+						<ConflictPanel conflicts={editingTask.conflicts ?? []} violations={editingTask.violations} show={showValue} canChoose={!isViewer} onChoose={resolveConflict} record={{ entity: "task", id: editingTask.id }} />
+						{workspace && <RecordTimeline workspacePath={workspace.path} entity="task" id={editingTask.id} title={editingTask.title} show={showValue} />}
 						{!isViewer && workspace && <DraftsButton workspacePath={workspace.path} entity="task" record={editingTask} members={members} onMerged={() => setEditingTask(null)} />}
 
 						<Comments
@@ -762,6 +768,10 @@ export default function WorkspaceTasks() {
 							canComment={!isViewer}
 							onChange={saveComments}
 						/>
+						<section aria-label="Discussion" className="space-y-1">
+							<h3 className="text-sm font-semibold">Discussion</h3>
+							<FieldDiscussion channel={`task:${editingTask.id}`} field="" canComment={!isViewer} placeholder="Say something about this task" label="Discuss this task" />
+						</section>
 
 						<DialogFooter>
 							<Button

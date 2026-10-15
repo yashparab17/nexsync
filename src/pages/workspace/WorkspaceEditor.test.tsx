@@ -27,6 +27,8 @@ vi.mock("@/store/workspace/WorkspaceContext", () => ({
 
 vi.mock("@/store/p2p/P2PContext", () => ({
 	useIsViewer: () => false,
+	useCanComment: () => true,
+	useSelfRole: () => "Owner",
 	useP2P: () => ({
 		viewersAt: () => [],
 		setMyPresence: () => {},

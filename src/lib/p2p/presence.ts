@@ -3,12 +3,13 @@
 import type { ProbeResult } from "@/lib/p2p/transport";
 
 // Pages a person can be on; anything else a peer sends is ignored, since following sends this device there
-const PAGES = ["dashboard", "notes", "editor", "explorer", "files", "assets", "tasks", "kanban", "insights", "members", "trash", "settings"] as const;
+const PAGES = ["dashboard", "notes", "editor", "explorer", "files", "assets", "tasks", "kanban", "chat", "insights", "members", "trash", "settings"] as const;
 
 export interface Presence {
 	page: string; // One of PAGES
 	item: string | null; // The file path, card id or task id open on that page
 	away: boolean; // No input for a while
+	typing?: string; // The chat channel being typed in, for a few seconds at a time
 }
 
 export interface PeerPresence extends Presence {
@@ -27,7 +28,8 @@ export function parsePresence(payload: string | undefined): Presence | null {
 		const p = JSON.parse(payload ?? "") as Partial<Presence> | null;
 		if (!p || typeof p.page !== "string" || !(PAGES as readonly string[]).includes(p.page)) return null;
 		if (p.item != null && (typeof p.item !== "string" || p.item.length > 300)) return null;
-		return { page: p.page, item: p.item ?? null, away: p.away === true };
+		const typing = typeof p.typing === "string" && p.typing.length > 0 && p.typing.length <= 80 ? { typing: p.typing } : {};
+		return { page: p.page, item: p.item ?? null, away: p.away === true, ...typing };
 	} catch {
 		return null;
 	}
@@ -53,6 +55,16 @@ export function placeLabel(p: Presence): string {
 export function followPath(p: Presence): string {
 	const base = p.page === "dashboard" ? "/workspace" : `/workspace/${p.page}`;
 	return p.item ? `${base}?open=${encodeURIComponent(p.item)}` : base;
+}
+
+// How long a "typing" notice counts after it arrived: the sender clears it, but a device that went away cannot
+export const TYPING_MS = 8 * 1000;
+
+// Names of those typing in a channel right now
+export function whoIsTyping(all: Record<string, PeerPresence>, channel: string, now = Date.now()): string[] {
+	return Object.entries(all)
+		.filter(([, p]) => p.typing === channel && now - p.at < TYPING_MS)
+		.map(([who]) => who);
 }
 
 // Who is on a page, or has one item open; an away person still counts as being there

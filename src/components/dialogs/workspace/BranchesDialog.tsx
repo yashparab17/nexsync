@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import * as Y from "yjs";
 import { GitBranch, GitMerge } from "@/components/animate-icons";
 
+import DiscussToggle from "@/components/elements/DiscussToggle";
 import { DiffView } from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogHeading } from "@/components/ui/dialog";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { branchDocId, closeBranch, listBranches, mergeBranch, previewMerge, startBranch, MAX_BRANCH_NAME, type Branch } from "@/lib/branches";
 import { diffLines, type DiffResult } from "@/lib/diff";
 import { getYjsDoc, saveYjsDoc } from "@/lib/tauri";
+import { useChat } from "@/store/chat/ChatContext";
 
 interface BranchesDialogProps {
 	workspacePath: string;
@@ -34,6 +36,7 @@ const when = (at: number) => new Date(at).toLocaleString();
 
 // Branches of one file: start one, work on it away from the file, then review what it would change and merge it
 export default function BranchesDialog({ workspacePath, fileName, doc, userName, canEdit, activeId, onOpenBranch, onClose }: BranchesDialogProps) {
+	const chat = useChat();
 	const [branches, setBranches] = useState(() => listBranches(doc));
 	const [name, setName] = useState("");
 	const [review, setReview] = useState<Review | "missing" | null>(null);
@@ -197,6 +200,9 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 											<Button size="sm" variant="outline" onPress={() => void openReview(b)} isDisabled={busy}>
 												{b.status === "open" ? "Review" : "See Changes"}
 											</Button>
+										</div>
+										<div className="basis-full">
+											<DiscussToggle channel={`branch:${b.id}`} canComment={chat.canPost} />
 										</div>
 									</li>
 								))}

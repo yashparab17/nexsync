@@ -14,6 +14,7 @@ const WorkspaceNotes = lazy(() => import("@/pages/workspace/WorkspaceNotes"));
 const WorkspaceAssets = lazy(() => import("@/pages/workspace/WorkspaceAssets"));
 const WorkspaceTasks = lazy(() => import("@/pages/workspace/WorkspaceTasks"));
 const WorkspaceKanban = lazy(() => import("@/pages/workspace/WorkspaceKanban"));
+const WorkspaceChat = lazy(() => import("@/pages/workspace/WorkspaceChat"));
 const WorkspaceInsights = lazy(() => import("@/pages/workspace/WorkspaceInsights"));
 const WorkspaceMembers = lazy(() => import("@/pages/workspace/WorkspaceMembers"));
 const WorkspaceTrash = lazy(() => import("@/pages/workspace/WorkspaceTrash"));
@@ -113,6 +114,14 @@ export const router = createBrowserRouter([
 						element: (
 							<RouteSuspense>
 								<WorkspaceKanban />
+							</RouteSuspense>
+						),
+					},
+					{
+						path: "chat",
+						element: (
+							<RouteSuspense>
+								<WorkspaceChat />
 							</RouteSuspense>
 						),
 					},

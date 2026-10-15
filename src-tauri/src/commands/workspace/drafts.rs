@@ -168,7 +168,7 @@ pub fn edit<T: Stored>(conn: &Connection, draft_id: &str, edited: &T, who: Optio
         return Err("That is not a valid version of the record.".into());
     }
     state.diff_write_from(&replica, &edited.paths(false), None, now_ms(), who);
-    state.sign_own(T::ENTITY, &draft.target, &replica);
+    state.sign_own(T::ENTITY, &draft.target, &replica, super::held::list_epoch(conn));
     save_state(conn, draft_id, &state)?;
     view(conn, draft_id)
 }

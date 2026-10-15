@@ -327,9 +327,11 @@ fn what_checking_a_writes_role_costs() {
 }
 
 /// Backs the "today" column with the real merge instead of a reading of it: a task whose title was written and signed by
-/// a Viewer's key is merged by `merge_remote`, which is what runs when any peer sends a state message
+/// a Viewer's key is merged by `merge_remote`, which is what runs when any peer sends a state message. That was the whole
+/// story until Phase 16 (RESEARCH.md §8j); now it is so on a device that holds no member list, and with one the write is held
+/// for an Admin (`workspace/held.rs`), which this test also checks.
 #[test]
-fn today_the_real_merge_takes_a_write_signed_by_a_viewers_key_and_by_a_stranger() {
+fn the_real_merge_takes_a_write_signed_by_a_viewers_key_or_a_strangers_only_on_a_device_with_no_member_list() {
     use crate::commands::workspace::crdt::{self, RecordState};
     use crate::commands::workspace::models::Task;
     use crate::commands::workspace::signing::{self, Write};
@@ -351,6 +353,17 @@ fn today_the_real_merge_takes_a_write_signed_by_a_viewers_key_and_by_a_stranger(
         sibling.sig = Some(sig);
         let remote = Task { title: "written by the wrong role".into(), crdt: Some(state), ..local.clone() };
         let merged = crdt::merge_remote(&conn, &remote, Some(&local), |_| true).unwrap();
-        assert_eq!(merged.map(|t| t.title), Some("written by the wrong role".to_string()), "{label}: the real merge was expected to take it, as the table says");
+        assert_eq!(merged.map(|t| t.title), Some("written by the wrong role".to_string()), "{label}: with no member list the merge takes it, as it always did");
+
+        // The same write on a device that holds the signed member list: kept apart, the record keeps its title
+        let conn2 = rusqlite::Connection::open_in_memory().unwrap();
+        crate::database::schema::init_schema(&conn2).unwrap();
+        conn2.execute("INSERT INTO workspace (id, name, description, path, created_at, updated_at) VALUES ('w', 'w', '', '/w', 't', 't')", []).unwrap();
+        let list = issue(&key(OWNER), "w", "w", 1, &id(OWNER), roster(&[(EDITOR, "Editor"), (VIEWER, "Viewer")]), vec![]);
+        conn2.execute("INSERT INTO membership (id, doc) VALUES (1, ?1)", [serde_json::to_string(&list).unwrap()]).unwrap();
+        crdt::ensure(&conn2, &local).unwrap();
+        let held = crdt::merge_remote(&conn2, &remote, Some(&local), |_| true).unwrap();
+        assert_ne!(held.map(|t| t.title), Some("written by the wrong role".to_string()), "{label}: with the list the write must not be merged");
+        assert_eq!(crate::commands::workspace::held::count(&conn2), 1, "{label}: and it waits for an Admin");
     }
 }

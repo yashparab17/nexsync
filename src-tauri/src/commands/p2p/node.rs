@@ -24,7 +24,7 @@ use tokio::{
 };
 
 use super::{
-    clock, files,
+    chat, clock, files,
     membership::{self, Membership},
     mesh::{self, MeshAllow},
     short_code::ShortCodes,
@@ -128,9 +128,15 @@ fn should_relay(from_host: bool, hosting: bool, owner_is_elsewhere: bool, kind: 
 }
 
 /// Roles a host may grant through an invite
-const INVITE_ROLES: &[&str] = &["Editor", "Viewer"];
+const INVITE_ROLES: &[&str] = &["Editor", "Commenter", "Viewer"];
 /// Roles a guest can hold once the host has promoted or demoted them
-const GUEST_ROLES: &[&str] = &["Admin", "Editor", "Viewer"];
+const GUEST_ROLES: &[&str] = &["Admin", "Editor", "Commenter", "Viewer"];
+
+/// Whether a role may change tasks, cards, files and notes. A Commenter reads everything and may write messages and
+/// comments (the signed log, `chat.rs`) but changes nothing else.
+fn can_edit(role: &str) -> bool {
+    matches!(role, "Admin" | "Editor")
+}
 
 /// Workspace folder this device shares with peers (`None` when no workspace is open)
 type SharedWorkspace = Arc<Mutex<Option<String>>>;
@@ -379,6 +385,8 @@ struct NodeState {
     dialing: std::collections::HashSet<EndpointId>,
     /// What the linked devices say the time is, to notice and correct a clock that is out
     skew: clock::SkewWatch,
+    /// What the moderation entries of the log say is in force: timeouts, bans, kicks to carry out
+    moderation: crate::commands::workspace::moderation::State,
     /// Whether this device has looked for the other members since its list was loaded. Until it has, its list may be out of
     /// date, so it does not let a member in by key: otherwise a removed member could get in during the moments after a
     /// device that missed their removal comes back online.
@@ -477,6 +485,7 @@ impl Node {
         tokio::spawn(node.clone().stats_loop());
         tokio::spawn(node.clone().network_loop());
         tokio::spawn(node.clone().member_loop());
+        tokio::spawn(node.clone().moderation_loop());
         tokio::spawn(sync::run_local_changes(node.clone(), local_changes));
         node.sync.watch(node.workspace_path().as_deref());
         Ok(node)
@@ -498,6 +507,32 @@ impl Node {
     pub fn peer_is_host(&self, peer_id: &str) -> Option<bool> {
         let id = parse_peer_id(peer_id).ok()?;
         self.lock().peers.get(&id).map(|p| p.is_host)
+    }
+
+    /// Who may do what, for checking the entries of the log: the signed member list when this device holds one, otherwise the
+    /// roles it was told and the devices it is linked to (the host it joined is the owner)
+    pub fn role_view(&self) -> chat::RoleView {
+        let me = self.endpoint.id().to_string();
+        let st = self.lock();
+        let mut roles: HashMap<String, String> = st.known.roles.clone();
+        let mut owner: Option<String> = None;
+        if let Some(m) = &st.membership {
+            roles = m.roles();
+            owner = Some(m.owner.clone());
+        }
+        for (id, peer) in st.peers.iter() {
+            if peer.is_host && owner.is_none() {
+                owner = Some(id.to_string());
+            } else if !roles.contains_key(&id.to_string()) && !peer.is_host {
+                roles.insert(id.to_string(), peer.role.clone());
+            }
+        }
+        // A device that is hosting, or has no host, is its own owner
+        if owner.is_none() && is_hosting(&st) {
+            owner = Some(me.clone());
+        }
+        let muted = st.moderation.banned.iter().map(|b| b.key.clone()).chain(st.moderation.timeouts.iter().map(|t| t.key.clone())).collect();
+        chat::RoleView { owner, roles, me, muted }
     }
 
     /// This device's own key, which hosts record as the device's identity in the member list
@@ -536,7 +571,7 @@ impl Node {
         self.lock()
             .peers
             .get(&id)
-            .is_some_and(|p| p.is_host || p.role != "Viewer")
+            .is_some_and(|p| p.is_host || can_edit(&p.role))
     }
 
     /// Emits a frontend event; payloads are plain structs, so serialization cannot fail
@@ -595,8 +630,9 @@ impl Node {
         .encode();
 
         let mut st = self.lock();
-        // A new invite is a fresh decision by the host, so earlier removals no longer stand
-        st.blocked.clear();
+        // A new invite is a fresh decision by the host, so earlier removals no longer stand; a ban does, until it is lifted
+        let banned: std::collections::HashSet<String> = st.moderation.banned.iter().map(|b| b.key.clone()).collect();
+        st.blocked.retain(|k| banned.contains(k));
         st.invite = Some(Invite {
             secret,
             expires_at,
@@ -764,6 +800,7 @@ impl Node {
 
     /// Takes the list stored with the open workspace, or none when there is none; called when the workspace changes
     pub fn reload_membership(self: &Arc<Self>) {
+        self.refresh_moderation();
         let loaded = self.workspace_path().and_then(|path| membership::load(&path));
         let mut st = self.lock();
         st.caught_up = false;
@@ -978,13 +1015,47 @@ impl Node {
         let ids: Vec<EndpointId> = m
             .members
             .iter()
-            .filter(|(id, _)| mine < *id)
+            .filter(|(id, _)| mine < *id && !st.moderation.is_banned(id) && !st.moderation.is_timed_out(id))
             .filter_map(|(id, _)| parse_peer_id(id).ok())
             .filter(|id| !st.peers.contains_key(id) && !st.dialing.contains(id))
             .take(MEMBER_DIAL_PARALLEL)
             .collect();
         st.dialing.extend(ids.iter().copied());
         ids
+    }
+
+    /// Works out what is in force again every so often, so a timeout starts and ends on time
+    async fn moderation_loop(self: Arc<Self>) {
+        let mut interval = tokio::time::interval(Duration::from_secs(20));
+        loop {
+            interval.tick().await;
+            self.refresh_moderation();
+        }
+    }
+
+    /// Reads the moderation entries of the open workspace and acts on them: a ban is remembered for good, and anyone who is
+    /// banned or timed out is disconnected. Whoever is timed out or banned is also refused when it connects, below.
+    pub fn refresh_moderation(self: &Arc<Self>) {
+        let Some(path) = self.workspace_path() else { return };
+        let Ok(db) = crate::database::WorkspaceDb::open_existing(&path) else { return };
+        let (_, state) = crate::commands::workspace::moderation::load(&db.conn, crate::commands::workspace::crdt::now_ms());
+        let leaving: Vec<String> = {
+            let mut st = self.lock();
+            let changed = st.moderation != state;
+            for b in &state.banned {
+                st.blocked.insert(b.key.clone());
+            }
+            st.moderation = state.clone();
+            let out: Vec<String> = st.peers.keys().map(|k| k.to_string()).filter(|k| state.is_banned(k) || state.is_timed_out(k)).collect();
+            if changed {
+                drop(st);
+                self.emit(chat::EVENT_MODERATION, serde_json::json!({}));
+            }
+            out
+        };
+        for id in leaving {
+            let _ = self.disconnect(&id);
+        }
     }
 
     /// Looks for the other members by key every so often, which is what keeps a workspace working when the host is away
@@ -1068,7 +1139,7 @@ impl Node {
     async fn answer_probe(&self, conn: &Connection, mut send: SendStream, from: &EndpointId) -> Result<(), String> {
         let reply = {
             let st = self.lock();
-            let a_member = st.known.roles.contains_key(&from.to_string()) && !st.blocked.contains(&from.to_string());
+            let a_member = st.known.roles.contains_key(&from.to_string()) && !st.blocked.contains(&from.to_string()) && !st.moderation.is_timed_out(&from.to_string());
             match (&st.membership, a_member) {
                 (Some(m), true) => HandshakeReply::Membership { doc: serde_json::to_string(m).ok() },
                 _ => HandshakeReply::Reject { error: "not a member".into() },
@@ -1146,7 +1217,7 @@ impl Node {
     fn check_known_member(&self, guest: &EndpointId) -> Option<HandshakeReply> {
         let st = self.lock();
         let id = guest.to_string();
-        if st.blocked.contains(&id) || st.known.workspace_id.is_empty() {
+        if st.blocked.contains(&id) || st.moderation.is_banned(&id) || st.moderation.is_timed_out(&id) || st.known.workspace_id.is_empty() {
             return None;
         }
         // A device that is not the owner and has not had a fresh list for a day does not vouch for anyone: it may have missed
@@ -1170,6 +1241,12 @@ impl Node {
 
     fn check_invite(&self, presented: &str, guest: &EndpointId) -> Result<HandshakeReply, String> {
         let mut st = self.lock();
+        if st.moderation.is_banned(&guest.to_string()) {
+            return Err("You were banned from this workspace.".into());
+        }
+        if let Some(t) = st.moderation.timeouts.iter().find(|t| t.key == guest.to_string()) {
+            return Err(format!("You are timed out from this workspace for about {} more minutes.", t.until.saturating_sub(now_ms()) / 60_000 + 1));
+        }
         if st.blocked.contains(&guest.to_string()) {
             return Err("The host has removed you from this workspace.".into());
         }
@@ -1347,6 +1424,7 @@ impl Node {
         tokio::spawn(write_loop(send, rx));
         tokio::spawn(self.clone().run_peer(conn, recv));
         tokio::spawn(sync::send_catch_up(self.clone(), id.to_string()));
+        tokio::spawn(chat::catch_up(self.clone(), id.to_string()));
         // Each side tells the other which version of the member list it holds, so whichever is behind catches up
         self.push_membership(Some(id), None);
         self.push_clock(Some(id));
@@ -1511,6 +1589,12 @@ impl Node {
             return;
         }
 
+        // Chat and comments: signed entries that any device may pass on, checked by every device
+        if chat::is_log_kind(kind) {
+            tokio::spawn(chat::handle(self.clone(), from.to_string(), message));
+            return;
+        }
+
         // File sync is handled entirely in the backend
         if SyncMessage::is_sync_kind(kind) {
             match serde_json::from_value::<SyncMessage>(message) {
@@ -1526,21 +1610,21 @@ impl Node {
         let Some((from_host, may_write, is_admin, hosting, sender)) = ({
             let st = self.lock();
             st.peers.get(from).map(|p| {
-                (p.is_host, p.is_host || p.role != "Viewer", p.role == "Admin", is_hosting(&st), p.name.clone())
+                (p.is_host, p.is_host || can_edit(&p.role), p.role == "Admin", is_hosting(&st), p.name.clone())
             })
         }) else {
             return;
         };
         match kind.as_str() {
             KIND_DATA_CHANGE | KIND_VERSION_NAMED if !may_write => {
-                eprintln!("[P2P] Ignoring a change from Viewer {}", from.fmt_short());
+                eprintln!("[P2P] Ignoring a change from a device that may not edit {}", from.fmt_short());
                 return;
             }
             // A Viewer's readOnly editor is a UI nicety, not a security boundary: a modified
             // client could still send raw Yjs updates, so the host must drop them itself. Sync
             // step 1/2 (state-vector handshake, no content) and presence stay allowed.
             "SYNC_UPDATE" | KIND_YDOC_UPDATE if !may_write => {
-                eprintln!("[P2P] Ignoring a Yjs update from Viewer {}", from.fmt_short());
+                eprintln!("[P2P] Ignoring a Yjs update from a device that may not edit {}", from.fmt_short());
                 return;
             }
             // Only the host decides who is in the workspace
@@ -3030,6 +3114,133 @@ mod tests {
         assert!(!note(&host).exists(), "the note came back to the host");
         assert!(!has_marker(&host), "the marker is back on the host");
         let _ = data_sync::export_for(&guest.dir.to_string_lossy()).unwrap();
+    }
+
+    // The entries of chat and comments over real links: an owner's entry reaches a guest, an Editor guest's reaches the host, a
+    // Viewer's is refused, and entries stored before a guest joined arrive when it does
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_chat_entries_travel_are_role_checked_and_catch_up() {
+        use crate::commands::workspace::chatlog::{self, Ctx, Entry, Role};
+        let mut host = start_test_node("log-host").await;
+        let editor = start_test_node("log-editor").await;
+        let viewer = start_test_node("log-viewer").await;
+        let mut commenter = start_test_node("log-commenter").await;
+        for n in [&host, &editor, &viewer, &commenter] {
+            seed_workspace(n, vec![]);
+        }
+        let list = |n: &TestNode| -> Vec<Entry> { chatlog::list(&crate::database::WorkspaceDb::open_existing(&n.dir.to_string_lossy()).unwrap().conn).unwrap() };
+        let bodies = |n: &TestNode| -> Vec<String> { list(n).into_iter().map(|e| e.body).collect() };
+        let now = crate::commands::workspace::crdt::now_ms();
+
+        // The host wrote one before anyone joined
+        let early = Entry::signed_with(&host.node.secret, "message", "general", "", "written before you joined", now - 1_000);
+        {
+            let db = crate::database::WorkspaceDb::open_existing(&host.dir.to_string_lossy()).unwrap();
+            let owner = |_: &str| Some(Role::Owner);
+            chatlog::merge(&db.conn, vec![early], &Ctx { me: &host.node.self_id(), now, role_of: &owner }).unwrap();
+        }
+
+        let invite = host.node.create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into()).await.unwrap();
+        editor.node.join(&invite.ticket, "Ed").await.unwrap();
+        let invite = host.node.create_invite("Viewer".into(), "ws".into(), "Demo".into(), "Host".into()).await.unwrap();
+        viewer.node.join(&invite.ticket, "Vi").await.unwrap();
+        let invite = host.node.create_invite("Commenter".into(), "ws".into(), "Demo".into(), "Host".into()).await.unwrap();
+        commenter.node.join(&invite.ticket, "Co").await.unwrap();
+        wait_until("all three guests are connected", || host.node.peers().len() == 3).await;
+
+        // Catch-up: what the host stored before reaches both guests
+        wait_until("the editor catches up", || bodies(&editor) == ["written before you joined"]).await;
+        wait_until("the viewer catches up", || bodies(&viewer) == ["written before you joined"]).await;
+
+        // A live entry from the owner reaches the guests
+        let live = Entry::signed_with(&host.node.secret, "message", "general", "", "hello from the host", crate::commands::workspace::crdt::now_ms());
+        chat::publish(&host.node, &live).await;
+        wait_until("the guests get the live entry", || bodies(&editor).len() == 2 && bodies(&viewer).len() == 2).await;
+
+        // An Editor's entry reaches the host
+        let from_editor = Entry::signed_with(&editor.node.secret, "message", "general", "", "hello from the editor", crate::commands::workspace::crdt::now_ms());
+        chat::publish(&editor.node, &from_editor).await;
+        wait_until("the host gets the editor's entry", || bodies(&host).contains(&"hello from the editor".to_string())).await;
+
+        // A Viewer's entry is refused by the host, and so never relayed on
+        let from_viewer = Entry::signed_with(&viewer.node.secret, "message", "general", "", "a viewer cannot write", crate::commands::workspace::crdt::now_ms());
+        chat::publish(&viewer.node, &from_viewer).await;
+        tokio::time::sleep(Duration::from_secs(4)).await;
+        assert!(!bodies(&host).contains(&"a viewer cannot write".to_string()));
+        assert!(!bodies(&editor).contains(&"a viewer cannot write".to_string()));
+
+        // A Commenter may write in the log, but its task and card changes are dropped by the host, as a Viewer's are
+        let from_commenter = Entry::signed_with(&commenter.node.secret, "message", "general", "", "a commenter may write", crate::commands::workspace::crdt::now_ms());
+        chat::publish(&commenter.node, &from_commenter).await;
+        wait_until("the host gets the commenter's entry", || bodies(&host).contains(&"a commenter may write".to_string())).await;
+        let change = serde_json::json!({ "kind": KIND_DATA_CHANGE, "payload": "commenter-task" });
+        commenter.node.send(None, &change).await.unwrap();
+        assert!(next_shared_message(&mut commenter, Duration::from_secs(1)).await.is_none());
+        assert!(next_shared_message(&mut host, Duration::from_secs(3)).await.is_none(), "a Commenter's task change should be dropped");
+    }
+
+    // A timeout disconnects a member and keeps it out until it ends or is lifted; a ban keeps it out whatever invite it has
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "needs network access for Iroh relays and address lookup"]
+    async fn test_a_timeout_disconnects_a_ban_stays_through_a_new_invite_and_both_can_be_lifted() {
+        use crate::commands::workspace::chatlog::{self, Ctx, Entry, Role};
+        use crate::commands::workspace::{crdt, moderation};
+        let host = start_test_node("mod-host").await;
+        let guest = start_test_node("mod-guest").await;
+        seed_workspace(&host, vec![]);
+        seed_workspace(&guest, vec![]);
+        let guest_id = guest.node.self_id();
+        let now = crdt::now_ms();
+
+        // The host's signed member list names the guest, and the guest joins
+        host.node.set_known_members("ws".into(), "Demo".into(), "Host".into(), vec![(guest_id.clone(), "Editor".into())]);
+        let invite = host.node.create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into()).await.unwrap();
+        guest.node.join(&invite.ticket, "Gus").await.unwrap();
+        wait_until("the guest is connected", || host.node.peers().len() == 1).await;
+
+        // The owner writes a moderation entry into its log; the node acts on it
+        let act = |action: &str, until: u64| {
+            let a = moderation::Action { action: action.into(), target: guest_id.clone(), target_name: "Gus".into(), until, reason: "testing".into(), ..Default::default() };
+            let e = Entry::signed_with(&host.node.secret, moderation::KIND, "moderation", "", &serde_json::to_string(&a).unwrap(), crdt::now_ms());
+            let db = crate::database::WorkspaceDb::open_existing(&host.dir.to_string_lossy()).unwrap();
+            let host_id = host.node.self_id();
+            let roles = |k: &str| Some(if k == host_id { Role::Owner } else { Role::Editor });
+            let merged = chatlog::merge(&db.conn, vec![e], &Ctx { me: &host_id, now: crdt::now_ms(), role_of: &roles }).unwrap();
+            assert_eq!(merged.added.len(), 1, "the moderation entry was refused");
+            host.node.refresh_moderation();
+        };
+        act("timeout", now + 3_600_000);
+        wait_until("the timed out guest is disconnected", || host.node.peers().is_empty()).await;
+        let invite = host.node.create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into()).await.unwrap();
+        let err = guest.node.join(&invite.ticket, "Gus").await.unwrap_err();
+        assert!(err.contains("timed out"), "unexpected error: {err}");
+
+        // Lifted, the guest comes back
+        act("untimeout", 0);
+        let invite = host.node.create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into()).await.unwrap();
+        guest.node.join(&invite.ticket, "Gus").await.unwrap();
+        wait_until("the guest is back", || host.node.peers().len() == 1).await;
+
+        // A ban sends it away, and a new invite does not let it back in
+        act("ban", 0);
+        wait_until("the banned guest is disconnected", || host.node.peers().is_empty()).await;
+        for _ in 0..2 {
+            let invite = host.node.create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into()).await.unwrap();
+            let err = guest.node.join(&invite.ticket, "Gus").await.unwrap_err();
+            assert!(err.contains("banned"), "unexpected error: {err}");
+        }
+        // Only an unban lets a new invite work again
+        act("unban", 0);
+        let invite = host.node.create_invite("Editor".into(), "ws".into(), "Demo".into(), "Host".into()).await.unwrap();
+        guest.node.join(&invite.ticket, "Gus").await.unwrap();
+    }
+
+    #[test]
+    fn only_editors_and_admins_may_change_things_and_a_commenter_may_only_write_messages() {
+        assert!(can_edit("Admin") && can_edit("Editor"));
+        assert!(!can_edit("Commenter") && !can_edit("Viewer"));
+        assert!(INVITE_ROLES.contains(&"Commenter") && GUEST_ROLES.contains(&"Commenter"));
     }
 
     #[test]

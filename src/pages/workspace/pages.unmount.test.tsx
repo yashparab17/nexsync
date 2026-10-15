@@ -75,6 +75,6 @@ describe("every workspace page unmounts cleanly", () => {
 				return;
 			}
 			expect(() => rendered?.unmount()).not.toThrow();
-		});
+		}, 30_000); // The first import of a heavy page is slow when the whole suite runs at once
 	}
 });

@@ -42,6 +42,9 @@ subtle = "2"
 postcard = { version = "1", default-features = false, features = ["use-std"] }
 notify = "8"
 blake3 = "1"
+aes-gcm = "0.10"
+curve25519-dalek = "5"
+sha2 = "0.10"
 trash = "5"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 portable-pty = "0.9"

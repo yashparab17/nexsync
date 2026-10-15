@@ -2,9 +2,12 @@
 // All backend invocations go through these functions to keep IPC calls type-safe
 // P2P commands live in src/lib/p2p/transport.ts
 
+import type { LoggedWrite } from "@/lib/timescrub";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { cleanPath } from "@/lib/utils";
+import type { EntryKind, LogEntry } from "@/lib/chat/entries";
+import type { ModerationView } from "@/lib/moderation";
 
 import type {
 	WorkspaceInfo,
@@ -211,6 +214,134 @@ export function eraseRecordForGood(path: string, entity: "task" | "card", id: st
 // Erase a file or folder for good on this device: its trash copy, saved versions, shared text and journal entries too
 export function eraseFileForGood(path: string, relPath: string, docIds: string[] = []): Promise<Erased> {
 	return invoke("erase_file_for_good", { path, relPath, docIds });
+}
+
+// ────────────────────────────
+// Chat, comments and the inbox
+// ────────────────────────────
+
+// What the chat and comment views read: every entry of the signed log, the read markers, and this device's key
+export interface ChatState {
+	entries: LogEntry[];
+	read: { channel: string; lastTs: number; muted: boolean }[];
+	me: string;
+	seen: Record<string, number>; // When this device first held each entry
+}
+
+export interface InboxItem {
+	id: number;
+	kind: string; // "mention", "reply", or a notice the app wrote
+	reference: string;
+	channel: string;
+	author: string;
+	snippet: string;
+	at: number;
+	read: boolean;
+}
+
+// A write to a task or card held for an Admin, because the key that signed it may not write now
+export interface HeldWrite {
+	id: number;
+	entity: "task" | "card";
+	record: string;
+	title: string; // The record's title here, or empty
+	path: string; // The field
+	value: string; // As JSON text
+	by: string; // Device key
+	who: string; // The name it wrote under
+	ts: number;
+	heldAt: number;
+	reason: string;
+}
+
+export function moderationState(path: string): Promise<ModerationView> {
+	return invoke("moderation_state", { path });
+}
+
+export function heldList(path: string): Promise<HeldWrite[]> {
+	return invoke("held_list", { path });
+}
+
+export function recordHistory(path: string, entity: "task" | "card", id: string): Promise<LoggedWrite[]> {
+	return invoke("record_history", { path, entity, id });
+}
+export function heldReviewGet(path: string): Promise<boolean> {
+	return invoke("held_review_get", { path });
+}
+export function heldReviewSet(path: string, on: boolean): Promise<void> {
+	return invoke("held_review_set", { path, on });
+}
+export function heldAccept(path: string, id: number): Promise<void> {
+	return invoke("held_accept", { path, id });
+}
+
+export function heldDiscard(path: string, id: number): Promise<void> {
+	return invoke("held_discard", { path, id });
+}
+
+// A change by a member that is in the journal, and whether undoing it is safe
+export interface MemberChange {
+	entry: CatchupEntry;
+	replaced: boolean; // The field shows someone else's value now
+	builtOn: boolean; // Others wrote in the record afterwards
+}
+
+export function getMemberChanges(path: string, key: string, name: string): Promise<MemberChange[]> {
+	return invoke("get_member_changes", { path, key, name });
+}
+
+export function chatState(path: string): Promise<ChatState> {
+	return invoke("chat_state", { path });
+}
+
+// Writes an entry as this device, stores it and sends it to the others; the result is the signed entry
+export function chatPost(args: { path: string; kind: EntryKind; channel: string; parent?: string; body: string; name: string }): Promise<LogEntry> {
+	return invoke("chat_post", { path: args.path, kind: args.kind, channel: args.channel, parent: args.parent ?? "", body: args.body, name: args.name });
+}
+
+// Seals text for one member's device; the result is the body of a "dm" entry
+export function dmSeal(to: string, text: string): Promise<string> {
+	return invoke("dm_seal", { to, text });
+}
+export function dmChannel(withKey: string): Promise<string> {
+	return invoke("dm_channel", { with: withKey });
+}
+// Opens the direct messages among these entries that this device wrote or was sent: entry id to text
+export function dmOpen(entries: [string, string, string][]): Promise<Record<string, string>> {
+	return invoke("dm_open", { entries });
+}
+export function chatGetHistoryLimit(path: string): Promise<number> {
+	return invoke("chat_get_history_limit", { path });
+}
+
+export function chatSetHistoryLimit(path: string, limit: number): Promise<void> {
+	return invoke("chat_set_history_limit", { path, limit });
+}
+
+export function chatMarkRead(path: string, channel: string, ts: number): Promise<void> {
+	return invoke("chat_mark_read", { path, channel, ts });
+}
+
+export function chatSetMuted(path: string, channel: string, muted: boolean): Promise<void> {
+	return invoke("chat_set_muted", { path, channel, muted });
+}
+
+export function inboxList(path: string): Promise<InboxItem[]> {
+	return invoke("inbox_list", { path });
+}
+
+// Keeps a notice the app wrote (a member joined, a task was assigned) so it survives a restart
+export function inboxAdd(path: string, kind: string, reference: string, snippet: string, channel?: string, author?: string): Promise<void> {
+	return invoke("inbox_add", { path, kind, reference, snippet, channel, author });
+}
+
+// Marks the given inbox items read, or all of them when none are given
+export function inboxMarkRead(path: string, ids: number[] = []): Promise<void> {
+	return invoke("inbox_mark_read", { path, ids });
+}
+
+export function inboxClear(path: string): Promise<void> {
+	return invoke("inbox_clear", { path });
 }
 
 // ────────────────────────────

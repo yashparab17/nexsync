@@ -176,6 +176,59 @@ pub fn list(conn: &Connection) -> Result<Vec<Entry>, String> {
         .map_err(e)
 }
 
+/// One change by a member, for "undo everything by this person", with what can be said about undoing it
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MemberChange {
+    pub entry: Entry,
+    /// The field now shows someone else's value, so there is nothing of theirs to undo
+    pub replaced: bool,
+    /// Others have written in the same record since, having (probably) seen the value: undoing it may overwrite their work, so
+    /// a person decides. Read from the stored write times, which never miss a write that saw this one (RESEARCH.md §8i).
+    pub built_on: bool,
+}
+
+/// Every change this device has journaled by the member with this device key (or, for an unsigned change, this name) that
+/// has not been undone yet, newest first
+pub fn member_changes(conn: &Connection, key: &str, name: &str) -> Result<Vec<MemberChange>, String> {
+    let e = |e: rusqlite::Error| e.to_string();
+    let rows: Vec<Entry> = conn
+        .prepare(
+            "SELECT id, at, kind, entity, target, label, path, before, after, who, state, signer FROM catchup_log
+             WHERE state != 'reverted' AND (signer = ?1 OR ((signer IS NULL OR signer = '') AND who = ?2)) ORDER BY id DESC LIMIT 2000",
+        )
+        .map_err(e)?
+        .query_map(params![key, name], |r| {
+            Ok(Entry { id: r.get(0)?, at: r.get(1)?, kind: r.get(2)?, entity: r.get(3)?, target: r.get(4)?, label: r.get(5)?, path: r.get(6)?, before: r.get(7)?, after: r.get(8)?, who: r.get(9)?, state: r.get(10)?, signer: r.get(11)? })
+        })
+        .map_err(e)?
+        .collect::<Result<_, _>>()
+        .map_err(e)?;
+    let mine = |by: Option<&str>, who: Option<&str>| by == Some(key) || (by.is_none() && who == Some(name));
+    let mut out = Vec::new();
+    for entry in rows {
+        let (mut replaced, mut built_on) = (false, false);
+        if entry.kind == "field" && (entry.entity == "task" || entry.entity == "card") {
+            if let Some(state) = super::crdt::load(conn, &entry.entity, &entry.target)? {
+                let top = state.fields.get(&entry.path).and_then(|siblings| siblings.iter().max_by_key(|s| (s.ts, s.dot.r.clone(), s.dot.c)));
+                match top {
+                    Some(top) if mine(top.by.as_deref(), top.who.as_deref()) => {
+                        built_on = state.fields.values().flatten().any(|s| !mine(s.by.as_deref(), s.who.as_deref()) && s.ts > top.ts);
+                    }
+                    _ => replaced = true,
+                }
+            }
+        }
+        out.push(MemberChange { entry, replaced, built_on });
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn get_member_changes(app_handle: tauri::AppHandle, path: String, key: String, name: String) -> Result<Vec<MemberChange>, String> {
+    member_changes(&open(&app_handle, &path)?.conn, &key, &name)
+}
+
 pub fn set_state(conn: &Connection, ids: &[i64], state: &str) -> Result<(), String> {
     if !matches!(state, "seen" | "reverted") {
         return Err("Unknown state.".into());
@@ -353,6 +406,51 @@ mod tests {
         }
         assert!(merge_state(&c, "c", unsigned).unwrap());
         assert!(list(&c).unwrap().iter().all(|e| e.signer.is_none()));
+    }
+
+    #[test]
+    fn a_members_changes_are_found_by_key_and_flagged_when_others_built_on_them_or_replaced_them() {
+        use super::super::crdt::RecordState;
+        use super::super::signing;
+        use serde_json::json;
+        let conn = db("w1");
+        let mine = iroh::SecretKey::from_bytes(&[8u8; 32]);
+        let (my_key, other_key) = (mine.public().to_string(), iroh::SecretKey::from_bytes(&[9u8; 32]).public().to_string());
+        let sign = |state: &mut RecordState, replica: &str, path: &str, key: &iroh::SecretKey| {
+            let s = state.fields.get_mut(path).unwrap().iter_mut().find(|s| s.dot.r == replica).unwrap();
+            let (by, sig) = signing::sign_with(key, &signing::Write { entity: "task", record: "t1", path, replica, counter: s.dot.c, ts: s.ts, who: Some("x"), value: &s.value.clone() });
+            s.by = Some(by);
+            s.sig = Some(sig);
+        };
+        // t1: the member set the title, and someone else then edited the description (after seeing it)
+        let mut state = RecordState::default();
+        state.write("rm", "title", json!("Mine"), 1_000, Some("Mem"));
+        sign(&mut state, "rm", "title", &mine);
+        state.write("ro", "description", json!("theirs"), 2_000, Some("Oth"));
+        sign(&mut state, "ro", "description", &iroh::SecretKey::from_bytes(&[9u8; 32]));
+        super::super::crdt::save(&conn, "task", "t1", &state).unwrap();
+        // t2: the member set the priority and someone else has since changed that same field
+        let mut state2 = RecordState::default();
+        state2.write("rm", "priority", json!("high"), 1_000, Some("Mem"));
+        sign(&mut state2, "rm", "priority", &mine);
+        state2.write("ro", "priority", json!("low"), 2_000, Some("Oth"));
+        super::super::crdt::save(&conn, "task", "t2", &state2).unwrap();
+        for (target, path) in [("t1", "title"), ("t2", "priority")] {
+            let mut e = entry("field", "task", target, "Task", Some("Mem".into()));
+            e.path = path.into();
+            e.signer = Some(my_key.clone());
+            e.before = Some("\"old\"".into());
+            insert(&conn, &e).unwrap();
+        }
+        // And one by someone else, and one by name only
+        let mut theirs = entry("field", "task", "t1", "Task", Some("Oth".into()));
+        theirs.signer = Some(other_key);
+        insert(&conn, &theirs).unwrap();
+        let changes = member_changes(&conn, &my_key, "Mem").unwrap();
+        assert_eq!(changes.len(), 2, "only this member's");
+        let by_target = |t: &str| changes.iter().find(|c| c.entry.target == t).unwrap();
+        assert!(by_target("t1").built_on && !by_target("t1").replaced, "others wrote in the record afterwards");
+        assert!(by_target("t2").replaced, "the field now shows someone else's value");
     }
 
     #[test]
