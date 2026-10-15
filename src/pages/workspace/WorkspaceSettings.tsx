@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import Avatar from "@/components/elements/Avatar";
 import { Row, SectionCard, SettingsShell } from "@/components/elements/SettingsParts";
 import RulesCard from "@/components/elements/RulesCard";
+import BundleCard from "@/components/elements/BundleCard";
+import { IconPicker, IconView, useWorkspaceIcon } from "@/components/elements/WorkspaceIcon";
 import HostRequiredCard from "@/components/elements/HostRequiredCard";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -37,6 +39,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 	// Only the workspace owner may change settings; a joined copy's local edits would just
 	// get overwritten by the next full snapshot pull anyway, same rule as the Members page.
 	const isJoinedCopy = selfName !== null;
+	const icon = useWorkspaceIcon(workspace?.id);
 	const chat = useChat();
 	// With the two-person rule on, deleting waits for another Admin to approve the request (a guard against a slip or a
 	// stolen session; the Owner can still remove the folder by hand, since it is theirs)
@@ -47,6 +50,14 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 	// How many messages per channel this device gives to a device that has none of them
 	const [history, setHistory] = useState(200);
 	const [review, setReview] = useState(false);
+	const removalsKey = `nexsync-announce-removals:${workspace?.id ?? ""}`;
+	const [announceRemovals, setAnnounceRemovals] = useState(() => {
+		try {
+			return localStorage.getItem(removalsKey) === "1";
+		} catch {
+			return false;
+		}
+	});
 	useEffect(() => {
 		if (!workspace?.path) return;
 		void chatGetHistoryLimit(workspace.path).then(setHistory).catch(() => {});
@@ -208,6 +219,19 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 						<Input id="ws-name" required value={name} disabled={isJoinedCopy} onChange={(e) => setName(e.target.value)} className="mt-1" />
 					</div>
 					<div>
+						<Label>Icon</Label>
+						<div className="mt-1">
+							{chat.role === "Owner" || chat.role === "Admin" ? (
+								<IconPicker value={icon} onChange={(next) => void chat.setWorkspaceIcon(next).catch(() => {})} name={name} shared />
+							) : (
+								<div className="flex items-center gap-4">
+									<IconView icon={icon} name={name} className="size-14 text-3xl" />
+									<p className="text-sm text-muted-foreground">Only the Owner and Admins change the icon. Everyone sees the same one.</p>
+								</div>
+							)}
+						</div>
+					</div>
+					<div>
 						<Label htmlFor="ws-desc">Description</Label>
 						<Textarea id="ws-desc" value={description} disabled={isJoinedCopy} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description…" rows={3} className="mt-1" />
 					</div>
@@ -225,6 +249,23 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 					<Row title="Share changes live" hint="Let collaborators connect and see changes live">
 						<input type="checkbox" aria-label="Share changes live" checked={sync} disabled={isJoinedCopy} onChange={(e) => setSync(e.target.checked)} />
 					</Row>
+					{!isJoinedCopy && (
+						<Row title="Announce removals" hint="Post an Info notice when a member is removed. Off by default">
+							<input
+								type="checkbox"
+								aria-label="Announce removals"
+								checked={announceRemovals}
+								onChange={(e) => {
+									setAnnounceRemovals(e.target.checked);
+									try {
+										localStorage.setItem(removalsKey, e.target.checked ? "1" : "0");
+									} catch {
+										/* blocked storage */
+									}
+								}}
+							/>
+						</Row>
+					)}
 					<Row title="Review changes before they apply" hint="Other people's changes to tasks and cards wait for you to accept them. Turn it off while joining a workspace">
 						<input
 							type="checkbox"
@@ -255,6 +296,10 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 							{![50, 200, 1000, 5000].includes(history) && <option value={history}>Last {history}</option>}
 						</select>
 					</Row>
+				</SectionCard>
+
+				<SectionCard id="bundle" title="Carry Without a Network" icon={<Download className="size-5" />}>
+					<BundleCard />
 				</SectionCard>
 
 				{workspace && <RulesCard workspacePath={workspace.path} />}

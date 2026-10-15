@@ -8,7 +8,7 @@
 
 pub mod chat;
 pub(crate) mod clock;
-mod files;
+pub(crate) mod files;
 #[cfg(test)]
 mod compat;
 #[cfg(test)]

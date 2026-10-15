@@ -13,6 +13,7 @@ import { locateAnchor, makeAnchor, type Placement } from "@/lib/chat/anchors";
 import { buildThreads, docChannel, type Thread, type ThreadComment } from "@/lib/chat/entries";
 import { encodeMentions } from "@/lib/chat/mentions";
 import { commentMarks, setCommentThreads } from "@/lib/editor/commentMarks";
+import { openProposals, type Proposal } from "@/lib/proposals";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/store/chat/ChatContext";
 import { useSelfRole } from "@/store/p2p/P2PContext";
@@ -48,6 +49,17 @@ export function useFileComments({ path, doc, canComment }: Options): FileComment
 	const [viewTick, setViewTick] = useState(0);
 	const [tick, setTick] = useState(0);
 	const ytext = useMemo(() => doc?.getText("content") ?? null, [doc]);
+
+	// Open suggestions, for a discussion under each in the panel
+	const [suggestions, setSuggestions] = useState<Proposal[]>([]);
+	useEffect(() => {
+		if (!doc) return setSuggestions([]);
+		const map = doc.getMap("proposals");
+		const read = () => setSuggestions(openProposals(doc));
+		read();
+		map.observe(read);
+		return () => map.unobserve(read);
+	}, [doc]);
 
 	// Where each comment is now; worked out again a moment after the text changes
 	useEffect(() => {
@@ -168,6 +180,7 @@ export function useFileComments({ path, doc, canComment }: Options): FileComment
 			onDelete={async (c: ThreadComment) => void (await chat.post({ kind: "delete", channel, parent: c.id, body: "" }))}
 			onResolve={async (t: Thread, resolved) => void (await chat.post({ kind: resolved ? "resolve" : "reopen", channel, parent: t.id, body: "" }))}
 			onClose={() => setOpen(false)}
+			suggestions={suggestions}
 			onReact={(c, emoji) => chat.toggleReaction(channel, c.id, emoji, c.reactions)}
 			following={chat.follows.has(channel)}
 			onFollow={(on) => chat.follow(channel, on)}

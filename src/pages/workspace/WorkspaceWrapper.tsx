@@ -22,6 +22,7 @@ import ShortcutsDialog from "@/components/dialogs/workspace/ShortcutsDialog";
 import { shortcutFor } from "@/lib/shortcuts";
 import { ChatProvider } from "@/store/chat/ChatContext";
 import { ModerationExecutor, RejoinWatch, TimeoutBanner } from "@/components/moderation/ModerationRuntime";
+import AnnouncementRuntime from "@/components/announcements/AnnouncementRuntime";
 import ReviewBanner from "@/components/moderation/ReviewBanner";
 
 // Shell layout for all workspace sub-routes
@@ -104,6 +105,7 @@ export default function Workspace() {
 				<WorkspaceHeader onOpenMenu={() => setNavOpen(true)} menuOpen={navOpen} />
 				<TimeoutBanner />
 				<ReviewBanner />
+				<AnnouncementRuntime />
 
 				{/* Page content */}
 				<div className="min-h-0 flex-1 overflow-hidden">

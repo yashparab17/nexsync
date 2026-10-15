@@ -13,6 +13,7 @@ const en = {
 	"nav.kanban": "Kanban",
 	"nav.insights": "Insights",
 	"nav.chat": "Chat",
+	"nav.announcements": "Announcements",
 	"nav.groupTalk": "Talk",
 	"nav.groupWrite": "Write",
 	"nav.groupStorage": "Storage",

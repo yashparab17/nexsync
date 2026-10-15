@@ -46,7 +46,7 @@ export default function ThreadPanel({ root, replies, channelName, people, me, ca
 		</li>
 	);
 	return (
-		<aside aria-label="Thread" className="flex w-80 shrink-0 flex-col border-l bg-panel">
+		<aside aria-label="Thread" className="flex w-72 shrink-0 flex-col @4xl:w-80 border-l bg-panel">
 			<Toolbar variant="header" className="gap-2">
 				<h2 className="min-w-0 flex-1 truncate px-1 text-sm font-semibold">Thread in #{channelName}</h2>
 				<Button variant="ghost" size="icon-sm" aria-label="Close thread" onPress={onClose}>

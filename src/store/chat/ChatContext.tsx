@@ -6,6 +6,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { buildChannels, buildConversations, buildMessages, commentText, GENERAL, isThread, unreadCount, type Channel, type Conversation, type EntryKind, type LogEntry, type Reaction } from "@/lib/chat/entries";
+import { ensureLocalColor, getLocalProfile, profilesFromEntries, setProfiles } from "@/lib/profile";
+import { getIcon, iconFromEntries, setIcon, type WorkspaceIcon } from "@/lib/workspaceIcon";
+import { buildAnnouncements, CHANNEL as ANNOUNCEMENTS, type Announcement, type AnnouncementDraft } from "@/lib/announcements";
 import { encodeMentions, type Person } from "@/lib/chat/mentions";
 import { EMPTY_VIEW, parseAction, type ModerationAction, type ModerationView, type TimedOutMember } from "@/lib/moderation";
 import { canCommentRole } from "@/lib/roles";
@@ -64,6 +67,20 @@ interface ChatContextType {
 	// Direct messages, by the other device's key: sealed so only the two devices read them
 	conversations: Map<string, Conversation>;
 	sendDirect: (to: string, text: string) => Promise<void>;
+	// Announcements (Owner and Admins post, everyone acknowledges); expired ones are left out
+	announcements: Announcement[];
+	announce: (draft: AnnouncementDraft) => Promise<string | null>; // The new announcement's id
+	reviseAnnouncement: (id: string, draft: AnnouncementDraft) => Promise<void>;
+	withdrawAnnouncement: (id: string) => Promise<void>;
+	acknowledge: (id: string) => Promise<void>;
+	// Says when an announcement, task, card or file is erased for good; 0 cancels
+	setExpiry: (entity: "announcement" | "task" | "card" | "file", id: string, at: number) => Promise<void>;
+	// The time as this device reads it, moved on every half minute
+	now: number;
+	// This device's role in the workspace
+	role: string;
+	// Sets the workspace's icon for everyone (Owner and Admins); `null` goes back to the letter
+	setWorkspaceIcon: (icon: WorkspaceIcon | null) => Promise<void>;
 }
 
 const NONE: ChatContextType = {
@@ -97,6 +114,15 @@ const NONE: ChatContextType = {
 	toggleReaction: () => {},
 	conversations: new Map(),
 	sendDirect: async () => {},
+	announcements: [],
+	announce: async () => null,
+	reviseAnnouncement: async () => {},
+	withdrawAnnouncement: async () => {},
+	acknowledge: async () => {},
+	setExpiry: async () => {},
+	now: 0,
+	role: "Viewer",
+	setWorkspaceIcon: async () => {},
 };
 
 // Per device and workspace, in this browser's storage; nothing here is needed for the app to work
@@ -359,6 +385,57 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 		return names;
 	}, [entries, removed]);
 
+	const announcements = useMemo(() => buildAnnouncements(entries, now), [entries, now]);
+	const announce = useCallback<ChatContextType["announce"]>(async (draft) => (await post({ kind: "announce", channel: ANNOUNCEMENTS, body: JSON.stringify(draft) }))?.id ?? null, [post]);
+	const reviseAnnouncement = useCallback<ChatContextType["reviseAnnouncement"]>(async (id, draft) => void (await post({ kind: "announce", channel: ANNOUNCEMENTS, parent: id, body: JSON.stringify(draft) })), [post]);
+	const withdrawAnnouncement = useCallback<ChatContextType["withdrawAnnouncement"]>(async (id) => void (await post({ kind: "announce_end", channel: ANNOUNCEMENTS, parent: id, body: "" })), [post]);
+	const acknowledge = useCallback<ChatContextType["acknowledge"]>(async (id) => void (await post({ kind: "ack", channel: ANNOUNCEMENTS, parent: id, body: "" })), [post]);
+	const setExpiry = useCallback<ChatContextType["setExpiry"]>(async (entity, id, at) => void (await post({ kind: "expire", channel: ANNOUNCEMENTS, body: JSON.stringify({ entity, id, at }) })), [post]);
+
+	// The icon: the newest signed one is kept on this device too, where the Welcome screen reads it. An icon this device chose
+	// before it was shared (made when the workspace was created) is shared once by an Owner or Admin.
+	const setWorkspaceIcon = useCallback<ChatContextType["setWorkspaceIcon"]>(
+		async (icon) => {
+			if (workspace) setIcon(workspace.id, icon);
+			await post({ kind: "icon", channel: "workspace", body: JSON.stringify(icon ?? { kind: "none" }) });
+		},
+		[post, workspace],
+	);
+	const synced = useMemo(() => iconFromEntries(entries), [entries]);
+	const iconKey = JSON.stringify(synced ?? null);
+	useEffect(() => {
+		if (!workspace || !me || entries.length === 0) return;
+		if (synced !== undefined) {
+			if (JSON.stringify(getIcon(workspace.id)) !== JSON.stringify(synced)) setIcon(workspace.id, synced);
+		} else if (role === "Owner" || role === "Admin") {
+			const mine = getIcon(workspace.id);
+			if (mine) void post({ kind: "icon", channel: "workspace", body: JSON.stringify(mine) }).catch(() => {});
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [iconKey, workspace?.id, me, role, entries.length === 0]);
+
+	// How the members look: colours and pictures they chose. Mine, set in Settings, is shared once and again when it changes.
+	useEffect(() => {
+		const map = profilesFromEntries(entries);
+		// This person's own colour is known at once, before their entry has come back
+		const mine = ensureLocalColor();
+		if (name.trim()) map.set(name.trim().toLowerCase(), { ...map.get(name.trim().toLowerCase()), ...mine });
+		setProfiles(map);
+	}, [entries, name]);
+	useEffect(() => {
+		if (!workspace || !me || entries.length === 0) return;
+		const share = () => {
+			const mine = getLocalProfile();
+			const published = profilesFromEntries(entries.filter((e) => e.author === me)).get(name.trim().toLowerCase()) ?? {};
+			if ((mine.color ?? "") === (published.color ?? "") && (mine.image ?? "") === (published.image ?? "")) return;
+			void post({ kind: "profile", channel: "profiles", body: JSON.stringify(mine) }).catch(() => {});
+		};
+		share();
+		window.addEventListener("nexsync-profile", share);
+		return () => window.removeEventListener("nexsync-profile", share);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [entries, me, name, workspace?.id]);
+
 	const act = useCallback<ChatContextType["act"]>(
 		async (action) => {
 			await post({ kind: "moderation", channel: "moderation", body: JSON.stringify(action) });
@@ -398,8 +475,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 			toggleReaction,
 			conversations,
 			sendDirect,
+			announcements,
+			announce,
+			reviseAnnouncement,
+			withdrawAnnouncement,
+			acknowledge,
+			setExpiry,
+			now,
+			role,
+			setWorkspaceIcon,
 		}),
-		[conversations, sendDirect, removedNames, toggleReaction, seen, dnd, setDnd, follows, follow, entries, me, name, people, role, channels, unread, read, post, markRead, setMuted, inbox, markInboxRead, clearInbox, moderation, removed, timedOut, act],
+		[setWorkspaceIcon, role, announcements, announce, reviseAnnouncement, withdrawAnnouncement, acknowledge, setExpiry, now, conversations, sendDirect, removedNames, toggleReaction, seen, dnd, setDnd, follows, follow, entries, me, name, people, role, channels, unread, read, post, markRead, setMuted, inbox, markInboxRead, clearInbox, moderation, removed, timedOut, act],
 	);
 	return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }

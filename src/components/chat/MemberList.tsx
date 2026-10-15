@@ -15,12 +15,14 @@ export default function MemberList({ members, online }: MemberListProps) {
 	const here = members.filter((m) => online.has(m.name));
 	const away = members.filter((m) => !online.has(m.name));
 	return (
-		<aside aria-label="Members" className="hidden h-full w-56 shrink-0 flex-col overflow-y-auto bg-panel lg:flex">
+		<aside aria-label="Members" className="hidden h-full w-56 shrink-0 flex-col overflow-y-auto bg-panel @4xl:flex">
 			<Toolbar variant="header">
 				<h2 className="px-1 text-sm font-semibold">Members</h2>
 			</Toolbar>
-			<Group title="Online" list={here} online />
-			<Group title="Offline" list={away} online={false} />
+			<div className="space-y-2 pt-2">
+				<Group title="Online" list={here} online />
+				<Group title="Offline" list={away} online={false} />
+			</div>
 		</aside>
 	);
 }

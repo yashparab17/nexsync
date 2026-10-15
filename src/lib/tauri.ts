@@ -262,8 +262,53 @@ export function heldList(path: string): Promise<HeldWrite[]> {
 	return invoke("held_list", { path });
 }
 
+// Erases what the expiry entries say is due on this device; resolves to how many things were erased
+export function expirySweep(path: string): Promise<number> {
+	return invoke("expiry_sweep", { path });
+}
+// A signed bundle of the workspace, for moving it between devices with no network (see workspace/bundle.rs)
+export interface BundleSummary {
+	by: string;
+	created: number;
+	epoch: number;
+	entries: number;
+	tasks: number;
+	cards: number;
+	files: number;
+	docs: number;
+	skipped: number;
+	newerList: boolean;
+}
+export interface BundleReport {
+	listTaken: boolean;
+	entriesAdded: number;
+	entriesRefused: number;
+	dataChanged: boolean;
+	filesWritten: number;
+	filesKept: number;
+	docs: [string, string][]; // Document id and its stored state as base64, for the app to merge
+}
+export function bundleExport(path: string, dest: string): Promise<number> {
+	return invoke("bundle_export", { path, dest });
+}
+export function bundleInspect(path: string, source: string): Promise<BundleSummary> {
+	return invoke("bundle_inspect", { path, source });
+}
+export function bundleImport(path: string, source: string): Promise<BundleReport> {
+	return invoke("bundle_import", { path, source });
+}
 export function recordHistory(path: string, entity: "task" | "card", id: string): Promise<LoggedWrite[]> {
 	return invoke("record_history", { path, entity, id });
+}
+// Chat messages and comments from a timed-out member, kept for an Owner or Admin
+export function heldEntriesList(path: string): Promise<LogEntry[]> {
+	return invoke("held_entries_list", { path });
+}
+export function heldEntryAccept(path: string, id: string): Promise<void> {
+	return invoke("held_entry_accept", { path, id });
+}
+export function heldEntryDiscard(path: string, id: string): Promise<void> {
+	return invoke("held_entry_discard", { path, id });
 }
 export function heldReviewGet(path: string): Promise<boolean> {
 	return invoke("held_review_get", { path });

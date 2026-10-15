@@ -42,7 +42,7 @@ export default function ChannelList({ channels, active, unread, muted, canCreate
 	const [creating, setCreating] = useState(false);
 	const shown = channels.filter((c) => !c.archived || c.id === active);
 	return (
-		<aside aria-label="Channels" className="flex h-full w-60 shrink-0 flex-col bg-panel">
+		<aside aria-label="Channels" className="flex h-full w-52 shrink-0 flex-col bg-panel @3xl:w-60">
 			<Toolbar variant="header" className="justify-between">
 				<h2 className="px-1 text-sm font-semibold">Channels</h2>
 				{canCreate && (
@@ -51,7 +51,7 @@ export default function ChannelList({ channels, active, unread, muted, canCreate
 					</Button>
 				)}
 			</Toolbar>
-			<nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+			<nav className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-2">
 				<ul className="space-y-1">
 					{shown.map((c) => {
 						const count = unread[c.id] ?? 0;

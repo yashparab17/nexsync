@@ -21,6 +21,7 @@ import { createTask, deleteTask, eraseRecordForGood, getTasks, resolveTaskConfli
 import EraseOption from "@/components/elements/EraseOption";
 import CommentCount, { useThreadCounts } from "@/components/elements/CommentCount";
 import ConflictPanel from "@/components/elements/ConflictPanel";
+import ExpiryBadge, { ExpiryControl, useExpiries } from "@/components/elements/ExpiryBadge";
 import RecordTimeline from "@/components/elements/RecordTimeline";
 import FieldDiscussion from "@/components/elements/FieldDiscussion";
 import RuleFlag from "@/components/elements/RuleFlag";
@@ -95,6 +96,7 @@ export default function WorkspaceTasks() {
 	const memberName = (id: string) => members.find((m) => m.id === id)?.name ?? "a removed member";
 	const { dataVersion, publishDataChange, viewersAt } = useP2P();
 	const threadCounts = useThreadCounts();
+	const expiries = useExpiries();
 	const isViewer = useIsViewer();
 	const logError = useErrorLog();
 
@@ -547,6 +549,7 @@ export default function WorkspaceTasks() {
 											<span className={cn("text-sm font-medium [overflow-wrap:anywhere]", task.status === "done" && "text-muted-foreground line-through")}>{task.title}</span>
 											<PresenceDots names={viewersAt("tasks", task.id)} doing="editing this task" />
 											<CommentCount entity="task" id={task.id} legacy={task.comments?.length ?? 0} counts={threadCounts} />
+											<ExpiryBadge entity="task" id={task.id} expiries={expiries} />
 											{(task.conflicts?.length ?? 0) > 0 && (
 												<span title="Two people changed this at the same time" className="text-warning">
 													<AlertTriangle className="size-3.5" aria-label="Has a change to sort out" />
@@ -759,6 +762,7 @@ export default function WorkspaceTasks() {
 
 						<ConflictPanel conflicts={editingTask.conflicts ?? []} violations={editingTask.violations} show={showValue} canChoose={!isViewer} onChoose={resolveConflict} record={{ entity: "task", id: editingTask.id }} />
 						{workspace && <RecordTimeline workspacePath={workspace.path} entity="task" id={editingTask.id} title={editingTask.title} show={showValue} />}
+						<ExpiryControl entity="task" id={editingTask.id} name={editingTask.title} />
 						{!isViewer && workspace && <DraftsButton workspacePath={workspace.path} entity="task" record={editingTask} members={members} onMerged={() => setEditingTask(null)} />}
 
 						<Comments

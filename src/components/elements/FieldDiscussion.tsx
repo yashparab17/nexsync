@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import ReactionBar from "@/components/chat/ReactionBar";
 import RichText from "@/components/chat/RichText";
 import Avatar from "@/components/elements/Avatar";
-import { buildThreads } from "@/lib/chat/entries";
+import { buildThreads, type Point } from "@/lib/chat/entries";
 import { encodeMentions } from "@/lib/chat/mentions";
 import { useChat } from "@/store/chat/ChatContext";
 
@@ -19,7 +19,7 @@ interface FieldDiscussionProps {
 	placeholder?: string;
 	label?: string;
 	threadId?: string; // Show and answer this thread, not the item's general one
-	point?: { x: number; y: number }; // Start a new thread pinned to this place in a picture
+	point?: Point; // Start a new thread pinned to this place in a picture or on a page of a PDF
 	onPosted?: () => void;
 }
 

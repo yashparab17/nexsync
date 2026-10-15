@@ -84,7 +84,7 @@ impl Drop for TransferGuard {
 }
 
 /// Validates a peer-supplied path: must name a non-hidden file inside a synced folder
-pub(super) fn check_rel_path(rel_path: &str) -> Result<String, String> {
+pub(crate) fn check_rel_path(rel_path: &str) -> Result<String, String> {
     let trimmed = rel_path.trim().trim_start_matches('/');
     let invalid = || format!("Invalid file path: {rel_path}");
 

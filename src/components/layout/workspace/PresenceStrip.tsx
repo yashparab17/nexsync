@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Bell, BellOff } from "@/components/animate-icons";
 
 import { initialOf } from "@/components/elements/Avatar";
-import { colorForName } from "@/lib/collabColor";
+import { colorOf } from "@/lib/collabColor";
 import { followPath, placeLabel, readQuiet, saveQuiet } from "@/lib/p2p/presence";
 import { cn } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -48,7 +48,7 @@ export default function PresenceStrip() {
 							onClick={() => setFollowing(followed ? null : peer.id)}
 							disabled={!where}
 							aria-pressed={followed}
-							style={{ background: colorForName(who) }}
+							style={{ background: colorOf(who) }}
 							aria-label={where ? `${followed ? "Stop following" : "Follow"} ${who}` : who}
 							title={`${detail}${where ? (followed ? " Click to stop following." : " Click to follow.") : ""}`}
 							className={cn(

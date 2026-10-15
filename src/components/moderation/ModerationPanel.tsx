@@ -8,6 +8,7 @@ import { parseAction } from "@/lib/moderation";
 import type { Member } from "@/types/workspace";
 
 import HeldEdits from "@/components/moderation/HeldEdits";
+import Art from "@/components/elements/Art";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/layout/Page";
 import { timeLeft } from "@/lib/moderation";
@@ -45,7 +46,7 @@ export default function ModerationPanel() {
 		<Panel
 			index="03"
 			title="Moderation"
-			className="lg:col-span-2"
+			className="@4xl:col-span-2"
 			right={
 				isOwner && (
 					<label className="flex cursor-pointer items-center gap-2 text-sm" title="Removing or banning someone needs a second Admin or the Owner to approve it">
@@ -80,7 +81,12 @@ export default function ModerationPanel() {
 
 			{tab === "awaiting" && (
 				<ul className="divide-y divide-border/60">
-					{state.awaiting.length === 0 && <li className="px-1 py-6 text-center text-sm text-muted-foreground">{state.requireTwo ? "Nothing is waiting for a second person." : "The two-person rule is off, so a kick or ban takes effect at once."}</li>}
+					{state.awaiting.length === 0 && (
+						<li className="flex flex-col items-center gap-3 px-1 py-6 text-center">
+							<Art name="approval" className="h-32 w-44" />
+							<span className="text-sm text-muted-foreground">{state.requireTwo ? "Nothing is waiting for a second person." : "The two-person rule is off, so a kick or ban takes effect at once."}</span>
+						</li>
+					)}
 					{state.awaiting.map((p) => (
 						<li key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
 							<div className="min-w-0 text-sm">

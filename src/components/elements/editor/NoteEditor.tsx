@@ -10,6 +10,7 @@ import SuggestEditDialog from "@/components/dialogs/workspace/SuggestEditDialog"
 import { buildThreads, docChannel, threadsMarkdown } from "@/lib/chat/entries";
 import { plainPreview } from "@/lib/chat/preview";
 import { useChat } from "@/store/chat/ChatContext";
+import { ExpiryControl } from "@/components/elements/ExpiryBadge";
 import { useFileComments } from "@/components/elements/editor/useFileComments";
 import { useCanComment } from "@/store/p2p/P2PContext";
 import { proposalMarks } from "@/lib/editor/proposalsView";
@@ -252,6 +253,7 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 									<GitBranch className="size-4" />
 								</Button>
 							)}
+							<ExpiryControl entity="file" id={docId} name={fileName} />
 							<Button variant="ghost" size="icon-xs" aria-label="History" onPress={() => setHistoryOpen(true)}>
 								<History className="size-4" />
 							</Button>

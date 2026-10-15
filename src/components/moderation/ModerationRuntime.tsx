@@ -3,6 +3,7 @@
 
 import { useEffect, useRef } from "react";
 
+import { systemNotice } from "@/lib/announcements";
 import { timeLeft } from "@/lib/moderation";
 import { writeWorkspaceMetadata } from "@/lib/tauri";
 import { useChat } from "@/store/chat/ChatContext";
@@ -38,7 +39,13 @@ export function ModerationExecutor() {
 						await writeWorkspaceMetadata({ path, metadata: { ...metadata, members: { members } } });
 						await addActivityEvent("Removed member", `${member.name} was ${p.action === "ban" ? "banned" : "removed"} by ${p.by}${p.reason ? `: ${p.reason}` : ""}`, undefined, "member");
 					}
-					await blockDevice(p.target).catch(() => disconnectPeer(p.target).catch(() => {}));
+						// Removals are not announced unless the Owner turned that on (Settings)
+						try {
+							if (localStorage.getItem(`nexsync-announce-removals:${workspace.id}`) === "1" && member) await chat.announce(systemNotice(`${member.name} is no longer a member`));
+						} catch {
+							/* blocked storage: nothing is announced */
+						}
+						await blockDevice(p.target).catch(() => disconnectPeer(p.target).catch(() => {}));
 					await chat.act({ action: "kicked", target: p.target, targetName: p.targetName, of: p.id });
 				}
 				await refreshMetadata();

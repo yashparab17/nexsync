@@ -12,6 +12,7 @@ import { useThemeContext } from "@/store/ThemeContext";
 import { useErrorLog } from "@/hooks/useErrorLog";
 
 // Components
+import WorkspaceIconView from "@/components/elements/WorkspaceIcon";
 import CreateWorkspaceDialog from "@/components/dialogs/workspace/CreateWorkspaceDialog";
 import ImportWorkspaceDialog from "@/components/dialogs/workspace/ImportWorkspaceDialog";
 import JoinWorkspaceDialog from "@/components/dialogs/workspace/JoinWorkspaceDialog";
@@ -177,8 +178,9 @@ export default function Welcome() {
 													onClick={() => handleOpenWorkspace(ws)}
 													className={`frame flex h-full min-h-44 w-full flex-col gap-3 bg-muted/40 p-6 text-left transition-colors hover:bg-muted`}
 												>
-													<span className="flex items-start justify-between gap-3">
-														<span className={`font-semibold text-xl`}>{ws.name}</span>
+													<span className="flex min-w-0 items-center gap-3">
+														<WorkspaceIconView id={ws.id} name={ws.name} className="size-10 text-xl" />
+														<span className="line-clamp-2 min-w-0 text-xl font-semibold [overflow-wrap:anywhere]">{ws.name}</span>
 													</span>
 													{ws.description && <span className="line-clamp-2 text-muted-foreground">{ws.description}</span>}
 													<span className="mt-auto flex flex-col gap-1 font-mono text-xs text-muted-foreground">

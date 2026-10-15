@@ -16,9 +16,8 @@ describe("Avatar", () => {
 		expect(look("Yash").letter).toBe("Y");
 	});
 
-	it("has the same colour for the same name and a different one for another name", () => {
-		expect(look("Yash").style).toBe(look("Yash").style);
-		expect(look("Yash").style).not.toBe(look("Sam").style);
+	it("is grey for everyone until they choose a colour, whatever the name", () => {
+		expect(look("Yash").style).toBe(look("Sam").style);
 	});
 
 	it("takes the first letter, ignoring spaces and case, and has a fallback for no name", () => {

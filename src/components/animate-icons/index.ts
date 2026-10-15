@@ -238,3 +238,7 @@ export const Paperclip = motionIcon(LPaperclip, 'tilt');
 export const SendHorizontal = motionIcon(LSendHorizontal, 'slide');
 export const SmilePlus = motionIcon(LSmilePlus, 'pop');
 export const Timer = motionIcon(LTimer, 'tilt');
+import { Megaphone as LMegaphone, Hourglass as LHourglass, Inbox as LInbox } from 'lucide-react';
+export const Megaphone = motionIcon(LMegaphone, 'tilt');
+export const Hourglass = motionIcon(LHourglass, 'pop');
+export const Inbox = motionIcon(LInbox, 'nudge');

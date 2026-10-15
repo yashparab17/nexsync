@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { open } from "@tauri-apps/plugin-dialog";
 import { APP_VERSION } from "@/lib/version";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Loader2 } from "lucide-react";
-import { Check, Moon, Plus, Sun, Trash2, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, Undo2, User, AlertTriangle } from "@/components/animate-icons";
+import { Upload, Check, Moon, Plus, Sun, Trash2, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, Undo2, User, AlertTriangle } from "@/components/animate-icons";
 
 import { Row, Segmented, SectionCard, SettingsShell } from "@/components/elements/SettingsParts";
 import CodeSchemePicker from "@/components/elements/CodeSchemePicker";
 import ThemePicker from "@/components/elements/ThemePicker";
 import Avatar from "@/components/elements/Avatar";
+import ColorSwatches from "@/components/elements/ColorSwatches";
+import { ensureLocalColor, setLocalProfile, type Profile } from "@/lib/profile";
+import { pictureToIcon } from "@/lib/workspaceIcon";
 import ErrorLogCard from "@/components/elements/ErrorLogCard";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -53,6 +56,14 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 	// The proxy is read when the app starts, so a change needs a restart
 	const [restartNeeded, setRestartNeeded] = useState(false);
 	const [name, setName] = useState("");
+	// How this person looks to others; kept on this device and shared into each workspace they open
+	const [profile, setProfile] = useState<Profile>(() => ensureLocalColor());
+	const picture = useRef<HTMLInputElement>(null);
+	const [pictureError, setPictureError] = useState<string | null>(null);
+	const changeProfile = (next: Profile) => {
+		setProfile(next);
+		setLocalProfile(next);
+	};
 	const [roots, setRoots] = useState<string[]>([]);
 	const [newRoot, setNewRoot] = useState("");
 	const [rootNote, setRootNote] = useState<string | null>(null);
@@ -217,7 +228,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						icon={<User className="size-5" />}
 					>
 						<div className="flex items-stretch gap-4">
-							<Avatar name={name} className="h-auto w-16 text-xl" />
+							<Avatar name={name} profile={profile} className="h-auto w-16 text-xl" />
 							<div className="min-w-0 flex-1 space-y-1">
 								<Input
 									value={name}
@@ -228,12 +239,53 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 									disabled={saved === null}
 								/>
 								<div className="flex justify-between text-xs text-muted-foreground">
-									<span>Leave it empty to appear as “Collaborator”. Your cursor color comes from this name.</span>
+									<span>Leave it empty to appear as “Collaborator”.</span>
 									<span className="tabular-nums">
 										{name.length}/{NAME_LIMIT}
 									</span>
 								</div>
 							</div>
+						</div>
+						<div className="space-y-2">
+							<p className="text-sm font-medium">Your colour</p>
+							<ColorSwatches value={profile.color} onChange={(color) => changeProfile({ ...profile, color: color ?? undefined })} />
+							<p className="text-[13px] text-muted-foreground">Colours your avatar and your cursor in shared notes. You were given one at random the first time; change it whenever you like.</p>
+						</div>
+						<div className="space-y-2">
+							<p className="text-sm font-medium">Your picture</p>
+							<div className="flex flex-wrap items-center gap-2">
+								<input
+									ref={picture}
+									type="file"
+									accept="image/png,image/jpeg,image/webp"
+									hidden
+									aria-label="Choose a picture"
+									onChange={(e) => {
+										const f = e.target.files?.[0];
+										e.target.value = "";
+										if (!f) return;
+										setPictureError(null);
+										pictureToIcon(f)
+											.then((icon) => icon.kind === "image" && changeProfile({ ...profile, image: icon.data }))
+											.catch((err) => setPictureError(err instanceof Error ? err.message : String(err)));
+									}}
+								/>
+								<Button variant="outline" size="sm" onPress={() => picture.current?.click()}>
+									<Upload className="size-3.5" />
+									Choose a Picture
+								</Button>
+								{profile.image && (
+									<Button variant="ghost" size="sm" onPress={() => changeProfile({ ...profile, image: undefined })}>
+										Remove
+									</Button>
+								)}
+							</div>
+							{pictureError && (
+								<p role="alert" className="text-xs text-destructive">
+									{pictureError}
+								</p>
+							)}
+							<p className="text-[13px] text-muted-foreground">Shown to the members of every workspace you are in. It is shrunk to a small square first.</p>
 						</div>
 					</SectionCard>
 

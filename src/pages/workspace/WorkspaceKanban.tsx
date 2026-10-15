@@ -34,6 +34,7 @@ import {
 import BoardDraftBar from "@/components/dialogs/workspace/BoardDraftBar";
 import CommentCount, { useThreadCounts } from "@/components/elements/CommentCount";
 import ConflictPanel from "@/components/elements/ConflictPanel";
+import ExpiryBadge, { ExpiryControl, useExpiries } from "@/components/elements/ExpiryBadge";
 import RecordTimeline from "@/components/elements/RecordTimeline";
 import FieldDiscussion from "@/components/elements/FieldDiscussion";
 import RuleFlag from "@/components/elements/RuleFlag";
@@ -55,6 +56,7 @@ export default function WorkspaceKanban() {
 	const memberName = (id: string) => members.find((m) => m.id === id)?.name ?? "a removed member";
 	const { dataVersion, publishDataChange, viewersAt } = useP2P();
 	const threadCounts = useThreadCounts();
+	const expiries = useExpiries();
 	const isViewer = useIsViewer();
 	const logError = useErrorLog();
 
@@ -653,6 +655,7 @@ export default function WorkspaceKanban() {
 													<h4 className="text-sm font-medium leading-snug text-foreground">
 														{card.title}
 														<span className="ml-1 align-middle"><CommentCount entity="card" id={card.id} legacy={card.comments?.length ?? 0} counts={threadCounts} /></span>
+														<span className="ml-1 align-middle"><ExpiryBadge entity="card" id={card.id} expiries={expiries} /></span>
 														{(card.conflicts?.length ?? 0) > 0 && (
 															<AlertTriangle className="ml-1 inline size-3.5 text-warning" aria-label="Has a change to sort out" />
 														)}
@@ -914,6 +917,7 @@ export default function WorkspaceKanban() {
 
 						<ConflictPanel conflicts={editingCard.conflicts ?? []} violations={editingCard.violations} show={showValue} canChoose={!isViewer} onChoose={resolveConflict} record={{ entity: "card", id: editingCard.id }} />
 						{workspace && <RecordTimeline workspacePath={workspace.path} entity="card" id={editingCard.id} title={editingCard.title} show={showValue} />}
+						<ExpiryControl entity="card" id={editingCard.id} name={editingCard.title} />
 						{!isViewer && workspace && <DraftsButton workspacePath={workspace.path} entity="card" record={editingCard} members={members} onMerged={() => setEditingCard(null)} />}
 
 						<Comments

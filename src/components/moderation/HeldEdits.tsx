@@ -4,9 +4,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, X } from "@/components/animate-icons";
 
+import Art from "@/components/elements/Art";
 import { Button } from "@/components/ui/button";
 import { fieldName } from "@/components/elements/ConflictPanel";
-import { heldAccept, heldDiscard, heldList, type HeldWrite } from "@/lib/tauri";
+import { channelLabel } from "@/lib/chat/routes";
+import { commentText, type LogEntry } from "@/lib/chat/entries";
+import { plainPreview } from "@/lib/chat/preview";
+import { heldAccept, heldDiscard, heldEntriesList, heldEntryAccept, heldEntryDiscard, heldList, type HeldWrite } from "@/lib/tauri";
 import { REVIEW_REASON } from "@/lib/moderation";
 import { useChat } from "@/store/chat/ChatContext";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -28,12 +32,14 @@ export default function HeldEdits({ onlyReview = false }: { onlyReview?: boolean
 	const chat = useChat();
 	const path = workspace?.path;
 	const [items, setItems] = useState<HeldWrite[]>([]);
+	const [messages, setMessages] = useState<LogEntry[]>([]);
 	const [error, setError] = useState<string | null>(null);
 
 	const load = useCallback(async () => {
 		if (!path) return;
 		try {
 			setItems(((await heldList(path)) ?? []).filter((h) => !onlyReview || h.reason === REVIEW_REASON));
+			setMessages(onlyReview ? [] : ((await heldEntriesList(path).catch(() => [])) ?? []));
 		} catch (err) {
 			setError(err instanceof Error ? err.message : String(err));
 		}
@@ -55,8 +61,13 @@ export default function HeldEdits({ onlyReview = false }: { onlyReview?: boolean
 		}
 	};
 
-	if (items.length === 0 && !error) {
-		return <p className="px-1 py-6 text-center text-sm text-muted-foreground">Nothing is held. Changes from a removed, timed-out or unknown device would wait here for you to accept or discard them.</p>;
+	if (items.length === 0 && messages.length === 0 && !error) {
+		return (
+			<div className="flex flex-col items-center gap-3 px-1 py-6 text-center">
+				<Art name="approval" className="h-32 w-44" />
+				<p className="text-sm text-muted-foreground">Nothing is held. Changes and messages from a removed, timed-out or unknown device would wait here for you to accept or discard them.</p>
+			</div>
+		);
 	}
 	return (
 		<div className="space-y-2">
@@ -89,7 +100,37 @@ export default function HeldEdits({ onlyReview = false }: { onlyReview?: boolean
 						</div>
 					</li>
 				))}
-			</ul>
-		</div>
-	);
-}
+				</ul>
+				{messages.length > 0 && (
+					<section aria-label="Held messages">
+						<h3 className="pt-2 font-mono text-[13px] text-muted-foreground">Messages / {messages.length}</h3>
+						<ul className="divide-y divide-border/60">
+							{messages.map((m) => (
+								<li key={m.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+									<div className="min-w-0">
+										<p className="text-sm">
+											<span className="font-semibold">{m.name || "Unknown"}</span> wrote in <span className="font-semibold">{channelLabel(m.channel)}</span>
+										</p>
+										<p className="break-words text-sm text-muted-foreground">{plainPreview(m.kind === "comment" ? commentText(m.body) : m.body, chat.people, 200)}</p>
+										<p className="font-mono text-[13px] text-muted-foreground">
+											Held because the device is timed out. Written {new Date(m.ts).toLocaleString()}.
+										</p>
+									</div>
+									<div className="flex shrink-0 gap-2">
+										<Button size="sm" variant="outline" onPress={() => void run(() => heldEntryAccept(path!, m.id))}>
+											<Check className="size-3.5" />
+											Accept
+										</Button>
+										<Button size="sm" variant="ghost" onPress={() => void run(() => heldEntryDiscard(path!, m.id))}>
+											<X className="size-3.5" />
+											Discard
+										</Button>
+									</div>
+								</li>
+							))}
+						</ul>
+					</section>
+				)}
+			</div>
+		);
+	}

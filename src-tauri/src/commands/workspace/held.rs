@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 
-use super::chatlog::Role;
+use super::chatlog::{self, Role};
 use super::crdt::{self, Crdt, RecordState, Sibling};
 use super::models::{KanbanCard, Task};
 use super::{data_sync, moderation};
@@ -224,7 +224,96 @@ pub fn list(conn: &Connection) -> Result<Vec<Held>, String> {
 }
 
 pub fn count(conn: &Connection) -> i64 {
-    conn.query_row("SELECT COUNT(*) FROM held_writes", [], |r| r.get(0)).unwrap_or(0)
+    let writes: i64 = conn.query_row("SELECT COUNT(*) FROM held_writes", [], |r| r.get(0)).unwrap_or(0);
+    let entries: i64 = conn.query_row("SELECT COUNT(*) FROM held_entries", [], |r| r.get(0)).unwrap_or(0);
+    writes + entries
+}
+
+// ────────────────────────────
+// Messages and comments of a timed-out member
+// ────────────────────────────
+//
+// A chat message or comment signed by a member who is timed out is not shown or passed on, but it is kept, signed, for an Owner
+// or Admin to accept or discard, as the task and card writes above are. A member's older message that reaches this device only
+// after their timeout began waits here too: nothing tells the two apart, so nothing is thrown away.
+
+/// Kinds of entry that are held. Reactions, edits and the like from a timed-out member are simply not taken.
+pub fn holdable(kind: &str) -> bool {
+    matches!(kind, "message" | "comment")
+}
+
+/// Keeps an entry apart, once however often it arrives. An entry this device already has is not kept again.
+pub fn hold_entry(conn: &Connection, e: &chatlog::Entry, now: u64) -> Result<(), String> {
+    let have: bool = conn.query_row("SELECT COUNT(*) > 0 FROM log_entries WHERE id = ?1", [&e.id], |r| r.get(0)).map_err(|x| x.to_string())?;
+    if have {
+        return Ok(());
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO held_entries (id, entry, author, name, kind, ts, held_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![e.id, serde_json::to_string(e).map_err(|x| x.to_string())?, e.author, e.name, e.kind, e.ts as i64, now as i64],
+    )
+    .map_err(|x| x.to_string())?;
+    conn.execute("DELETE FROM held_entries WHERE id NOT IN (SELECT id FROM held_entries ORDER BY held_at DESC, rowid DESC LIMIT ?1)", [KEEP]).map(|_| ()).map_err(|x| x.to_string())
+}
+
+pub fn list_entries(conn: &Connection) -> Result<Vec<chatlog::Entry>, String> {
+    let mut stmt = conn.prepare("SELECT entry FROM held_entries ORDER BY ts ASC").map_err(|x| x.to_string())?;
+    let rows = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|x| x.to_string())?;
+    Ok(rows.filter_map(Result::ok).filter_map(|t| serde_json::from_str(&t).ok()).collect())
+}
+
+pub fn discard_entry(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM held_entries WHERE id = ?1", [id]).map(|_| ()).map_err(|x| x.to_string())
+}
+
+/// Takes a held entry into the log, judged by the role its author has in the member list (the timeout is set aside)
+pub fn accept_entry(conn: &Connection, id: &str, now: u64) -> Result<Option<chatlog::Entry>, String> {
+    let text: Option<String> = conn.query_row("SELECT entry FROM held_entries WHERE id = ?1", [id], |r| r.get(0)).optional().map_err(|x| x.to_string())?;
+    let Some(text) = text else { return Ok(None) };
+    let entry: chatlog::Entry = serde_json::from_str(&text).map_err(|x| x.to_string())?;
+    let (list, _) = moderation::load(conn, now);
+    let Some(list) = list else { return Err("This device holds no member list.".into()) };
+    let roles: HashMap<String, Role> = list.members.iter().filter_map(|(k, r)| Role::parse(r).map(|r| (k.clone(), r))).collect();
+    let owner = list.owner.clone();
+    let role_of = move |k: &str| if k == owner { Some(Role::Owner) } else { roles.get(k).copied() };
+    let me = super::signing::device_key().unwrap_or_default();
+    let merged = chatlog::merge(conn, vec![entry], &chatlog::Ctx { me: &me, now, role_of: &role_of })?;
+    discard_entry(conn, id)?;
+    Ok(merged.added.into_iter().next())
+}
+
+#[tauri::command]
+pub fn held_entries_list(app: tauri::AppHandle, path: String) -> Result<Vec<chatlog::Entry>, String> {
+    validate_allowed_root(&app, &path)?;
+    list_entries(&WorkspaceDb::open_existing(&path)?.conn)
+}
+
+fn entry_reviewer(conn: &Connection) -> Result<(), String> {
+    let me = super::signing::device_key().unwrap_or_default();
+    if Gate::load(conn, crdt::now_ms()).may_review(&me) {
+        Ok(())
+    } else {
+        Err("Only the Owner and Admins review held messages.".into())
+    }
+}
+
+#[tauri::command]
+pub fn held_entry_accept(app: tauri::AppHandle, path: String, id: String) -> Result<(), String> {
+    use tauri::Emitter;
+    validate_allowed_root(&app, &path)?;
+    let db = WorkspaceDb::open_existing(&path)?;
+    entry_reviewer(&db.conn)?;
+    accept_entry(&db.conn, &id, crdt::now_ms())?;
+    let _ = app.emit(crate::commands::p2p::chat::EVENT_LOG, ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn held_entry_discard(app: tauri::AppHandle, path: String, id: String) -> Result<(), String> {
+    validate_allowed_root(&app, &path)?;
+    let db = WorkspaceDb::open_existing(&path)?;
+    entry_reviewer(&db.conn)?;
+    discard_entry(&db.conn, &id)
 }
 
 pub fn discard(conn: &Connection, id: i64) -> Result<(), String> {
@@ -520,6 +609,30 @@ mod tests {
             s.by = None;
         }
         arrive(&conn, Some(&local), &later);
+        assert_eq!(count(&conn), 0);
+    }
+
+    #[test]
+    fn a_timed_out_members_message_is_held_once_and_an_accepted_one_joins_the_log() {
+        let conn = workspace();
+        list_with(&conn, &[]);
+        let msg = Entry::signed_with(&key(2), "message", "general", "", "said while timed out", 1_000);
+        for _ in 0..3 {
+            hold_entry(&conn, &msg, 5_000).unwrap();
+        }
+        assert_eq!((list_entries(&conn).unwrap().len(), count(&conn)), (1, 1));
+        assert!(holdable("message") && holdable("comment") && !holdable("react"));
+        // Accepting takes it into the log, judged by the member's own role, and it is no longer held
+        let taken = accept_entry(&conn, &msg.id, 6_000).unwrap();
+        assert_eq!(taken.map(|e| e.id), Some(msg.id.clone()));
+        assert_eq!(count(&conn), 0);
+        assert!(chatlog::list(&conn).unwrap().iter().any(|e| e.id == msg.id));
+        // One that is already in the log is not held again; a discarded one is gone
+        hold_entry(&conn, &msg, 7_000).unwrap();
+        assert_eq!(count(&conn), 0);
+        let other = Entry::signed_with(&key(2), "message", "general", "", "unwanted", 1_100);
+        hold_entry(&conn, &other, 7_000).unwrap();
+        discard_entry(&conn, &other.id).unwrap();
         assert_eq!(count(&conn), 0);
     }
 

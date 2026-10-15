@@ -7,7 +7,7 @@ import type { Awareness } from "y-protocols/awareness";
 
 import PresenceDots from "@/components/elements/PresenceDots";
 import { Button } from "@/components/ui/button";
-import { colorForName } from "@/lib/collabColor";
+import { colorOf } from "@/lib/collabColor";
 import { CARD_H, CARD_W, clampZoom, summarize } from "@/lib/notes/board";
 import { degrees, type GraphEdge, type NoteInfo, type Point } from "@/lib/notes/graph";
 import { noteTitle } from "@/lib/notes/links";
@@ -241,10 +241,10 @@ export default function NoteBoard({ notes, positions, edges, activePath, onMove,
 				{/* Other people's pointers */}
 				{pointers.map((p, i) => (
 					<div key={`${p.name}-${i}`} className="pointer-events-none absolute z-10" style={{ left: p.x, top: p.y }}>
-						<svg width="14" height="14" viewBox="0 0 14 14" style={{ color: colorForName(p.name) }}>
+						<svg width="14" height="14" viewBox="0 0 14 14" style={{ color: colorOf(p.name) }}>
 							<path d="M1 1l11 5-4.5 1.5L6 12z" fill="currentColor" />
 						</svg>
-						<span className="ml-3 -mt-1 inline-block px-1 text-xs font-medium text-white" style={{ background: colorForName(p.name) }}>
+						<span className="ml-3 -mt-1 inline-block px-1 text-xs font-medium text-white" style={{ background: colorOf(p.name) }}>
 							{p.name}
 						</span>
 					</div>

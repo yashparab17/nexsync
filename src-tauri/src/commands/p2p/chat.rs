@@ -181,8 +181,15 @@ async fn on_entries(node: Arc<Node>, from: String, workspace: String, message: s
         return;
     }
     let view = node.role_view();
+    // Messages and comments of a member who is timed out are kept apart for an Admin, not refused (held.rs)
+    let (held, entries): (Vec<Entry>, Vec<Entry>) = entries.into_iter().partition(|e| {
+        crate::commands::workspace::held::holdable(&e.kind) && view.muted.contains(&e.author) && e.signature_ok() && view.base_role_of(&e.author).is_some_and(|r| r >= Role::Commenter)
+    });
     let merged = tokio::task::spawn_blocking(move || {
         let db = WorkspaceDb::open_existing(&workspace)?;
+        for e in &held {
+            crate::commands::workspace::held::hold_entry(&db.conn, e, crdt::now_ms())?;
+        }
         let role_of = |k: &str| view.role_of(k);
         chatlog::merge(&db.conn, entries, &Ctx { me: &view.me, now: crdt::now_ms(), role_of: &role_of })
     })

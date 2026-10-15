@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { plainPreview } from "@/lib/chat/preview";
 import { channelLabel, routeForChannel } from "@/lib/chat/routes";
 import { noticeText } from "@/lib/moderation";
+import Art from "@/components/elements/Art";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/store/chat/ChatContext";
 import { useNotifications } from "@/store/notifications/NotificationContext";
@@ -71,11 +72,14 @@ export default function NotificationBell() {
 							</span>
 						</div>
 						{empty ? (
-							<p className="p-4 text-sm text-muted-foreground">Nothing yet. Mentions, replies, new collaborators and assigned tasks show up here, and stay until you clear them.</p>
+							<div className="flex flex-col items-center gap-3 p-6 text-center">
+								<Art name="mailbox" className="h-28 w-40" />
+								<p className="text-sm text-muted-foreground">Nothing yet. Mentions, replies, new collaborators and assigned tasks show up here, and stay until you clear them.</p>
+							</div>
 						) : chat.active ? (
 							<ul className="max-h-96 overflow-y-auto">
 								{chat.inbox.map((n) => {
-									const entryItem = n.kind === "mention" || n.kind === "reply" || n.kind === "follow" || n.kind === "dm";
+									const entryItem = n.kind === "mention" || n.kind === "reply" || n.kind === "follow" || n.kind === "dm" || n.kind === "announcement";
 									// What an Admin did about this member: the details are in the snippet as JSON
 									const detail = n.kind === "moderation" ? parseDetail(n.snippet) : {};
 									const go = () => {
@@ -93,7 +97,7 @@ export default function NotificationBell() {
 													<span className="block text-sm">
 														{entryItem ? (
 															<>
-																<span className="font-semibold">{n.author}</span> {n.kind === "mention" ? "mentioned you" : n.kind === "reply" ? "replied to you" : n.kind === "dm" ? "sent you a direct message" : "commented"} in <span className="font-semibold">{channelLabel(n.channel)}</span>
+																<span className="font-semibold">{n.author}</span> {n.kind === "mention" ? "mentioned you" : n.kind === "reply" ? "replied to you" : n.kind === "dm" ? "sent you a direct message" : n.kind === "announcement" ? "posted" : "commented"} in <span className="font-semibold">{channelLabel(n.channel)}</span>
 															</>
 														) : n.kind === "moderation" ? (
 															noticeText(n.channel, n.author, detail)

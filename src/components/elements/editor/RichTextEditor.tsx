@@ -8,7 +8,7 @@ import "@blocknote/mantine/style.css";
 
 import { useSeedOnce } from "@/hooks/useSeedOnce";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
-import { colorForName } from "@/lib/collabColor";
+import { colorOf } from "@/lib/collabColor";
 import { blocksToPlainText, plainTextToBlocks } from "@/lib/notes/text";
 import { useThemeContext } from "@/store/ThemeContext";
 import Loading from "@/components/Loading";
@@ -53,7 +53,7 @@ export default function RichTextEditor({
 						schema,
 						collaboration: {
 							fragment: collab.doc.getXmlFragment("blocknote"),
-							user: { name: userName, color: colorForName(userName) },
+							user: { name: userName, color: colorOf(userName) },
 							provider: { awareness: collab.awareness },
 						},
 					})

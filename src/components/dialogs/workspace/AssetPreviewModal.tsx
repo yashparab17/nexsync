@@ -7,7 +7,7 @@ import { Dialog, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import Loading from "@/components/Loading";
 import PdfViewer from "@/components/elements/PdfViewer";
 import FieldDiscussion from "@/components/elements/FieldDiscussion";
-import { buildThreads, docChannel } from "@/lib/chat/entries";
+import { buildThreads, docChannel, type Point } from "@/lib/chat/entries";
 import { useChat } from "@/store/chat/ChatContext";
 import { useIsViewer } from "@/store/p2p/P2PContext";
 
@@ -62,7 +62,7 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 	const chat = useChat();
 	// Comments pinned to a place in a picture
 	const [pinMode, setPinMode] = useState(false);
-	const [draftPoint, setDraftPoint] = useState<{ x: number; y: number } | null>(null);
+	const [draftPoint, setDraftPoint] = useState<Point | null>(null);
 	const [openPin, setOpenPin] = useState<string | null>(null);
 	const [box, setBox] = useState<{ left: number; top: number; w: number; h: number } | null>(null);
 	const imgRef = useRef<HTMLImageElement>(null);
@@ -218,9 +218,9 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 
 			<section className="space-y-1">
 				<h3 className="font-mono text-xs text-muted-foreground">Comments</h3>
-				{isImage && !isViewer && (
+				{(isImage || isPdf) && !isViewer && (
 					<Button variant={pinMode ? "default" : "outline"} size="sm" aria-pressed={pinMode} onPress={() => setPinMode((v) => !v)}>
-						{pinMode ? "Click the picture to place a comment" : "Pin a comment on the picture"}
+						{pinMode ? `Click the ${isPdf ? "page" : "picture"} to place a comment` : `Pin a Comment on the ${isPdf ? "Page" : "Picture"}`}
 					</Button>
 				)}
 				{draftPoint && <FieldDiscussion channel={docChannel(asset.path)} field="" point={draftPoint} canComment placeholder="Comment on this spot" label="Comment on this spot" onPosted={() => setDraftPoint(null)} />}
@@ -351,7 +351,23 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 											<audio src={dataUrl} controls className="w-full" />
 										</div>
 									)}
-									{isPdf && <PdfViewer name={asset.name} base64={dataUrl.slice(dataUrl.indexOf(",") + 1)} />}
+									{isPdf && (
+										<PdfViewer
+											name={asset.name}
+											base64={dataUrl.slice(dataUrl.indexOf(",") + 1)}
+											placing={pinMode && !isViewer}
+											pins={pins.filter((t) => t.point?.page !== undefined).map((t) => ({ id: t.id, page: t.point!.page!, x: t.point!.x, y: t.point!.y, label: String(pins.findIndex((p) => p.id === t.id) + 1), active: openPin === t.id }))}
+											draft={draftPoint?.page !== undefined ? { page: draftPoint.page, x: draftPoint.x, y: draftPoint.y } : null}
+											onPlace={(page, x, y) => {
+												setDraftPoint({ page, x, y });
+												setOpenPin(null);
+											}}
+											onPin={(id) => {
+												setOpenPin(id);
+												setDraftPoint(null);
+											}}
+										/>
+									)}
 									{!isImage && !isVideo && !isAudio && !isPdf && (
 										<div className="m-auto flex max-w-sm flex-col items-center gap-3 border bg-muted/40 p-8 text-center">
 											<FileText className="size-12 text-muted-foreground" />

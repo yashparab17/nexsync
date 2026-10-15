@@ -257,7 +257,7 @@ export default function WorkspaceChat() {
 
 	return (
 		<Page>
-			<div className="flex min-h-0 flex-1">
+			<div className="@container flex min-h-0 flex-1">
 				<ChannelList
 					channels={chat.channels}
 					active={channel.id}
@@ -287,10 +287,12 @@ export default function WorkspaceChat() {
 					}}
 				/>
 				<section aria-label={`${dmWith ? "@" : "#"}${channel.name}`} className="flex min-w-0 flex-1 flex-col">
-					<Toolbar variant="header" className="gap-2 px-4">
+					<Toolbar>
 						{dmPerson ? <Avatar name={dmPerson.name} className="size-6 text-xs" /> : <Hash className="size-5 shrink-0 text-muted-foreground" />}
-						<ToolbarTitle name={channel.name} meta={channel.topic} />
+						<ToolbarTitle name={channel.name} />
+						{channel.topic && <span className="hidden min-w-0 flex-1 truncate border-l pl-3 font-mono text-[13px] text-muted-foreground @3xl:block">{channel.topic}</span>}
 						<span className="flex-1" />
+						<div className="flex flex-wrap items-center justify-end gap-1">
 						<Button variant="ghost" size="icon-sm" aria-label={muted[channel.id] ? "Unmute channel" : "Mute channel"} onPress={() => chat.setMuted(channel.id, !muted[channel.id])} className="text-muted-foreground">
 							{muted[channel.id] ? <BellOff className="size-4" /> : <Bell className="size-4" />}
 						</Button>
@@ -328,9 +330,10 @@ export default function WorkspaceChat() {
 						>
 							<Moon className="size-4" />
 						</Button>
-						<Button variant="ghost" size="icon-sm" aria-label={showMembers ? "Hide members" : "Show members"} aria-pressed={showMembers} onPress={() => setShowMembers((v) => !v)} className={cn("hidden lg:inline-flex", showMembers ? "text-foreground" : "text-muted-foreground")}>
+						<Button variant="ghost" size="icon-sm" aria-label={showMembers ? "Hide members" : "Show members"} aria-pressed={showMembers} onPress={() => setShowMembers((v) => !v)} className={cn("hidden @4xl:inline-flex", showMembers ? "text-foreground" : "text-muted-foreground")}>
 							<Users className="size-4" />
 						</Button>
+						</div>
 					</Toolbar>
 					{notice && (
 						<p role="status" className="flex h-8 shrink-0 items-center justify-between gap-4 bg-muted px-4 text-[13px]">
@@ -341,7 +344,7 @@ export default function WorkspaceChat() {
 						</p>
 					)}
 					{messages.length === 0 ? (
-						<EmptyState art="members" title={dmWith ? `Your Conversation With ${channel.name}` : `Welcome to #${channel.name}`}>
+						<EmptyState art={dmWith ? "direct" : "chat"} title={dmWith ? `Your Conversation With ${channel.name}` : `Welcome to #${channel.name}`}>
 							{dmWith
 								? "Only the two of you can read what is written here: it is sealed to your two device keys, so even the device that passes it on cannot read it. Who wrote to whom, and when, is not hidden."
 								: "This is the start of the channel. Messages are signed with each person's device key and travel directly between devices, with no server in between."}

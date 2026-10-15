@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { arrivedLate, laneOf, parseValue, stops, valuesAt, type LoggedWrite } from "@/lib/timescrub";
 import { recordHistory } from "@/lib/tauri";
-import { colorForName } from "@/lib/collabColor";
+import { colorOf } from "@/lib/collabColor";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -102,7 +102,7 @@ function Replay({ workspacePath, entity, id, title, show, onClose }: Props & { o
 													aria-label={`${lane} changed ${fieldName(w.path)} at ${when(w.ts)}${arrivedLate(w) ? ", reached this device later" : ""}`}
 													title={`${fieldName(w.path)} · ${when(w.ts)}${arrivedLate(w) ? " · reached this device later" : ""}`}
 													onClick={() => setAt(moments.indexOf(w.ts))}
-													style={{ left: `${((w.ts - first) / span) * 100}%`, background: colorForName(lane) }}
+													style={{ left: `${((w.ts - first) / span) * 100}%`, background: colorOf(lane) }}
 													className={cn("absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full", arrivedLate(w) && "ring-2 ring-warning", w.ts === now && "outline outline-2 outline-foreground")}
 												/>
 											))}

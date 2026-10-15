@@ -19,7 +19,7 @@ interface RichTextProps {
 
 export default function RichText({ text, people, me, onOpenNote, refTitle, onOpenRef, renderFile }: RichTextProps) {
 	return (
-		<div className="min-w-0 space-y-1 text-sm break-words whitespace-pre-wrap">
+		<div className="min-w-0 space-y-1 text-sm whitespace-pre-wrap [overflow-wrap:anywhere]">
 			{parseMessage(text, people).map((block, i) =>
 				block.type === "code" ? (
 					<pre key={i} className="overflow-x-auto rounded-md bg-muted/60 p-3 font-mono text-[13px] whitespace-pre">

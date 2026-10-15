@@ -5,6 +5,8 @@ import { useState } from "react";
 import { X } from "lucide-react";
 
 import ReactionBar from "@/components/chat/ReactionBar";
+import DiscussToggle from "@/components/elements/DiscussToggle";
+import type { Proposal } from "@/lib/proposals";
 import RichText from "@/components/chat/RichText";
 import { AnimateIcon, Bell, BellRing, Check, CornerUpLeft, Pencil, RotateCcw, Trash2 } from "@/components/animate-icons";
 import Toolbar from "@/components/layout/Toolbar";
@@ -32,6 +34,8 @@ export interface CommentsPanelProps {
 	onResolve: (thread: Thread, resolved: boolean) => Promise<void>;
 	onClose: () => void;
 	onReact: (comment: ThreadComment, emoji: string) => void;
+	// Open suggestions of this file, each with a discussion of its own
+	suggestions?: Proposal[];
 	// Whether this device is told about new comments on the file, and the switch for it
 	following: boolean;
 	onFollow: (on: boolean) => void;
@@ -84,6 +88,18 @@ export default function CommentsPanel(props: CommentsPanelProps) {
 				{shown.map((t) => (
 					<ThreadCard key={t.id} thread={t} placement={props.placements.get(t.id) ?? null} {...props} />
 				))}
+				{tab === "open" && (props.suggestions?.length ?? 0) > 0 && (
+					<section aria-label="Suggestions" className="space-y-2 pt-2">
+						<h3 className="px-1 font-mono text-[13px] text-muted-foreground">Suggestions / {props.suggestions!.length}</h3>
+						{props.suggestions!.map((p) => (
+							<div key={p.id} className="frame space-y-1 bg-muted/40 p-3">
+								<p className="text-[13px] text-muted-foreground">{p.by} suggests</p>
+								<p className="line-clamp-3 font-mono text-[13px]">{p.text || "(delete this text)"}</p>
+								<DiscussToggle channel={`suggestion:${p.id}`} canComment={props.canComment} />
+							</div>
+						))}
+					</section>
+				)}
 			</div>
 		</aside>
 	);

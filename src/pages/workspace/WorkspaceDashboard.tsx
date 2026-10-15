@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowUpRight, FilePlus, FileText, FolderOpen, ListTodo, StickyNote, Upload, UsersRound, Calendar, AnimateIcon } from "@/components/animate-icons";
 
 import Avatar from "@/components/elements/Avatar";
+import AnnouncementStrip from "@/components/announcements/AnnouncementStrip";
 import { Page, PageBody, Panel } from "@/components/layout/Page";
 import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
 import Art from "@/components/elements/Art";
@@ -84,8 +85,10 @@ export default function WorkspaceDashboard() {
 			</Toolbar>
 
 			{/* A bento grid: tile size follows importance, with where to continue largest */}
-			<PageBody className="grid content-start gap-4 md:grid-cols-6 xl:grid-cols-12">
-				<Panel index="01" title="Pick Up Where You Left Off" flush={recent.length > 0} className="md:col-span-6 xl:col-span-5 xl:row-span-2">
+			<PageBody className="@container">
+				<div className="grid content-start gap-4 @xl:grid-cols-6 @4xl:grid-cols-12">
+				<AnnouncementStrip />
+				<Panel index="01" title="Pick Up Where You Left Off" flush={recent.length > 0} className="@xl:col-span-6 @4xl:col-span-5 @4xl:row-span-2">
 					{recent.length === 0 ? (
 						<div className="flex h-full flex-col items-center justify-center gap-4 py-6 text-center">
 							<Art name="recent" className="h-40 w-64 max-w-full" />
@@ -110,7 +113,7 @@ export default function WorkspaceDashboard() {
 					)}
 				</Panel>
 
-				<Tile index="02" title="Open Tasks" value={open.length} onClick={goTo("/workspace/tasks")} className="md:col-span-3 xl:col-span-4">
+				<Tile index="02" title="Open Tasks" value={open.length} onClick={goTo("/workspace/tasks")} className="@xl:col-span-3 @4xl:col-span-4">
 					<span className="block h-2 bg-muted" role="img" aria-label={`${doneShare}% of tasks done`}>
 						<span className="block h-full bg-success" style={{ width: `${doneShare}%` }} />
 					</span>
@@ -119,13 +122,13 @@ export default function WorkspaceDashboard() {
 						{late > 0 && <span className="text-destructive"> · {late} overdue</span>}
 					</span>
 				</Tile>
-				<Tile index="03" title="Files" value={stats?.files ?? 0} onClick={goTo("/workspace/files")} className="md:col-span-3 xl:col-span-3">
+				<Tile index="03" title="Files" value={stats?.files ?? 0} onClick={goTo("/workspace/files")} className="@xl:col-span-3 @4xl:col-span-3">
 					<span className="text-sm text-muted-foreground">
 						{stats?.assets ?? 0} assets · {stats?.kanban_cards ?? 0} cards
 					</span>
 				</Tile>
 
-				<Panel index="04" title="Due Soon" flush={due.length > 0} className="md:col-span-3 xl:col-span-4">
+				<Panel index="04" title="Due Soon" flush={due.length > 0} className="@xl:col-span-3 @4xl:col-span-4">
 					{due.length === 0 ? (
 						<p className="text-sm text-muted-foreground">No dates set. Give a task a due date and it appears here.</p>
 					) : (
@@ -150,18 +153,18 @@ export default function WorkspaceDashboard() {
 					)}
 				</Panel>
 
-				<Panel index="05" title="People" hint={`${[...online].filter((n) => members.some((m) => m.name === n)).length} online`} flush className="md:col-span-3 xl:col-span-3">
+				<Panel index="05" title="People" hint={`${[...online].filter((n) => members.some((m) => m.name === n)).length} online`} flush className="@xl:col-span-3 @4xl:col-span-3">
 					<ul className="divide-y">
 						{members.slice(0, 4).map((m) => {
 							const here = online.has(m.name);
 							return (
-								<li key={m.id} className="flex items-center gap-3 px-4 py-3">
-									<span className="relative">
-										<Avatar name={m.name} className={cn("size-8", !here && "opacity-50")} />
-										<span className={cn("absolute -right-0.5 -bottom-0.5 size-2.5 ring-2 ring-background", here ? "bg-success" : "bg-muted-foreground/50")} />
+								<li key={m.id} className="flex min-h-14 items-center gap-3 px-4 py-2">
+									<Avatar name={m.name} className={cn("size-8", !here && "opacity-50")} />
+									<span className="min-w-0 flex-1">
+										<span className={cn("block truncate text-sm font-medium", !here && "text-muted-foreground")}>{m.name}</span>
+										<span className="block truncate font-mono text-[13px] text-muted-foreground">{m.role.toLowerCase()}</span>
 									</span>
-									<span className={cn("min-w-0 flex-1 truncate text-sm font-medium", !here && "text-muted-foreground")}>{m.name}</span>
-									<span className="font-mono text-[13px] text-muted-foreground">{m.role.toLowerCase()}</span>
+									<span title={here ? "Online" : "Offline"} aria-label={here ? "Online" : "Offline"} className={cn("size-2 shrink-0 rounded-full", here ? "bg-success" : "bg-muted-foreground/40")} />
 								</li>
 							);
 						})}
@@ -175,7 +178,7 @@ export default function WorkspaceDashboard() {
 					</ul>
 				</Panel>
 
-				<Panel index="06" title="Activity" flush={activity.length > 0} className="md:col-span-6 xl:col-span-8">
+				<Panel index="06" title="Activity" flush={activity.length > 0} className="@xl:col-span-6 @4xl:col-span-8">
 					{activity.length === 0 ? (
 						<p className="text-sm text-muted-foreground">Nothing has changed yet. Create a note, file or task to get started.</p>
 					) : (
@@ -200,9 +203,10 @@ export default function WorkspaceDashboard() {
 					)}
 				</Panel>
 
-				<Tile index="07" title="Kanban Cards" value={stats?.kanban_cards ?? 0} onClick={goTo("/workspace/kanban")} className="md:col-span-6 xl:col-span-4">
+				<Tile index="07" title="Kanban Cards" value={stats?.kanban_cards ?? 0} onClick={goTo("/workspace/kanban")} className="@xl:col-span-6 @4xl:col-span-4">
 					<span className="text-sm text-muted-foreground">{members.length} {members.length === 1 ? "member" : "members"} share this board</span>
 				</Tile>
+				</div>
 			</PageBody>
 		</Page>
 	);

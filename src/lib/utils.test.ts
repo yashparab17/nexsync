@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { colorForName } from "@/lib/collabColor";
+import { colorOf, NEUTRAL } from "@/lib/collabColor";
 import { cleanPath, errorText, formatBytes, getMimeType } from "@/lib/utils";
 
 describe("utils", () => {
@@ -22,9 +22,9 @@ describe("utils", () => {
 		expect(errorText(42, "fallback")).toBe("fallback");
 	});
 
-	it("gives a collaborator the same color every time", () => {
-		expect(colorForName("Ada")).toBe(colorForName("Ada"));
-		expect(colorForName("Ada")).toMatch(/^#[0-9a-f]{6}$/);
+	it("gives nobody a colour from their name: grey until they have chosen one", () => {
+		expect(colorOf("Ada")).toBe(NEUTRAL);
+		expect(colorOf("Bo")).toBe(NEUTRAL);
 	});
 });
 

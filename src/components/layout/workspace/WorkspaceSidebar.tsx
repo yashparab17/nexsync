@@ -1,5 +1,5 @@
 // React
-import { AnimateIcon, Code2, Files, FolderClose, FolderTree, ListTodo, MessageSquareText, StickyNote } from "@/components/animate-icons";
+import { AnimateIcon, Code2, Files, FolderClose, FolderTree, ListTodo, MessageSquareText, Megaphone, StickyNote } from "@/components/animate-icons";
 import { useCallback, useState, type ElementType } from "react";
 
 // React Router
@@ -18,7 +18,9 @@ import Avatar from "@/components/elements/Avatar";
 import { myName } from "@/lib/p2p/selfName";
 import PresenceDots from "@/components/elements/PresenceDots";
 import { pageOf } from "@/lib/p2p/presence";
-import { useP2P } from "@/store/p2p/P2PContext";
+import { useP2P, useSelfRole } from "@/store/p2p/P2PContext";
+import { waitingForMe } from "@/lib/announcements";
+import WorkspaceIconView from "@/components/elements/WorkspaceIcon";
 import { useChat } from "@/store/chat/ChatContext";
 
 // Context
@@ -78,6 +80,12 @@ const navigation: NavigationItem[] = [
 		icon: MessageSquareText,
 	},
 	{
+		name: "Announcements",
+		label: "nav.announcements",
+		path: "/workspace/announcements",
+		icon: Megaphone,
+	},
+	{
 		name: "Tasks",
 		label: "nav.tasks",
 		path: "/workspace/tasks",
@@ -97,7 +105,7 @@ const byPath = (path: string) => navigation.find((item) => item.path === path)!;
 // items, then planning
 const navGroups: { id: string; label?: MessageKey; items: NavigationItem[] }[] = [
 	{ id: "top", items: [byPath("/workspace"), byPath("/workspace/explorer")] },
-	{ id: "talk", label: "nav.groupTalk", items: [byPath("/workspace/chat")] },
+	{ id: "talk", label: "nav.groupTalk", items: [byPath("/workspace/announcements"), byPath("/workspace/chat")] },
 	{ id: "write", label: "nav.groupWrite", items: [byPath("/workspace/notes"), byPath("/workspace/editor")] },
 	{ id: "storage", label: "nav.groupStorage", items: [byPath("/workspace/files"), byPath("/workspace/assets")] },
 	{ id: "plan", label: "nav.groupPlan", items: [byPath("/workspace/tasks"), byPath("/workspace/kanban")] },
@@ -146,8 +154,10 @@ const MIN_OPEN = 200;
 function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; expanded: boolean; onNavigate?: () => void }) {
 	const Icon = item.icon;
 	const { viewersAt } = useP2P();
-	const { totalUnread } = useChat();
-	const badge = item.path === "/workspace/chat" ? totalUnread : 0;
+	const { totalUnread, announcements, me, now } = useChat();
+	const role = useSelfRole();
+	const waiting = waitingForMe(announcements, me, role, now).length;
+	const badge = item.path === "/workspace/chat" ? totalUnread : item.path === "/workspace/announcements" ? waiting : 0;
 	const page = pageOf(item.path);
 	const [hot, setHot] = useState(false);
 
@@ -253,6 +263,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 					<ArrowLeft className="size-5" />
 				</Button>
 
+				<WorkspaceIconView id={workspace?.id} name={workspace?.name ?? ""} className={cn("size-6 text-sm", !showLabels && "hidden")} />
 				<p className={cn("truncate font-semibold whitespace-nowrap", showLabels ? "block" : "hidden")}>{workspace?.name}</p>
 			</div>
 

@@ -7,7 +7,7 @@ import { codeLook } from "@/lib/editor/codeTheme";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
 
 import { useThemeContext } from "@/store/ThemeContext";
-import { colorForName } from "@/lib/collabColor";
+import { colorOf } from "@/lib/collabColor";
 import { loadLanguage, type LoadedLanguage } from "@/lib/editor/languages";
 import { syntaxLinter } from "@/lib/editor/syntax";
 import { useEditorPrefs } from "@/lib/editorPrefs";
@@ -249,7 +249,7 @@ export default function CodeEditor({
 	// Presence is announced from an effect, not while rendering, because it makes the editor update
 	const awareness = collab?.awareness;
 	useEffect(() => {
-		awareness?.setLocalStateField("user", { name: userName, color: colorForName(userName) });
+		awareness?.setLocalStateField("user", { name: userName, color: colorOf(userName) });
 	}, [awareness, userName]);
 
 	const extensions = useMemo(() => {

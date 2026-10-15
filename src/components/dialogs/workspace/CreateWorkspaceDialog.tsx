@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { IconPicker, IconView } from "@/components/elements/WorkspaceIcon";
+import { setIcon, type WorkspaceIcon } from "@/lib/workspaceIcon";
 import { Dialog, DialogTrigger, DialogHeading, DialogFooter } from "@/components/ui/dialog";
 
 // Tauri API
@@ -39,6 +41,7 @@ export default function CreateWorkspaceDialog({
 	const [description, setDescription] = useState("");
 	const [workspacePath, setWorkspacePath] = useState("");
 	const [error, setError] = useState("");
+	const [icon, setIconChoice] = useState<WorkspaceIcon | null>(null);
 
 	// Guard against duplicate submissions
 	const isCreating = useRef(false);
@@ -84,6 +87,7 @@ export default function CreateWorkspaceDialog({
 				path: workspacePath,
 			});
 
+			if (icon) setIcon(workspace.id, icon);
 			await loadWorkspace(workspace);
 			navigate("/workspace");
 		} catch (err) {
@@ -106,8 +110,8 @@ export default function CreateWorkspaceDialog({
 			<Dialog className="sm:max-w-3xl">
 				<DialogHeading icon={<FolderPlus className="size-6" />} title="Create a Workspace" />
 
-				<div className="grid gap-8 md:grid-cols-[3fr_2fr]">
-					<div className="flex flex-col gap-5">
+				<div className="grid gap-8 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+					<div className="flex min-w-0 flex-col gap-5">
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="workspace-name">Name</Label>
 							<Input id="workspace-name" autoComplete="off" autoFocus placeholder="MSc research" value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} aria-invalid={!!nameProblem} aria-describedby={nameProblem ? "workspace-name-problem" : undefined} />
@@ -124,6 +128,11 @@ export default function CreateWorkspaceDialog({
 						</div>
 
 						<div className="flex flex-col gap-2">
+							<Label>Icon <span className="font-normal text-muted-foreground">(optional)</span></Label>
+							<IconPicker value={icon} onChange={setIconChoice} name={workspaceName} />
+						</div>
+
+						<div className="flex flex-col gap-2">
 							<Label htmlFor="workspace-location">Save in</Label>
 							<div className="flex gap-2">
 								<Input id="workspace-location" readOnly value={workspacePath} className="font-mono text-xs" />
@@ -136,11 +145,14 @@ export default function CreateWorkspaceDialog({
 					</div>
 
 					{/* The card as it will appear on the Welcome screen */}
-					<div className="flex flex-col gap-3">
+					<div className="flex min-w-0 flex-col gap-3">
 						<span className="font-mono text-xs text-muted-foreground">preview</span>
-						<div className="flex min-h-44 flex-col gap-3 border border-primary bg-card p-6">
-							<span className="text-xl font-semibold">{workspaceName.trim() || "Workspace name"}</span>
-							<span className="line-clamp-2 text-muted-foreground">{description.trim() || "No description yet."}</span>
+						<div className="flex h-56 min-w-0 flex-col gap-3 overflow-hidden border border-primary bg-card p-6">
+							<span className="flex min-w-0 items-center gap-3">
+								<IconView icon={icon} name={workspaceName} className="size-10 text-xl" />
+								<span className="line-clamp-2 min-w-0 text-xl font-semibold [overflow-wrap:anywhere]">{workspaceName.trim() || "Workspace name"}</span>
+							</span>
+							<span className="line-clamp-2 min-w-0 text-muted-foreground [overflow-wrap:anywhere]">{description.trim() || "No description yet."}</span>
 							<span className="mt-auto truncate font-mono text-xs text-muted-foreground">{workspacePath.replace(/[\\/]+$/, "")}/{workspaceName.trim() || "…"}</span>
 						</div>
 					</div>

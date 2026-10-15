@@ -19,7 +19,7 @@ import { proposalMarks } from "@/lib/editor/proposalsView";
 import { useCollabDoc } from "@/hooks/useCollabDoc";
 import { useSeededText } from "@/hooks/useSeededText";
 import { useErrorLog } from "@/hooks/useErrorLog";
-import { colorForName } from "@/lib/collabColor";
+import { colorOf } from "@/lib/collabColor";
 import {
 	blameLines,
 	blameRanges,
@@ -518,7 +518,7 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 												</span>
 											</div>
 											<div className="h-1 bg-muted">
-												<div className="h-full" style={{ width: `${person.percent}%`, background: colorForName(person.author) }} />
+												<div className="h-full" style={{ width: `${person.percent}%`, background: colorOf(person.author) }} />
 											</div>
 											{person.lastEdit && (
 												<p className="text-xs text-muted-foreground">Last edit {new Date(person.lastEdit).toLocaleString()}</p>
@@ -534,7 +534,7 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 											type="button"
 											onClick={() => jumpToLine(range.from)}
 											className="flex w-full items-center gap-2 border-l-2 px-2 py-1 text-left hover:bg-muted/50"
-											style={{ borderColor: colorForName(range.author) }}
+											style={{ borderColor: colorOf(range.author) }}
 										>
 											<span className="min-w-0 flex-1 truncate">{range.author}</span>
 											<span className="shrink-0 tabular-nums text-muted-foreground">

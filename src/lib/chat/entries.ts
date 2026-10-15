@@ -6,7 +6,7 @@
 //
 // The Rust side has already refused entries from people who may not write, so edits and deletions found here are valid.
 
-export type EntryKind = "message" | "edit" | "delete" | "react" | "unreact" | "channel" | "comment" | "resolve" | "reopen" | "dm" | "moderation";
+export type EntryKind = "message" | "edit" | "delete" | "react" | "unreact" | "channel" | "comment" | "resolve" | "reopen" | "dm" | "icon" | "profile" | "announce" | "announce_end" | "ack" | "expire" | "moderation";
 
 export interface LogEntry {
 	id: string;
@@ -99,7 +99,7 @@ export interface Message {
 }
 
 // A reaction is a set per (author, emoji): the newest of that author's react and unreact entries decides
-function reactionsFor(reacts: LogEntry[]): Reaction[] {
+export function reactionsFor(reacts: LogEntry[]): Reaction[] {
 	const last = new Map<string, LogEntry>();
 	for (const r of reacts) {
 		const emoji = typeof asRecord(r.body).emoji === "string" ? (asRecord(r.body).emoji as string) : "";
@@ -185,11 +185,17 @@ export interface ThreadComment {
 	reactions: Reaction[];
 }
 
+export interface Point {
+	x: number;
+	y: number;
+	page?: number; // The page of a PDF, counted from 0; absent for a picture
+}
+
 export interface Thread {
 	id: string; // The root comment's id
 	channel: string;
 	anchor: Anchor | null;
-	point: { x: number; y: number } | null; // For a comment pinned to a place in a picture: 0 to 1 across and down
+	point: Point | null; // For a comment pinned to a place in a picture or on a page of a PDF: 0 to 1 across and down
 	field: string; // For a discussion of a conflict: the field it is about; empty otherwise
 	resolved: boolean;
 	resolvedBy: string; // Name of whoever last resolved it
@@ -198,11 +204,12 @@ export interface Thread {
 	lastTs: number;
 }
 
-function parsePoint(value: unknown): { x: number; y: number } | null {
+function parsePoint(value: unknown): Point | null {
 	if (!value || typeof value !== "object") return null;
 	const p = value as Record<string, unknown>;
 	const ok = (n: unknown): n is number => typeof n === "number" && n >= 0 && n <= 1;
-	return ok(p.x) && ok(p.y) ? { x: p.x, y: p.y } : null;
+	const page = typeof p.page === "number" && Number.isInteger(p.page) && p.page >= 0 && p.page < 10_000 ? { page: p.page } : {};
+	return ok(p.x) && ok(p.y) ? { x: p.x, y: p.y, ...page } : null;
 }
 
 function parseAnchor(value: unknown): Anchor | null {

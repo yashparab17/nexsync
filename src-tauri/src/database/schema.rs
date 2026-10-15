@@ -465,6 +465,21 @@ CREATE TABLE IF NOT EXISTS write_log (
 CREATE INDEX IF NOT EXISTS idx_write_log_record ON write_log (entity, record, ts);
 "##,
 	},
+	Migration {
+		version: 26,
+		description: "chat messages and comments from a timed-out member, held for an Admin",
+		up: r##"
+CREATE TABLE IF NOT EXISTS held_entries (
+    id TEXT PRIMARY KEY,
+    entry TEXT NOT NULL,
+    author TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    kind TEXT NOT NULL,
+    ts INTEGER NOT NULL,
+    held_at INTEGER NOT NULL
+);
+"##,
+	},
 ];
 
 /// The newest schema version this build knows how to read and write

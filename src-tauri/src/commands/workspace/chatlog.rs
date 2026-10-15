@@ -32,7 +32,7 @@ pub const HISTORY_DEFAULT: usize = 200;
 /// Most ids a device names when it asks for what it is missing
 pub const HAVE_LIMIT: usize = 20_000;
 
-const KINDS: &[&str] = &["message", "edit", "delete", "react", "unreact", "channel", "comment", "resolve", "reopen", "dm", super::moderation::KIND];
+const KINDS: &[&str] = &["message", "edit", "delete", "react", "unreact", "channel", "comment", "resolve", "reopen", "dm", "icon", "profile", super::announce::KIND, super::announce::END, super::announce::ACK, super::announce::EXPIRE, super::moderation::KIND];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -168,11 +168,82 @@ fn refusal(conn: &Connection, e: &Entry, ctx: &Ctx) -> Result<Option<&'static st
         return Ok(Some("signature does not match"));
     }
     let Some(role) = (ctx.role_of)(&e.author) else { return Ok(Some("author is not a member")) };
-    if role < Role::Commenter {
+    // A Viewer may only say "Got it" to an announcement, and set how they look to the others (colour and picture)
+    if role < Role::Commenter && e.kind != super::announce::ACK && e.kind != "profile" {
         return Ok(Some("a Viewer cannot write"));
     }
+    if super::announce::is_expired_target(conn, e, ctx.now) {
+        return Ok(Some("the announcement it is about has expired"));
+    }
     match e.kind.as_str() {
+        // Announcements (announce.rs): posted, edited and withdrawn by the Owner and Admins; anyone acknowledges
+        "announce" => {
+            if role < Role::Admin {
+                return Ok(Some("only Admins and the Owner post announcements"));
+            }
+            let Some(body) = super::announce::parse(&e.body) else { return Ok(Some("not an announcement")) };
+            if let Err(why) = super::announce::valid(&body) {
+                return Ok(Some(why));
+            }
+            if (body.system && role != Role::Owner) || e.channel != super::announce::CHANNEL {
+                return Ok(Some("not a valid announcement"));
+            }
+            if e.parent.is_empty() {
+                return Ok(None);
+            }
+            match find(conn, &e.parent)? {
+                Some(t) if t.kind == super::announce::KIND && t.parent.is_empty() && (t.author == e.author || role == Role::Owner) => Ok(None),
+                Some(_) => Ok(Some("only the author or the Owner edits an announcement")),
+                None => Ok(Some("the announcement it edits is not here")),
+            }
+        }
+        "announce_end" | "ack" => {
+            if e.kind == super::announce::END && role < Role::Admin {
+                return Ok(Some("only Admins and the Owner withdraw announcements"));
+            }
+            match find(conn, &e.parent)? {
+                Some(t) if t.kind == super::announce::KIND && t.parent.is_empty() => Ok(None),
+                _ => Ok(Some("the announcement it is about is not here")),
+            }
+        }
+        "expire" => {
+            if role < Role::Admin {
+                return Ok(Some("only Admins and the Owner set an expiry"));
+            }
+            Ok(super::announce::expiry_of(&e.body).is_none().then_some("not an expiry"))
+        }
         "channel" if role < Role::Admin => Ok(Some("only Admins make channels")),
+        // The workspace's icon, set by the Owner or an Admin (the newest wins): a picture or an emoji, small enough for one entry
+        "icon" => {
+            if role < Role::Admin {
+                return Ok(Some("only Admins and the Owner set the icon"));
+            }
+            let ok = serde_json::from_str::<serde_json::Value>(&e.body).ok().is_some_and(|v| match v.get("kind").and_then(|k| k.as_str()) {
+                Some("image") => v.get("data").and_then(|d| d.as_str()).is_some_and(|d| d.starts_with("data:image/")),
+                Some("glyph") => v.get("glyph").and_then(|g| g.as_str()).is_some_and(|g| (1..=2).contains(&g.chars().count())),
+                Some("letter") => true,
+                Some("none") => true,
+                _ => false,
+            });
+            if !ok || e.channel != "workspace" {
+                return Ok(Some("not a valid icon"));
+            }
+            let newer: bool = conn.query_row("SELECT COUNT(*) > 0 FROM log_entries WHERE kind = 'icon' AND ts > ?1", [e.ts as i64], |r| r.get(0)).map_err(err)?;
+            Ok(newer.then_some("a newer icon is already set"))
+        }
+        // How a member looks to the others: a colour and a small picture, both optional; the newest of each author wins
+        "profile" => {
+            let ok = serde_json::from_str::<serde_json::Value>(&e.body).ok().is_some_and(|v| {
+                v.is_object()
+                    && v.get("color").is_none_or(|c| c.as_str().is_some_and(|c| c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|h| h.is_ascii_hexdigit())))
+                    && v.get("image").is_none_or(|d| d.as_str().is_some_and(|d| d.starts_with("data:image/")))
+            });
+            if !ok || e.channel != "profiles" {
+                return Ok(Some("not a valid profile"));
+            }
+            let newer: bool = conn.query_row("SELECT COUNT(*) > 0 FROM log_entries WHERE kind = 'profile' AND author = ?1 AND ts > ?2", params![e.author, e.ts as i64], |r| r.get(0)).map_err(err)?;
+            Ok(newer.then_some("a newer profile is already set"))
+        }
         // A direct message names a member it is for; the words are sealed (dm.rs) and cannot be checked here
         "dm" => match super::dm::recipient(&e.body) {
             Some(to) if (ctx.role_of)(&to).is_some() && e.channel == super::dm::channel_of(&e.author, &to) => Ok(None),
@@ -220,6 +291,10 @@ fn store(conn: &Connection, e: &Entry) -> Result<bool, String> {
             params![e.id, e.kind, e.channel, e.parent, e.author, e.name, e.ts as i64, e.body, e.sig],
         )
         .map_err(err)?;
+    if n > 0 && matches!(e.kind.as_str(), "icon" | "profile") {
+        // What a newer one replaces is not kept: the icon of the workspace, and the profile of each author
+        conn.execute("DELETE FROM log_entries WHERE kind = ?1 AND id != ?2 AND ts <= ?3 AND (?1 = 'icon' OR author = ?4)", params![e.kind, e.id, e.ts as i64, e.author]).map_err(err)?;
+    }
     if n > 0 {
         conn.execute("INSERT OR IGNORE INTO log_seen (id, at) VALUES (?1, ?2)", params![e.id, super::crdt::now_ms() as i64]).map_err(err)?;
     }
@@ -563,6 +638,77 @@ mod tests {
         let other = db();
         merge_as(&other, vec![good], 3, 2_000);
         assert!(inbox_list(&other).unwrap().is_empty());
+    }
+
+    #[test]
+    fn announcements_are_posted_by_admins_edited_by_their_author_and_acknowledged_by_anyone() {
+        use crate::commands::workspace::announce;
+        let conn = db();
+        let body = |title: &str| serde_json::json!({ "title": title, "text": "body", "level": "important" }).to_string();
+        let post = |by: u8, title: &str, ts: u64| Entry::signed_with(&key(by), announce::KIND, announce::CHANNEL, "", &body(title), ts);
+        let by_admin = post(2, "Release on Friday", 1_000);
+        let by_editor = post(3, "Not allowed", 1_001);
+        let m = merge_as(&conn, vec![by_admin.clone(), by_editor], 1, 2_000);
+        assert_eq!((m.added.len(), m.refused), (1, 1));
+        // A second Admin may not edit the first Admin's announcement, the Owner may, the author may
+        let edit_by = |by: u8| Entry::signed_with(&key(by), announce::KIND, announce::CHANNEL, &by_admin.id, &body("Release on Monday"), 3_000);
+        let owner_edit = edit_by(1);
+        let author_edit = edit_by(2);
+        assert_eq!(merge_as(&conn, vec![owner_edit, author_edit], 1, 4_000).added.len(), 2);
+        // Anyone acknowledges, a Viewer included; a stranger and an acknowledgement of nothing do not
+        let ack = |by: u8, of: &str| Entry::signed_with(&key(by), announce::ACK, announce::CHANNEL, of, "", 5_000);
+        let m = merge_as(&conn, vec![ack(5, &by_admin.id), ack(3, &by_admin.id), ack(9, &by_admin.id), ack(4, "no-such-id")], 1, 6_000);
+        assert_eq!((m.added.len(), m.refused), (2, 2));
+        assert_eq!(announce::acks_of(&conn, &by_admin.id).unwrap().len(), 2);
+        // Only an Admin withdraws it
+        let end = |by: u8| Entry::signed_with(&key(by), announce::END, announce::CHANNEL, &by_admin.id, "", 7_000);
+        assert_eq!(merge_as(&conn, vec![end(3), end(2)], 1, 8_000).added.len(), 1);
+    }
+
+    #[test]
+    fn an_expired_announcement_is_erased_with_what_points_at_it_and_is_not_taken_again() {
+        use crate::commands::workspace::announce;
+        let conn = db();
+        let ann = Entry::signed_with(&key(2), announce::KIND, announce::CHANNEL, "", &serde_json::json!({ "title": "Maintenance", "level": "info" }).to_string(), 1_000);
+        let ack = Entry::signed_with(&key(3), announce::ACK, announce::CHANNEL, &ann.id, "", 1_500);
+        let expire = Entry::signed_with(&key(2), announce::EXPIRE, announce::CHANNEL, "", &serde_json::json!({ "entity": "announcement", "id": ann.id, "at": 5_000 }).to_string(), 1_600);
+        assert_eq!(merge_as(&conn, vec![ann.clone(), ack.clone(), expire], 1, 2_000).added.len(), 3);
+        // Before the time, nothing is erased; after it, the announcement and its acknowledgement are gone
+        assert!(announce::expired_announcements(&conn, 4_000).is_empty());
+        assert!(announce::expired_announcements(&conn, 6_000).contains(&ann.id));
+        assert_eq!(announce::erase_announcement(&conn, &ann.id).unwrap(), 2);
+        assert!(find(&conn, &ann.id).unwrap().is_none() && find(&conn, &ack.id).unwrap().is_none());
+        // A copy that arrives later, from a device that was off, is refused
+        let m = merge_as(&conn, vec![ann, ack], 1, 7_000);
+        assert_eq!((m.added.len(), m.refused), (0, 2));
+        // Only an Admin sets an expiry
+        let by_editor = Entry::signed_with(&key(3), announce::EXPIRE, announce::CHANNEL, "", &serde_json::json!({ "entity": "task", "id": "t", "at": 9_000 }).to_string(), 1_700);
+        assert_eq!(merge_as(&conn, vec![by_editor], 1, 7_000).refused, 1);
+    }
+
+    #[test]
+    fn only_admins_set_the_icon_and_an_older_one_does_not_replace_a_newer_one() {
+        let conn = db();
+        let icon = |by: u8, ts: u64, body: &str| Entry::signed_with(&key(by), "icon", "workspace", "", body, ts);
+        let rocket = r#"{"kind":"glyph","glyph":"🚀"}"#;
+        let m = merge_as(&conn, vec![icon(3, 1_000, rocket), icon(2, 2_000, rocket), icon(2, 3_000, r#"{"kind":"image","data":"javascript:x"}"#), icon(2, 3_100, r#"{"kind":"none"}"#)], 1, 4_000);
+        assert_eq!((m.added.len(), m.refused), (2, 2));
+        // Arriving late, an older icon is not taken over the newer
+        assert_eq!(merge_as(&conn, vec![icon(1, 2_500, rocket)], 1, 4_000).refused, 1);
+    }
+
+    #[test]
+    fn anyone_sets_their_own_profile_and_only_the_newest_is_kept() {
+        let conn = db();
+        let profile = |by: u8, ts: u64, body: &str| Entry::signed_with(&key(by), "profile", "profiles", "", body, ts);
+        let m = merge_as(&conn, vec![profile(5, 1_000, r##"{"color":"#d22d64"}"##), profile(3, 1_000, r##"{"color":"#1c823e","image":"data:image/webp;base64,AAAA"}"##), profile(3, 1_500, r##"{"color":"nope"}"##), profile(9, 1_000, "{}")], 1, 2_000);
+        // A Viewer's and an Editor's are taken; a bad colour and a stranger's are not
+        assert_eq!((m.added.len(), m.refused), (2, 2));
+        // A newer one replaces the author's older; an older one arriving late is refused
+        assert_eq!(merge_as(&conn, vec![profile(3, 1_800, r##"{"color":"#5a64dc"}"##)], 1, 2_500).added.len(), 1);
+        assert_eq!(merge_as(&conn, vec![profile(3, 1_200, "{}")], 1, 2_500).refused, 1);
+        let kept: i64 = conn.query_row("SELECT COUNT(*) FROM log_entries WHERE kind = 'profile' AND author = ?1", [key(3).public().to_string()], |r| r.get(0)).unwrap();
+        assert_eq!(kept, 1);
     }
 
     #[test]

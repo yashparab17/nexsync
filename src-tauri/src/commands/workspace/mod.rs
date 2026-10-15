@@ -10,6 +10,8 @@ pub mod catchup;
 pub mod erase;
 pub mod chatlog;
 pub mod moderation;
+pub mod announce;
+pub mod bundle;
 pub mod dm;
 pub mod held;
 pub mod invariants;

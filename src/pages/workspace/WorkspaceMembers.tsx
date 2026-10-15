@@ -24,6 +24,7 @@ import P2PConnectDialog from "@/components/dialogs/workspace/P2PConnectDialog";
 import ModerateDialog from "@/components/moderation/ModerateDialog";
 import ModerationPanel from "@/components/moderation/ModerationPanel";
 import { canModerate, timeLeft } from "@/lib/moderation";
+import { systemNotice } from "@/lib/announcements";
 import { useChat } from "@/store/chat/ChatContext";
 import type { Member } from "@/types/workspace";
 
@@ -111,6 +112,7 @@ export default function WorkspaceMembers() {
 			setHandoffBusy(true);
 			setHandoffError(null);
 			// Written while this device is still the Owner, which is who may sign it
+			await chat.announce(systemNotice(`${hostTarget.name} is now the Owner`, "The Owner role, and with it hosting, was handed over.")).catch(() => {});
 			await chat.act({ action: "handoff", target: hostTarget.deviceId, targetName: hostTarget.name }).catch(() => {});
 			await transferHost(hostTarget.deviceId);
 			setHostTarget(null);
@@ -290,8 +292,9 @@ export default function WorkspaceMembers() {
 			</Toolbar>
 
 			{/* Members Grid & Roles Overview */}
-			<PageBody className="grid content-start grid-cols-1 gap-4 lg:grid-cols-3">
-				<Panel index="01" title="People" className="lg:col-span-2">
+			<PageBody className="@container">
+			<div className="grid content-start grid-cols-1 gap-4 @4xl:grid-cols-3">
+				<Panel index="01" title="People" className="@4xl:col-span-2">
 					<div className="space-y-3">
 							{isJoinedCopy && (
 								<p className="text-xs text-muted-foreground">
@@ -458,7 +461,7 @@ export default function WorkspaceMembers() {
 					</div>
 				</Panel>
 
-				<Panel index="02" title="Roles" className="self-start lg:row-span-2">
+				<Panel index="02" title="Roles" className="self-start @4xl:row-span-2">
 					<div className="space-y-4 text-sm">
 							<div className="border-l-2 border-border py-1 pl-4">
 								<div className="flex items-center gap-2 font-semibold text-warning">
@@ -513,6 +516,7 @@ export default function WorkspaceMembers() {
 					</div>
 				</Panel>
 				{(selfRole === "Owner" || selfRole === "Admin") && <ModerationPanel />}
+			</div>
 			</PageBody>
 
 			{/* Real P2P WebRTC Connection & E2EE Handshake Dialog */}
