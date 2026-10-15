@@ -1,14 +1,8 @@
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { useLeaveWorkspace } from "@/hooks/useLeaveWorkspace";
 import { errorText } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -33,15 +27,7 @@ export default function WorkspaceDeletedDialog() {
 	return (
 		<Dialog isOpen isDismissable={false} showCloseButton={false} onOpenChange={() => {}}>
 			<div className="space-y-4">
-				<DialogHeader>
-					<div className="flex items-center gap-2">
-						<Trash2 className="size-5 text-destructive" />
-						<DialogTitle>Workspace Deleted</DialogTitle>
-					</div>
-					<DialogDescription>
-						The host deleted this workspace. Your copy is still on this device and nothing was removed.
-					</DialogDescription>
-				</DialogHeader>
+				<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Workspace Deleted" description={<>The host deleted this workspace. Your copy is still on this device and nothing was removed.</>} />
 				{error && <p className="text-xs text-destructive">{error}</p>}
 				<DialogFooter>
 					<Button variant="outline" onPress={dismissWorkspaceDeleted}>

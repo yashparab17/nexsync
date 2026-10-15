@@ -1,34 +1,31 @@
 import { useEffect, useState } from "react";
-import {
-	Check,
-	Copy,
-	Download,
-	FileText,
-	Film,
-	Headphones,
-	Image as ImageIcon,
-	Loader2,
-	Maximize2,
-	Minimize2,
-	RefreshCw,
-	Sparkles,
-	Volume2,
-	X,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Check, ChevronRight, Copy, Download, FileText, Film, Headphones, History, Image as ImageIcon, Maximize2, Minimize2, Pencil, RefreshCw, Sparkles, Trash2, Volume2, X } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
-
-import { readWorkspaceBinaryFile } from "@/lib/tauri";
-import { getMimeType, formatBytes } from "@/lib/utils";
-import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
-import type { AssetItem } from "@/types/workspace";
+import { Dialog, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import Loading from "@/components/Loading";
+import PdfViewer from "@/components/elements/PdfViewer";
+
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
+import { displaySize } from "@/lib/assets/displaySize";
+import { readWorkspaceBinaryFile } from "@/lib/tauri";
+import { cn, formatBytes, getMimeType } from "@/lib/utils";
+import type { AssetItem } from "@/types/workspace";
+
+const INSPECTOR = 320;
+const HEADER = 64;
+const MIN_VIEWER = { w: 420, h: 440 };
+
+// The size the viewer area takes: a picture or video at its own size, as large as the window allows; a PDF as a tall page
+function viewerSize(kind: "image" | "video" | "pdf" | "other", media: { w: number; h: number } | null, win: { w: number; h: number }) {
+	const maxW = Math.max(MIN_VIEWER.w, Math.min(win.w * 0.96 - INSPECTOR, 1700));
+	const maxH = Math.max(MIN_VIEWER.h, win.h * 0.92 - HEADER);
+	if (kind === "pdf") return { w: Math.min(maxW, 860), h: maxH };
+	if (kind === "other" || !media) return { w: Math.min(maxW, 560), h: Math.min(maxH, 440) };
+	const scale = Math.min(1, maxW / media.w, maxH / media.h);
+	return { w: Math.max(MIN_VIEWER.w, Math.round(media.w * scale)), h: Math.max(MIN_VIEWER.h, Math.round(media.h * scale)) };
+}
 
 interface AssetPreviewModalProps {
 	asset: AssetItem | null;
@@ -36,67 +33,80 @@ interface AssetPreviewModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	onDownloadLazy?: (asset: AssetItem) => Promise<void>;
+	// Stepping through the assets that are showing; the arrow keys do the same
+	onStep?: (direction: -1 | 1) => void;
+	position?: { index: number; total: number };
+	// Left out for people who may not change assets
+	onHistory?: (asset: AssetItem) => void;
+	onRename?: (asset: AssetItem) => void;
+	onDelete?: (asset: AssetItem) => void;
 }
 
-export default function AssetPreviewModal({
-	asset,
-	workspacePath,
-	isOpen,
-	onClose,
-	onDownloadLazy,
-}: AssetPreviewModalProps) {
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+	return (
+		<div className="flex items-baseline justify-between gap-4 border-b py-2 last:border-b-0">
+			<dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
+			<dd className="min-w-0 truncate text-right font-mono text-xs" title={typeof children === "string" ? children : undefined}>
+				{children}
+			</dd>
+		</div>
+	);
+}
+
+export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClose, onDownloadLazy, onStep, position, onHistory, onRename, onDelete }: AssetPreviewModalProps) {
 	const [dataUrl, setDataUrl] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const { copiedKey, copy } = useCopyToClipboard();
-	const [dimensions, setDimensions] = useState<{
-		width: number;
-		height: number;
-	} | null>(null);
-	const [isFitToScreen, setIsFitToScreen] = useState(true);
+	const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+	// The size of the picture or video showing now; kept until the next one reports its own, so the window changes size
+	// once, smoothly, when the next asset is ready
+	const [media, setMedia] = useState<{ w: number; h: number } | null>(null);
+	const [win, setWin] = useState({ w: window.innerWidth, h: window.innerHeight });
+	useEffect(() => {
+		const onResize = () => setWin({ w: window.innerWidth, h: window.innerHeight });
+		window.addEventListener("resize", onResize);
+		return () => window.removeEventListener("resize", onResize);
+	}, []);
+	const [fit, setFit] = useState(true);
 	const [isSyncing, setIsSyncing] = useState(false);
 
 	useEffect(() => {
-		if (!isOpen || !asset || !workspacePath) {
+		setDimensions(null);
+		setFit(true);
+		if (!isOpen || !asset || !workspacePath || asset.syncStatus === "remote_placeholder") {
 			setDataUrl(null);
 			setError(null);
-			setDimensions(null);
 			return;
 		}
-
-		if (asset.syncStatus === "remote_placeholder") {
-			setDataUrl(null);
-			return;
-		}
-
-		let isMounted = true;
+		let mounted = true;
 		setLoading(true);
 		setError(null);
-
-		const loadBinary = async () => {
-			try {
-				const base64 = await readWorkspaceBinaryFile(
-					workspacePath,
-					asset.path.startsWith("/") ? asset.path.slice(1) : asset.path,
-				);
-				if (!isMounted) return;
-				const mime = getMimeType(asset.name);
-				setDataUrl(`data:${mime};base64,${base64}`);
-			} catch (err) {
-				if (!isMounted) return;
+		readWorkspaceBinaryFile(workspacePath, asset.path.replace(/^\/+/, ""))
+			.then((base64) => mounted && setDataUrl(`data:${getMimeType(asset.name)};base64,${base64}`))
+			.catch((err) => {
+				if (!mounted) return;
 				console.error("Failed to load asset binary:", err);
 				setError(String(err));
-			} finally {
-				if (isMounted) setLoading(false);
-			}
-		};
-
-		loadBinary();
-
+			})
+			.finally(() => mounted && setLoading(false));
 		return () => {
-			isMounted = false;
+			mounted = false;
 		};
 	}, [isOpen, asset, workspacePath]);
+
+	// Left and right arrows move to the neighbouring asset, unless something is being typed or played
+	useEffect(() => {
+		if (!isOpen || !onStep) return;
+		const onKey = (e: KeyboardEvent) => {
+			const tag = (e.target as HTMLElement).tagName;
+			if (e.altKey || e.ctrlKey || e.metaKey || tag === "INPUT" || tag === "TEXTAREA" || tag === "VIDEO" || tag === "AUDIO") return;
+			if (e.key === "ArrowLeft") onStep(-1);
+			else if (e.key === "ArrowRight") onStep(1);
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [isOpen, onStep]);
 
 	if (!asset) return null;
 
@@ -105,20 +115,12 @@ export default function AssetPreviewModal({
 	const isVideo = mimeType.startsWith("video/");
 	const isAudio = mimeType.startsWith("audio/");
 	const isPdf = mimeType === "application/pdf";
+	const relPath = asset.path.replace(/^\/+/, "");
+	const markdown = isImage ? `![${asset.name}](${relPath})` : `[${asset.name}](${relPath})`;
+	const isRemote = asset.syncStatus === "remote_placeholder";
+	const shown = dimensions ? displaySize(dimensions.width, dimensions.height) : null;
 
-	const cleanRelPath =
-		asset.path.startsWith("/") ? asset.path.slice(1) : asset.path;
-
-	const markdownSnippet =
-		isImage ?
-			`![${asset.name}](${cleanRelPath})`
-		:	`[${asset.name}](${cleanRelPath})`;
-
-	const handleCopyMarkdown = () => copy(markdownSnippet, "markdown");
-
-	const handleCopyPath = () => copy(cleanRelPath, "path");
-
-	const handleDownloadFile = () => {
+	const exportFile = () => {
 		if (!dataUrl) return;
 		const a = document.createElement("a");
 		a.href = dataUrl;
@@ -128,7 +130,7 @@ export default function AssetPreviewModal({
 		document.body.removeChild(a);
 	};
 
-	const handleFetchRemote = async () => {
+	const fetchRemote = async () => {
 		if (!onDownloadLazy) return;
 		setIsSyncing(true);
 		try {
@@ -138,304 +140,192 @@ export default function AssetPreviewModal({
 		}
 	};
 
+	const KindIcon = isImage ? ImageIcon : isVideo ? Film : isAudio ? Headphones : FileText;
+	const iconButton = "size-8";
+
+	// Wide windows size themselves to what is showing; narrow ones fill the window and stack the details below
+	const adaptive = win.w >= 900;
+	const size = viewerSize(isPdf ? "pdf" : isImage ? "image" : isVideo ? "video" : "other", media, win);
+	// A picture bigger than the window can be viewed at its own size, scrolling inside the same space
+	const canZoom = isImage && !!dimensions && (dimensions.width > size.w + 1 || dimensions.height > size.h + 1);
+
+	const details = (
+		<aside aria-label="Asset details" className={cn("flex shrink-0 flex-col gap-5 overflow-y-auto border-border bg-muted/40 p-4", adaptive ? "w-80 border-l" : "max-h-[40%] w-full border-t")}>
+			<div className="flex flex-wrap gap-2">
+				{dataUrl && (
+					<Button variant="outline" size="sm" onPress={exportFile}>
+						<Download data-icon="inline-start" className="size-4" />
+						Export
+					</Button>
+				)}
+				{onHistory && (
+					<Button variant="ghost" size="icon-xs" className={iconButton} aria-label="File history" onPress={() => onHistory(asset)}>
+						<History className="size-4" />
+					</Button>
+				)}
+				{onRename && (
+					<Button variant="ghost" size="icon-xs" className={iconButton} aria-label="Rename" onPress={() => onRename(asset)}>
+						<Pencil className="size-4" />
+					</Button>
+				)}
+				{onDelete && (
+					<Button variant="ghost" size="icon-xs" className={cn(iconButton, "text-destructive")} aria-label="Delete" onPress={() => onDelete(asset)}>
+						<Trash2 className="size-4" />
+					</Button>
+				)}
+			</div>
+
+			<section>
+				<h3 className="mb-1 font-mono text-xs text-muted-foreground">Details</h3>
+				<dl>
+					<Row label="Type">{mimeType}</Row>
+					<Row label="Size">{formatBytes(asset.size)}</Row>
+					{dimensions && <Row label="Picture">{`${dimensions.width} × ${dimensions.height} px`}</Row>}
+					{shown?.halved && <Row label="In the mosaic">{`${shown.width} × ${shown.height} px (50%)`}</Row>}
+					<Row label="Status">{isRemote ? "Not downloaded" : "On this device"}</Row>
+					<Row label="Modified">{new Date(asset.modified_at).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</Row>
+				</dl>
+			</section>
+
+			<section className="space-y-2">
+				<div className="flex items-center justify-between">
+					<h3 className="font-mono text-xs text-muted-foreground">{isImage ? "Markdown embed" : "Markdown link"}</h3>
+					<Button variant="ghost" size="xs" onPress={() => copy(markdown, "markdown")}>
+						{copiedKey === "markdown" ? <Check data-icon="inline-start" className="size-3.5 text-success" /> : <Copy data-icon="inline-start" className="size-3.5" />}
+						{copiedKey === "markdown" ? "Copied" : "Copy"}
+					</Button>
+				</div>
+				<code className="block break-all border bg-background p-3 font-mono text-xs select-all">{markdown}</code>
+				<p className="text-xs text-muted-foreground">Paste into a note or Markdown file to embed it.</p>
+			</section>
+
+			<section className="space-y-2">
+				<div className="flex items-center justify-between">
+					<h3 className="font-mono text-xs text-muted-foreground">Path</h3>
+					<Button variant="ghost" size="xs" onPress={() => copy(relPath, "path")}>
+						{copiedKey === "path" ? <Check data-icon="inline-start" className="size-3.5 text-success" /> : <Copy data-icon="inline-start" className="size-3.5" />}
+						{copiedKey === "path" ? "Copied" : "Copy"}
+					</Button>
+				</div>
+				<code className="block break-all border bg-background p-3 font-mono text-xs select-all">{relPath}</code>
+			</section>
+		</aside>
+	);
+
 	return (
-		<Dialog
-			isOpen={isOpen}
-			onOpenChange={(open) => !open && onClose()}
-			showCloseButton={false}
-			className="h-[85vh] w-[95vw] gap-0 overflow-hidden p-0 sm:max-w-6xl grid-rows-[minmax(0,1fr)] [&>*]:grid-rows-[minmax(0,1fr)]"
-		>
-			<div className="flex h-full min-h-0 flex-col overflow-hidden">
-				{/* Top Bar */}
-				<DialogHeader className="flex flex-row items-center justify-between shrink-0 px-5 py-3 border-b bg-muted/20">
-					<div className="flex items-center gap-3">
-						<div className="p-2 rounded-none bg-primary/10 text-primary">
-							{isImage ?
-								<ImageIcon className="size-5" />
-							: isVideo ?
-								<Film className="size-5" />
-							: isAudio ?
-								<Headphones className="size-5" />
-							:	<FileText className="size-5" />}
-						</div>
-						<div>
-							<DialogTitle className="text-base font-semibold truncate max-w-md">
-								{asset.name}
-							</DialogTitle>
-							<DialogDescription className="text-xs text-muted-foreground">
-								{formatBytes(asset.size)} • {cleanRelPath}
-							</DialogDescription>
-						</div>
+		<Dialog isOpen={isOpen} onOpenChange={(open) => !open && onClose()} showCloseButton={false} className="right-0 left-0 mx-auto w-fit max-w-[calc(100%-1rem)] translate-x-0 gap-0 overflow-hidden p-0 sm:max-w-none">
+			<div
+				style={adaptive ? { width: size.w + INSPECTOR, height: size.h + HEADER } : { width: "calc(100vw - 1rem)", height: "calc(100dvh - 1rem)" }}
+				className="flex flex-col overflow-hidden transition-[width,height] duration-300 ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none"
+			>
+				{/* Title bar */}
+				<div style={{ height: HEADER }} className="flex shrink-0 items-center gap-3 border-b px-4">
+					<KindIcon className="size-5 shrink-0 text-primary" />
+					<div className="min-w-0 flex-1">
+						<DialogTitle className="truncate text-sm font-semibold">{asset.name}</DialogTitle>
+						<DialogDescription className="truncate font-mono text-xs text-muted-foreground">
+							{formatBytes(asset.size)} · {relPath}
+						</DialogDescription>
 					</div>
-
-					<div className="flex items-center gap-2">
-						{dataUrl && (
-							<Button
-								variant="outline"
-								size="sm"
-								onPress={handleDownloadFile}
-								className="gap-1.5 text-xs h-8"
-							>
-								<Download className="size-3.5" />
-								Export
+					{position && position.total > 1 && (
+						<div className="flex items-center gap-1">
+							<Button variant="ghost" size="icon-xs" aria-label="Previous asset" onPress={() => onStep?.(-1)}>
+								<ChevronRight className="size-4 rotate-180" />
 							</Button>
-						)}
-						<Button
-							variant="ghost"
-							size="icon"
-							onPress={onClose}
-							aria-label="Close preview"
-							className="size-8"
-						>
-							<X className="size-4" />
-						</Button>
-					</div>
-				</DialogHeader>
+							<span className="font-mono text-xs tabular-nums text-muted-foreground" aria-live="polite">
+								{position.index + 1} / {position.total}
+							</span>
+							<Button variant="ghost" size="icon-xs" aria-label="Next asset" onPress={() => onStep?.(1)}>
+								<ChevronRight className="size-4" />
+							</Button>
+						</div>
+					)}
+					<Button variant="ghost" size="icon-xs" onPress={onClose} aria-label="Close preview">
+						<X className="size-4" />
+					</Button>
+				</div>
 
-				{/* Preview Workspace Area */}
-				<div className="flex min-h-0 flex-1 flex-col md:flex-row overflow-hidden">
-					{/* Main Viewer */}
-					<div className="relative flex min-h-0 min-w-0 flex-1 overflow-auto bg-muted/40 p-4">
-						{loading && (
-							<Loading className="m-auto" />
-						)}
-
-						{error && (
-							<div className="m-auto flex max-w-md flex-col items-center gap-2 p-6 text-center text-destructive">
-								<p className="text-sm font-semibold">
-									Failed to load asset preview
-								</p>
-								<p className="text-xs font-mono text-destructive/80">
-									{error}
-								</p>
-							</div>
-						)}
-
-						{asset.syncStatus === "remote_placeholder" && (
-							<div className="m-auto flex max-w-md flex-col items-center gap-4 border bg-card p-8 text-center">
-								<div className="p-3 rounded-none bg-amber-500/10 text-amber-500 border border-amber-500/20">
-									<Sparkles className="size-8" />
+				<div className={cn("flex min-h-0 flex-1", adaptive ? "flex-row" : "flex-col")}>
+					{/* Viewer: just the asset, with no frame or pattern behind it */}
+					<div className="relative flex min-h-0 min-w-0 flex-1 overflow-auto bg-background">
+						{/* Each asset fades in as it arrives */}
+						<div key={asset.name} className="flex min-h-full min-w-full animate-in fade-in duration-300 motion-reduce:animate-none">
+							{loading && <Loading className="m-auto" />}
+							{error && (
+								<div role="alert" className="m-auto max-w-md p-6 text-center">
+									<p className="text-sm font-semibold text-destructive">This asset could not be opened</p>
+									<p className="mt-1 font-mono text-xs text-destructive/80">{error}</p>
 								</div>
-								<div>
-									<h4 className="font-semibold text-foreground">
-										Not downloaded yet
-									</h4>
-									<p className="text-xs text-muted-foreground mt-1">
-										This file is part of the workspace, but it hasn't been downloaded to this device yet.
-									</p>
+							)}
+							{isRemote && (
+								<div className="m-auto flex max-w-sm flex-col items-center gap-4 border bg-muted/40 p-8 text-center">
+									<Sparkles className="size-8 text-warning" />
+									<div>
+										<h4 className="font-semibold">Not Downloaded Yet</h4>
+										<p className="mt-1 text-sm text-muted-foreground">This file belongs to the workspace but has not reached this device yet.</p>
+									</div>
+									<Button onPress={fetchRemote} isDisabled={isSyncing}>
+										{isSyncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw data-icon="inline-start" className="size-4" />}
+										{isSyncing ? "Downloading…" : "Download"}
+									</Button>
 								</div>
-								<Button
-									onPress={handleFetchRemote}
-									isDisabled={isSyncing}
-									className="gap-2"
-								>
-									{isSyncing ?
-										<Loader2 className="size-4 animate-spin" />
-									:	<RefreshCw className="size-4" />}
-									{isSyncing ? "Downloading…" : "Download"}
-								</Button>
-							</div>
-						)}
-
-						{!loading && !error && dataUrl && (
-							<>
-								{/* Image Preview */}
-								{isImage && (
-									<div className="flex min-h-full min-w-full">
+							)}
+							{!loading && !error && dataUrl && (
+								<>
+									{isImage && (
 										<img
 											src={dataUrl}
 											alt={asset.name}
 											onLoad={(e) => {
-												const img = e.currentTarget;
-												setDimensions({
-													width: img.naturalWidth,
-													height: img.naturalHeight,
-												});
+												const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+												setDimensions({ width: w, height: h });
+												if (w > 0 && h > 0) setMedia({ w, h });
 											}}
-											className={`m-auto bg-background shadow-md ${
-												isFitToScreen ?
-													"max-h-full max-w-full object-contain"
-												:	"max-w-none"
-											}`}
+											className={cn("m-auto", fit ? "max-h-full max-w-full object-contain" : "max-w-none")}
 										/>
-										<button
-											onClick={() => setIsFitToScreen(!isFitToScreen)}
-											title={isFitToScreen ? "Original Size" : "Fit to Screen"}
-											className="absolute right-4 bottom-4 z-10 flex cursor-pointer items-center gap-1 border bg-background p-2 text-xs text-foreground shadow-sm hover:bg-muted"
-										>
-											{isFitToScreen ?
-												<Maximize2 className="size-3.5" />
-											:	<Minimize2 className="size-3.5" />}
-										</button>
-									</div>
-								)}
-
-								{/* Video Preview */}
-								{isVideo && (
-									<div className="m-auto flex w-full max-w-3xl flex-col items-center">
+									)}
+									{isVideo && (
 										<video
 											src={dataUrl}
 											controls
-											autoPlay={false}
-											className="max-h-full w-full border bg-black"
+											onLoadedMetadata={(e) => {
+												const { videoWidth: w, videoHeight: h } = e.currentTarget;
+												if (w > 0 && h > 0) setMedia({ w, h });
+											}}
+											className="m-auto max-h-full max-w-full bg-black"
 										/>
-									</div>
-								)}
-
-								{/* Audio Preview */}
-								{isAudio && (
-									<div className="m-auto flex w-full max-w-md flex-col items-center gap-4 border bg-card p-6">
-										<div className="p-4 rounded-none bg-primary/10 text-primary animate-pulse">
-											<Volume2 className="size-8" />
+									)}
+									{isAudio && (
+										<div className="m-auto flex w-full max-w-md flex-col items-center gap-4 border bg-muted/40 p-6">
+											<Volume2 className="size-8 text-primary" />
+											<p className="text-sm font-semibold">{asset.name}</p>
+											<audio src={dataUrl} controls className="w-full" />
 										</div>
-										<div className="text-center">
-											<p className="font-semibold text-sm">{asset.name}</p>
-											<p className="text-xs text-muted-foreground">
-												Audio Stream
-											</p>
-										</div>
-										<audio src={dataUrl} controls className="w-full mt-2" />
-									</div>
-								)}
-
-								{/* PDF Viewer */}
-								{isPdf && (
-									<iframe
-										src={dataUrl}
-										title={asset.name}
-										className="h-full min-h-[60vh] w-full border bg-white"
-									/>
-								)}
-
-								{/* Generic Binary / Other */}
-								{!isImage && !isVideo && !isAudio && !isPdf && (
-									<div className="m-auto flex flex-col items-center gap-3 border bg-card p-8 text-center">
-										<FileText className="size-12 text-muted-foreground" />
-										<div>
+									)}
+									{isPdf && <PdfViewer name={asset.name} base64={dataUrl.slice(dataUrl.indexOf(",") + 1)} />}
+									{!isImage && !isVideo && !isAudio && !isPdf && (
+										<div className="m-auto flex max-w-sm flex-col items-center gap-3 border bg-muted/40 p-8 text-center">
+											<FileText className="size-12 text-muted-foreground" />
 											<p className="font-semibold">{asset.name}</p>
-											<p className="text-xs text-muted-foreground mt-1">
-												Binary file preview is not supported for this format.
-											</p>
+											<p className="text-sm text-muted-foreground">This kind of file cannot be previewed here.</p>
+											<Button variant="outline" size="sm" onPress={exportFile}>
+												<Download data-icon="inline-start" className="size-4" />
+												Export File
+											</Button>
 										</div>
-										<Button
-											variant="outline"
-											size="sm"
-											onPress={handleDownloadFile}
-											className="gap-2 mt-2"
-										>
-											<Download className="size-4" />
-											Download File
-										</Button>
-									</div>
-								)}
-							</>
+									)}
+								</>
+							)}
+						</div>
+						{canZoom && (
+							<Button variant="outline" size="sm" onPress={() => setFit((f) => !f)} aria-pressed={!fit} className="absolute right-3 bottom-3 bg-background">
+								{fit ? <Maximize2 data-icon="inline-start" className="size-4" /> : <Minimize2 data-icon="inline-start" className="size-4" />}
+								{fit ? "Actual Size" : "Fit to Window"}
+							</Button>
 						)}
 					</div>
 
-					{/* Metadata & Embed Inspector Sidebar */}
-					<div className="flex max-h-[40%] w-full shrink-0 flex-col gap-5 overflow-y-auto border-t bg-card p-5 md:max-h-none md:w-72 md:border-t-0 md:border-l">
-						<div>
-							<h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-								Asset Details
-							</h4>
-							<dl className="space-y-2.5 text-xs">
-								<div className="flex justify-between items-center py-1 border-b border-border/40">
-									<dt className="text-muted-foreground">Type</dt>
-									<dd className="font-mono text-foreground font-medium">
-										{mimeType}
-									</dd>
-								</div>
-								<div className="flex justify-between items-center py-1 border-b border-border/40">
-									<dt className="text-muted-foreground">File Size</dt>
-									<dd className="font-mono text-foreground">
-										{formatBytes(asset.size)}
-									</dd>
-								</div>
-								{dimensions && (
-									<div className="flex justify-between items-center py-1 border-b border-border/40">
-										<dt className="text-muted-foreground">Resolution</dt>
-										<dd className="font-mono text-foreground">
-											{dimensions.width} × {dimensions.height} px
-										</dd>
-									</div>
-								)}
-								<div className="flex justify-between items-center py-1 border-b border-border/40">
-									<dt className="text-muted-foreground">Status</dt>
-									<dd>
-										{asset.syncStatus === "synced" ?
-											<span className="text-emerald-500 font-medium flex items-center gap-1">
-												● Local Storage
-											</span>
-										:	<span className="text-amber-500 font-medium flex items-center gap-1">
-												○ Not downloaded
-											</span>
-										}
-									</dd>
-								</div>
-								<div className="flex justify-between items-center py-1">
-									<dt className="text-muted-foreground">Modified</dt>
-									<dd className="text-foreground">
-										{new Date(asset.modified_at).toLocaleDateString(undefined, {
-											month: "short",
-											day: "numeric",
-											hour: "2-digit",
-											minute: "2-digit",
-										})}
-									</dd>
-								</div>
-							</dl>
-						</div>
-
-						{/* Markdown Embed Snippet */}
-						<div className="space-y-2">
-							<div className="flex items-center justify-between">
-								<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-									Markdown Embed
-								</span>
-								<Button
-									variant="ghost"
-									size="sm"
-									onPress={handleCopyMarkdown}
-									className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary"
-								>
-									{copiedKey === "markdown" ?
-										<Check className="size-3 text-emerald-400" />
-									:	<Copy className="size-3" />}
-									{copiedKey === "markdown" ? "Copied" : "Copy"}
-								</Button>
-							</div>
-							<div className="p-2.5 rounded-none bg-muted/60 border border-border/60 font-mono text-xs break-all select-all text-muted-foreground">
-								{markdownSnippet}
-							</div>
-							<p className="text-[11px] text-muted-foreground">
-								Paste directly into BlockNote or Markdown notes to embed this
-								asset.
-							</p>
-						</div>
-
-						{/* Relative Path */}
-						<div className="space-y-2">
-							<div className="flex items-center justify-between">
-								<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-									Relative Path
-								</span>
-								<Button
-									variant="ghost"
-									size="sm"
-									onPress={handleCopyPath}
-									className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary"
-								>
-									{copiedKey === "path" ?
-										<Check className="size-3 text-emerald-400" />
-									:	<Copy className="size-3" />}
-									{copiedKey === "path" ? "Copied" : "Copy"}
-								</Button>
-							</div>
-							<div className="p-2 rounded-none bg-muted/40 font-mono text-xs text-foreground/80 break-all select-all">
-								{cleanRelPath}
-							</div>
-						</div>
-					</div>
+					{details}
 				</div>
 			</div>
 		</Dialog>

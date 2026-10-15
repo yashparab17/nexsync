@@ -1,256 +1,229 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
-// Icons
-import {
-	Activity,
-	FilePlus,
-	FolderOpen,
-	ListTodo,
-	StickyNote,
-	Upload,
-	UsersRound,
-} from "lucide-react";
+import { ArrowUpRight, FilePlus, FileText, FolderOpen, ListTodo, StickyNote, Upload, UsersRound, Calendar, AnimateIcon } from "@/components/animate-icons";
 
-// Components
-import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-
-// Context
+import Avatar from "@/components/elements/Avatar";
+import { Page, PageBody, Panel } from "@/components/layout/Page";
+import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
+import Art from "@/components/elements/Art";
+import { formatAction } from "@/lib/insights";
+import { readRecent } from "@/lib/recentFiles";
+import { getTasks, loadConfig } from "@/lib/tauri";
+import { cn } from "@/lib/utils";
+import { useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import type { Task } from "@/types/workspace";
 
-// Assets
-import logo from "@/assets/logos/logo.svg";
-
-// ────────────────────────────
-// Helpers
-// ────────────────────────────
-
-// Converts ISO-8601 timestamp to a relative time string (e.g. "5m ago")
+// "5m ago" from an ISO timestamp
 function formatRelative(iso: string): string {
-	if (!iso) return "—";
-	const then = new Date(iso).getTime();
-	const now = Date.now();
-	const diff = Math.max(0, now - then);
-	const mins = Math.floor(diff / 60_000);
+	if (!iso) return "";
+	const mins = Math.floor(Math.max(0, Date.now() - new Date(iso).getTime()) / 60_000);
 	if (mins < 1) return "just now";
 	if (mins < 60) return `${mins}m ago`;
 	const hours = Math.floor(mins / 60);
 	if (hours < 24) return `${hours}h ago`;
 	const days = Math.floor(hours / 24);
-	if (days < 7) return `${days}d ago`;
-	return new Date(iso).toLocaleDateString();
+	return days < 7 ? `${days}d ago` : new Date(iso).toLocaleDateString();
 }
 
-// Converts raw action identifiers into human-friendly capitalized titles
-function formatAction(action: string): string {
-	const clean = action.replace(/_/g, " ").trim();
-	return clean.replace(/\b\w/g, (c) => c.toUpperCase());
+// The icon for what an event touched; neutral, so colour is saved for what needs attention
+function eventIcon(targetType?: string, action?: string) {
+	const key = `${targetType ?? ""} ${action ?? ""}`.toLowerCase();
+	if (key.includes("note")) return StickyNote;
+	if (key.includes("asset")) return Upload;
+	if (key.includes("task") || key.includes("card") || key.includes("column")) return ListTodo;
+	if (key.includes("folder")) return FolderOpen;
+	if (key.includes("member")) return UsersRound;
+	return FilePlus;
 }
 
-// Returns a contextual icon matching the entity type of the event
-function getActivityIcon(targetType?: string, action?: string) {
-	const act = (action || "").toLowerCase();
-	const type = (targetType || "").toLowerCase();
+// Notes open in the notes page, everything else in the code editor
+const openPath = (file: string) => `/workspace/${/\.(md|txt)$/i.test(file) ? "notes" : "editor"}?open=${encodeURIComponent(`/${file.replace(/^\/+/, "")}`)}`;
 
-	if (type === "note" || act.includes("note")) {
-		return <StickyNote className="size-4 text-sky-400 shrink-0" />;
-	}
-	if (type === "asset" || act.includes("asset")) {
-		return <Upload className="size-4 text-emerald-400 shrink-0" />;
-	}
-	if (type === "task" || act.includes("task")) {
-		return <ListTodo className="size-4 text-purple-400 shrink-0" />;
-	}
-	if (type === "kanban" || act.includes("card") || act.includes("list") || act.includes("column")) {
-		return <ListTodo className="size-4 text-indigo-400 shrink-0" />;
-	}
-	if (type === "folder") {
-		return <FolderOpen className="size-4 text-primary shrink-0" />;
-	}
-	if (type === "member" || act.includes("member")) {
-		return <UsersRound className="size-4 text-primary shrink-0" />;
-	}
-	return <FilePlus className="size-4 text-amber-400 shrink-0" />;
-}
-
-interface StatCardProps {
-	label: string;
-	value: number;
-	icon: ReactNode;
-}
-
-// Read-only metric card
-function StatCard({ label, value, icon }: StatCardProps) {
-	return (
-		<Card>
-			<CardContent className="flex items-center justify-between py-5">
-				<div>
-					<p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-						{label}
-					</p>
-					<p className="mt-1 text-3xl font-bold">{value}</p>
-				</div>
-				{icon}
-			</CardContent>
-		</Card>
-	);
-}
-
-// ────────────────────────────
-// Main component
-// ────────────────────────────
-
-// Workspace overview dashboard showing quick actions, stats, and activity
+// Workspace overview: where to continue, who is here, what is due, what changed
 export default function WorkspaceDashboard() {
-	const { workspace, metadata, stats, refreshMetadata, refreshStats } =
-		useWorkspace();
+	const { workspace, metadata, stats, refreshMetadata, refreshStats } = useWorkspace();
+	const { peers, nameOf } = useP2P();
 	const navigate = useNavigate();
+	const [tasks, setTasks] = useState<Task[]>([]);
+	const [me, setMe] = useState("");
 
 	useEffect(() => {
 		void refreshMetadata();
 		void refreshStats();
+		loadConfig().then((c) => setMe(c.display_name.trim())).catch(() => {});
 	}, [refreshMetadata, refreshStats]);
 
-	const activity = metadata?.activity.events ?? [];
+	useEffect(() => {
+		if (!workspace) return;
+		getTasks(workspace.path).then(setTasks).catch(() => setTasks([]));
+	}, [workspace]);
 
-	// Quick action shortcuts
-	const quickActions = [
-		{
-			label: "New Note",
-			icon: StickyNote,
-			onClick: () => navigate("/workspace/notes"),
-		},
-		{
-			label: "New File",
-			icon: FilePlus,
-			onClick: () => navigate("/workspace/files"),
-		},
-		{
-			label: "New Task",
-			icon: ListTodo,
-			onClick: () => navigate("/workspace/tasks"),
-		},
-		{
-			label: "Upload Asset",
-			icon: Upload,
-			onClick: () => navigate("/workspace/assets"),
-		},
-	];
+	const activity = metadata?.activity.events ?? [];
+	// Files opened in the Editor or Notes on this device, newest first
+	const recent = useMemo(() => (workspace ? readRecent(workspace.path) : []), [workspace]);
+	const members = metadata?.members.members ?? [];
+	const online = useMemo(() => new Set([me, ...peers.filter((p) => p.status === "connected").map((p) => nameOf(p.id))]), [me, peers, nameOf]);
+	const due = useMemo(
+		() => tasks.filter((t) => t.status !== "done" && t.due_date).sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1)).slice(0, 5),
+		[tasks],
+	);
+	const today = new Date().toISOString().slice(0, 10);
+
+	const open = tasks.filter((t) => t.status !== "done");
+	const doneShare = tasks.length ? Math.round(((tasks.length - open.length) / tasks.length) * 100) : 0;
+	const late = open.filter((t) => t.due_date && t.due_date < today).length;
+	const goTo = (path: string) => () => navigate(path);
 
 	return (
-		<div className="space-y-6">
-			{/* Watermark logo */}
-			<div className="pointer-events-none absolute inset-0 flex items-center justify-center z-[-1]">
-				<img src={logo} className="h-150 w-150 opacity-10" alt="" />
-			</div>
+		<Page>
+			<Toolbar>
+				<ToolbarTitle name={workspace?.name ?? "Dashboard"} />
+				{workspace?.description && <span className="ml-1 hidden min-w-0 flex-1 truncate border-l pl-3 text-sm text-muted-foreground md:block">{workspace.description}</span>}
+			</Toolbar>
 
-			{/* Header */}
-			<div>
-				<h1 className="text-2xl font-semibold">Dashboard</h1>
-				<p className="mt-1 text-sm text-muted-foreground">
-					Welcome back to{" "}
-					<span className="font-semibold text-foreground">
-						{workspace?.name}
+			{/* A bento grid: tile size follows importance, with where to continue largest */}
+			<PageBody className="grid content-start gap-4 md:grid-cols-6 xl:grid-cols-12">
+				<Panel index="01" title="Pick Up Where You Left Off" flush={recent.length > 0} className="md:col-span-6 xl:col-span-5 xl:row-span-2">
+					{recent.length === 0 ? (
+						<div className="flex h-full flex-col items-center justify-center gap-4 py-6 text-center">
+							<Art name="recent" className="h-40 w-64 max-w-full" />
+							<p className="text-sm text-muted-foreground">Files you open show up here, so you can jump back in.</p>
+						</div>
+					) : (
+						<ul className="divide-y">
+							{recent.slice(0, 6).map((file) => (
+								<li key={file}>
+									<AnimateIcon animateOnHover asChild>
+										<button type="button" onClick={() => navigate(openPath(file))} className="flex w-full items-center gap-3 px-4 py-4 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
+											<FileText className="size-5 shrink-0 text-muted-foreground" />
+											<span className="min-w-0">
+												<span className="block truncate text-sm font-medium">{file.split("/").pop()}</span>
+												<span className="block truncate font-mono text-[13px] text-muted-foreground">{file}</span>
+											</span>
+										</button>
+									</AnimateIcon>
+								</li>
+							))}
+						</ul>
+					)}
+				</Panel>
+
+				<Tile index="02" title="Open Tasks" value={open.length} onClick={goTo("/workspace/tasks")} className="md:col-span-3 xl:col-span-4">
+					<span className="block h-2 bg-muted" role="img" aria-label={`${doneShare}% of tasks done`}>
+						<span className="block h-full bg-success" style={{ width: `${doneShare}%` }} />
 					</span>
-					. Here's what's happening in your workspace.
-				</p>
-			</div>
+					<span className="text-sm text-muted-foreground">
+						{tasks.length === 0 ? "No tasks yet" : `${doneShare}% of ${tasks.length} done`}
+						{late > 0 && <span className="text-destructive"> · {late} overdue</span>}
+					</span>
+				</Tile>
+				<Tile index="03" title="Files" value={stats?.files ?? 0} onClick={goTo("/workspace/files")} className="md:col-span-3 xl:col-span-3">
+					<span className="text-sm text-muted-foreground">
+						{stats?.assets ?? 0} assets · {stats?.kanban_cards ?? 0} cards
+					</span>
+				</Tile>
 
-			{/* Quick Actions */}
-			<div className="flex flex-wrap gap-2">
-				{quickActions.map((action) => {
-					const Icon = action.icon;
-					return (
-						<Button
-							key={action.label}
-							variant="outline"
-							onPress={action.onClick}
-						>
-							<Icon data-icon="inline-start" className="size-4" />
-							{action.label}
-						</Button>
-					);
-				})}
-			</div>
-
-			{/* Stats Grid */}
-			<div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-				<StatCard
-					label="Files"
-					value={stats?.files ?? 0}
-					icon={<FilePlus className="size-8 text-primary/60" />}
-				/>
-				<StatCard
-					label="Assets"
-					value={stats?.assets ?? 0}
-					icon={<Upload className="size-8 text-primary/60" />}
-				/>
-				<StatCard
-					label="Tasks"
-					value={stats?.tasks ?? 0}
-					icon={<ListTodo className="size-8 text-primary/60" />}
-				/>
-				<StatCard
-					label="Members"
-					value={stats?.members ?? 0}
-					icon={<UsersRound className="size-8 text-primary/60" />}
-				/>
-			</div>
-
-			{/* Recent Activity */}
-			<div>
-				<Card>
-					<CardHeader>
-						<CardTitle className="flex items-center gap-2">
-							<Activity className="size-5 text-primary" />
-							Recent Activity
-						</CardTitle>
-						<CardDescription>
-							Latest events and changes in this workspace.
-						</CardDescription>
-					</CardHeader>
-					<CardContent>
-						{activity.length === 0 ? (
-							<p className="text-sm text-muted-foreground">
-								No activity yet. Start by creating a note, file, or task.
-							</p>
-						) : (
-							<ul className="divide-y divide-border/50">
-								{activity.slice(0, 7).map((event) => (
-									<li
-										key={event.id}
-										className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0 text-sm"
-									>
-										<div className="flex items-start gap-3 min-w-0">
-											<div className="p-2 rounded-none bg-muted/60 mt-0.5">
-												{getActivityIcon(event.target_type, event.action)}
-											</div>
-											<div className="min-w-0">
-												<p className="font-semibold text-xs text-foreground">
-													{formatAction(event.action)}
-												</p>
-												<p className="text-xs text-muted-foreground truncate mt-0.5">
-													{event.detail}
-												</p>
-											</div>
-										</div>
-										<span className="shrink-0 text-[11px] font-mono text-muted-foreground">
-											{formatRelative(event.timestamp)}
-										</span>
+				<Panel index="04" title="Due Soon" flush={due.length > 0} className="md:col-span-3 xl:col-span-4">
+					{due.length === 0 ? (
+						<p className="text-sm text-muted-foreground">No dates set. Give a task a due date and it appears here.</p>
+					) : (
+						<ul className="divide-y">
+							{due.slice(0, 4).map((task) => {
+								const overdue = task.due_date! < today;
+								return (
+									<li key={task.id}>
+										<AnimateIcon animateOnHover asChild>
+											<button type="button" onClick={() => navigate(`/workspace/tasks?open=${encodeURIComponent(task.id)}`)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:bg-muted">
+												<span className="truncate font-medium">{task.title}</span>
+												<span className={cn("flex shrink-0 items-center gap-2 font-mono text-[13px] tabular-nums", overdue ? "text-destructive" : task.due_date === today ? "text-warning" : "text-muted-foreground")}>
+													<Calendar className="size-3.5" />
+													{task.due_date === today ? "today" : task.due_date}
+												</span>
+											</button>
+										</AnimateIcon>
 									</li>
-								))}
-							</ul>
+								);
+							})}
+						</ul>
+					)}
+				</Panel>
+
+				<Panel index="05" title="People" hint={`${[...online].filter((n) => members.some((m) => m.name === n)).length} online`} flush className="md:col-span-3 xl:col-span-3">
+					<ul className="divide-y">
+						{members.slice(0, 4).map((m) => {
+							const here = online.has(m.name);
+							return (
+								<li key={m.id} className="flex items-center gap-3 px-4 py-3">
+									<span className="relative">
+										<Avatar name={m.name} className={cn("size-8", !here && "opacity-50")} />
+										<span className={cn("absolute -right-0.5 -bottom-0.5 size-2.5 ring-2 ring-background", here ? "bg-success" : "bg-muted-foreground/50")} />
+									</span>
+									<span className={cn("min-w-0 flex-1 truncate text-sm font-medium", !here && "text-muted-foreground")}>{m.name}</span>
+									<span className="font-mono text-[13px] text-muted-foreground">{m.role.toLowerCase()}</span>
+								</li>
+							);
+						})}
+						{members.length > 4 && (
+							<li>
+								<button type="button" onClick={goTo("/workspace/members")} className="w-full px-4 py-3 text-left text-sm text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted">
+									and {members.length - 4} more
+								</button>
+							</li>
 						)}
-					</CardContent>
-				</Card>
-			</div>
-		</div>
+					</ul>
+				</Panel>
+
+				<Panel index="06" title="Activity" flush={activity.length > 0} className="md:col-span-6 xl:col-span-8">
+					{activity.length === 0 ? (
+						<p className="text-sm text-muted-foreground">Nothing has changed yet. Create a note, file or task to get started.</p>
+					) : (
+						<ul className="divide-y">
+							{activity.slice(0, 6).map((event) => {
+								const Icon = eventIcon(event.target_type, event.action);
+								return (
+									<li key={event.id} className="flex items-center gap-3 px-4 py-3">
+										{event.author ? <Avatar name={event.author} className="size-7 text-xs" /> : <span className="flex size-7 shrink-0 items-center justify-center bg-muted text-muted-foreground"><Icon className="size-4" /></span>}
+										<div className="min-w-0 flex-1">
+											<p className="truncate text-sm">
+												<span className="font-medium">{event.author ?? formatAction(event.action)}</span>
+												{event.author && <span className="text-muted-foreground"> {formatAction(event.action).toLowerCase()}</span>}
+											</p>
+											<p className="truncate text-sm text-muted-foreground">{event.detail}</p>
+										</div>
+										<span className="shrink-0 font-mono text-[13px] tabular-nums text-muted-foreground">{formatRelative(event.timestamp)}</span>
+									</li>
+								);
+							})}
+						</ul>
+					)}
+				</Panel>
+
+				<Tile index="07" title="Kanban Cards" value={stats?.kanban_cards ?? 0} onClick={goTo("/workspace/kanban")} className="md:col-span-6 xl:col-span-4">
+					<span className="text-sm text-muted-foreground">{members.length} {members.length === 1 ? "member" : "members"} share this board</span>
+				</Tile>
+			</PageBody>
+		</Page>
+	);
+}
+
+// A number worth a glance with a line of context under it. The header is the same as a panel's (number, title); the arrow says
+// the whole tile opens its page.
+function Tile({ index, title, value, onClick, className, children }: { index: string; title: string; value: number; onClick: () => void; className?: string; children?: ReactNode }) {
+	return (
+		<button type="button" onClick={onClick} className={cn("frame flex min-w-0 flex-col overflow-hidden bg-muted/40 text-left transition-colors hover:bg-muted focus-visible:bg-muted", className)}>
+			<span className="flex h-12 shrink-0 items-center gap-3 border-b px-4">
+				<span className="font-mono text-[13px] text-primary" aria-hidden>
+					{index}
+				</span>
+				<span className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</span>
+				<ArrowUpRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+			</span>
+			<span className="flex flex-1 flex-col justify-between gap-4 p-4">
+				<span className="text-4xl font-semibold tabular-nums">{value}</span>
+				<span className="flex flex-col gap-2">{children}</span>
+			</span>
+		</button>
 	);
 }

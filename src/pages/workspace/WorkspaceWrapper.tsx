@@ -17,12 +17,15 @@ import HostHandoffDialog from "@/components/dialogs/workspace/HostHandoffDialog"
 import TransferTray from "@/components/layout/workspace/TransferTray";
 import HostGate from "@/components/layout/workspace/HostGate";
 import DueReminders from "@/components/layout/workspace/DueReminders";
+import ShortcutsDialog from "@/components/dialogs/workspace/ShortcutsDialog";
+import { shortcutFor } from "@/lib/shortcuts";
 
 // Shell layout for all workspace sub-routes
 export default function Workspace() {
 	const { workspace, isLoading } = useWorkspace();
 	const navigate = useNavigate();
 	const { pathname } = useLocation();
+	// The Editor, Notes, Files and Assets are full-bleed workspaces: no page padding, and they fill the window
 	// Below the medium breakpoint the sidebar is a drawer
 	const [navOpen, setNavOpen] = useState(false);
 
@@ -39,6 +42,22 @@ export default function Workspace() {
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
 	}, [navOpen]);
+
+	// Workspace-wide shortcuts; the Editor and Notes handle their own keys
+	const [help, setHelp] = useState(false);
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			const action = shortcutFor(e);
+			if (!action) return;
+			e.preventDefault();
+			if (action.type === "go") navigate(action.to);
+			else if (action.type === "help") setHelp((h) => !h);
+			else if (action.type === "settings") navigate(`${pathname}?settings=1`);
+			else document.querySelector<HTMLInputElement>('input[aria-label="Search workspace"]')?.focus();
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [navigate, pathname]);
 
 	// Show loader while workspace data is being fetched
 	if (isLoading) {
@@ -70,22 +89,24 @@ export default function Workspace() {
 					<div className="relative h-full animate-in slide-in-from-left duration-200 motion-reduce:animate-none">
 						<WorkspaceSidebar expanded onNavigate={() => setNavOpen(false)} />
 					</div>
-					<button type="button" aria-label={t("nav.close")} className="flex-1 cursor-default bg-black/50" onClick={() => setNavOpen(false)} />
+					<button type="button" aria-label={t("nav.close")} className="flex-1 cursor-default bg-scrim" onClick={() => setNavOpen(false)} />
 				</div>
 			)}
 
 			{/* Main content area */}
-			<div className="flex min-w-0 flex-1 flex-col">
+			<div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-xl bg-background window-edge">
 				{/* Header */}
 				<WorkspaceHeader onOpenMenu={() => setNavOpen(true)} menuOpen={navOpen} />
 
 				{/* Page content */}
-				<div className="flex-1 overflow-auto p-4 md:p-6">
-					<div key={pathname} className="relative flex min-h-full flex-col animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
+				<div className="min-h-0 flex-1 overflow-hidden">
+					<div key={pathname} className="relative flex h-full w-full flex-col animate-in fade-in duration-200 motion-reduce:animate-none">
 						<Outlet />
 					</div>
 				</div>
 			</div>
+
+			{help && <ShortcutsDialog onClose={() => setHelp(false)} />}
 
 			{/* Warns about work due today or late, whichever page is open */}
 			<DueReminders />

@@ -1,5 +1,5 @@
-import { parseDate } from "@internationalized/date";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { getLocalTimeZone, parseDate, today } from "@internationalized/date";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from "@/components/animate-icons";
 import {
 	Button,
 	Calendar,
@@ -36,19 +36,22 @@ export function DateField({
 	value,
 	onChange,
 	className,
+	noPast,
 	"aria-label": ariaLabel = "Date",
 }: {
 	id?: string;
 	value: string;
 	onChange: (value: string) => void;
 	className?: string;
+	// Days before today cannot be picked or typed
+	noPast?: boolean;
 	"aria-label"?: string;
 }) {
 	return (
-		<DatePicker aria-label={ariaLabel} value={toDate(value)} onChange={(d) => onChange(d ? d.toString() : "")} className={cn("group", className)}>
+		<DatePicker aria-label={ariaLabel} minValue={noPast ? today(getLocalTimeZone()) : undefined} value={toDate(value)} onChange={(d) => onChange(d ? d.toString() : "")} className={cn("group", className)}>
 			<Group
 				id={id}
-				className="flex h-10 w-full items-center border border-input bg-background pl-3 text-sm focus-within:ring-2 focus-within:ring-ring"
+				className="flex h-10 w-full items-center border border-input bg-input pl-3 text-sm focus-within:ring-2 focus-within:ring-ring"
 			>
 				<DateInput className="flex flex-1 items-center">
 					{(segment) => (
@@ -72,7 +75,7 @@ export function DateField({
 					<CalendarIcon className="size-4" />
 				</Button>
 			</Group>
-			<Popover placement="bottom end" className="z-[70] border border-border bg-popover p-3 text-popover-foreground shadow-md">
+			<Popover placement="bottom end" className="z-[70] border border-border bg-popover p-3 text-popover-foreground rounded-lg ring-1 ring-foreground/10">
 				<Dialog className="outline-none">
 					<Calendar>
 						<header className="mb-2 flex items-center justify-between">

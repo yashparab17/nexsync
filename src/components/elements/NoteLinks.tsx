@@ -1,7 +1,7 @@
 // Notes a task or card points at by writing [[Note name]] in its description
 
 import { useEffect, useState } from "react";
-import { FileText } from "lucide-react";
+import { FileText } from "@/components/animate-icons";
 import { useNavigate } from "react-router-dom";
 
 import { extractLinks, noteTitle, resolveLink } from "@/lib/notes/links";
@@ -28,9 +28,9 @@ export default function NoteLinks({ text }: { text: string }) {
 	}, [hasLinks, workspace?.path]);
 
 	return (
-		<div className="mt-1.5 space-y-1">
+		<div className="mt-2 space-y-1">
 			{hasLinks && (
-				<div className="flex flex-wrap gap-1.5">
+				<div className="flex flex-wrap gap-2">
 					{links.map((target) => {
 						const note = resolveLink(target, notes);
 						return note ? (
@@ -38,13 +38,13 @@ export default function NoteLinks({ text }: { text: string }) {
 								key={target}
 								type="button"
 								onClick={() => navigate(`/workspace/notes?open=${encodeURIComponent(note.path)}`)}
-								className="inline-flex cursor-pointer items-center gap-1 border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-xs hover:bg-primary/20"
+								className="inline-flex cursor-pointer items-center gap-1 border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs hover:bg-primary/20"
 							>
 								<FileText className="size-3" />
 								{noteTitle(note.name)}
 							</button>
 						) : (
-							<span key={target} className="inline-flex items-center gap-1 border border-dashed border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+							<span key={target} className="inline-flex items-center gap-1 border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">
 								<FileText className="size-3" />
 								{target} (no such note)
 							</span>

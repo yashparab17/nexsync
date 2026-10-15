@@ -1,15 +1,16 @@
 // Header button for the catch-up review: how many changes by other people have not been reviewed, and the review itself
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { History } from "lucide-react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { History } from "@/components/animate-icons";
 
-import CatchUpDialog from "@/components/dialogs/workspace/CatchUpDialog";
 import { Button } from "@/components/ui/button";
 import { countRows, type Lookups } from "@/lib/catchup";
 import { getCatchup, getKanban } from "@/lib/tauri";
 import { useNotifications } from "@/store/notifications/NotificationContext";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+
+const CatchUpDialog = lazy(() => import("@/components/dialogs/workspace/CatchUpDialog"));
 import type { CatchupEntry, KanbanColumn } from "@/types/workspace";
 
 export default function CatchUp() {
@@ -86,10 +87,14 @@ export default function CatchUp() {
 			<Button variant="ghost" size="icon" onPress={() => setOpen(true)} aria-label={unread > 0 ? `Catch up, ${unread} to review` : "Catch up"} className="relative">
 				<History className="size-5" />
 				{unread > 0 && (
-					<span className="absolute right-1 top-1 flex min-w-4 items-center justify-center bg-primary px-1 text-[10px] font-bold text-primary-foreground">{unread > 9 ? "9+" : unread}</span>
+					<span className="absolute right-1 top-1 flex min-w-4 items-center justify-center bg-primary px-1 text-xs font-bold text-primary-foreground">{unread > 9 ? "9+" : unread}</span>
 				)}
 			</Button>
-			{open && <CatchUpDialog workspacePath={path} entries={entries} lookups={lookups} members={members ?? []} onChanged={refresh} onClose={() => setOpen(false)} />}
+			{open && (
+				<Suspense fallback={null}>
+					<CatchUpDialog workspacePath={path} entries={entries} lookups={lookups} members={members ?? []} onChanged={refresh} onClose={() => setOpen(false)} />
+				</Suspense>
+			)}
 		</>
 	);
 }

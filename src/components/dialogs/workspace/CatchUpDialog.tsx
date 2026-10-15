@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, ChevronRight, History, ShieldCheck, Undo2 } from "lucide-react";
+import { Check, ChevronRight, ChevronDown, History, ShieldCheck, Undo2 } from "@/components/animate-icons";
 
 import { DiffView } from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { canRevertField, describe, groupByAuthor, previewText, revertValue, rowKey, rowsOf, textHunks, type Lookups } from "@/lib/catchup";
 import { diffLines } from "@/lib/diff";
 import { markCatchup, resolveCardConflict, resolveTaskConflict } from "@/lib/tauri";
@@ -93,7 +93,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 						</p>
 					</div>
 					{canRevertField(e) && (
-						<Button size="sm" variant="outline" isDisabled={busy} onPress={() => void revertField(e)} className="gap-1.5">
+						<Button size="sm" variant="outline" isDisabled={busy} onPress={() => void revertField(e)} className="gap-2">
 							<Undo2 className="size-3.5" />
 							Undo
 						</Button>
@@ -107,9 +107,9 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 							{undone.has(`${e.id}:${index}`) ? (
 								<span className="text-xs text-muted-foreground">Undone</span>
 							) : (
-								<Button size="sm" variant="outline" isDisabled={busy || e.state === "reverted"} onPress={() => void revertHunkOf(e, index)} className="h-6 gap-1.5 px-2 text-xs">
+								<Button size="sm" variant="outline" isDisabled={busy || e.state === "reverted"} onPress={() => void revertHunkOf(e, index)} className="h-6 gap-2 px-2 text-xs">
 									<Undo2 className="size-3" />
-									Undo this change
+									Undo This Change
 								</Button>
 							)}
 						</div>
@@ -123,16 +123,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 	return (
 		<Dialog isOpen onOpenChange={(open) => !open && onClose()} className="sm:max-w-3xl">
 			<div className="flex max-h-[75vh] min-h-0 flex-col gap-4">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<History className="size-4" />
-						Catch up
-					</DialogTitle>
-					<DialogDescription>
-						What other people changed, by who did it. Merging never loses anything, but it does not ask you either, so this is where you check it. Undoing a change is a new edit that reaches
-						everyone like any other.
-					</DialogDescription>
-				</DialogHeader>
+				<DialogHeading icon={<History className="size-6" />} title="Catch Up" />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
@@ -155,7 +146,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 												· {rows.length} {rows.length === 1 ? "change" : "changes"}
 											</span>
 											{group.vouched ? (
-												<span className="inline-flex items-center gap-1 text-xs font-normal text-emerald-500" title="Signed with this member's device key">
+												<span className="inline-flex items-center gap-1 text-xs font-normal text-success" title="Signed with this member's device key">
 													<ShieldCheck className="size-3.5" aria-hidden />
 													Verified
 												</span>
@@ -168,9 +159,9 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 												</span>
 											)}
 										</h3>
-										<Button size="sm" variant="ghost" isDisabled={busy} onPress={() => void markReviewed(group.entries)} className="gap-1.5">
+										<Button size="sm" variant="ghost" isDisabled={busy} onPress={() => void markReviewed(group.entries)} className="gap-2">
 											<Check className="size-3.5" />
-											Mark reviewed
+											Mark Reviewed
 										</Button>
 									</div>
 									<ul className="divide-y divide-border/60">
@@ -195,7 +186,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 																Edited {first.label}
 																{row.length > 1 && <span className="text-muted-foreground"> · {row.length} edits</span>}
 															</span>
-															<span className="block truncate font-mono text-xs text-emerald-500">+ {previewText(first)}</span>
+															<span className="block truncate font-mono text-xs text-success">+ {previewText(first)}</span>
 														</span>
 														<span className="shrink-0 text-xs text-muted-foreground">{when(first.at)}</span>
 													</button>
@@ -213,7 +204,7 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 				<div className="flex justify-end gap-2">
 					{entries.length > 0 && (
 						<Button variant="outline" isDisabled={busy} onPress={() => void markReviewed(entries)}>
-							Mark all reviewed
+							Mark All Reviewed
 						</Button>
 					)}
 					<Button onPress={onClose}>Close</Button>

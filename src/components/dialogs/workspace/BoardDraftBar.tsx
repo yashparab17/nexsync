@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { GitBranch } from "lucide-react";
+import { GitBranch, GitMerge } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { discardBoardDraft, getKanban, listBoardDrafts, mergeBoardDraft, previewBoardDraft, startBoardDraft } from "@/lib/tauri";
 import { errorText } from "@/lib/utils";
@@ -89,25 +89,25 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 	return (
 		<>
 			{board ? (
-				<div className="flex shrink-0 flex-wrap items-center gap-2 border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs">
+				<div className="flex shrink-0 flex-wrap items-center gap-2 border border-primary/30 bg-primary/10 px-3 py-2 text-xs">
 					<GitBranch className="size-3.5 shrink-0 text-primary" />
 					<span className="min-w-0 flex-1">
 						You are trying out <span className="font-semibold">{board.name}</span>. Moves here are private until you merge them. Cards can be moved; to edit or add cards, go back to the board.
 					</span>
 					<Button size="xs" onPress={() => void review()} isDisabled={busy}>
-						Review and merge
+						Review and Merge
 					</Button>
 					<Button variant="ghost" size="xs" onPress={() => onBoard(null)}>
-						Back to the board
+						Back to the Board
 					</Button>
 					<Button variant="ghost" size="xs" onPress={() => void discard(board)} isDisabled={busy}>
 						Discard
 					</Button>
 				</div>
 			) : (
-				<Button variant="outline" size="sm" onPress={() => setChoosing(true)} className="gap-1.5">
+				<Button variant="outline" size="sm" onPress={() => setChoosing(true)} className="gap-2">
 					<GitBranch className="size-4" />
-					Try a reorganisation
+					Try a Reorganisation
 				</Button>
 			)}
 
@@ -120,13 +120,8 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 			{choosing && (
 				<Dialog isOpen onOpenChange={(open) => !open && setChoosing(false)} className="sm:max-w-lg">
 					<div className="flex flex-col gap-4">
-						<DialogHeader>
-							<DialogTitle>Try a reorganisation</DialogTitle>
-							<DialogDescription>
-								Move cards between lists and reorder them without changing the real board. When it looks right, review what it would change and merge it. Nothing reaches your collaborators until then,
-								and anything they change meanwhile is kept.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<GitBranch className="size-6" />} title="Try a Reorganisation" description={<>Move cards between lists and reorder them without changing the real board. When it looks right, review what it would change and merge it. Nothing reaches your collaborators until then,
+								and anything they change meanwhile is kept.</>} />
 						{error && (
 							<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
 								{error}
@@ -178,10 +173,7 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 			{reviewing && board && (
 				<Dialog isOpen onOpenChange={(open) => !open && setReviewing(null)} className="sm:max-w-xl">
 					<div className="flex max-h-[75vh] min-h-0 flex-col gap-4">
-						<DialogHeader>
-							<DialogTitle>Merge {board.name}?</DialogTitle>
-							<DialogDescription>This is what merging would change on the real board. All of it is merged together, or none of it.</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<GitMerge className="size-6" />} title={`Merge ${board.name}?`} description={<>This is what merging would change on the real board. All of it is merged together, or none of it.</>} />
 						{error && (
 							<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
 								{error}
@@ -195,7 +187,7 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 									<li key={card.id} className="space-y-1 px-3 py-2 text-sm">
 										<p className="font-medium">{card.title || "Untitled card"}</p>
 										{card.deleted ? (
-											<p className="text-xs text-amber-400">Deleted since you started, so its move is dropped.</p>
+											<p className="text-xs text-warning">Deleted since you started, so its move is dropped.</p>
 										) : (
 											<ul className="text-xs text-muted-foreground">
 												{card.changes.map((c) => (
@@ -203,17 +195,17 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 												))}
 											</ul>
 										)}
-										{card.collisions.length > 0 && <p className="text-xs text-amber-400">Someone else also changed {card.collisions.map((c) => c.field).join(", ")}; you will be asked which to keep.</p>}
+										{card.collisions.length > 0 && <p className="text-xs text-warning">Someone else also changed {card.collisions.map((c) => c.field).join(", ")}; you will be asked which to keep.</p>}
 									</li>
 								))}
 							</ul>
 						)}
 						<div className="flex justify-end gap-2">
 							<Button variant="ghost" onPress={() => setReviewing(null)}>
-								Keep working
+								Keep Working
 							</Button>
 							<Button onPress={() => void merge()} isDisabled={busy || reviewing.cards.length === 0}>
-								Merge into the board
+								Merge into the Board
 							</Button>
 						</div>
 					</div>

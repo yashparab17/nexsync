@@ -69,10 +69,18 @@ export const router = createBrowserRouter([
 						),
 					},
 					{
+						path: "explorer",
+						element: (
+							<RouteSuspense>
+								<WorkspaceFiles mode="explorer" />
+							</RouteSuspense>
+						),
+					},
+					{
 						path: "files",
 						element: (
 							<RouteSuspense>
-								<WorkspaceFiles />
+								<WorkspaceFiles mode="files" />
 							</RouteSuspense>
 						),
 					},

@@ -1,15 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, RefreshCw, Trash2 } from "lucide-react";
+import { Check, Copy, RefreshCw, Trash2, Bug } from "@/components/animate-icons";
 import { APP_VERSION } from "@/lib/version";
 
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { SectionCard } from "@/components/elements/SettingsParts";
 
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { clearErrorLog, getErrorLog } from "@/lib/tauri";
@@ -54,16 +48,9 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 			.join("\n\n");
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle className="text-base">Error Log</CardTitle>
-				<CardDescription>
-					Recent errors recorded on this device. Nothing is sent anywhere; copy it when reporting a bug.
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-3">
+		<SectionCard id="diagnostics" title="Error Log" icon={<Bug className="size-5" />}>
 				<div className="flex flex-wrap gap-2">
-					<Button variant="outline" size="sm" onPress={refresh} className="gap-1.5">
+					<Button variant="outline" size="sm" onPress={refresh} className="gap-2">
 						<RefreshCw className="size-3.5" />
 						Refresh
 					</Button>
@@ -72,21 +59,21 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 						size="sm"
 						onPress={() => copy(asText(), "log")}
 						isDisabled={records.length === 0}
-						className="gap-1.5"
+						className="gap-2"
 					>
 						{copiedKey === "log" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
 						{copiedKey === "log" ? "Copied" : "Copy All"}
 					</Button>
-					<Button variant="outline" size="sm" onPress={copyDiagnostics} className="gap-1.5">
+					<Button variant="outline" size="sm" onPress={copyDiagnostics} className="gap-2">
 						{copiedKey === "diagnostics" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-						{copiedKey === "diagnostics" ? "Copied" : "Copy diagnostics"}
+						{copiedKey === "diagnostics" ? "Copied" : "Copy Diagnostics"}
 					</Button>
 					<Button
 						variant="outline"
 						size="sm"
 						onPress={handleClear}
 						isDisabled={records.length === 0}
-						className="gap-1.5"
+						className="gap-2"
 					>
 						<Trash2 className="size-3.5" />
 						Clear
@@ -102,14 +89,14 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 						{records.map((r, i) => (
 							<li key={`${r.timestamp}-${i}`} className="space-y-1 p-3">
 								<div className="flex items-center justify-between gap-3 text-muted-foreground">
-									<span className="font-semibold uppercase tracking-widest">{r.source}</span>
+									<span className="font-semibold ">{r.source}</span>
 									<span>{new Date(r.timestamp).toLocaleString()}</span>
 								</div>
 								<p className="break-words text-foreground">{r.message}</p>
 								{r.detail && (
 									<details>
 										<summary className="cursor-pointer text-muted-foreground">Details</summary>
-										<pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-muted-foreground">
+										<pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground">
 											{r.detail}
 										</pre>
 									</details>
@@ -118,7 +105,6 @@ ${asText() || "No errors recorded."}`, "diagnostics");
 						))}
 					</ul>
 				)}
-			</CardContent>
-		</Card>
+			</SectionCard>
 	);
 }

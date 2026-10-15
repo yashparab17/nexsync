@@ -110,7 +110,7 @@ describe("Settings page", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Larger text" }));
 		fireEvent.click(screen.getByRole("button", { name: "8" }));
 		const stored = JSON.parse(localStorage.getItem("nexsync.editorPrefs") ?? "{}");
-		expect(stored).toMatchObject({ fontSize: 13, tabSize: 8 });
+		expect(stored).toMatchObject({ fontSize: 14, tabSize: 8 });
 		expect(await screen.findByText(`v${APP_VERSION}`)).toBeTruthy();
 	});
 });

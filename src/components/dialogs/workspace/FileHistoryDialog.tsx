@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { History, Loader2, RotateCcw, Save } from "lucide-react";
+import { History, RotateCcw, Save } from "@/components/animate-icons";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { diffLines, type DiffResult, type DiffRow } from "@/lib/diff";
 import { isBinaryFile, isDocumentFile } from "@/lib/editor/languages";
@@ -49,18 +50,18 @@ export function DiffView({ diff }: { diff: DiffResult }) {
 	return (
 		<div className="font-mono text-xs" role="table" aria-label="Changes">
 			{diff.tooLarge && (
-				<p className="border-b bg-amber-500/10 p-2 text-amber-400">Too large to compare line by line, so everything in the middle is shown as changed.</p>
+				<p className="border-b bg-warning/10 p-2 text-warning">Too large to compare line by line, so everything in the middle is shown as changed.</p>
 			)}
 			{shown.map((row, index) =>
 				"gap" in row ? (
-					<div key={`gap-${index}`} className="bg-muted/30 px-3 py-0.5 text-center text-[11px] text-muted-foreground">
+					<div key={`gap-${index}`} className="bg-muted/30 px-3 py-0.5 text-center text-xs text-muted-foreground">
 						{row.gap} unchanged {row.gap === 1 ? "line" : "lines"}
 					</div>
 				) : (
 					<div
 						key={`${row.oldLine ?? ""}-${row.newLine ?? ""}-${row.kind}`}
 						role="row"
-						className={cn("flex", row.kind === "add" && "bg-emerald-500/10", row.kind === "del" && "bg-red-500/10")}
+						className={cn("flex", row.kind === "add" && "bg-success/10", row.kind === "del" && "bg-destructive/10")}
 					>
 						<span className="w-10 shrink-0 select-none px-1 text-right text-muted-foreground/60">{row.oldLine ?? ""}</span>
 						<span className="w-10 shrink-0 select-none px-1 text-right text-muted-foreground/60">{row.newLine ?? ""}</span>
@@ -68,7 +69,7 @@ export function DiffView({ diff }: { diff: DiffResult }) {
 						<span className="min-w-0 flex-1 whitespace-pre-wrap break-all pr-2">
 							{row.segments
 								? row.segments.map((s, i) => (
-										<span key={i} className={cn(s.changed && (row.kind === "add" ? "bg-emerald-500/30" : "bg-red-500/30"))}>
+										<span key={i} className={cn(s.changed && (row.kind === "add" ? "bg-success/30" : "bg-destructive/30"))}>
 											{s.text}
 										</span>
 									))
@@ -201,15 +202,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 	return (
 		<Dialog isOpen onOpenChange={(open) => !open && onClose()} className="sm:max-w-5xl">
 			<div className="flex h-[70vh] min-h-0 flex-col gap-4">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<History className="size-4" />
-						History of {fileName}
-					</DialogTitle>
-					<DialogDescription>
-						Versions are kept on this device each time the file is saved, synced or imported{isText ? ", and automatically while you edit" : ""}.
-					</DialogDescription>
-				</DialogHeader>
+				<DialogHeading icon={<History className="size-6" />} title={`History of ${fileName}`} />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
@@ -236,7 +229,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 											setConfirming(false);
 											setRestored(false);
 										}}
-										className={cn("w-full px-2 py-1.5 text-left text-xs hover:bg-muted/50", v.id === selected && "bg-primary/10")}
+										className={cn("w-full px-2 py-2 text-left text-xs hover:bg-muted/50", v.id === selected && "bg-primary/10")}
 									>
 										<span className="block font-medium">{new Date(v.createdAt).toLocaleString()}</span>
 										<span className="block text-muted-foreground">
@@ -255,19 +248,19 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 									<div className="flex flex-wrap items-center gap-3 text-xs">
 										<div role="group" aria-label="Compare" className="inline-flex border">
 											<Button size="xs" variant={mode === "since" ? "secondary" : "ghost"} aria-pressed={mode === "since"} onPress={() => setMode("since")}>
-												Changes since this version
+												Changes Since This Version
 											</Button>
 											<Button size="xs" variant={mode === "in" ? "secondary" : "ghost"} aria-pressed={mode === "in"} onPress={() => setMode("in")}>
-												Changes in this version
+												Changes in This Version
 											</Button>
 										</div>
-										<label className="flex items-center gap-1.5">
+										<label className="flex items-center gap-2">
 											<input type="checkbox" checked={ignoreWhitespace} onChange={(e) => setIgnoreWhitespace(e.target.checked)} />
 											Ignore whitespace
 										</label>
 										{diff && !diff.identical && (
 											<span className="ml-auto tabular-nums">
-												<span className="text-emerald-400">+{diff.added}</span> <span className="text-red-400">-{diff.removed}</span>
+												<span className="text-success">+{diff.added}</span> <span className="text-destructive">-{diff.removed}</span>
 											</span>
 										)}
 									</div>
@@ -300,7 +293,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 										<Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Name the current text" maxLength={80} aria-label="Version name" className="h-8 w-56 text-xs" />
 										<Button type="submit" size="sm" variant="outline" isDisabled={busy || !label.trim()}>
 											<Save className="size-3.5" />
-											Save version
+											Save Version
 										</Button>
 									</form>
 								)}
@@ -309,7 +302,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 										<span className="text-xs text-muted-foreground">Open the file in Notes or Editor to restore a version.</span>
 									)}
 									{notice && <span role="status" className="text-xs text-muted-foreground">{notice}</span>}
-									{restored && <span className="text-xs text-emerald-400">Restored.</span>}
+									{restored && <span className="text-xs text-success">Restored.</span>}
 									{!isText && confirming ? (
 										<>
 											<span className="text-xs">Replace the current file?</span>
@@ -323,7 +316,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 									) : (
 										<Button size="sm" isDisabled={!canRestore || busy} onPress={() => (isText ? void restore() : setConfirming(true))}>
 											<RotateCcw className="size-3.5" />
-											Restore this version
+											Restore This Version
 										</Button>
 									)}
 								</div>

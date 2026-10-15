@@ -3,34 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { open } from "@tauri-apps/plugin-dialog";
 import { APP_VERSION } from "@/lib/version";
 import { relaunch } from "@tauri-apps/plugin-process";
-import {
-	Bug,
-	Check,
-	Code2,
-	DownloadCloud,
-	FolderPlus,
-	Globe,
-	HardDrive,
-	Loader2,
-	Minus,
-	Monitor,
-	Moon,
-	Palette,
-	Plus,
-	Save,
-	ShieldCheck,
-	Sun,
-	Trash2,
-	Undo2,
-	User,
-	X,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Check, Moon, Plus, Sun, Trash2, Code2, DownloadCloud, FolderPlus, Globe, HardDrive, Minus, Monitor, Palette, Save, Undo2, User, AlertTriangle } from "@/components/animate-icons";
 
-import { Row, Segmented, SectionCard } from "@/components/elements/SettingsParts";
+import { Row, Segmented, SectionCard, SettingsShell } from "@/components/elements/SettingsParts";
+import CodeSchemePicker from "@/components/elements/CodeSchemePicker";
+import ThemePicker from "@/components/elements/ThemePicker";
 import Avatar from "@/components/elements/Avatar";
 import ErrorLogCard from "@/components/elements/ErrorLogCard";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAppUpdater } from "@/hooks/useAppUpdater";
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -48,15 +30,6 @@ import { useThemeContext, type ThemePreference } from "@/store/ThemeContext";
 import Loading from "@/components/Loading";
 
 const NAME_LIMIT = 40;
-
-const SECTIONS = [
-	{ id: "profile", label: "Profile", icon: User },
-	{ id: "appearance", label: "Appearance", icon: Palette },
-	{ id: "editor", label: "Editor", icon: Code2 },
-	{ id: "storage", label: "Storage", icon: HardDrive },
-	{ id: "updates", label: "Updates & About", icon: DownloadCloud },
-	{ id: "diagnostics", label: "Diagnostics", icon: Bug },
-];
 
 // Two paths are the same folder if they differ only in slashes, a trailing slash or letter case
 const samePath = (a: string, b: string) => {
@@ -194,38 +167,44 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 	const back = () => (dirty ? setLeaving(true) : close());
 
 	return (
-		<div className={cn("bg-background", onClose ? "h-[85vh] overflow-y-auto" : "min-h-full")}>
-			<div className="mx-auto flex max-w-5xl gap-8 p-8">
-				{/* Section list */}
-				<aside className="hidden w-44 shrink-0 md:block">
-					<nav aria-label="Settings sections" className="sticky top-8 space-y-1">
-						{SECTIONS.map(({ id, label, icon: Icon }) => (
-							<button
-								key={id}
-								type="button"
-								onClick={() => document.getElementById(id)?.scrollIntoView?.({ behavior: "smooth", block: "start" })}
-								className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-							>
-								<Icon className="size-4 shrink-0" />
-								{label}
-							</button>
-						))}
-					</nav>
-				</aside>
-
-				<div className="min-w-0 flex-1 space-y-6">
-					<div className="flex items-center gap-3">
-						<Button variant="ghost" size="icon" onPress={back} aria-label="Close">
-							<X className="size-5" />
+		<>
+			<SettingsShell
+				title="Settings"
+				onClose={back}
+				className={onClose ? "h-[85vh]" : "h-full"}
+				footer={
+					(dirty || saving || justSaved || saveError) && (
+				<div
+					role="region"
+					aria-label="Unsaved changes"
+					className=""
+				>
+					<div className="mx-auto flex max-w-3xl flex-wrap items-center gap-3 px-3 py-2">
+						<p
+							role={saveError ? "alert" : "status"}
+							className={cn(
+								"min-w-0 flex-1 text-xs",
+								saveError ? "text-destructive" : justSaved ? "text-success" : "text-muted-foreground",
+							)}
+						>
+							{saveError
+								? `Could not save: ${saveError}`
+								: justSaved && !dirty
+									? "Settings saved."
+									: "You have unsaved changes to your profile or storage folders."}
+						</p>
+						<Button variant="outline" size="sm" onPress={discard} isDisabled={!dirty || saving}>
+							Discard
 						</Button>
-						<div>
-							<h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-							<p className="text-sm text-muted-foreground">
-								Preferences for this device. Nothing here is shared with collaborators except your name.
-							</p>
-						</div>
+						<Button size="sm" onPress={() => void save()} isDisabled={!dirty || saving || noRoots}>
+							{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+							{saving ? "Saving…" : "Save Changes"}
+						</Button>
 					</div>
-
+				</div>
+			)
+				}
+			>
 					{loadError && (
 						<p role="alert" className="border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
 							Could not load your settings: {loadError}
@@ -235,11 +214,10 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 					<SectionCard
 						id="profile"
 						title="Profile"
-						description="How collaborators see you when you join a workspace."
-						icon={<User className="size-4 text-primary" />}
+						icon={<User className="size-5" />}
 					>
-						<div className="flex items-center gap-4">
-							<Avatar name={name} className="size-12 text-lg" />
+						<div className="flex items-stretch gap-4">
+							<Avatar name={name} className="h-auto w-16 text-xl" />
 							<div className="min-w-0 flex-1 space-y-1">
 								<Input
 									value={name}
@@ -262,8 +240,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 					<SectionCard
 						id="network"
 						title="Network"
-						description="Only needed if your network allows web traffic through a proxy and nothing else."
-						icon={<Globe className="size-4 text-primary" />}
+						icon={<Globe className="size-5" />}
 					>
 						<div className="space-y-1">
 							<Input
@@ -278,10 +255,10 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								Leave it empty to connect directly. Addresses with a username or password are not accepted, since they would be stored as plain text.
 							</p>
 							{restartNeeded && (
-								<div className="flex items-center justify-between gap-2 border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-400">
+								<div className="flex items-center justify-between gap-2 border border-warning/30 bg-warning/10 p-2 text-xs text-warning">
 									<span>Restart Nexsync to use the new proxy.</span>
 									<Button size="sm" variant="outline" onPress={() => void relaunch()}>
-										Restart now
+										Restart Now
 									</Button>
 								</div>
 							)}
@@ -291,10 +268,9 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 					<SectionCard
 						id="appearance"
 						title="Appearance"
-						description="The theme is applied at once and remembered on this device."
-						icon={<Palette className="size-4 text-primary" />}
+						icon={<Palette className="size-5" />}
 					>
-						<Row title="Theme" hint="System follows your operating system, including when it switches at night.">
+						<Row title="Theme" hint="System follows your OS">
 							<Segmented<ThemePreference>
 								label="Theme"
 								value={preference}
@@ -306,15 +282,17 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								]}
 							/>
 						</Row>
+						<div className="border-t pt-4">
+							<ThemePicker />
+						</div>
 					</SectionCard>
 
 					<SectionCard
 						id="editor"
 						title="Editor"
-						description="How code and Markdown look in the Editor and Notes tabs. Applied at once to open files."
-						icon={<Code2 className="size-4 text-primary" />}
+						icon={<Code2 className="size-5" />}
 					>
-						<Row title="Font size" hint={`${FONT_SIZE_RANGE.min} to ${FONT_SIZE_RANGE.max} px`}>
+						<Row title="Font size">
 							<Button
 								variant="outline"
 								size="icon-xs"
@@ -337,7 +315,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								<Plus />
 							</Button>
 						</Row>
-						<Row title="Tab width" hint="How wide a tab character looks.">
+						<Row title="Tab width">
 							<Segmented
 								label="Tab width"
 								value={editorPrefs.tabSize}
@@ -345,13 +323,36 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								options={TAB_SIZES.map((size) => ({ value: size, label: String(size) }))}
 							/>
 						</Row>
-						<Row title="Wrap long lines" hint="Markdown always wraps.">
+						<Row title="Wrap long lines">
 							<input
 								type="checkbox"
 								aria-label="Wrap long lines"
-								className="size-4 accent-primary"
 								checked={editorPrefs.wrap}
 								onChange={(e) => setEditorPrefs({ wrap: e.target.checked })}
+							/>
+						</Row>
+						<Row title="Vim keys" hint="Modal editing in the Editor and Markdown notes">
+							<input
+								type="checkbox"
+								aria-label="Vim keys"
+								checked={editorPrefs.vim}
+								onChange={(e) => setEditorPrefs({ vim: e.target.checked })}
+							/>
+						</Row>
+						<Row title="Relative line numbers" hint="Number lines by distance from the cursor">
+							<input
+								type="checkbox"
+								aria-label="Relative line numbers"
+								checked={editorPrefs.relativeNumbers}
+								onChange={(e) => setEditorPrefs({ relativeNumbers: e.target.checked })}
+							/>
+						</Row>
+						<Row title="Minimap">
+							<input
+								type="checkbox"
+								aria-label="Minimap"
+								checked={editorPrefs.minimap}
+								onChange={(e) => setEditorPrefs({ minimap: e.target.checked })}
 							/>
 						</Row>
 						<pre
@@ -372,15 +373,17 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 							isDisabled={JSON.stringify(editorPrefs) === JSON.stringify(DEFAULT_EDITOR_PREFS)}
 						>
 							<Undo2 />
-							Reset editor settings
+							Reset Editor Settings
 						</Button>
+					<div className="border-t pt-4">
+							<CodeSchemePicker />
+						</div>
 					</SectionCard>
 
 					<SectionCard
 						id="storage"
 						title="Storage"
-						description="Workspaces can only be created or imported inside these folders. This keeps Nexsync away from the rest of your disk."
-						icon={<ShieldCheck className="size-4 text-emerald-400" />}
+						icon={<HardDrive className="size-5" />}
 					>
 						{saved === null && !loadError ? (
 							<Loading />
@@ -449,13 +452,12 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 					<SectionCard
 						id="updates"
 						title="Updates & About"
-						description="Nexsync keeps your work on your own computer: no account, no cloud, and no server holding your data."
-						icon={<DownloadCloud className="size-4 text-primary" />}
+						icon={<DownloadCloud className="size-5" />}
 					>
-						<Row title="Version" hint="Notes, tasks and code, shared directly between your devices.">
+						<Row title="Version">
 							<span className="text-sm font-semibold tabular-nums">{version ? `v${version}` : "…"}</span>
 						</Row>
-						<Row title="Update channel" hint="Stable is the tested release. Beta gets new builds sooner and may have rough edges.">
+						<Row title="Update channel" hint="Beta gets new builds sooner">
 							<Segmented
 								label="Update channel"
 								value={updater.channel}
@@ -468,7 +470,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						</Row>
 						<Row
 							title="Updates"
-							hint="Signed builds come from GitHub Releases. Nothing is checked until you ask."
+							hint="Nothing is checked until you ask"
 						>
 							{updater.status === "available" || updater.status === "installing" ? (
 								<Button size="sm" onPress={updater.installUpdate} isDisabled={updater.status === "installing"}>
@@ -491,7 +493,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 									) : (
 										<DownloadCloud className="size-3.5" />
 									)}
-									Check for updates
+									Check for Updates
 								</Button>
 							)}
 						</Row>
@@ -504,7 +506,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 							</div>
 						)}
 						{updater.status === "up-to-date" && (
-							<p role="status" className="flex items-center gap-1.5 text-xs text-emerald-400">
+							<p role="status" className="flex items-center gap-2 text-xs text-success">
 								<Check className="size-3.5" />
 								You are on the latest version.
 							</p>
@@ -512,62 +514,24 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						{updater.status === "error" && <p className="text-xs text-destructive">{updater.error}</p>}
 					</SectionCard>
 
-					<div id="diagnostics" className="scroll-mt-8">
-						<ErrorLogCard />
-					</div>
-				</div>
-			</div>
-
-			{/* Appears while there is something to save; the profile and storage sections save together */}
-			{(dirty || saving || justSaved || saveError) && (
-				<div
-					role="region"
-					aria-label="Unsaved changes"
-					className="sticky bottom-0 border-t bg-background/95 backdrop-blur"
-				>
-					<div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-8 py-3">
-						<p
-							role={saveError ? "alert" : "status"}
-							className={cn(
-								"min-w-0 flex-1 text-xs",
-								saveError ? "text-destructive" : justSaved ? "text-emerald-400" : "text-muted-foreground",
-							)}
-						>
-							{saveError
-								? `Could not save: ${saveError}`
-								: justSaved && !dirty
-									? "Settings saved."
-									: "You have unsaved changes to your profile or storage folders."}
-						</p>
-						<Button variant="outline" size="sm" onPress={discard} isDisabled={!dirty || saving}>
-							Discard
-						</Button>
-						<Button size="sm" onPress={() => void save()} isDisabled={!dirty || saving || noRoots}>
-							{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-							{saving ? "Saving…" : "Save changes"}
-						</Button>
-					</div>
-				</div>
-			)}
+					<ErrorLogCard />
+			</SettingsShell>
 
 			{leaving && (
 				<Dialog isOpen onOpenChange={(isOpen) => !isOpen && setLeaving(false)}>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Leave without saving?</DialogTitle>
-							<DialogDescription>Your changes to the profile or storage folders will be lost.</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Leave Without Saving?" description={<>Your changes to the profile or storage folders will be lost.</>} />
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setLeaving(false)}>
-								Keep editing
+								Keep Editing
 							</Button>
 							<Button variant="destructive" onPress={close}>
-								Discard and leave
+								Discard and Leave
 							</Button>
 						</DialogFooter>
 					</div>
 				</Dialog>
 			)}
-		</div>
+		</>
 	);
 }

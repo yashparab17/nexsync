@@ -1,47 +1,35 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
-import {
-	Copy,
-	Check,
-	FileText,
-	Film,
-	Headphones,
-	Image as ImageIcon,
-	LayoutGrid,
-	List,
-	History,
-	Pencil,
-	Search,
-	Sparkles,
-	Trash2,
-	Upload,
-	UploadCloud,
-} from "lucide-react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { EmptyState } from "@/components/layout/Page";
+import Toolbar, { ToolbarTitle, ToolbarSearch, ToolbarSelect, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
+import { SlidersHorizontal, Copy, Check, Play, Trash2, FileText, Film, Headphones, Image as ImageIcon, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
+import { displaySize } from "@/lib/assets/displaySize";
+import { justify } from "@/lib/assets/justify";
+import { validateFileName } from "@/lib/validation";
+import { MAX_PREVIEW_BYTES, pdfFirstPage, previewKind, textSnippet, videoFrame, type TilePreview } from "@/lib/assets/previews";
+import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
+import { dropSummary, importDropped } from "@/lib/dropImport";
+import { Ellipsis } from "lucide-react";
+import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import AssetPreviewModal from "@/components/dialogs/workspace/AssetPreviewModal";
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import AssetUploadDialog from "@/components/dialogs/workspace/AssetUploadDialog";
+import { useListKeys } from "@/hooks/useListKeys";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
-import { formatBytes } from "@/lib/utils";
+import { formatBytes, getMimeType } from "@/lib/utils";
 import {
 	deleteWorkspaceItem,
 	listWorkspaceFiles,
 	readWorkspaceBinaryFile,
 	renameWorkspaceItem,
-	writeWorkspaceBinaryFile,
 } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
@@ -70,6 +58,34 @@ function getAssetCategory(fileName: string): AssetCategory {
 	return "other";
 }
 
+const SORTS = {
+	newest: "Newest first",
+	oldest: "Oldest first",
+	name: "Name A–Z",
+	"name-desc": "Name Z–A",
+	largest: "Largest first",
+	smallest: "Smallest first",
+	type: "Kind",
+};
+type SortKey = keyof typeof SORTS;
+const SIZE_BANDS = { any: "Any size", small: "Under 1 MB", medium: "1–10 MB", large: "Over 10 MB" };
+type SizeBand = keyof typeof SIZE_BANDS;
+const AGES = { any: "Any time", day: "Past day", week: "Past week", month: "Past month" };
+type Age = keyof typeof AGES;
+const MB = 1024 * 1024;
+const DAY_MS = 86_400_000;
+const AGE_MS: Record<Age, number> = { any: Infinity, day: DAY_MS, week: 7 * DAY_MS, month: 30 * DAY_MS };
+const when = (a: AssetItem) => new Date(a.modified_at).getTime() || 0;
+const COMPARE: Record<SortKey, (a: AssetItem, b: AssetItem) => number> = {
+	newest: (a, b) => when(b) - when(a),
+	oldest: (a, b) => when(a) - when(b),
+	name: (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
+	"name-desc": (a, b) => b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: "base" }),
+	largest: (a, b) => b.size - a.size,
+	smallest: (a, b) => a.size - b.size,
+	type: (a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
+};
+
 export default function WorkspaceAssets() {
 	const { workspace, refreshStats, addActivityEvent } = useWorkspace();
 	const { placeholders, downloadFileOnDemand, lastSyncedFile } = useP2P();
@@ -82,13 +98,32 @@ export default function WorkspaceAssets() {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCategory, setSelectedCategory] =
 		useState<AssetCategory>("all");
-	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+	const [sort, setSort] = useState<SortKey>("newest");
+	const [sizeBand, setSizeBand] = useState<SizeBand>("any");
+	const [age, setAge] = useState<Age>("any");
+	const [showFilters, setShowFilters] = useState(false);
+	// How big the tiles are drawn, and each picture's own size once it is known
+	const [tile, setTile] = useState<"s" | "m" | "l">("m");
+	const [sizes, setSizes] = useState<Record<string, { w: number; h: number }>>({});
+	// Small pictures of PDFs, videos and text files, made in the background
+	const [previews, setPreviews] = useState<Record<string, TilePreview>>({});
+	const [gridWidth, setGridWidth] = useState(1200);
+	// The mosaic's width is watched from the moment it is on screen, however many times it has been hidden and shown again
+	const observer = useRef<ResizeObserver | null>(null);
+	const gridRef = useCallback((el: HTMLUListElement | null) => {
+		observer.current?.disconnect();
+		if (!el) return;
+		observer.current = new ResizeObserver(() => setGridWidth(el.clientWidth));
+		observer.current.observe(el);
+		setGridWidth(el.clientWidth);
+	}, []);
 
 	// Thumbnails cache for images (base64 URLs)
 	const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
 
 	// Dialog states
 	const [isUploadOpen, setIsUploadOpen] = useState(false);
+	useListKeys(isViewer ? undefined : () => setIsUploadOpen(true));
 	const [previewAsset, setPreviewAsset] = useState<AssetItem | null>(null);
 
 	// Deep link from workspace search
@@ -104,7 +139,6 @@ export default function WorkspaceAssets() {
 	const [isDeleting, setIsDeleting] = useState(false);
 
 	// Drag and drop overlay
-	const [isDraggingOver, setIsDraggingOver] = useState(false);
 	const { copiedKey, copy } = useCopyToClipboard(1800);
 
 	// Fetch assets from workspace/assets directory and merge remote placeholders (>10MB)
@@ -176,17 +210,61 @@ export default function WorkspaceAssets() {
 		if (lastSyncedFile) void loadAssets();
 	}, [lastSyncedFile]);
 
+	// A picture's own size, read once its thumbnail has arrived, decides how big its tile is
+	useEffect(() => {
+		for (const [name, src] of Object.entries(thumbnails)) {
+			if (sizes[name]) continue;
+			const img = new Image();
+			img.onload = () => img.naturalWidth > 0 && img.naturalHeight > 0 && setSizes((prev) => (prev[name] ? prev : { ...prev, [name]: { w: img.naturalWidth, h: img.naturalHeight } }));
+			img.src = src;
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [thumbnails]);
+
+	// PDFs, videos and text files get a preview tile, made one at a time so a big folder does not stall the page
+	useEffect(() => {
+		const root = workspace?.path;
+		if (!root) return;
+		let live = true;
+		void (async () => {
+			for (const asset of assets) {
+				if (!live) return;
+				const kind = previewKind(asset.name);
+				if (!kind || previews[asset.name] || asset.syncStatus !== "synced" || asset.size > MAX_PREVIEW_BYTES[kind]) continue;
+				try {
+					const base64 = await readWorkspaceBinaryFile(root, asset.path.replace(/^\/+/, ""));
+					const made: TilePreview = kind === "pdf" ? await pdfFirstPage(base64) : kind === "video" ? await videoFrame(`data:${getMimeType(asset.name)};base64,${base64}`) : { kind: "text", text: textSnippet(base64) };
+					if (!live) return;
+					setPreviews((prev) => ({ ...prev, [asset.name]: made }));
+					if (made.kind === "image" && made.width > 0 && made.height > 0) setSizes((prev) => ({ ...prev, [asset.name]: { w: made.width, h: made.height } }));
+				} catch (err) {
+					console.debug("Preview skipped for", asset.name, err);
+				}
+			}
+		})();
+		return () => {
+			live = false;
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [assets, workspace?.path]);
+
 	// Filtered assets
 	const filteredAssets = useMemo(() => {
-		return assets.filter((asset) => {
-			const matchesCategory =
-				selectedCategory === "all" || asset.category === selectedCategory;
-			const matchesSearch = asset.name
-				.toLowerCase()
-				.includes(searchQuery.toLowerCase());
-			return matchesCategory && matchesSearch;
-		});
-	}, [assets, selectedCategory, searchQuery]);
+		const now = Date.now();
+		return assets
+			.filter((asset) => {
+				const matchesCategory =
+					selectedCategory === "all" || asset.category === selectedCategory;
+				const matchesSearch = asset.name
+					.toLowerCase()
+					.includes(searchQuery.toLowerCase());
+				const matchesSize = sizeBand === "any" || (sizeBand === "small" ? asset.size < MB : sizeBand === "medium" ? asset.size >= MB && asset.size <= 10 * MB : asset.size > 10 * MB);
+				const matchesAge = age === "any" || now - when(asset) <= AGE_MS[age];
+				return matchesCategory && matchesSearch && matchesSize && matchesAge;
+			})
+			.sort(COMPARE[sort]);
+	}, [assets, selectedCategory, searchQuery, sizeBand, age, sort]);
+	const narrowed = sizeBand !== "any" || age !== "any";
 
 	// Category counts
 	const categoryCounts = useMemo(() => {
@@ -298,455 +376,252 @@ export default function WorkspaceAssets() {
 		}
 	};
 
-	// Drop handler for page-level drop
-	const handlePageDrop = async (e: React.DragEvent) => {
-		e.preventDefault();
-		setIsDraggingOver(false);
-		if (
-			isViewer ||
-			!workspace?.path ||
-			!e.dataTransfer.files ||
-			e.dataTransfer.files.length === 0
-		)
-			return;
-
-		for (const file of Array.from(e.dataTransfer.files)) {
-			try {
-				const base64Data = await new Promise<string>((resolve, reject) => {
-					const reader = new FileReader();
-					reader.onload = () => {
-						const result = reader.result as string;
-						resolve(result.includes(",") ? result.split(",")[1] : result);
-					};
-					reader.onerror = reject;
-					reader.readAsDataURL(file);
-				});
-				const sanitizedName = file.name.replace(/[^\w.-]/g, "_");
-				await writeWorkspaceBinaryFile(
-					workspace.path,
-					`assets/${sanitizedName}`,
-					base64Data,
-				);
-			} catch (err) {
-				console.error("Drop upload failed for file:", file.name, err);
-			}
-		}
+	// Files dropped anywhere on the page are added to assets, saved as they are; a dropped folder adds the files in it
+	const notice = useDropNotice();
+	const { dragging, bind: dropProps } = useFileDrop(async (items) => {
+		if (!workspace?.path) return;
+		const result = await importDropped(workspace.path, "assets", items.map((i) => ({ ...i, rel: i.file.name })));
+		notice.show(dropSummary(result));
 		await loadAssets();
 		await refreshStats();
+	}, isViewer || !workspace?.path);
+
+	const kindIcon = (category: AssetItem["category"], className: string) =>
+		category === "video" ? <Film className={className} /> : category === "audio" ? <Headphones className={className} /> : category === "image" ? <ImageIcon className={className} /> : <FileText className={className} />;
+
+	// Tiles sit in rows that each fill the width, so no space is left over. A tile wants to be drawn at its own size,
+	// or half of it for pictures bigger than 500 pixels, and each row stretches its tiles together to reach the edges.
+	const GAP = 8;
+	const PAD = 12;
+	const mul = tile === "s" ? 0.7 : tile === "l" ? 1.4 : 1;
+	const tileWish = (asset: AssetItem): { aspect: number; height: number } => {
+		const natural = sizes[asset.name];
+		let w: number;
+		let h: number;
+		if (asset.syncStatus === "remote_placeholder") [w, h] = [150, 150];
+		else if (natural) {
+			const d = displaySize(natural.w, natural.h);
+			[w, h] = [d.width, d.height];
+		} else if (asset.category === "image") [w, h] = [200, 200];
+		else if (asset.category === "video") [w, h] = [240, 135];
+		else if (asset.category === "audio") [w, h] = [180, 135];
+		else if (asset.category === "document") [w, h] = [150, 200];
+		else [w, h] = [120, 120];
+		return { aspect: w / h, height: h * mul };
+	};
+	const layout = useMemo(
+		() => justify(filteredAssets.map((a) => ({ id: a.name, ...tileWish(a) })), gridWidth - PAD * 2, GAP),
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[filteredAssets, sizes, gridWidth, tile],
+	);
+
+	const tabs = [
+		{ key: "all", label: "All", count: categoryCounts.all },
+		{ key: "image", label: "Photos", count: categoryCounts.image },
+		{ key: "video", label: "Video", count: categoryCounts.video },
+		{ key: "audio", label: "Audio", count: categoryCounts.audio },
+		{ key: "document", label: "Documents", count: categoryCounts.document },
+		{ key: "other", label: "Other", count: categoryCounts.other },
+	];
+
+	const menu = useContextMenu();
+	const renameAsset = (asset: AssetItem) => {
+		setAssetToRename(asset);
+		setNewName(asset.name);
+	};
+	// The same actions as the buttons on a wide tile, for narrow tiles and for a right-click
+	const assetMenu = (e: { clientX: number; clientY: number; preventDefault: () => void }, asset: AssetItem) => {
+		const entries: MenuEntry[] = [
+			{ label: "Open", icon: <ImageIcon className="size-4" />, onSelect: () => setPreviewAsset(asset) },
+			{ label: "Copy Markdown link", icon: <Copy className="size-4" />, onSelect: () => copy(asset.category === "image" ? `![${asset.name}](${asset.path.replace(/^\/+/, "")})` : `[${asset.name}](${asset.path.replace(/^\/+/, "")})`, asset.name) },
+			{ label: "File history", icon: <History className="size-4" />, onSelect: () => setHistoryAsset(asset) },
+			...(isViewer
+				? []
+				: ([
+						"separator",
+						{ label: "Rename…", icon: <Pencil className="size-4" />, onSelect: () => renameAsset(asset) },
+						{ label: "Delete…", icon: <Trash2 className="size-4" />, danger: true, onSelect: () => setAssetToDelete(asset) },
+					] as MenuEntry[])),
+		];
+		menu.open(e, entries);
 	};
 
+	const actionButton = "flex size-8 cursor-pointer items-center justify-center bg-background/90 text-foreground outline-none backdrop-blur hover:bg-background focus-visible:ring-2 focus-visible:ring-ring";
+
 	return (
-		<div
-			onDragOver={(e) => {
-				e.preventDefault();
-				setIsDraggingOver(true);
-			}}
-			onDragLeave={() => setIsDraggingOver(false)}
-			onDrop={handlePageDrop}
-			className="space-y-6 relative min-h-[calc(100vh-10rem)]"
-		>
-			{/* Drag & Drop Window Overlay */}
-			{isDraggingOver && (
-				<div className="absolute inset-0 z-50 bg-primary/20 backdrop-blur-sm border-2 border-dashed border-primary rounded-none flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-150">
-					<UploadCloud className="size-16 text-primary animate-bounce mb-3" />
-					<h3 className="text-xl font-bold text-foreground">
-						Drop files to upload directly to assets/
-					</h3>
-					<p className="text-sm text-muted-foreground mt-1">
-						Images, audio, video, and documents will be saved in your workspace
-					</p>
-				</div>
-			)}
+		<div {...dropProps} className="relative flex h-full min-h-0 flex-col bg-background">
+			<DropOverlay show={dragging} title="Drop to add to assets" />
+			{notice.node}
 
-			{/* Page Header */}
-			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight">Assets</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Store and manage images, media, and binary files in your local{" "}
-						<code className="bg-muted px-1.5 py-0.5 rounded-none text-xs font-mono text-foreground">
-							assets/
-						</code>{" "}
-						folder.
-					</p>
-				</div>
+			{/* Toolbar */}
+			<Toolbar>
+				<ToolbarTitle name="Assets" meta={assets.length || undefined} />
+				<ToolbarTabs label="Kind of asset" value={selectedCategory} onChange={setSelectedCategory} tabs={tabs as { key: AssetCategory; label: string; count: number }[]} />
+				<span className="flex-1" />
+				{!isViewer && (
+					<Button size="sm" onPress={() => setIsUploadOpen(true)}>
+						<Upload data-icon="inline-start" className="size-4" />
+						Upload
+					</Button>
+				)}
+			</Toolbar>
+			<Toolbar variant="sub" className="h-auto min-h-10 flex-wrap gap-2 py-1">
+				<ToolbarSearch label="Search assets" placeholder="Search assets" value={searchQuery} onChange={setSearchQuery} />
+				<Button variant={showFilters || narrowed ? "secondary" : "outline"} size="sm" aria-expanded={showFilters} onPress={() => setShowFilters((v) => !v)}>
+					<SlidersHorizontal className="size-4" />
+					Filters
+					{narrowed && <span className="font-mono text-[13px]">{Number(sizeBand !== "any") + Number(age !== "any")}</span>}
+				</Button>
+				{showFilters && (
+					<>
+						<ToolbarSelect label="Size" value={sizeBand} onChange={setSizeBand} active={sizeBand !== "any"} options={Object.entries(SIZE_BANDS).map(([value, label]) => ({ value: value as SizeBand, label }))} />
+						<ToolbarSelect label="Modified" value={age} onChange={setAge} active={age !== "any"} options={Object.entries(AGES).map(([value, label]) => ({ value: value as Age, label }))} />
+						{narrowed && (
+							<Button variant="ghost" size="sm" onPress={() => { setSizeBand("any"); setAge("any"); }}>
+								Clear
+							</Button>
+						)}
+					</>
+				)}
+				<span className="flex-1" />
+				<ToolbarSelect label="Sort by" value={sort} onChange={setSort} options={Object.entries(SORTS).map(([value, label]) => ({ value: value as SortKey, label }))} />
+				<ToolbarSwitch
+					label="Tile size"
+					value={tile}
+					onChange={setTile}
+					options={[
+						{ value: "s", label: "S", title: "Small tiles" },
+						{ value: "m", label: "M", title: "Medium tiles" },
+						{ value: "l", label: "L", title: "Large tiles" },
+					]}
+				/>
+			</Toolbar>
 
-				<div className="flex items-center gap-2">
-					{!isViewer && (
-						<Button
-							onPress={() => setIsUploadOpen(true)}
-							className="gap-2 text-xs"
-						>
-							<Upload className="size-4" />
-							Upload Asset
-						</Button>
-					)}
-				</div>
-			</div>
-
-			{/* Toolbar: Search, Categories, View Toggle */}
-			<div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2 border-b border-border/60">
-				{/* Category Filter Tabs */}
-				<div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-					{[
-						{ key: "all", label: "All", count: categoryCounts.all },
-						{ key: "image", label: "Images", count: categoryCounts.image },
-						{ key: "video", label: "Video", count: categoryCounts.video },
-						{ key: "audio", label: "Audio", count: categoryCounts.audio },
-						{
-							key: "document",
-							label: "Documents",
-							count: categoryCounts.document,
-						},
-						{ key: "other", label: "Other", count: categoryCounts.other },
-					].map((tab) => (
-						<button
-							key={tab.key}
-							onClick={() => setSelectedCategory(tab.key as AssetCategory)}
-							className={`px-3 py-1.5 text-xs font-medium rounded-none transition-colors flex items-center gap-1.5 cursor-pointer ${
-								selectedCategory === tab.key ?
-									"bg-primary text-primary-foreground font-semibold shadow-sm"
-								:	"bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
-							}`}
-						>
-							{tab.label}
-							<span
-								className={`text-[10px] px-1.5 py-0.2 rounded-none ${
-									selectedCategory === tab.key ?
-										"bg-primary-foreground/20 text-primary-foreground"
-									:	"bg-background/80 text-muted-foreground"
-								}`}
-							>
-								{tab.count}
-							</span>
-						</button>
-					))}
-				</div>
-
-				{/* Search & View Switcher */}
-				<div className="flex items-center gap-3">
-					<div className="relative w-full md:w-64">
-						<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-						<Input
-							placeholder="Search assets…"
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							className="pl-8 h-8 text-xs bg-muted/40"
-						/>
-					</div>
-
-					<div className="flex items-center border border-border rounded-none p-0.5 bg-muted/30">
-						<button
-							onClick={() => setViewMode("grid")}
-							title="Grid View"
-							className={`p-1.5 rounded-none transition-all cursor-pointer ${
-								viewMode === "grid" ?
-									"bg-background text-foreground shadow-sm"
-								:	"text-muted-foreground hover:text-foreground"
-							}`}
-						>
-							<LayoutGrid className="size-4" />
-						</button>
-						<button
-							onClick={() => setViewMode("list")}
-							title="List View"
-							className={`p-1.5 rounded-none transition-all cursor-pointer ${
-								viewMode === "list" ?
-									"bg-background text-foreground shadow-sm"
-								:	"text-muted-foreground hover:text-foreground"
-							}`}
-						>
-							<List className="size-4" />
-						</button>
-					</div>
-				</div>
-			</div>
-
-			{/* Asset Content List / Grid */}
-			{loading ?
-				<Loading className="py-24" />
-			: filteredAssets.length === 0 ?
-				<div className="flex flex-col items-center justify-center py-20 border border-dashed border-border rounded-none text-center p-8 bg-card/20">
-					<div className="p-4 rounded-none bg-muted/60 text-muted-foreground mb-3">
-						<ImageIcon className="size-8" />
-					</div>
-					<h3 className="font-semibold text-base text-foreground">
-						{searchQuery ?
-							"No matching assets found"
-						:	"No assets in this category"}
-					</h3>
-					<p className="text-xs text-muted-foreground max-w-sm mt-1">
-						{searchQuery ?
-							"Try refining your search query or switching categories."
-						:	"Upload images, media, or documents to link them directly into your notes and code files."}
-					</p>
-					{!searchQuery && !isViewer && (
-						<Button
-							size="sm"
-							onPress={() => setIsUploadOpen(true)}
-							className="mt-4 gap-2 text-xs"
-						>
-							<UploadCloud className="size-4" />
-							Upload First Asset
-						</Button>
-					)}
-				</div>
-			: viewMode === "grid" ?
-				/* Grid View */
-				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-					{filteredAssets.map((asset) => {
-						const isImage = asset.category === "image";
-						const isVideo = asset.category === "video";
-						const isAudio = asset.category === "audio";
-						const thumbnail = thumbnails[asset.name];
-						const isRemote = asset.syncStatus === "remote_placeholder";
-
-						return (
-							<Card
-								key={asset.name}
-								onClick={() => setPreviewAsset(asset)}
-								className="group relative overflow-hidden cursor-pointer border-border hover:border-primary/60 hover:shadow-lg transition-all duration-200 bg-card/60 flex flex-col"
-							>
-								{/* Thumbnail Header Area */}
-								<div className="relative h-36 bg-black/40 flex items-center justify-center overflow-hidden border-b border-border/40">
-									{isRemote ?
-										<div className="flex flex-col items-center gap-2 text-amber-500/80 p-4 text-center">
-											<Sparkles className="size-7" />
-											<span className="text-[11px] font-medium uppercase tracking-wider">
-												Not downloaded
-											</span>
-										</div>
-									: isImage && thumbnail ?
-										<img
-											src={thumbnail}
-											alt={asset.name}
-											className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-										/>
-									: isImage ?
-										<ImageIcon className="size-10 text-muted-foreground group-hover:text-primary transition-colors" />
-									: isVideo ?
-										<div className="flex flex-col items-center gap-1.5 text-muted-foreground group-hover:text-primary transition-colors">
-											<Film className="size-10" />
-											<span className="text-[10px] font-mono">VIDEO</span>
-										</div>
-									: isAudio ?
-										<div className="flex flex-col items-center gap-1.5 text-muted-foreground group-hover:text-primary transition-colors">
-											<Headphones className="size-10" />
-											<span className="text-[10px] font-mono">AUDIO</span>
-										</div>
-									:	<FileText className="size-10 text-muted-foreground group-hover:text-primary transition-colors" />}
-
-									{/* Status Badge */}
-									<div className="absolute top-2 left-2">
-										{isRemote ?
-											<span className="bg-amber-500/90 text-black text-[10px] font-bold px-2 py-0.5 rounded-none shadow-sm">
-												Remote
-											</span>
-										:	<span className="bg-black/60 backdrop-blur text-white text-[10px] font-mono px-2 py-0.5 rounded-none border border-white/10">
-												{asset.name.split(".").pop()?.toUpperCase()}
-											</span>
-										}
-									</div>
-
-									{/* Quick Action Overlay on Hover */}
-									<div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-										<button
-											onClick={(e) => handleCopyMarkdown(e, asset)}
-											title="Copy Markdown Embed Link"
-											className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
-										>
-											{copiedKey === asset.name ?
-												<Check className="size-3.5 text-emerald-400" />
-											:	<Copy className="size-3.5" />}
-										</button>
-										<button
-											onClick={(e) => {
-												e.stopPropagation();
-												setHistoryAsset(asset);
-											}}
-											title="History"
-											className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
-										>
-											<History className="size-3.5" />
-										</button>
-										{!isViewer && (
-											<>
-												<button
-													onClick={(e) => {
-														e.stopPropagation();
-														setAssetToRename(asset);
-														setNewName(asset.name);
-													}}
-													title="Rename"
-													className="p-1.5 rounded-none bg-background/80 hover:bg-background text-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
-												>
-													<Pencil className="size-3.5" />
-												</button>
-												<button
-													onClick={(e) => {
-														e.stopPropagation();
-														setAssetToDelete(asset);
-													}}
-													title="Delete"
-													className="p-1.5 rounded-none bg-background/80 hover:bg-destructive text-foreground hover:text-destructive-foreground border border-border/60 shadow-sm cursor-pointer transition-all"
-												>
-													<Trash2 className="size-3.5" />
-												</button>
-											</>
-										)}
-									</div>
-								</div>
-
-								{/* Info Area */}
-								<CardContent className="p-3 flex-1 flex flex-col justify-between">
-									<div>
-										<p
-											className="font-medium text-xs text-foreground truncate"
-											title={asset.name}
-										>
-											{asset.name}
-										</p>
-										<p className="text-[11px] text-muted-foreground mt-0.5">
-											{formatBytes(asset.size)}
-										</p>
-									</div>
-
-									<div className="flex items-center justify-between pt-2 mt-2 border-t border-border/40 text-[10px] text-muted-foreground">
-										<span>
-											{new Date(asset.modified_at).toLocaleDateString(
-												undefined,
-												{
-													month: "short",
-													day: "numeric",
-												},
-											)}
-										</span>
-										<span className="font-mono uppercase text-[9px] bg-muted px-1.5 py-0.5 rounded-none text-foreground/80">
-											{asset.category}
-										</span>
-									</div>
-								</CardContent>
-							</Card>
-						);
-					})}
-				</div>
-			:	/* List View */
-				<div className="border border-border rounded-none overflow-hidden bg-card/60">
-					<table className="w-full text-left text-xs">
-						<thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase text-[10px] tracking-wider">
-							<tr>
-								<th className="py-3 px-4">Name</th>
-								<th className="py-3 px-4">Category</th>
-								<th className="py-3 px-4">Size</th>
-								<th className="py-3 px-4">Status</th>
-								<th className="py-3 px-4">Modified</th>
-								<th className="py-3 px-4 text-right">Actions</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-border/60">
-							{filteredAssets.map((asset) => {
-								const isRemote =
-									asset.syncStatus === "remote_placeholder";
-
-								return (
-									<tr
-										key={asset.name}
+			{/* Assets */}
+			<div className="min-h-0 flex-1 overflow-auto">
+				{loading ? (
+					<Loading className="py-24" />
+				) : filteredAssets.length === 0 ? (
+					<EmptyState
+						art={searchQuery || narrowed ? "search" : "assets"}
+						title={searchQuery || narrowed ? "No Matching Assets" : "Nothing Here Yet"}
+						action={
+							!searchQuery && !narrowed && !isViewer && (
+								<Button size="sm" onPress={() => setIsUploadOpen(true)}>
+									<UploadCloud data-icon="inline-start" className="size-4" />
+									Upload Assets
+								</Button>
+							)
+						}
+					>
+						{searchQuery || narrowed ? "Try a different search, a wider size or date, or another kind of asset." : "Drop pictures, audio, video or documents anywhere on this page, or press Upload."}
+					</EmptyState>
+				) : (
+					/* Mosaic: columns that each fill from the top, so tiles of different heights pack together */
+					<ul ref={gridRef} className="relative" style={{ height: (Number.isFinite(layout.height) ? layout.height : 0) + PAD * 2 }}>
+						{filteredAssets.map((asset) => {
+							const thumbnail = thumbnails[asset.name];
+							const preview = previews[asset.name];
+							const isRemote = asset.syncStatus === "remote_placeholder";
+							const ext = asset.name.split(".").pop()?.toUpperCase() ?? "";
+							const natural = sizes[asset.name];
+							const shown = natural ? displaySize(natural.w, natural.h) : null;
+							const box = layout.boxes[asset.name];
+							if (!box) return null;
+							const details = [natural && `${natural.w}×${natural.h}${shown?.halved ? " (shown at 50%)" : ""}`, formatBytes(asset.size), new Date(asset.modified_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })].filter(Boolean).join(" · ");
+							return (
+								<li
+									key={asset.name}
+									onContextMenu={(e) => assetMenu(e, asset)}
+									className="group absolute overflow-hidden animate-in fade-in zoom-in-95 duration-300 [transition:left_350ms_cubic-bezier(.22,1,.36,1),top_350ms_cubic-bezier(.22,1,.36,1),width_350ms_cubic-bezier(.22,1,.36,1),height_350ms_cubic-bezier(.22,1,.36,1)] motion-reduce:animate-none motion-reduce:transition-none"
+									style={{ left: box.x + PAD, top: box.y + PAD, width: box.w, height: box.h }}
+								>
+									<button
+										type="button"
+										data-nav
 										onClick={() => setPreviewAsset(asset)}
-										className="hover:bg-muted/40 cursor-pointer transition-colors group"
+										aria-label={`${asset.name}, ${asset.category}, ${formatBytes(asset.size)}${isRemote ? ", not downloaded" : ""}`}
+										className="frame relative block h-full w-full cursor-pointer overflow-hidden bg-card text-left"
 									>
-										<td className="py-3 px-4 font-medium text-foreground flex items-center gap-3">
-											<div className="p-1.5 rounded-none bg-muted text-muted-foreground group-hover:text-primary">
-												{asset.category === "image" ?
-													<ImageIcon className="size-4" />
-												: asset.category === "video" ?
-													<Film className="size-4" />
-												: asset.category === "audio" ?
-													<Headphones className="size-4" />
-												:	<FileText className="size-4" />}
+										{asset.category === "image" && thumbnail && !isRemote ? (
+											<img
+												src={thumbnail}
+												alt=""
+												className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none"
+											/>
+										) : preview?.kind === "image" && !isRemote ? (
+											<>
+												<img src={preview.src} alt="" className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none" />
+												{asset.category === "video" && (
+													<span aria-hidden="true" className="absolute top-1/2 left-1/2 flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center bg-black/55 text-white">
+														<Play className="size-5" />
+													</span>
+												)}
+											</>
+										) : preview?.kind === "text" && !isRemote ? (
+											<div className="flex h-full w-full flex-col gap-2 overflow-hidden border bg-muted/40 p-3">
+												<pre className="min-h-0 flex-1 overflow-hidden font-mono text-xs leading-snug break-words whitespace-pre-wrap text-muted-foreground">{preview.text}</pre>
+												<span className="font-mono text-xs text-muted-foreground/70">{ext}</span>
 											</div>
-											<span className="truncate max-w-xs">{asset.name}</span>
-										</td>
-										<td className="py-3 px-4">
-											<span className="font-mono text-[11px] bg-muted px-2 py-0.5 rounded-none text-foreground/80 capitalize">
-												{asset.category}
+										) : (
+											<div className={cn("flex h-full w-full flex-col items-center justify-center gap-2 border bg-muted/40", isRemote && "border border-dashed border-warning/60 bg-transparent")}>
+												{isRemote ? <Sparkles className="size-8 text-warning" /> : kindIcon(asset.category, "size-9 text-muted-foreground")}
+												<span className="font-mono text-xs text-muted-foreground">{isRemote ? "Remote" : ext}</span>
+											</div>
+										)}
+										{/* The name and details appear only on hover or keyboard focus */}
+										<span className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-gradient-to-t from-black/75 via-black/40 to-transparent p-3 pt-10 text-white opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none">
+											<span className="truncate text-sm font-medium">{asset.name}</span>
+											<span className="truncate font-mono text-xs opacity-85">
+												{ext} · {details}
+												{isRemote && " · not downloaded"}
 											</span>
-										</td>
-										<td className="py-3 px-4 font-mono text-muted-foreground">
-											{formatBytes(asset.size)}
-										</td>
-										<td className="py-3 px-4">
-											{isRemote ?
-												<span className="text-amber-500 font-medium flex items-center gap-1">
-													○ Not downloaded
-												</span>
-											:	<span className="text-emerald-500 font-medium flex items-center gap-1">
-													● Local
-												</span>
-											}
-										</td>
-										<td className="py-3 px-4 text-muted-foreground">
-											{new Date(asset.modified_at).toLocaleDateString(
-												undefined,
-												{
-													month: "short",
-													day: "numeric",
-													year: "numeric",
-												},
-											)}
-										</td>
-										<td className="py-3 px-4 text-right">
-											<div className="flex items-center justify-end gap-1.5">
-												<button
-													onClick={(e) => handleCopyMarkdown(e, asset)}
-													className="h-7 px-2 text-[11px] rounded-none bg-muted/60 hover:bg-muted text-foreground flex items-center gap-1 cursor-pointer transition-all border border-border/40"
-												>
-													{copiedKey === asset.name ?
-														<Check className="size-3 text-emerald-400" />
-													:	<Copy className="size-3" />}
-													{copiedKey === asset.name ? "Copied" : "Copy"}
+										</span>
+									</button>
+									{/* Wide tiles show every action; narrow ones show one button that opens the same list as a menu */}
+									<div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none">
+										{box.w >= 200 ? (
+											<>
+												<button type="button" aria-label={`Copy a Markdown link to ${asset.name}`} onClick={(e) => handleCopyMarkdown(e, asset)} className={actionButton}>
+													{copiedKey === asset.name ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
 												</button>
-												<button
-													onClick={(e) => {
-														e.stopPropagation();
-														setHistoryAsset(asset);
-													}}
-													title="History"
-													className="p-1.5 rounded-none hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-all"
-												>
-													<History className="size-3.5" />
+												<button type="button" aria-label={`History of ${asset.name}`} onClick={() => setHistoryAsset(asset)} className={actionButton}>
+													<History className="size-4" />
 												</button>
 												{!isViewer && (
 													<>
-														<button
-															onClick={(e) => {
-																e.stopPropagation();
-																setAssetToRename(asset);
-																setNewName(asset.name);
-															}}
-															className="p-1.5 rounded-none hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-all"
-														>
-															<Pencil className="size-3.5" />
+														<button type="button" aria-label={`Rename ${asset.name}`} onClick={() => renameAsset(asset)} className={actionButton}>
+															<Pencil className="size-4" />
 														</button>
-														<button
-															onClick={(e) => {
-																e.stopPropagation();
-																setAssetToDelete(asset);
-															}}
-															className="p-1.5 rounded-none hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer transition-all"
-														>
-															<Trash2 className="size-3.5" />
+														<button type="button" aria-label={`Delete ${asset.name}`} onClick={() => setAssetToDelete(asset)} className={cn(actionButton, "hover:bg-destructive hover:text-white")}>
+															<Trash2 className="size-4" />
 														</button>
 													</>
 												)}
-											</div>
-										</td>
-									</tr>
-								);
-							})}
-						</tbody>
-					</table>
-				</div>
-			}
+											</>
+										) : (
+											<button
+												type="button"
+												aria-label={`Actions for ${asset.name}`}
+												aria-haspopup="menu"
+												onClick={(e) => {
+													const r = e.currentTarget.getBoundingClientRect();
+													assetMenu({ clientX: r.left, clientY: r.bottom + 4, preventDefault: () => {} }, asset);
+												}}
+												className={actionButton}
+											>
+												<Ellipsis className="size-4" />
+											</button>
+										)}
+									</div>
+								</li>
+							);
+						})}
+					</ul>
+				)}
+			</div>
+
+			{menu.menu}
 
 			{/* Asset Upload Modal */}
 			{isUploadOpen && workspace?.path && (
@@ -775,6 +650,25 @@ export default function WorkspaceAssets() {
 					isOpen={!!previewAsset}
 					onClose={() => setPreviewAsset(null)}
 					onDownloadLazy={handleLazyDownload}
+					position={{ index: Math.max(0, filteredAssets.findIndex((a) => a.name === previewAsset.name)), total: filteredAssets.length }}
+					onStep={(direction) => {
+						const at = filteredAssets.findIndex((a) => a.name === previewAsset.name);
+						const next = filteredAssets[(at + direction + filteredAssets.length) % filteredAssets.length];
+						if (next) setPreviewAsset(next);
+					}}
+					onHistory={(a) => {
+						setPreviewAsset(null);
+						setHistoryAsset(a);
+					}}
+					onRename={isViewer ? undefined : (a) => {
+						setPreviewAsset(null);
+						setAssetToRename(a);
+						setNewName(a.name);
+					}}
+					onDelete={isViewer ? undefined : (a) => {
+						setPreviewAsset(null);
+						setAssetToDelete(a);
+					}}
 				/>
 			)}
 
@@ -786,27 +680,25 @@ export default function WorkspaceAssets() {
 					className="max-w-sm p-5 bg-card border-border"
 				>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Rename Asset</DialogTitle>
-							<DialogDescription>
-								Provide a new name for{" "}
-								<span className="font-semibold text-foreground">
-									{assetToRename.name}
-								</span>
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Pencil className="size-6" />} title="Rename Asset" />
 
-						<div className="space-y-3 my-2">
-							<Label htmlFor="rename-input">New File Name</Label>
+						<div className="space-y-2">
+							<Label htmlFor="rename-input">New name</Label>
 							<Input
 								id="rename-input"
 								value={newName}
 								onChange={(e) => setNewName(e.target.value)}
+								aria-invalid={!!validateFileName(newName)}
 								autoFocus
 							/>
+							{validateFileName(newName) && (
+								<p role="alert" className="text-xs text-destructive">
+									{validateFileName(newName)}
+								</p>
+							)}
 						</div>
 
-						<DialogFooter className="gap-2">
+						<DialogFooter className="mt-4 gap-2">
 							<Button
 								variant="outline"
 								onPress={() => setAssetToRename(null)}
@@ -816,7 +708,7 @@ export default function WorkspaceAssets() {
 							</Button>
 							<Button
 								onPress={handleRenameConfirm}
-								isDisabled={!newName.trim() || isRenaming}
+								isDisabled={!newName.trim() || isRenaming || !!validateFileName(newName)}
 							>
 								{isRenaming ? "Renaming…" : "Rename"}
 							</Button>
@@ -833,18 +725,13 @@ export default function WorkspaceAssets() {
 					className="max-w-sm p-5 bg-card border-border"
 				>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Delete Asset</DialogTitle>
-							<DialogDescription>
-								Move{" "}
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Asset" description={<>Move{" "}
 								<span className="font-semibold text-foreground">
 									{assetToDelete.name}
 								</span>{" "}
-								to the Trash? You can restore it from there.
-							</DialogDescription>
-						</DialogHeader>
+								to the Trash? You can restore it from there.</>} />
 
-						<DialogFooter className="gap-2">
+						<DialogFooter className="mt-4 gap-2">
 							<Button
 								variant="outline"
 								onPress={() => setAssetToDelete(null)}

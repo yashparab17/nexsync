@@ -1,29 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-	AlertCircle,
-	AlertTriangle,
-	CalendarDays,
-	CheckCircle2,
-	Clock,
-	Filter,
-	List,
-	ListTodo,
-	Pencil,
-	Plus,
-	Search,
-	Sparkles,
-	Trash2,
-} from "lucide-react";
+import { MAX_TITLE } from "@/lib/validation";
+import { useCallback, useEffect, useMemo, useState, type ElementType } from "react";
+import { Plus, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, } from "@/components/animate-icons";
 
+import { EmptyState } from "@/components/layout/Page";
+import Toolbar, { ToolbarTitle, ToolbarSearch, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +14,7 @@ import { DueBadge, TagChip, TagInput } from "@/components/elements/PlanningField
 import TaskCalendar from "@/components/elements/TaskCalendar";
 import { collectTags } from "@/lib/planning";
 
+import { useListKeys } from "@/hooks/useListKeys";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
 import { createTask, deleteTask, eraseRecordForGood, getTasks, resolveTaskConflict, updateTask } from "@/lib/tauri";
@@ -61,27 +44,27 @@ const PRIORITY_CONFIG: Record<
 > = {
 	low: {
 		label: "Low",
-		color: "text-blue-400",
-		bg: "bg-blue-500/10",
-		border: "border-blue-500/20",
+		color: "text-info",
+		bg: "bg-info/10",
+		border: "border-info/20",
 	},
 	medium: {
 		label: "Medium",
-		color: "text-amber-400",
-		bg: "bg-amber-500/10",
-		border: "border-amber-500/20",
+		color: "text-warning",
+		bg: "bg-warning/10",
+		border: "border-warning/20",
 	},
 	high: {
 		label: "High",
-		color: "text-rose-400",
-		bg: "bg-rose-500/10",
-		border: "border-rose-500/20",
+		color: "text-destructive",
+		bg: "bg-destructive/10",
+		border: "border-destructive/20",
 	},
 };
 
 const STATUS_CONFIG: Record<
 	TaskStatus,
-	{ label: string; icon: typeof Clock; color: string; border: string }
+	{ label: string; icon: ElementType; color: string; border: string }
 > = {
 	todo: {
 		label: "To Do",
@@ -92,14 +75,14 @@ const STATUS_CONFIG: Record<
 	in_progress: {
 		label: "In Progress",
 		icon: AlertCircle,
-		color: "text-amber-400",
-		border: "border-amber-500/30",
+		color: "text-warning",
+		border: "border-warning/30",
 	},
 	done: {
 		label: "Done",
 		icon: CheckCircle2,
-		color: "text-emerald-400",
-		border: "border-emerald-500/30",
+		color: "text-success",
+		border: "border-success/30",
 	},
 };
 
@@ -174,6 +157,7 @@ export default function WorkspaceTasks() {
 		setFormAssignee("");
 		setIsCreateOpen(true);
 	};
+	useListKeys(isViewer ? undefined : handleOpenCreate);
 
 	// Open Edit Modal
 	const handleOpenEdit = (task: Task) => {
@@ -193,7 +177,7 @@ export default function WorkspaceTasks() {
 		if (task) handleOpenEdit(task);
 	}, !loading);
 
-	// Submit Create Task
+	// Submit Create task
 	const handleCreateSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (isViewer || !workspace?.path || !formTitle.trim()) return;
@@ -233,7 +217,7 @@ export default function WorkspaceTasks() {
 		}
 	};
 
-	// Submit Edit Task
+	// Submit Edit task
 	const handleEditSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (isViewer || !workspace?.path || !editingTask || !formTitle.trim()) return;
@@ -284,6 +268,8 @@ export default function WorkspaceTasks() {
 			status: nextStatus[task.status],
 			updated_at: new Date().toISOString(),
 		};
+		// Shown at once; the file write follows, and the list is read back if it fails
+		setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
 		try {
 			await updateTask({ path: workspace.path, task: updated });
 			publishDataChange({ entity: "task", op: "upsert", task: updated });
@@ -298,6 +284,7 @@ export default function WorkspaceTasks() {
 		} catch (err) {
 			console.error("Failed to toggle task status:", err);
 			logError(err, { source: "tasks" });
+			await loadTasks();
 		}
 	};
 
@@ -350,7 +337,7 @@ export default function WorkspaceTasks() {
 		}
 	};
 
-	// Delete Task
+	// Delete task
 	const handleDeleteTask = async () => {
 		if (isViewer || !workspace?.path || !deletingTaskId) return;
 		try {
@@ -414,7 +401,7 @@ export default function WorkspaceTasks() {
 					id={`${prefix}-assignee`}
 					value={formAssignee}
 					onChange={(e) => setFormAssignee(e.target.value)}
-					className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+					className="mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 				>
 					<option value="">Unassigned</option>
 					{members.map((m) => (
@@ -431,343 +418,166 @@ export default function WorkspaceTasks() {
 		</>
 	);
 
+	const filtering = searchQuery || statusFilter !== "all" || priorityFilter !== "all" || tagFilter;
+	const clearFilters = () => {
+		setSearchQuery("");
+		setStatusFilter("all");
+		setPriorityFilter("all");
+		setTagFilter(null);
+	};
+
 	return (
-		<div className="space-y-6">
-			{/* Header & Controls */}
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Organize, track, and manage your workspace priorities.
-					</p>
-				</div>
+		<div className="flex h-full min-h-0 flex-col bg-background">
+			<Toolbar>
+				<ToolbarTitle name="Tasks" meta={stats.total - stats.done ? `${stats.total - stats.done} open` : undefined} />
+				<ToolbarTabs
+					label="Status"
+					value={statusFilter}
+					onChange={setStatusFilter}
+					tabs={[
+						{ key: "all", label: "All", count: stats.total },
+						{ key: "todo", label: "To do", count: stats.todo },
+						{ key: "in_progress", label: "In progress", count: stats.inProgress },
+						{ key: "done", label: "Done", count: stats.done },
+					]}
+				/>
+				<span className="flex-1" />
+				<ToolbarSearch label="Search tasks" placeholder="Search tasks" value={searchQuery} onChange={setSearchQuery} />
+				<ToolbarSwitch
+					label="Priority"
+					value={priorityFilter}
+					onChange={setPriorityFilter}
+					options={[
+						{ value: "all", label: "Any", title: "Any priority" },
+						{ value: "high", label: "High", title: "High priority" },
+						{ value: "medium", label: "Med", title: "Medium priority" },
+						{ value: "low", label: "Low", title: "Low priority" },
+					]}
+				/>
+				<ToolbarSwitch
+					label="View"
+					value={view}
+					onChange={setView}
+					options={[
+						{ value: "list", label: <List className="size-4" />, title: "List" },
+						{ value: "calendar", label: <CalendarDays className="size-4" />, title: "Calendar" },
+					]}
+				/>
 				{!isViewer && (
-					<Button
-						onPress={handleOpenCreate}
-						className="w-fit gap-2 shadow-sm transition-transform active:scale-95"
-					>
+					<Button size="sm" onPress={handleOpenCreate}>
 						<Plus className="size-4" />
 						New Task
 					</Button>
 				)}
-			</div>
-
-			{/* Metric Stat Cards */}
-			<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-				<Card className="border-border/60 bg-card/40 backdrop-blur-xs">
-					<CardContent className="flex items-center justify-between p-4">
-						<div>
-							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-								Total Tasks
-							</p>
-							<p className="mt-1 text-2xl font-bold">{stats.total}</p>
-						</div>
-						<ListTodo className="size-6 text-muted-foreground/60" />
-					</CardContent>
-				</Card>
-
-				<Card className="border-border/60 bg-card/40 backdrop-blur-xs">
-					<CardContent className="flex items-center justify-between p-4">
-						<div>
-							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-								To Do
-							</p>
-							<p className="mt-1 text-2xl font-bold text-sky-400">
-								{stats.todo}
-							</p>
-						</div>
-						<Clock className="size-6 text-sky-400/60" />
-					</CardContent>
-				</Card>
-
-				<Card className="border-border/60 bg-card/40 backdrop-blur-xs">
-					<CardContent className="flex items-center justify-between p-4">
-						<div>
-							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-								In Progress
-							</p>
-							<p className="mt-1 text-2xl font-bold text-amber-400">
-								{stats.inProgress}
-							</p>
-						</div>
-						<AlertCircle className="size-6 text-amber-400/60" />
-					</CardContent>
-				</Card>
-
-				<Card className="border-border/60 bg-card/40 backdrop-blur-xs">
-					<CardContent className="flex items-center justify-between p-4">
-						<div>
-							<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-								Completed
-							</p>
-							<p className="mt-1 text-2xl font-bold text-emerald-400">
-								{stats.done}
-							</p>
-						</div>
-						<CheckCircle2 className="size-6 text-emerald-400/60" />
-					</CardContent>
-				</Card>
-			</div>
-
-			{/* Search and Filters Bar */}
-			<div className="flex flex-col gap-3 rounded-none border bg-muted/20 p-3 sm:flex-row sm:items-center">
-				<div className="relative flex-1">
-					<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-					<Input
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						placeholder="Search tasks..."
-						className="pl-9 bg-background/60"
-					/>
-				</div>
-
-				<div className="flex items-center border" role="group" aria-label="View">
-					{(["list", "calendar"] as const).map((v) => (
-						<button
-							key={v}
-							type="button"
-							aria-pressed={view === v}
-							onClick={() => setView(v)}
-							className={cn(
-								"flex cursor-pointer items-center gap-1 px-2.5 py-1 text-xs font-medium transition-colors",
-								view === v
-									? "bg-primary text-primary-foreground"
-									: "bg-muted text-muted-foreground hover:text-foreground",
-							)}
-						>
-							{v === "list" ? <List className="size-3.5" /> : <CalendarDays className="size-3.5" />}
-							{v === "list" ? "List" : "Calendar"}
-						</button>
-					))}
-				</div>
-
-				<div className="flex flex-wrap items-center gap-2">
-					<div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-						<Filter className="size-3.5" />
-						Status:
-					</div>
-					{(["all", "todo", "in_progress", "done"] as const).map((s) => (
-						<button
-							key={s}
-							type="button"
-							onClick={() => setStatusFilter(s)}
-							className={cn(
-								"rounded-none px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
-								statusFilter === s
-									? "bg-primary text-primary-foreground font-semibold"
-									: "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
-							)}
-						>
-							{s === "all" ? "All" : STATUS_CONFIG[s].label}
-						</button>
-					))}
-
-					<div className="ml-2 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-						Priority:
-					</div>
-					{(["all", "high", "medium", "low"] as const).map((p) => (
-						<button
-							key={p}
-							type="button"
-							onClick={() => setPriorityFilter(p)}
-							className={cn(
-								"rounded-none px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
-								priorityFilter === p
-									? "bg-primary text-primary-foreground font-semibold"
-									: "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
-							)}
-						>
-							{p === "all" ? "All" : PRIORITY_CONFIG[p].label}
-						</button>
-					))}
-				</div>
-			</div>
+			</Toolbar>
 
 			{allTags.length > 0 && (
-				<div className="flex flex-wrap items-center gap-1.5">
-					<span className="text-xs font-medium text-muted-foreground">Tags:</span>
+				<Toolbar variant="sub" className="gap-2 overflow-x-auto">
+					<span className="font-mono text-[13px] text-muted-foreground">tags</span>
 					{allTags.map((tag) => (
-						<TagChip
-							key={tag}
-							tag={tag}
-							active={tagFilter === tag}
-							onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
-						/>
+						<TagChip key={tag} tag={tag} active={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)} />
 					))}
-				</div>
+				</Toolbar>
 			)}
 
-			{/* Tasks List */}
-			{loading ? (
-				<Loading className="h-48" />
-			) : view === "calendar" ? (
-				<TaskCalendar tasks={filteredTasks} onOpen={handleOpenEdit} />
-			) : filteredTasks.length === 0 ? (
-				<div className="flex flex-col items-center justify-center rounded-none border border-dashed border-border/80 p-12 text-center bg-card/10">
-					<div className="flex size-12 items-center justify-center rounded-none bg-muted/60">
-						<Sparkles className="size-6 text-muted-foreground" />
+			<div className="min-h-0 flex-1 overflow-auto">
+				{loading ? (
+					<Loading className="h-48" />
+				) : view === "calendar" ? (
+					<div className="p-3">
+						<TaskCalendar tasks={filteredTasks} onOpen={handleOpenEdit} />
 					</div>
-					<h3 className="mt-4 text-base font-semibold">No tasks found</h3>
-					<p className="mt-1 text-sm text-muted-foreground max-w-sm">
-						{searchQuery || statusFilter !== "all" || priorityFilter !== "all" || tagFilter
-							? "No tasks match your current search or active filters."
-							: "You have no tasks created yet. Create one to begin tracking."}
-					</p>
-					{searchQuery || statusFilter !== "all" || priorityFilter !== "all" || tagFilter ? (
-						<Button
-							variant="outline"
-							size="sm"
-							className="mt-4"
-							onPress={() => {
-								setSearchQuery("");
-								setStatusFilter("all");
-								setPriorityFilter("all");
-								setTagFilter(null);
-							}}
-						>
-							Clear Filters
-						</Button>
-					) : (
-						!isViewer && (
-							<Button
-								size="sm"
-								className="mt-4 gap-1.5"
-								onPress={handleOpenCreate}
-							>
-								<Plus className="size-4" />
-								Create Task
-							</Button>
-						)
-					)}
-				</div>
-			) : (
-				<div className="grid gap-2">
-					{filteredTasks.map((task) => {
-						const statusConf = STATUS_CONFIG[task.status];
-						const priorityConf = PRIORITY_CONFIG[task.priority];
-						const StatusIcon = statusConf.icon;
-
-						return (
-							<div
-								key={task.id}
-								className={cn(
-									"group flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-none border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-xs",
-									task.status === "done" && "opacity-75 bg-muted/10",
-								)}
-							>
-								{/* Left: Checkmark & Title/Description */}
-								<div className="flex items-start gap-3 min-w-0">
+				) : filteredTasks.length === 0 ? (
+					<EmptyState
+						art={filtering ? "search" : "tasks"}
+						title={filtering ? "No Matching Tasks" : "No Tasks Yet"}
+						action={
+							filtering ? (
+								<Button variant="outline" size="sm" onPress={clearFilters}>
+									Clear Filters
+								</Button>
+							) : (
+								!isViewer && (
+									<Button size="sm" onPress={handleOpenCreate}>
+										<Plus className="size-4" />
+										Create Task
+									</Button>
+								)
+							)
+						}
+					>
+						{filtering ? "Nothing matches the search or filters." : "Create one to start tracking what needs doing."}
+					</EmptyState>
+				) : (
+					<ul className="divide-y">
+						{filteredTasks.map((task) => {
+							const statusConf = STATUS_CONFIG[task.status];
+							const priorityConf = PRIORITY_CONFIG[task.priority];
+							const StatusIcon = statusConf.icon;
+							return (
+								<li
+									key={task.id}
+									className={cn(
+										"group flex items-start gap-3 border-l-2 px-3 py-3 transition-colors hover:bg-muted/40",
+										task.priority === "high" ? "border-l-destructive" : task.priority === "medium" ? "border-l-warning" : "border-l-transparent",
+										task.status === "done" && "opacity-60",
+									)}
+								>
 									<button
 										type="button"
 										onClick={() => handleToggleStatus(task)}
 										disabled={isViewer}
-										title={
-											isViewer
-												? undefined
-												: "Click to cycle status (To Do -> In Progress -> Done)"
-										}
+										aria-label={`${task.title}: ${statusConf.label}. ${isViewer ? "" : "Press to move it along."}`}
+										title={isViewer ? undefined : "Move along: To do, In progress, Done"}
 										className={cn(
-											"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-none border transition-colors",
+											"mt-0.5 flex size-5 shrink-0 items-center justify-center border transition-colors",
 											isViewer ? "cursor-default" : "cursor-pointer",
-											task.status === "done"
-												? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
-												: task.status === "in_progress"
-													? "border-amber-500 bg-amber-500/20 text-amber-400"
-													: "border-muted-foreground/40 hover:border-primary",
+											task.status === "done" ? "border-success bg-success/20 text-success" : task.status === "in_progress" ? "border-warning bg-warning/20 text-warning" : "border-muted-foreground/40 hover:border-primary",
 										)}
 									>
 										<StatusIcon className="size-3.5" />
 									</button>
 
-									<div className="min-w-0 flex-1">
-										<div className="flex items-center gap-2 flex-wrap">
-											<h4
-												className={cn(
-													"font-medium text-sm text-foreground",
-													task.status === "done" &&
-														"line-through text-muted-foreground",
-												)}
-											>
-												{task.title}
-											</h4>
+									<button type="button" data-nav onClick={() => handleOpenEdit(task)} className="min-w-0 flex-1 cursor-pointer text-left outline-none focus-visible:bg-muted">
+										<span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+											<span className={cn("text-sm font-medium [overflow-wrap:anywhere]", task.status === "done" && "text-muted-foreground line-through")}>{task.title}</span>
 											<PresenceDots names={viewersAt("tasks", task.id)} doing="editing this task" />
 											{(task.conflicts?.length ?? 0) > 0 && (
-												<span title="Two people changed this at the same time" className="text-amber-500">
+												<span title="Two people changed this at the same time" className="text-warning">
 													<AlertTriangle className="size-3.5" aria-label="Has a change to sort out" />
 												</span>
 											)}
-											<span
-												className={cn(
-													"inline-flex items-center rounded-none border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-													priorityConf.color,
-													priorityConf.bg,
-													priorityConf.border,
-												)}
-											>
-												{priorityConf.label}
-											</span>
-											<span
-												className={cn(
-													"inline-flex items-center rounded-none border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/30",
-													statusConf.border,
-												)}
-											>
-												{statusConf.label}
-											</span>
-										</div>
+										</span>
+										{task.description && <span className="mt-0.5 line-clamp-2 block text-sm text-muted-foreground">{task.description}</span>}
+									</button>
 
-										{task.description && (
-											<p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-												{task.description}
-											</p>
-										)}
-
-										{(task.due_date || task.assignee_id || (task.tags ?? []).length > 0 || (task.violations ?? []).length > 0) && (
-											<div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-												<RuleFlag violations={task.violations} />
-												<DueBadge due={task.due_date} done={task.status === "done"} />
-												{task.assignee_id && <span>Assigned to {memberName(task.assignee_id)}</span>}
-												{(task.tags ?? []).map((tag) => (
-													<TagChip
-														key={tag}
-														tag={tag}
-														active={tagFilter === tag}
-														onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
-													/>
-												))}
-											</div>
+									<div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm text-muted-foreground">
+										<RuleFlag violations={task.violations} />
+										{task.assignee_id && <span className="max-w-32 truncate">{memberName(task.assignee_id)}</span>}
+										{(task.tags ?? []).map((tag) => (
+											<TagChip key={tag} tag={tag} active={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)} />
+										))}
+										<DueBadge due={task.due_date} done={task.status === "done"} />
+										<span className={cn("font-mono text-[13px]", priorityConf.color)}>{priorityConf.label.toLowerCase()}</span>
+										{!isViewer && (
+											<span className="flex opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
+												<Button variant="ghost" size="icon-xs" onPress={() => handleOpenEdit(task)} aria-label="Edit task">
+													<Pencil className="size-3.5" />
+												</Button>
+												<Button variant="ghost" size="icon-xs" onPress={() => setDeletingTaskId(task.id)} aria-label="Delete task">
+													<Trash2 className="size-3.5 text-destructive" />
+												</Button>
+											</span>
 										)}
 									</div>
-								</div>
+								</li>
+							);
+						})}
+					</ul>
+				)}
+			</div>
 
-								{/* Right: Actions */}
-								{!isViewer && (
-									<div className="flex items-center gap-1 sm:self-center self-end">
-										<Button
-											variant="ghost"
-											size="icon-xs"
-											onPress={() => handleOpenEdit(task)}
-											aria-label="Edit Task"
-										>
-											<Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
-										</Button>
-										<Button
-											variant="ghost"
-											size="icon-xs"
-											onPress={() => setDeletingTaskId(task.id)}
-											aria-label="Delete Task"
-										>
-											<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
-										</Button>
-									</div>
-								)}
-							</div>
-						);
-					})}
-				</div>
-			)}
-
-			{/* Create Task Modal */}
+			{/* Create task Modal */}
 			{isCreateOpen && (
 				<Dialog
 					isOpen={isCreateOpen}
@@ -775,18 +585,14 @@ export default function WorkspaceTasks() {
 					className="max-w-lg"
 				>
 					<form onSubmit={handleCreateSubmit} className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Create New Task</DialogTitle>
-							<DialogDescription>
-								Add a task to this workspace.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Plus className="size-6" />} title="New Task" />
 
 						<div className="space-y-3">
 							<div>
 								<Label htmlFor="create-title">Title *</Label>
 								<Input
 									id="create-title"
+									maxLength={MAX_TITLE}
 									required
 									value={formTitle}
 									onChange={(e) => setFormTitle(e.target.value)}
@@ -802,7 +608,7 @@ export default function WorkspaceTasks() {
 									id="create-desc"
 									value={formDescription}
 									onChange={(e) => setFormDescription(e.target.value)}
-									placeholder="Provide extra details, acceptance criteria, or context..."
+									placeholder="Provide extra details, acceptance criteria, or context…"
 									rows={3}
 									className="mt-1"
 								/>
@@ -817,7 +623,7 @@ export default function WorkspaceTasks() {
 										onChange={(e) =>
 											setFormStatus(e.target.value as TaskStatus)
 										}
-										className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+										className="mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 									>
 										<option value="todo">To Do</option>
 										<option value="in_progress">In Progress</option>
@@ -833,7 +639,7 @@ export default function WorkspaceTasks() {
 										onChange={(e) =>
 											setFormPriority(e.target.value as TaskPriority)
 										}
-										className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+										className="mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 									>
 										<option value="low">Low</option>
 										<option value="medium">Medium</option>
@@ -844,7 +650,7 @@ export default function WorkspaceTasks() {
 
 							<div>
 								<Label htmlFor="create-due">Due Date</Label>
-								<DateField id="create-due" value={formDueDate} onChange={setFormDueDate} className="mt-1" />
+								<DateField id="create-due" noPast value={formDueDate} onChange={setFormDueDate} className="mt-1" />
 							</div>
 							{renderExtras("create")}
 						</div>
@@ -869,7 +675,7 @@ export default function WorkspaceTasks() {
 				</Dialog>
 			)}
 
-			{/* Edit Task Modal */}
+			{/* Edit task Modal */}
 			{editingTask && (
 				<Dialog
 					isOpen={!!editingTask}
@@ -877,18 +683,14 @@ export default function WorkspaceTasks() {
 					className="max-w-lg"
 				>
 					<form onSubmit={handleEditSubmit} className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Edit Task</DialogTitle>
-							<DialogDescription>
-								Update this task's details.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Pencil className="size-6" />} title="Edit task" description={<>Update this task's details.</>} />
 
 						<div className="space-y-3">
 							<div>
 								<Label htmlFor="edit-title">Title *</Label>
 								<Input
 									id="edit-title"
+									maxLength={MAX_TITLE}
 									required
 									value={formTitle}
 									onChange={(e) => setFormTitle(e.target.value)}
@@ -918,7 +720,7 @@ export default function WorkspaceTasks() {
 										onChange={(e) =>
 											setFormStatus(e.target.value as TaskStatus)
 										}
-										className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+										className="mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 									>
 										<option value="todo">To Do</option>
 										<option value="in_progress">In Progress</option>
@@ -934,7 +736,7 @@ export default function WorkspaceTasks() {
 										onChange={(e) =>
 											setFormPriority(e.target.value as TaskPriority)
 										}
-										className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+										className="mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 									>
 										<option value="low">Low</option>
 										<option value="medium">Medium</option>
@@ -993,13 +795,8 @@ export default function WorkspaceTasks() {
 					}}
 				>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Delete Task</DialogTitle>
-							<DialogDescription>
-								Are you sure you want to delete this task? This action cannot be
-								undone.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Task" description={<>Are you sure you want to delete this task? This action cannot be
+								undone.</>} />
 						<EraseOption checked={eraseTask} onChange={setEraseTask} what="the task" />
 
 						<DialogFooter>

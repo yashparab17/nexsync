@@ -4,6 +4,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { cleanPath } from "@/lib/utils";
 
 import type {
 	WorkspaceInfo,
@@ -123,6 +124,8 @@ export function emptyTrash(path: string): Promise<void> {
 	return invoke("empty_trash", { path });
 }
 
+const tidy = (w: WorkspaceInfo): WorkspaceInfo => ({ ...w, path: cleanPath(w.path) });
+
 // ────────────────────────────
 // Workspace creation & import
 // ────────────────────────────
@@ -131,12 +134,12 @@ export function emptyTrash(path: string): Promise<void> {
 export function createWorkspace(
 	request: CreateWorkspaceRequest,
 ): Promise<WorkspaceInfo> {
-	return invoke("create_workspace", { request });
+	return invoke<WorkspaceInfo>("create_workspace", { request: { ...request, path: cleanPath(request.path) } }).then(tidy);
 }
 
 // Import an existing workspace from disk
 export function importWorkspace(path: string): Promise<WorkspaceInfo> {
-	return invoke("import_workspace", { path });
+	return invoke<WorkspaceInfo>("import_workspace", { path: cleanPath(path) }).then(tidy);
 }
 
 // ────────────────────────────
@@ -147,7 +150,7 @@ export function importWorkspace(path: string): Promise<WorkspaceInfo> {
 export function readWorkspaceMetadata(
 	path: string,
 ): Promise<WorkspaceMetadata> {
-	return invoke("read_workspace_metadata", { path });
+	return invoke<WorkspaceMetadata>("read_workspace_metadata", { path }).then((m) => ({ ...m, workspace: { ...m.workspace, path: cleanPath(m.workspace.path) } }));
 }
 
 // Persist updated workspace metadata to database
@@ -363,17 +366,19 @@ export function searchWorkspaceFiles(path: string): Promise<{ name: string; path
 }
 
 // Create a new empty file in workspace
-export function createWorkspaceFile(
+export async function createWorkspaceFile(
 	path: string,
 	relPath: string,
 	name: string,
 ): Promise<void> {
-	return invoke("create_workspace_item", {
+	await invoke("create_workspace_item", {
 		path,
 		relPath,
 		name,
 		isDir: false,
 	});
+	// A new file starts empty, even if a file of the same name once had live editing state
+	await forgetYjsDocs(path, `${relPath.replace(/^\/+|\/+$/g, "")}/${name}`);
 }
 
 // Create a new folder in workspace
@@ -433,11 +438,23 @@ export function importAssetFromPath(
 }
 
 // Delete a workspace file or directory permanently
-export function deleteWorkspaceItem(
+export async function deleteWorkspaceItem(
 	path: string,
 	relPath: string,
 ): Promise<void> {
-	return invoke("delete_workspace_item", { path, relPath });
+	await invoke("delete_workspace_item", { path, relPath });
+	// The live editing state goes with the file, or a new file of the same name would open with the old text
+	await forgetYjsDocs(path, relPath.replace(/^\/+|\/+$/g, ""));
+}
+
+// Removes the stored editing state of a file, or of every file inside a folder
+async function forgetYjsDocs(workspacePath: string, rel: string): Promise<void> {
+	try {
+		const ids = (await listYjsDocs(workspacePath)) ?? [];
+		await Promise.all(ids.filter((id) => id === rel || id.startsWith(`${rel}/`)).map((id) => deleteYjsDoc(workspacePath, id)));
+	} catch {
+		// The file itself is already created or deleted; stale state is only a nuisance
+	}
 }
 
 // Rename a workspace file or directory
@@ -460,7 +477,7 @@ export function getWorkspaceStats(path: string): Promise<WorkspaceStats> {
 
 // Get list of recent workspaces from app registry
 export function getRecentWorkspaces(): Promise<WorkspaceInfo[]> {
-	return invoke("get_recent_workspaces");
+	return invoke<WorkspaceInfo[]>("get_recent_workspaces").then((list) => list.map(tidy));
 }
 
 // Add workspace to recent workspaces list
@@ -479,7 +496,7 @@ export function removeRecentWorkspace(id: string): Promise<void> {
 
 // Get last opened workspace for automatic restoration
 export function getLastWorkspace(): Promise<WorkspaceInfo | null> {
-	return invoke("get_last_workspace");
+	return invoke<WorkspaceInfo | null>("get_last_workspace").then((w) => (w ? tidy(w) : w));
 }
 
 // Persist last opened workspace
@@ -498,7 +515,7 @@ export function clearLastWorkspace(): Promise<void> {
 
 // Load application security configuration
 export function loadConfig(): Promise<NexsyncConfig> {
-	return invoke("load_config_cmd");
+	return invoke<NexsyncConfig>("load_config_cmd").then((c) => ({ ...c, allowed_workspace_roots: (c.allowed_workspace_roots ?? []).map(cleanPath) }));
 }
 
 // Save application security configuration
@@ -626,6 +643,54 @@ export const onRunOutput = (handler: (event: RunOutput) => void) =>
 
 export const onRunExit = (handler: (event: RunExit) => void) =>
 	listen<RunExit>("editor://run-exit", (e) => handler(e.payload));
+
+// ────────────────────────────
+// Terminals: real shells in the Editor's bottom panel
+// ────────────────────────────
+
+export interface TerminalData {
+	id: string;
+	// Base64 of the raw bytes the shell printed
+	data: string;
+}
+
+export interface TerminalExit {
+	id: string;
+	code: number | null;
+}
+
+// Open a shell in a folder of the editor area; what it prints arrives through onTerminalData
+export function openTerminal(workspacePath: string, dir: string, cols: number, rows: number, shell?: string): Promise<string> {
+	return invoke("terminal_open", { workspacePath, dir, cols, rows, shell: shell ?? null });
+}
+
+// The shells installed on this device (PowerShell, cmd, bash, ...), the default first
+export interface TerminalShell {
+	id: string;
+	name: string;
+	path: string;
+}
+export function listTerminalShells(): Promise<TerminalShell[]> {
+	return invoke("terminal_shells");
+}
+
+export function writeTerminal(id: string, data: string): Promise<void> {
+	return invoke("terminal_write", { id, data });
+}
+
+export function resizeTerminal(id: string, cols: number, rows: number): Promise<void> {
+	return invoke("terminal_resize", { id, cols, rows });
+}
+
+export function closeTerminal(id: string): Promise<void> {
+	return invoke("terminal_close", { id });
+}
+
+export const onTerminalData = (handler: (event: TerminalData) => void) =>
+	listen<TerminalData>("terminal://data", (e) => handler(e.payload));
+
+export const onTerminalExit = (handler: (event: TerminalExit) => void) =>
+	listen<TerminalExit>("terminal://exit", (e) => handler(e.payload));
 
 // Open a workspace file, such as a Word document, in the default app for its type
 export function openWorkspaceFile(workspacePath: string, relPath: string): Promise<void> {

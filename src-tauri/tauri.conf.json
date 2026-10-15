@@ -14,6 +14,7 @@
 			{
 				"title": "Nexsync",
 				"decorations": false,
+				"dragDropEnabled": false,
 				"width": 1100,
 				"height": 700,
 				"minWidth": 720,

@@ -5,7 +5,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { FolderOpen, FolderPlus, Settings as SettingsIcon, UsersRound } from "lucide-react";
+import { AnimateIcon, Settings as SettingsIcon, UsersRound, FolderClose, FolderPlus, HardDrive, Lock, UserX } from "@/components/animate-icons";
 
 // Hooks
 import { useThemeContext } from "@/store/ThemeContext";
@@ -22,15 +22,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 
 const Settings = lazy(() => import("@/pages/Settings"));
-import {
-	Card,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 
 // Tauri IPC
 import { APP_VERSION } from "@/lib/version";
+import Art from "@/components/elements/Art";
 import { getLastWorkspace, getRecentWorkspaces, loadConfig } from "@/lib/tauri";
 
 // Context
@@ -40,12 +35,33 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { WorkspaceInfo } from "@/types/workspace";
 
 // Assets
-import logo from "@/assets/logos/logo.svg";
 import logo_black from "@/assets/logos/logo-black.svg";
 import logo_white from "@/assets/logos/logo-white.svg";
 import Loading from "@/components/Loading";
 import OnboardingTour, { tourSeen } from "@/components/dialogs/OnboardingTour";
 import { t } from "@/i18n";
+
+// Keys that work from any workspace screen
+const shortcuts: [string, string][] = [
+	["Ctrl K", "Search and commands"],
+	["Ctrl S", "Save the open note or file"],
+	["[[name]]", "Link to another note"],
+];
+
+// Action tiles in the side column share one shape
+const tile = "h-auto w-full justify-start gap-4 px-5 py-4 text-left";
+
+// "edited 3h ago" from an ISO timestamp; empty when the registry has none
+function editedAgo(iso: string): string {
+	const ms = Date.now() - new Date(iso).getTime();
+	if (!iso || Number.isNaN(ms)) return "";
+	const m = Math.floor(Math.max(0, ms) / 60_000);
+	if (m < 1) return "edited just now";
+	if (m < 60) return `edited ${m}m ago`;
+	if (m < 1440) return `edited ${Math.floor(m / 60)}h ago`;
+	if (m < 10080) return `edited ${Math.floor(m / 1440)}d ago`;
+	return `edited ${new Date(iso).toLocaleDateString()}`;
+}
 
 // Welcome landing page with recent workspaces and quick actions
 export default function Welcome() {
@@ -63,7 +79,6 @@ export default function Welcome() {
 	);
 	const [loading, setLoading] = useState(true);
 	// The workspace that was open when the app was last used
-	const [lastId, setLastId] = useState<string | null>(null);
 	// The name from Settings, for the greeting; empty until loaded or when none is set
 	const [userName, setUserName] = useState("");
 
@@ -74,11 +89,9 @@ export default function Welcome() {
 
 	// The introduction opens by itself the first time, and from the link below after that
 	const [tourOpen, setTourOpen] = useState(() => !tourSeen());
+	// The folder icon opens while anything on its button is hovered or focused, not only the icon
+	const [importHot, setImportHot] = useState(false);
 	const [settingsOpen, setSettingsOpen] = useState(false);
-
-	// Shared button styling
-	const actionButtonClass =
-		"px-8 text-base cursor-pointer hover:scale-[1.02] hover:border-primary";
 
 	// Load recent workspaces on mount
 	useEffect(() => {
@@ -92,9 +105,9 @@ export default function Welcome() {
 	const loadRecentWorkspaces = async () => {
 		try {
 			const workspaces = await getRecentWorkspaces();
-			setRecentWorkspaces(workspaces);
-			// Only used to mark the card; not knowing it must not hide the list
-			setLastId((await getLastWorkspace().catch(() => null))?.id ?? null);
+			// Only used to lead the list; not knowing it must not hide the list
+			const last = (await getLastWorkspace().catch(() => null))?.id ?? null;
+			setRecentWorkspaces([...workspaces].sort((x, y) => Number(y.id === last) - Number(x.id === last)));
 		} catch (err) {
 			console.error("Failed to load recent workspaces:", err);
 			logError(err, { source: "recent_load" });
@@ -115,129 +128,120 @@ export default function Welcome() {
 	};
 
 	return (
-		<div className="flex min-h-full flex-col p-8">
-			{/* Header */}
-			<header className="relative flex items-center justify-center">
+		<div className="flex min-h-full flex-col rounded-t-xl bg-background window-edge px-8 py-6 2xl:px-16">
+			<header className="flex items-center justify-between">
 				<div className="flex items-center gap-3">
-					<img
-						src={isDark ? logo_white : logo_black}
-						alt="Nexsync"
-						className="h-12 w-12"
-					/>
-
-					<h1 className="text-5xl font-bold">Nexsync</h1>
+					<img src={isDark ? logo_white : logo_black} alt="" className="size-9" />
+					<span className="text-xl font-bold">Nexsync</span>
+					<span className="font-mono text-xs text-muted-foreground">v{APP_VERSION}</span>
 				</div>
-
-				<div className="absolute right-0 flex items-center gap-2">
+				<div className="flex items-center gap-1">
+					<Button variant="ghost" size="sm" onPress={() => setTourOpen(true)}>{t("welcome.tour")}</Button>
 					<ThemeToggle />
-
-					<Button
-						variant="ghost"
-						size="icon"
-						onPress={() => setSettingsOpen(true)}
-						aria-label="Application Settings"
-					>
+					<Button variant="ghost" size="icon" onPress={() => setSettingsOpen(true)} aria-label="Application Settings">
 						<SettingsIcon className="size-5" />
 					</Button>
 				</div>
 			</header>
 
-			{/* Tagline */}
-			<p className="mt-2 text-center text-lg text-muted-foreground">
-				Notes, tasks and code, shared with your team and kept on your own computer.
-			</p>
+			{/* The window is the canvas: content fills it up to a wide cap, centred in both directions */}
+			<main className="flex flex-1 items-center justify-center py-12">
+				<div className="grid w-full max-w-[88rem] gap-12 xl:grid-cols-[minmax(0,1fr)_24rem] xl:gap-16">
+					<div className="flex min-w-0 flex-col gap-10">
+						<div>
+							<h1 className="text-5xl font-bold tracking-tight 2xl:text-5xl">{greeting}</h1>
+							<p className="mt-3 max-w-prose text-xl text-muted-foreground">
+								Notes, tasks and code, shared with your team and kept on your own computer.
+							</p>
+						</div>
 
-			{/* Main Content */}
-			<section className="relative flex flex-1 flex-col items-center justify-center gap-6">
-				{/* Background Image */}
-				<div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-					<img src={logo} className="h-150 w-150 opacity-10" alt="" />
-				</div>
+						{/* Opening a workspace is the common case, so the list comes first and the last one used leads it */}
+						<section aria-labelledby="recent-heading" className="flex flex-col gap-4">
+							<h2 id="recent-heading" className="font-mono text-xs text-muted-foreground">
+								Workspaces / {recentWorkspaces.length}
+							</h2>
 
-				<div className="relative z-2 flex flex-col items-center gap-6">
-					<h2 className="text-center text-2xl font-semibold">{greeting}</h2>
-
-					<p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-						Quick Actions
-					</p>
-
-					{/* Action Buttons */}
-					<div className="flex flex-wrap justify-center gap-6">
-						<CreateWorkspaceDialog>
-							<Button className={actionButtonClass}>
-								<FolderPlus className="size-5" />
-								Create Workspace
-							</Button>
-						</CreateWorkspaceDialog>
-
-						<JoinWorkspaceDialog>
-							<Button className={actionButtonClass}>
-								<UsersRound className="size-5" />
-								Join Workspace
-							</Button>
-						</JoinWorkspaceDialog>
-
-						<ImportWorkspaceDialog>
-							<Button className={actionButtonClass}>
-								<FolderOpen className="size-5" />
-								Import Workspace
-							</Button>
-						</ImportWorkspaceDialog>
+							{loading ?
+								<Loading />
+							: recentWorkspaces.length === 0 ?
+								<div className="frame flex flex-col items-center gap-4 p-8 text-center text-muted-foreground sm:flex-row sm:text-left">
+									<Art name="welcome" className="h-44 w-72 max-w-full shrink-0" />
+									<p>No workspaces yet. Create one, or join a teammate with their ticket.</p>
+								</div>
+							:	<ul className="grid grid-cols-[repeat(auto-fill,minmax(20rem,1fr))] gap-4">
+									{recentWorkspaces.map((ws) => {
+										return (
+											<li key={ws.id}>
+												<button
+													type="button"
+													onClick={() => handleOpenWorkspace(ws)}
+													className={`frame flex h-full min-h-44 w-full flex-col gap-3 bg-muted/40 p-6 text-left transition-colors hover:bg-muted`}
+												>
+													<span className="flex items-start justify-between gap-3">
+														<span className={`font-semibold text-xl`}>{ws.name}</span>
+													</span>
+													{ws.description && <span className="line-clamp-2 text-muted-foreground">{ws.description}</span>}
+													<span className="mt-auto flex flex-col gap-1 font-mono text-xs text-muted-foreground">
+														<span className="truncate">{ws.path}</span>
+														<span>{editedAgo(ws.updated_at)}</span>
+													</span>
+												</button>
+											</li>
+										);
+									})}
+								</ul>
+							}
+						</section>
 					</div>
 
+					<aside className="flex flex-col gap-8">
+						<section className="flex flex-col gap-3">
+							<h2 className="font-mono text-xs text-muted-foreground">Start</h2>
+							<CreateWorkspaceDialog>
+								<Button className={tile}>
+									<FolderPlus className="size-6 shrink-0" />
+									<span><span className="block font-semibold">Create a Workspace</span><span className="block text-sm font-normal opacity-80">A new folder on this computer</span></span>
+								</Button>
+							</CreateWorkspaceDialog>
+							<JoinWorkspaceDialog>
+								<Button variant="outline" className={tile}>
+									<UsersRound className="size-6 shrink-0" />
+									<span><span className="block font-semibold">Join with a Ticket</span><span className="block text-sm font-normal text-muted-foreground">Paste what a teammate sent you</span></span>
+								</Button>
+							</JoinWorkspaceDialog>
+							<ImportWorkspaceDialog>
+								<Button variant="outline" className={tile} onHoverStart={() => setImportHot(true)} onHoverEnd={() => setImportHot(false)} onFocus={() => setImportHot(true)} onBlur={() => setImportHot(false)}>
+									<AnimateIcon animate={importHot} className="flex items-center gap-4">
+										<FolderClose className="size-6 shrink-0" />
+										<span><span className="block font-semibold">Import a Folder</span><span className="block text-sm font-normal text-muted-foreground">Use files you already have</span></span>
+									</AnimateIcon>
+								</Button>
+							</ImportWorkspaceDialog>
+						</section>
 
-					{/* Recent Workspaces */}
-					<section className="flex w-full flex-col items-center gap-4">
-						<h2 className="text-2xl font-semibold">
-							Recent Workspaces
-						</h2>
-
-						{loading ?
-							<Loading />
-						: recentWorkspaces.length === 0 ?
-							<p className="text-sm text-muted-foreground">
-								No recent workspaces. Create or import one to
-								get started.
-							</p>
-						:	<div className="flex flex-wrap justify-center gap-6">
-								{recentWorkspaces.map((ws) => (
-									<Card
-										key={ws.id}
-										className="w-80 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg"
-										onClick={() => handleOpenWorkspace(ws)}
-									>
-										<CardHeader>
-											<CardTitle>{ws.name}</CardTitle>
-
-											<CardDescription>
-												{ws.description ||
-													"Local Workspace"}
-											</CardDescription>
-
-											{ws.id === lastId && (
-												<p className="pt-2 text-sm text-muted-foreground">
-													You visited this last time
-												</p>
-											)}
-										</CardHeader>
-									</Card>
+						<section className="flex flex-col gap-3">
+							<h2 className="font-mono text-xs text-muted-foreground">Shortcuts</h2>
+							<dl className="flex flex-col gap-2 text-sm">
+								{shortcuts.map(([keys, what]) => (
+									<div key={what} className="flex items-center justify-between gap-4">
+										<dt>{what}</dt>
+										<dd><kbd className="border bg-card px-2 py-0.5 font-mono text-xs">{keys}</kbd></dd>
+									</div>
 								))}
-							</div>
-						}
-					</section>
-				</div>
-			</section>
+							</dl>
+						</section>
 
-			{/* Footer */}
-			<footer className="mt-auto space-y-1 pb-4 text-center text-muted-foreground">
-				<p className="text-2xl">Nexsync {APP_VERSION}</p>
-				<p className="text-xs">
-					Local First • Open Source • Built with Tauri
-				</p>
-				<Button variant="link" size="sm" onPress={() => setTourOpen(true)}>
-					{t("welcome.tour")}
-				</Button>
-			</footer>
+						<section className="flex flex-col gap-3">
+							<h2 className="font-mono text-xs text-muted-foreground">Your Data</h2>
+							<ul className="flex flex-col gap-2 text-sm text-muted-foreground">
+								<li className="flex gap-3"><HardDrive className="size-4 shrink-0 text-primary" />Files stay as plain files in folders you choose.</li>
+								<li className="flex gap-3"><Lock className="size-4 shrink-0 text-primary" />Connections between devices are end-to-end encrypted.</li>
+								<li className="flex gap-3"><UserX className="size-4 shrink-0 text-primary" />No account and no server holds your work.</li>
+							</ul>
+						</section>
+					</aside>
+				</div>
+			</main>
 
 			{/* Settings opens over the page; the page asks before closing with unsaved edits, so Escape and a click outside are off */}
 			<Dialog isOpen={settingsOpen} onOpenChange={setSettingsOpen} showCloseButton={false} isDismissable={false} isKeyboardDismissDisabled className="overflow-hidden p-0 sm:max-w-5xl">

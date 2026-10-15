@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, BellOff } from "lucide-react";
+import { Bell, BellOff } from "@/components/animate-icons";
 
 import { initialOf } from "@/components/elements/Avatar";
 import { colorForName } from "@/lib/collabColor";
@@ -33,7 +33,7 @@ export default function PresenceStrip() {
 	if (peers.length === 0) return null;
 
 	return (
-		<div className="flex items-center gap-1.5">
+		<div className="flex items-center gap-2">
 			<div className="flex items-center -space-x-1">
 				{peers.map((peer) => {
 					const who = nameOf(peer.id);
@@ -52,23 +52,23 @@ export default function PresenceStrip() {
 							aria-label={where ? `${followed ? "Stop following" : "Follow"} ${who}` : who}
 							title={`${detail}${where ? (followed ? " Click to stop following." : " Click to follow.") : ""}`}
 							className={cn(
-								"relative flex size-7 items-center justify-center text-[11px] font-bold text-white ring-2 ring-background",
+								"relative flex size-7 items-center justify-center text-xs font-bold text-white ring-2 ring-background",
 								away && "opacity-60",
 								followed && "ring-primary",
 							)}
 						>
 							{initialOf(who)}
-							<span className={cn("absolute -bottom-0.5 -right-0.5 size-2 ring-1 ring-background", away ? "bg-amber-400" : "bg-emerald-400")} />
+							<span className={cn("absolute -bottom-0.5 -right-0.5 size-2 ring-1 ring-background", away ? "bg-warning" : "bg-success")} />
 						</button>
 					);
 				})}
 			</div>
 			{hostName !== null && link === "members" && (
-				<span className="hidden text-[11px] text-amber-400 md:inline" title={`${hostName} is offline. You are working with the other members.`}>
+				<span className="hidden text-xs text-warning md:inline" title={`${hostName} is offline. You are working with the other members.`}>
 					Host offline
 				</span>
 			)}
-			{following && <span className="hidden text-[11px] text-primary md:inline">Following {nameOf(following)}</span>}
+			{following && <span className="hidden text-xs text-primary md:inline">Following {nameOf(following)}</span>}
 			<button
 				type="button"
 				onClick={() => {

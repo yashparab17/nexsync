@@ -26,13 +26,13 @@ describe("conflict panel", () => {
 	it("hands back the field and the value that was chosen", () => {
 		const onChoose = vi.fn();
 		render(<ConflictPanel conflicts={conflicts} show={show} canChoose onChoose={onChoose} />);
-		fireEvent.click(screen.getAllByRole("button", { name: "Keep this" })[1]);
+		fireEvent.click(screen.getAllByRole("button", { name: "Keep This" })[1]);
 		expect(onChoose).toHaveBeenCalledWith("title", "Title A");
 	});
 
 	it("lets a viewer see the conflict but not settle it, and shows nothing when there is none", () => {
 		const { container, rerender } = render(<ConflictPanel conflicts={conflicts} show={show} canChoose={false} onChoose={() => {}} />);
-		expect(screen.queryByRole("button", { name: "Keep this" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Keep This" })).toBeNull();
 		rerender(<ConflictPanel conflicts={[]} show={show} canChoose onChoose={() => {}} />);
 		expect(container.textContent).toBe("");
 	});

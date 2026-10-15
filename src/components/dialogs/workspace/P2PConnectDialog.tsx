@@ -1,26 +1,9 @@
 import { useEffect, useState } from "react";
-import {
-	AlertTriangle,
-	Check,
-	Copy,
-	Globe,
-	KeyRound,
-	Lock,
-	Radio,
-	RefreshCw,
-	Sparkles,
-	Unplug,
-	Users,
-	Wifi,
-} from "lucide-react";
+import { Check, Copy, Radio, RefreshCw, AlertTriangle, Globe, KeyRound, Link2, Lock, Sparkles, Unplug, Users } from "@/components/animate-icons";
+import Avatar from "@/components/elements/Avatar";
 
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useP2P, describeSyncProgress } from "@/store/p2p/P2PContext";
@@ -40,7 +23,6 @@ export default function P2PConnectDialog({
 }: P2PConnectDialogProps) {
 	const {
 		peers,
-		connectionStatus,
 		syncProgress,
 		createInvite,
 		createShortCode,
@@ -64,6 +46,7 @@ export default function P2PConnectDialog({
 	// Limits for a full invite: how long it lasts (seconds, empty for until stopped) and whether one guest uses it up
 	const [expiry, setExpiry] = useState("3600");
 	const [singleUse, setSingleUse] = useState(false);
+	const [showOptions, setShowOptions] = useState(false);
 	const [invite, setInvite] = useState<InviteInfo | null>(null);
 	const [isGenerating, setIsGenerating] = useState(false);
 	const [shortCode, setShortCode] = useState<ShortCodeInfo | null>(null);
@@ -160,460 +143,314 @@ export default function P2PConnectDialog({
 		}
 	};
 
-	// "Online" means the internet and relay are reachable, whether or not a peer is connected
-	const statusLabel = !network.online
-		? "Offline"
-		: peers.length > 0
-		  ? hostName !== null && link === "members"
-			? `Connected to ${peers.length === 1 ? "a member" : `${peers.length} members`} (${hostName} is offline)`
-			: "Connected"
-		  : connectionStatus === "reconnecting"
-			? hostName ? `Reconnecting to ${hostName}…` : "Reconnecting"
-			: connectionStatus === "connecting"
-			  ? hostName ? `Reaching ${hostName}…` : "Connecting"
-			  : hostUnreachable
-				? `${hostName ?? "The host"} is offline`
-				: "Online";
-	const statusDot = !network.online
-		? "bg-red-400"
-		: peers.length > 0
-		  ? "bg-emerald-400 animate-ping"
-		  : connectionStatus === "reconnecting" || connectionStatus === "connecting"
-			? "bg-amber-400 animate-pulse"
-			: hostUnreachable
-			  ? "bg-red-400"
-			  : "bg-emerald-400";
+	const tabs = [
+		{ id: "invite" as const, label: "Invite", icon: <Users className="size-4" /> },
+		{ id: "join" as const, label: "Join", icon: <Globe className="size-4" /> },
+		{ id: "peers" as const, label: `People${peers.length ? ` · ${peers.length}` : ""}`, icon: <Radio className="size-4" /> },
+	];
 
-	const tabClass = (tab: typeof activeTab) =>
-		cn(
-			"flex flex-1 items-center justify-center gap-2 border-b-2 py-2.5 text-xs font-medium transition-colors",
-			activeTab === tab
-				? "border-primary text-foreground"
-				: "border-transparent text-muted-foreground hover:text-foreground",
-		);
+	const roles = [
+		{ id: "Editor", title: "Can edit", text: "Changes files, notes and tasks with you." },
+		{ id: "Viewer", title: "Can view", text: "Reads everything, changes nothing." },
+	];
+
+	// A notice above the tabs; the tone says how serious it is
+	const notice = (tone: "warning" | "info" | "error", children: React.ReactNode) => (
+		<div role={tone === "error" ? "alert" : "status"} className={cn("flex items-start gap-3 border px-3 py-3 text-sm", tone === "warning" ? "border-warning/40 bg-warning/10" : tone === "info" ? "border-info/40 bg-info/10" : "border-destructive/40 bg-destructive/10 text-destructive")}>
+			<AlertTriangle className={cn("mt-0.5 size-4 shrink-0", tone === "warning" ? "text-warning" : tone === "info" ? "text-info" : "text-destructive")} />
+			<div className="min-w-0 flex-1 space-y-2">{children}</div>
+		</div>
+	);
 
 	return (
-		<Dialog isOpen={open} onOpenChange={onOpenChange} className="max-w-xl">
-			<div className="space-y-4">
-				<DialogHeader>
-					<div className="flex items-center gap-2">
-						<div className="flex h-9 w-9 items-center justify-center rounded-none bg-sky-500/10 text-sky-400 border border-sky-500/20">
-							<Radio className="h-5 w-5 animate-pulse" />
-						</div>
-						<div>
-							<DialogTitle className="text-lg">
-								Collaborate
-							</DialogTitle>
-							<DialogDescription className="text-xs">
-								Invite someone to work on this workspace with you, from any network.
-							</DialogDescription>
-						</div>
-					</div>
-				</DialogHeader>
+		<Dialog isOpen={open} onOpenChange={onOpenChange} className="max-w-2xl">
+			<div className="min-w-0 space-y-5">
+				<DialogHeading icon={<Radio className="size-6" />} title="Collaborate" />
 
-					<div className="flex items-center gap-1.5 font-mono text-[11px]" role="status">
-						<span className={cn("h-2 w-2 rounded-none", statusDot)} />
-						<span>{statusLabel}</span>
-					</div>
-
-				{network.online && hostUnreachable && peers.length === 0 && (
-					<div className="flex items-start gap-2 rounded-none border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
-						<AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-						<div className="space-y-1">
+				{network.online && hostUnreachable && peers.length === 0 &&
+					notice(
+						"warning",
+						<>
 							<p>
-								{hostName ?? "The host"} isn't online right now, or has closed Nexsync. This workspace is hosted from their device, so
-								nobody else can connect you to it. Your copy keeps working, and this device looks for them again every 30 seconds.
+								{hostName ?? "The host"} is not online, or has closed Nexsync. This workspace is hosted from their device, so nobody else can connect you to it. Your copy keeps working, and this device looks for them again every 30 seconds.
 							</p>
-							<Button variant="outline" size="sm" className="mt-1 gap-1.5" onPress={handleRetry}>
-								<RefreshCw className="h-3.5 w-3.5" />
-								Try now
+							<Button variant="outline" size="sm" onPress={handleRetry}>
+								<RefreshCw data-icon="inline-start" className="size-3.5" />
+								Try Now
 							</Button>
-						</div>
-					</div>
-				)}
+						</>,
+					)}
 
-				{network.online && hostName !== null && link === "members" && (
-					<div className="flex items-start gap-2 rounded-none border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-300">
-						<Radio className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-						<p>
-							{hostName} is offline. You are working with the other members who are online, and your changes reach {hostName} when
-							they are back. Settings, roles and invites can only be changed while the host is connected.
-						</p>
-					</div>
-				)}
+				{network.online && hostName !== null && link === "members" &&
+					notice("info", <p>{hostName} is offline. You are working with the other members who are online, and your changes reach {hostName} when they are back. Settings, roles and invites can only be changed while the host is connected.</p>)}
 
-				{!network.online && (
-					<div className="flex items-start gap-2 rounded-none border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
-						<AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-						<div className="space-y-1">
-							<p>
-								Nexsync can't reach the service that connects you to people on other networks.
-								Check your internet, then press Retry.
-							</p>
-							{network.detail && <p className="font-mono text-[11px] opacity-80">Details: {network.detail}</p>}
-							<p className="opacity-80">
-								On a college or office network a firewall may be blocking it. Try a phone hotspot,
-								a VPN, or ask IT to allow access to *.relay.n0.iroh.link.
-							</p>
-							<Button variant="outline" size="sm" className="mt-1 gap-1.5" onPress={handleRetry}>
-								<RefreshCw className="h-3.5 w-3.5" />
-								Retry connection
+				{!network.online &&
+					notice(
+						"warning",
+						<>
+							<p>Nexsync cannot reach the service that connects you to people on other networks. Check your internet, then try again.</p>
+							{network.detail && <p className="font-mono text-xs opacity-80">Details: {network.detail}</p>}
+							<p className="text-muted-foreground">On a college or office network a firewall may be blocking it. Try a phone hotspot or a VPN, or ask IT to allow *.relay.n0.iroh.link.</p>
+							<Button variant="outline" size="sm" onPress={handleRetry}>
+								<RefreshCw data-icon="inline-start" className="size-3.5" />
+								Retry Connection
 							</Button>
-						</div>
-					</div>
-				)}
+						</>,
+					)}
 
-				{errorMessage && (
-					<div className="rounded-none border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-						{errorMessage}
-					</div>
-				)}
+				{errorMessage && notice("error", <p>{errorMessage}</p>)}
 
 				{syncProgress && (
-					<div className="flex items-center gap-2 rounded-none border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs text-sky-400">
-						<RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" />
-						<span className="truncate">{describeSyncProgress(syncProgress)}</span>
+					<div role="status" className="flex items-center gap-2 border border-info/30 bg-info/10 px-3 py-2 text-sm text-info">
+						<RefreshCw className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+						<span className="min-w-0 truncate">{describeSyncProgress(syncProgress)}</span>
 					</div>
 				)}
 
-				{/* Tab Selection */}
-				<div className="flex border-b border-border/50">
-					<button type="button" onClick={() => setActiveTab("invite")} className={tabClass("invite")}>
-						<Users className="h-3.5 w-3.5" />
-						Invite someone
-					</button>
-					<button type="button" onClick={() => setActiveTab("join")} className={tabClass("join")}>
-						<Globe className="h-3.5 w-3.5" />
-						Join with Invite
-					</button>
-					<button type="button" onClick={() => setActiveTab("peers")} className={tabClass("peers")}>
-						<Wifi className="h-3.5 w-3.5" />
-						People ({peers.length})
-					</button>
+				{/* Tabs */}
+				<div role="tablist" aria-label="Collaborate" className="flex border-b">
+					{tabs.map((tab) => (
+						<button
+							key={tab.id}
+							type="button"
+							role="tab"
+							aria-selected={activeTab === tab.id}
+							onClick={() => setActiveTab(tab.id)}
+							className={cn(
+								"flex flex-1 items-center justify-center gap-2 border-b-2 py-3 text-sm font-medium outline-none transition-colors focus-visible:bg-muted",
+								activeTab === tab.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+							)}
+						>
+							{tab.icon}
+							{tab.label}
+						</button>
+					))}
 				</div>
 
-				{/* TAB 1: HOST INVITE */}
+				{/* INVITE */}
 				{activeTab === "invite" && (
-					<div className="space-y-4 pt-1">
-						<div className="space-y-2">
-							<Label className="text-xs">What the person you invite can do</Label>
-							<div className="flex gap-2">
-								{["Editor", "Viewer"].map((r) => (
-									<Button
-										key={r}
-										variant={hostRole === r ? "default" : "outline"}
-										size="sm"
-										onPress={() => setHostRole(r)}
-										className="h-8 text-xs"
-									>
-										{r}
-									</Button>
-								))}
-							</div>
-						</div>
+					<div className="space-y-5">
+						{!shortCode && !invite && (
+							<>
+								<fieldset className="space-y-2">
+									<legend className="text-sm font-medium">1. What can they do?</legend>
+									<div role="radiogroup" aria-label="What the person you invite can do" className="grid gap-2 sm:grid-cols-2">
+										{roles.map((r) => (
+											<button
+												key={r.id}
+												type="button"
+												role="radio"
+												aria-checked={hostRole === r.id}
+												onClick={() => setHostRole(r.id)}
+												className={cn("flex flex-col items-start gap-0.5 border p-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", hostRole === r.id ? "border-primary bg-primary/10" : "hover:bg-muted/50")}
+											>
+												<span className="flex items-center gap-2 text-sm font-semibold">
+													<span className={cn("flex size-4 items-center justify-center border", hostRole === r.id ? "border-primary bg-primary text-primary-foreground" : "border-input")}>{hostRole === r.id && <Check className="size-3" />}</span>
+													{r.title}
+												</span>
+												<span className="pl-6 text-sm text-muted-foreground">{r.text}</span>
+											</button>
+										))}
+									</div>
+								</fieldset>
 
-						{shortCode ? (
-							<div className="space-y-3 rounded-none border bg-muted/30 p-4 text-center">
-								<Label className="text-xs text-muted-foreground font-medium">
-									Tell your collaborator this code:
-								</Label>
-								<div className="font-mono text-4xl font-bold tracking-[0.3em] text-primary select-all">
+								<fieldset className="space-y-2">
+									<legend className="text-sm font-medium">2. How do they join?</legend>
+									<div className="grid gap-2 sm:grid-cols-2">
+										<button type="button" onClick={handleGenerateShortCode} disabled={isGenerating} className="flex flex-col items-start gap-1 border p-3 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
+											<span className="flex items-center gap-2 text-sm font-semibold">
+												{isGenerating ? <RefreshCw className="size-4 animate-spin motion-reduce:animate-none" /> : <KeyRound className="size-4 text-primary" />}
+												6-digit code
+											</span>
+											<span className="text-sm text-muted-foreground">Quickest. Read it out loud or type it in a chat. It stops working after 2 minutes, and you approve each person.</span>
+										</button>
+										<button type="button" onClick={handleGenerateInvite} disabled={isGenerating} className="flex flex-col items-start gap-1 border p-3 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
+											<span className="flex items-center gap-2 text-sm font-semibold">
+												<Link2 className="size-4 text-primary" />
+												Invite link
+											</span>
+											<span className="text-sm text-muted-foreground">A long invite to paste into a message. Lasts as long as you choose, so people can join later.</span>
+										</button>
+									</div>
+									<button type="button" aria-expanded={showOptions} onClick={() => setShowOptions((o) => !o)} className="text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:text-foreground">
+										{showOptions ? "Hide options for the invite link" : "Options for the invite link"}
+									</button>
+									{showOptions && (
+										<div className="flex flex-wrap items-center gap-x-5 gap-y-2 border bg-muted/30 p-3 text-sm">
+											<label className="flex items-center gap-2">
+												Lasts
+												<select value={expiry} onChange={(e) => setExpiry(e.target.value)} className="h-8 border border-input bg-input px-2">
+													<option value="600">10 minutes</option>
+													<option value="3600">1 hour</option>
+													<option value="86400">1 day</option>
+													<option value="604800">7 days</option>
+													<option value="">Until I stop it</option>
+												</select>
+											</label>
+											<label className="flex items-center gap-2">
+												<input type="checkbox" checked={singleUse} onChange={(e) => setSingleUse(e.target.checked)} />
+												Only one person can use it
+											</label>
+										</div>
+									)}
+								</fieldset>
+							</>
+						)}
+
+						{shortCode && (
+							<div className="space-y-4 border bg-muted/40 p-5 text-center">
+								<p className="text-sm text-muted-foreground">Tell {hostRole === "Viewer" ? "the person you are inviting" : "your collaborator"} this code</p>
+								<div className="text-5xl tabular-nums font-bold tracking-[0.25em] text-primary select-all" aria-label={`Code ${shortCode.code.split("").join(" ")}`}>
 									{shortCode.code.slice(0, 3)} {shortCode.code.slice(3)}
 								</div>
-								<p className="text-xs text-muted-foreground">
-									Expires in {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}.
-									You will be asked to allow them when they use it.
+								<p className="text-sm text-muted-foreground" aria-live="off">
+									Works for {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")} more. You will be asked to allow them when they use it.
 								</p>
-								{!shortCode.relayConnected && (
-									<p className="text-[11px] text-amber-400">
-										Couldn't reach the internet service that connects you to other networks, so only people on your local network can join.
-									</p>
-								)}
+								{!shortCode.relayConnected && <p className="text-sm text-warning">Nexsync could not reach the service that connects you to other networks, so only people on your local network can join.</p>}
 								<div className="flex justify-center gap-2">
-									<Button size="sm" variant="secondary" onPress={() => copy(shortCode.code, "code")} className="h-8 px-3 text-xs gap-1.5">
-										{copiedKey === "code" ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-										{copiedKey === "code" ? "Copied" : "Copy"}
+									<Button variant="secondary" onPress={() => copy(shortCode.code, "code")}>
+										{copiedKey === "code" ? <Check data-icon="inline-start" className="size-4 text-success" /> : <Copy data-icon="inline-start" className="size-4" />}
+										{copiedKey === "code" ? "Copied" : "Copy Code"}
 									</Button>
-									<Button size="sm" variant="ghost" onPress={handleStopInviting} className="h-8 text-xs text-muted-foreground hover:text-destructive">
+									<Button variant="ghost" onPress={handleStopInviting}>
 										Cancel
 									</Button>
 								</div>
 							</div>
-						) : !invite ? (
-							<div className="space-y-3">
-							<div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-								<label className="flex items-center gap-1.5">
-									Full invite lasts
-									<select value={expiry} onChange={(e) => setExpiry(e.target.value)} className="h-7 border border-input bg-background px-1.5">
-										<option value="600">10 minutes</option>
-										<option value="3600">1 hour</option>
-										<option value="86400">1 day</option>
-										<option value="604800">7 days</option>
-										<option value="">Until I stop it</option>
-									</select>
-								</label>
-								<label className="flex items-center gap-1.5">
-									<input type="checkbox" checked={singleUse} onChange={(e) => setSingleUse(e.target.checked)} />
-									Only one person can use it
-								</label>
-							</div>
-							<div className="flex gap-2">
-								<Button
-									onPress={handleGenerateShortCode}
-									isDisabled={isGenerating}
-									className="flex-1 h-9 text-xs gap-2"
-								>
-									{isGenerating ? (
-										<>
-											<RefreshCw className="h-3.5 w-3.5 animate-spin" />
-											Connecting…
-										</>
-									) : (
-										<>
-											<KeyRound className="h-3.5 w-3.5" />
-											6-digit Code
-										</>
-									)}
-								</Button>
-								<Button
-									variant="outline"
-									onPress={handleGenerateInvite}
-									isDisabled={isGenerating}
-									className="flex-1 h-9 text-xs gap-2"
-								>
-									<Copy className="h-3.5 w-3.5" />
-									Full invite
-								</Button>
-							</div>
-							</div>
-						) : (
-							<div className="space-y-3 rounded-none border bg-muted/30 p-4">
-								<div className="flex items-center justify-between">
-									<Label className="text-xs text-muted-foreground font-medium">
-										Send this invite to your collaborator:
-									</Label>
-									<Button
-										size="sm"
-										variant="secondary"
-										onPress={() => copy(invite.ticket)}
-										className="h-8 px-3 text-xs gap-1.5"
-									>
-										{copiedKey === "copied" ? (
-											<>
-												<Check className="h-4 w-4 text-emerald-400" />
-												Copied
-											</>
-										) : (
-											<>
-												<Copy className="h-4 w-4" />
-												Copy
-											</>
-										)}
+						)}
+
+						{invite && (
+							<div className="space-y-4 border bg-muted/40 p-5">
+								<div className="flex items-center justify-between gap-3">
+									<p className="text-sm text-muted-foreground">Send this invite to your collaborator</p>
+									<Button variant="secondary" size="sm" onPress={() => copy(invite.ticket)}>
+										{copiedKey === "copied" ? <Check data-icon="inline-start" className="size-4 text-success" /> : <Copy data-icon="inline-start" className="size-4" />}
+										{copiedKey === "copied" ? "Copied" : "Copy Invite"}
 									</Button>
 								</div>
-								<div className="max-h-28 overflow-y-auto rounded-none border border-primary/30 bg-background px-3 py-2 font-mono text-[11px] leading-relaxed break-all select-all text-primary">
-									{invite.ticket}
-								</div>
-								<p className="text-[11px] text-muted-foreground">
+								<div className="max-h-28 overflow-y-auto border border-primary/30 bg-background px-3 py-2 font-mono text-xs leading-relaxed break-all select-all text-primary">{invite.ticket}</div>
+								<p className="text-sm text-muted-foreground">
 									{invite.expiresAt ? `Works until ${new Date(invite.expiresAt).toLocaleString()}` : "Works until you stop it"}
 									{invite.singleUse ? ", for one person." : "."}
 								</p>
-
-								{!invite.relayConnected && (
-									<div className="flex items-start gap-2 rounded-none border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-400">
-										<AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-										<span>
-											Couldn't reach the internet service that connects you to other networks, so only people on your local
-											network can join. Check your internet connection and create a new invite.
-										</span>
-									</div>
-								)}
-
-								{/* Live rendezvous status */}
-								<div className="rounded-none border border-border/50 bg-background/60 p-3 text-xs flex items-center justify-between">
+								{!invite.relayConnected && notice("warning", <p>Nexsync could not reach the service that connects you to other networks, so only people on your local network can join. Check your internet and make a new invite.</p>)}
+								<div className="flex items-center justify-between gap-3 border-t pt-4">
 									{hasGuests ? (
-										<div className="flex items-center gap-2 text-emerald-400 font-medium">
-											<Check className="h-4 w-4" />
-											<span>Collaborator connected. Your changes now show up for both of you.</span>
-										</div>
+										<span className="flex items-center gap-2 text-sm font-medium text-success">
+											<Check className="size-4" />
+											Someone joined. Your changes now show up for both of you.
+										</span>
 									) : (
-										<div className="flex items-center gap-2 text-muted-foreground">
-											<RefreshCw className="h-3.5 w-3.5 animate-spin text-sky-400" />
-											<span>Waiting for a collaborator to join…</span>
-										</div>
+										<span className="flex items-center gap-2 text-sm text-muted-foreground">
+											<RefreshCw className="size-4 animate-spin text-info motion-reduce:animate-none" />
+											Waiting for someone to join…
+										</span>
 									)}
-									<div className="flex items-center gap-1">
-										<Button
-											variant="ghost"
-											size="sm"
-											onPress={handleGenerateInvite}
-											className="h-7 text-[11px] text-muted-foreground hover:text-foreground"
-										>
+									<span className="flex shrink-0 gap-1">
+										<Button variant="ghost" size="sm" onPress={handleGenerateInvite}>
 											New Invite
 										</Button>
-										<Button
-											variant="ghost"
-											size="sm"
-											onPress={handleStopInviting}
-											className="h-7 text-[11px] text-muted-foreground hover:text-destructive"
-										>
+										<Button variant="ghost" size="sm" onPress={handleStopInviting} className="hover:text-destructive">
 											Stop
 										</Button>
-									</div>
+									</span>
 								</div>
-								<p className="text-[11px] text-muted-foreground">
-									Making a new invite or pressing Stop turns this one off. People who
-									already joined stay connected.
-								</p>
+								<p className="text-sm text-muted-foreground">Making a new invite or pressing Stop turns this one off. People who already joined stay connected.</p>
 							</div>
 						)}
 					</div>
 				)}
 
-				{/* TAB 2: JOIN WITH INVITE */}
+				{/* JOIN */}
 				{activeTab === "join" && (
-					<div className="space-y-4 pt-1">
+					<div className="space-y-4">
 						<div className="space-y-2">
-							<Label className="text-xs">Paste the invite or type the 6-digit code</Label>
+							<Label htmlFor="invite-ticket" className="text-sm">
+								Paste the invite, or type the 6-digit code
+							</Label>
 							<Textarea
-								placeholder="Paste the invite, or type the 6-digit code"
+								id="invite-ticket"
+								placeholder="123 456, or a long invite"
 								value={ticketInput}
 								onChange={(e) => setTicketInput(e.target.value)}
 								rows={4}
-								className="font-mono text-[11px] break-all rounded-none border border-input px-3 py-2"
+								className="rounded-md border border-input px-3 py-2 font-mono text-xs break-all"
 								autoFocus
 							/>
-							<p className="text-[11px] text-muted-foreground">
-								Their workspace will be copied into the workspace you have open and kept up to date.
-							</p>
+							<p className="text-sm text-muted-foreground">Their workspace is copied into the one you have open, and kept up to date.</p>
 						</div>
-
 						{joinSuccess ? (
-							<div className="flex items-center justify-center gap-2 p-3 text-xs text-emerald-400 font-medium">
-								<Sparkles className="h-4 w-4" />
-								<span>Connected! Getting the workspace…</span>
+							<div role="status" className="flex items-center justify-center gap-2 p-3 text-sm font-medium text-success">
+								<Sparkles className="size-4" />
+								Connected! Getting the workspace…
 							</div>
 						) : (
-							<Button
-								onPress={handleJoin}
-								isDisabled={!ticketInput.trim() || isJoining}
-								className="w-full h-10 text-xs gap-2"
-							>
-								{isJoining ? (
-									<>
-										<RefreshCw className="h-3.5 w-3.5 animate-spin" />
-										Connecting…
-									</>
-								) : (
-									<>
-										<Globe className="h-3.5 w-3.5" />
-										Join workspace
-									</>
-								)}
+							<Button onPress={handleJoin} isDisabled={!ticketInput.trim() || isJoining} className="w-full">
+								{isJoining ? <RefreshCw data-icon="inline-start" className="size-4 animate-spin motion-reduce:animate-none" /> : <Globe data-icon="inline-start" className="size-4" />}
+								{isJoining ? "Connecting…" : "Join Workspace"}
 							</Button>
 						)}
 					</div>
 				)}
 
-				{/* TAB 3: CONNECTED PEERS */}
+				{/* PEOPLE */}
 				{activeTab === "peers" && (
-					<div className="space-y-3 pt-1">
+					<div className="space-y-3">
 						{peers.length === 0 ? (
-							<div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-								<Radio className="h-8 w-8 stroke-[1.25] text-muted-foreground/40 mb-2" />
-								<p className="text-xs font-medium">No one is connected</p>
-								<p className="text-[11px] text-muted-foreground/70">
-									Create an invite or paste one from a collaborator to connect.
-								</p>
-									<Button variant="outline" size="sm" className="mt-3 gap-1.5" onPress={handleRetry}>
-										<RefreshCw className="h-3.5 w-3.5" />
-										Reconnect to host
+							<div className="flex flex-col items-center gap-2 py-8 text-center">
+								<Radio className="size-8 text-muted-foreground/50" />
+								<p className="text-sm font-medium">No one is connected</p>
+								<p className="text-sm text-muted-foreground">Invite someone, or join a workspace with an invite you were sent.</p>
+								<div className="mt-2 flex gap-2">
+									<Button size="sm" onPress={() => setActiveTab("invite")}>
+										Invite Someone
 									</Button>
+									<Button variant="outline" size="sm" onPress={handleRetry}>
+										<RefreshCw data-icon="inline-start" className="size-3.5" />
+										Reconnect to Host
+									</Button>
+								</div>
 							</div>
 						) : (
-							<div className="space-y-3">
-								<div className="flex items-center justify-between">
-									<span className="text-xs text-muted-foreground">
-										People connected ({peers.length})
-									</span>
-									{hasHost && (
-										<Button
-											size="sm"
-											variant="outline"
-											onPress={() => requestWorkspaceSnapshot()}
-											isDisabled={syncProgress !== null}
-											className="h-7 text-xs gap-1.5"
-										>
-											<RefreshCw className="h-3 w-3" />
-											Refresh from host
+							<>
+								{hasHost && (
+									<div className="flex justify-end">
+										<Button size="sm" variant="outline" onPress={() => requestWorkspaceSnapshot()} isDisabled={syncProgress !== null}>
+											<RefreshCw data-icon="inline-start" className="size-3.5" />
+											Refresh from Host
 										</Button>
-									)}
-								</div>
-
-								<div className="space-y-2 max-h-[240px] overflow-y-auto">
+									</div>
+								)}
+								<ul className="max-h-72 space-y-2 overflow-y-auto" aria-label="People connected">
 									{peers.map((peer) => (
-										<div
-											key={peer.id}
-											className="flex items-center justify-between rounded-none border bg-card p-2.5 text-xs"
-										>
-											<div className="flex items-center gap-2.5">
-												<span className="h-2 w-2 rounded-none bg-emerald-400" />
-												<div>
-													<div className="flex items-center gap-1.5 font-medium">
-														<span>{peer.name}</span>
-														<span className="rounded-none bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground uppercase tracking-wider">
-															{peer.isHost ? "Host" : peer.role}
-														</span>
-														<span
-															className={cn(
-																"rounded-none px-1.5 py-0.5 text-[10px] uppercase tracking-wider",
-																peer.connectionType === "direct"
-																	? "text-emerald-400"
-																	: "text-amber-400",
-															)}
-															title={
-																peer.connectionType === "relay"
-																	? "Connected through a helper server because a direct link is not possible here. Still private. Nexsync keeps trying for a direct one."
-																	: undefined
-															}
-														>
-															{peer.connectionType === "direct"
-																? "Direct"
-																: peer.connectionType === "relay"
-																	? "Indirect"
-																	: "Connecting"}
-														</span>
-													</div>
-													<div className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
-														<span>Delay: {peer.latencyMs} ms</span>
-														<span>•</span>
-														<span>
-															Sent {(peer.bytesSent / 1024).toFixed(1)} KB · Received{" "}
-															{(peer.bytesReceived / 1024).toFixed(1)} KB
-														</span>
-													</div>
+										<li key={peer.id} className="flex items-center gap-3 border bg-muted/40 p-3">
+											<Avatar name={peer.name} className="size-9" />
+											<div className="min-w-0 flex-1">
+												<div className="flex flex-wrap items-center gap-2">
+													<span className="truncate text-sm font-medium">{peer.name}</span>
+													<span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">{peer.isHost ? "Host" : peer.role}</span>
+													<span
+														className={cn("text-xs", peer.connectionType === "direct" ? "text-success" : "text-warning")}
+														title={peer.connectionType === "relay" ? "Connected through a helper server because a direct link is not possible here. Still private. Nexsync keeps trying for a direct one." : undefined}
+													>
+														{peer.connectionType === "direct" ? "Direct" : peer.connectionType === "relay" ? "Indirect" : "Connecting"}
+													</span>
 												</div>
+												<p className="truncate font-mono text-xs text-muted-foreground">
+													{peer.latencyMs} ms · sent {(peer.bytesSent / 1024).toFixed(1)} KB · received {(peer.bytesReceived / 1024).toFixed(1)} KB
+												</p>
 											</div>
-
-											<div className="flex items-center gap-1.5">
-												<div className="flex items-center gap-1 text-[11px] text-emerald-400 py-0.5">
-													<Lock className="h-3 w-3" />
-													<span>Private</span>
-												</div>
-												<Button
-													size="sm"
-													variant="ghost"
-													onPress={() => disconnectPeer(peer.id)}
-													className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-													aria-label="Disconnect this person"
-												>
-													<Unplug className="h-3.5 w-3.5" />
-												</Button>
-											</div>
-										</div>
+											<span className="hidden items-center gap-1 text-xs text-success sm:flex">
+												<Lock className="size-3.5" />
+												Private
+											</span>
+											<Button size="icon-xs" variant="ghost" onPress={() => disconnectPeer(peer.id)} className="size-8 hover:text-destructive" aria-label={`Disconnect ${peer.name}`}>
+												<Unplug className="size-4" />
+											</Button>
+										</li>
 									))}
-								</div>
-							</div>
+								</ul>
+							</>
 						)}
 					</div>
 				)}

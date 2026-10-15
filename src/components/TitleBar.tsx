@@ -1,37 +1,115 @@
-import { Minus, Square, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { cn } from "@/lib/utils";
-import { APP_VERSION } from "@/lib/version";
 
-const controls = [
-	{ label: "Minimize", icon: Minus, run: () => getCurrentWindow().minimize() },
-	{ label: "Maximize", icon: Square, run: () => getCurrentWindow().toggleMaximize() },
-	{ label: "Close", icon: X, run: () => getCurrentWindow().close(), danger: true },
-];
+// macOS keeps its own traffic-light buttons (the window is configured to draw them over this bar, see
+// tauri.macos.conf.json), so the bar only leaves room for them; they also give macOS its native full screen and tiling.
+const IS_MAC = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform || navigator.userAgent);
 
-// Minimal custom window chrome (native decorations are disabled in tauri.conf.json)
+// Windows 11 shows its snap layouts when the pointer rests on a native maximize button. This one is drawn by the app, so
+// resting on it for a moment asks the decorum plugin to bring the flyout up (it presses Win+Z). Windows 10 has none.
+const IS_WINDOWS = typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
+const SNAP_DELAY_MS = 620;
+let windows11: Promise<boolean> | undefined;
+const isWindows11 = () =>
+	(windows11 ??= IS_WINDOWS
+		? ((navigator as Navigator & { userAgentData?: { getHighEntropyValues: (hints: string[]) => Promise<{ platformVersion?: string }> } }).userAgentData
+				?.getHighEntropyValues(["platformVersion"])
+				.then((v) => parseInt(v.platformVersion ?? "0", 10) >= 13) ?? Promise.resolve(false)).catch(() => false)
+		: Promise.resolve(false));
+
+const glyph = { fill: "none", stroke: "currentColor", strokeWidth: 1, className: "size-[10px]", viewBox: "0 0 10 10", "aria-hidden": true } as const;
+const Minimize = () => (
+	<svg {...glyph}>
+		<path d="M0 5.5h10" />
+	</svg>
+);
+const Maximize = () => (
+	<svg {...glyph}>
+		<rect x="0.5" y="0.5" width="9" height="9" />
+	</svg>
+);
+// Two squares: the window is maximized and this puts it back
+const Restore = () => (
+	<svg {...glyph}>
+		<rect x="0.5" y="2.5" width="7" height="7" />
+		<path d="M2.5 2.5v-2h7v7h-2" />
+	</svg>
+);
+const Close = () => (
+	<svg {...glyph}>
+		<path d="M0.5 0.5l9 9M9.5 0.5l-9 9" />
+	</svg>
+);
+
+// Window chrome drawn by the app (native decorations are off in tauri.conf.json). Dragging the bar moves the window and
+// can snap it to a screen edge or into a tiling layout; double-clicking it maximizes. Tiling window managers on Linux
+// manage the size themselves and ignore the buttons, which stay as a fallback.
 export default function TitleBar() {
+	const [maximized, setMaximized] = useState(false);
+
+	useEffect(() => {
+		let off: (() => void) | undefined;
+		let gone = false;
+		try {
+			const win = getCurrentWindow();
+			const sync = () => void win.isMaximized().then((m) => !gone && setMaximized(m), () => {});
+			sync();
+			// A resize covers maximizing, restoring and snapping, whoever did it
+			void win.onResized(sync).then((f) => (gone ? f() : (off = f)), () => {});
+		} catch {
+			// Not running inside the desktop app
+		}
+		return () => {
+			gone = true;
+			off?.();
+		};
+	}, []);
+
+	// The snap flyout is asked for once the pointer has rested on the maximize button, and not if it leaves or clicks first
+	const snapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const cancelSnap = () => clearTimeout(snapTimer.current);
+	const armSnap = () => {
+		cancelSnap();
+		void isWindows11().then((yes) => {
+			if (!yes) return;
+			snapTimer.current = setTimeout(() => {
+				void getCurrentWindow().setFocus().then(() => invoke("plugin:decorum|show_snap_overlay")).catch(() => {});
+			}, SNAP_DELAY_MS);
+		});
+	};
+	useEffect(() => cancelSnap, []);
+
+	const controls = [
+		{ label: "Minimize", icon: <Minimize />, run: () => getCurrentWindow().minimize() },
+		{ label: maximized ? "Restore" : "Maximize", icon: maximized ? <Restore /> : <Maximize />, run: () => { cancelSnap(); void getCurrentWindow().toggleMaximize(); }, snap: true },
+		{ label: "Close", icon: <Close />, run: () => getCurrentWindow().close(), danger: true },
+	];
+
 	return (
-		<header className="relative z-[60] flex h-8 shrink-0 select-none items-center border-b bg-background">
-			<div data-tauri-drag-region className="flex h-full flex-1 items-center px-3">
-				<span data-tauri-drag-region className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-					Nexsync <span className="font-normal normal-case tracking-normal">v{APP_VERSION}</span>
-				</span>
+		<header className="relative z-[60] flex h-9 shrink-0 select-none items-center">
+			<div data-tauri-drag-region className={cn("flex h-full min-w-0 flex-1 items-center gap-2", IS_MAC ? "pl-20" : "pl-3")}>
 			</div>
-			{controls.map(({ label, icon: Icon, run, danger }) => (
-				<button
-					key={label}
-					onClick={run}
-					aria-label={label}
-					className={cn(
-						"flex h-full w-11 items-center justify-center text-muted-foreground transition-colors",
-						danger ? "hover:bg-red-600 hover:text-white" : "hover:bg-muted hover:text-foreground",
-					)}
-				>
-					<Icon className={label === "Maximize" ? "size-3" : "size-3.5"} />
-				</button>
-			))}
+			{!IS_MAC &&
+				controls.map(({ label, icon, run, danger, snap }) => (
+					<button
+						key={label}
+						type="button"
+						onClick={run}
+						onMouseEnter={snap ? armSnap : undefined}
+						onMouseLeave={snap ? cancelSnap : undefined}
+						aria-label={label}
+						title={label}
+						className={cn(
+							"flex h-full w-12 items-center justify-center text-muted-foreground outline-none transition-colors focus-visible:bg-muted",
+							danger ? "hover:bg-destructive hover:text-white focus-visible:bg-destructive focus-visible:text-white" : "hover:bg-muted hover:text-foreground",
+						)}
+					>
+						{icon}
+					</button>
+				))}
 		</header>
 	);
 }

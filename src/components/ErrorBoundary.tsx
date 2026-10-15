@@ -46,7 +46,7 @@ export default class ErrorBoundary extends Component<
 			return (
 				<div className="flex h-full items-center justify-center">
 					<div className="text-center">
-						<p className="text-2xl font-semibold">
+						<p className="text-xl font-semibold">
 							Something went wrong
 						</p>
 						<p className="mt-2 text-sm text-muted-foreground">

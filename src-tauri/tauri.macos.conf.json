@@ -1,0 +1,19 @@
+{
+	"app": {
+		"windows": [
+			{
+				"title": "Nexsync",
+				"decorations": true,
+				"titleBarStyle": "Overlay",
+				"hiddenTitle": true,
+				"dragDropEnabled": false,
+				"width": 1100,
+				"height": 700,
+				"minWidth": 720,
+				"minHeight": 520,
+				"devtools": false,
+				"incognito": false
+			}
+		]
+	}
+}

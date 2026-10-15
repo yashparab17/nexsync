@@ -74,3 +74,11 @@ COMMENT_STYLE_GUIDE.md
 IMPLEMENTATION_PLAN.md
 ALPHA_CHECKLIST.md
 nexsync-synopsis.pdf
+
+# Agent skills (installed locally)
+.agents/
+skills-lock.json
+
+# Local agent notes
+CLAUDE.md
+PRODUCT.md

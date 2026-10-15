@@ -14,7 +14,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { XIcon } from "lucide-react";
+import { X as XIcon } from "@/components/animate-icons";
 
 // Trigger element that opens the dialog modal
 function DialogTrigger({ ...props }: DialogTriggerPrimitiveProps) {
@@ -53,7 +53,7 @@ function DialogOverlay({
 		<ModalOverlayPrimitive
 			data-slot="dialog-overlay"
 			className={cn(
-				"fixed inset-0 isolate z-50 bg-black/20 duration-100 data-entering:animate-in data-entering:fade-in-0 data-exiting:animate-out data-exiting:fade-out-0 supports-backdrop-filter:backdrop-blur-sm",
+				"fixed inset-0 isolate z-50 bg-scrim duration-100 data-entering:animate-in data-entering:fade-in-0 data-exiting:animate-out data-exiting:fade-out-0 supports-backdrop-filter:backdrop-blur-sm",
 				className,
 			)}
 			{...props}
@@ -81,13 +81,13 @@ function Dialog({
 			<ModalPrimitive
 				data-slot="dialog-content"
 				className={cn(
-					"fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-none bg-popover p-6 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 outline-none data-entering:animate-in data-entering:fade-in-0 data-entering:zoom-in-95 data-exiting:animate-out data-exiting:fade-out-0 data-exiting:zoom-out-95 sm:max-w-md",
+					"fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full overflow-x-hidden overflow-y-auto overscroll-contain [overflow-wrap:anywhere] max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-xl bg-popover p-6 text-sm text-popover-foreground border ring-1 ring-foreground/10 duration-100 outline-none data-entering:animate-in data-entering:fade-in-0 data-entering:zoom-in-95 data-exiting:animate-out data-exiting:fade-out-0 data-exiting:zoom-out-95 sm:max-w-md",
 					className,
 				)}
 			>
 				<DialogPrimitive
 					data-slot="dialog"
-					className="[display:inherit] gap-[inherit] outline-none"
+					className="[display:inherit] min-w-0 gap-[inherit] outline-none [&>*]:min-w-0"
 				>
 					{children}
 					{showCloseButton && (
@@ -153,7 +153,7 @@ function DialogTitle({
 			slot="title"
 			data-slot="dialog-title"
 			className={cn(
-				"font-heading text-lg leading-none font-semibold tracking-wider uppercase",
+				"font-heading text-xl leading-none font-semibold",
 				className,
 			)}
 			{...props}
@@ -178,7 +178,31 @@ function DialogDescription({
 	);
 }
 
+// The top of a dialog: an icon tile, the title and one line saying what the dialog does. `danger` marks deleting and
+// removing, `warning` marks losing work or running something.
+function DialogHeading({ icon, title, description, tone = "default" }: { icon: React.ReactNode; title: string; description?: React.ReactNode; tone?: "default" | "warning" | "danger" }) {
+	return (
+		<DialogHeader>
+			<div className={cn("flex gap-4", description ? "items-start" : "items-center")}>
+				<span
+					className={cn(
+						"flex size-11 shrink-0 items-center justify-center",
+						tone === "danger" ? "bg-destructive/10 text-destructive" : tone === "warning" ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary",
+					)}
+				>
+					{icon}
+				</span>
+				<div className="min-w-0">
+					<DialogTitle>{title}</DialogTitle>
+					{description && <DialogDescription className="mt-2">{description}</DialogDescription>}
+				</div>
+			</div>
+		</DialogHeader>
+	);
+}
+
 export {
+	DialogHeading,
 	type DialogPrimitiveProps,
 	type DialogTriggerPrimitiveProps,
 	Dialog,

@@ -64,7 +64,7 @@ export default function NoteGraph({ notes, edges, activePath, onOpen }: NoteGrap
 						<g
 							key={note.path}
 							transform={`translate(${p.x} ${p.y})`}
-							className={cn("cursor-pointer outline-none transition-opacity", dim && "opacity-30")}
+							className={cn("cursor-pointer transition-opacity", dim && "opacity-30")}
 							role="button"
 							tabIndex={0}
 							aria-label={`Open ${names.get(note.path)}`}

@@ -5,9 +5,14 @@ export interface EditorPrefs {
 	fontSize: number;
 	tabSize: number;
 	wrap: boolean;
+	// Vim keys in code and Markdown editors, and line numbers counted from the cursor line (as in Neovim)
+	vim: boolean;
+	relativeNumbers: boolean;
+	// The explorer, the bottom panel and the Markdown preview stay as they were left
+	minimap: boolean;
 }
 
-export const DEFAULT_EDITOR_PREFS: EditorPrefs = { fontSize: 12, tabSize: 4, wrap: false };
+export const DEFAULT_EDITOR_PREFS: EditorPrefs = { fontSize: 13, tabSize: 4, wrap: false, vim: false, relativeNumbers: false, minimap: false };
 export const FONT_SIZE_RANGE = { min: 10, max: 24 };
 export const TAB_SIZES = [2, 4, 8];
 
@@ -23,6 +28,9 @@ function sanitize(raw: Partial<EditorPrefs>): EditorPrefs {
 		fontSize: Number.isFinite(raw.fontSize) ? clamp(raw.fontSize!, FONT_SIZE_RANGE.min, FONT_SIZE_RANGE.max) : d.fontSize,
 		tabSize: TAB_SIZES.includes(raw.tabSize as number) ? (raw.tabSize as number) : d.tabSize,
 		wrap: typeof raw.wrap === "boolean" ? raw.wrap : d.wrap,
+		vim: typeof raw.vim === "boolean" ? raw.vim : d.vim,
+		relativeNumbers: typeof raw.relativeNumbers === "boolean" ? raw.relativeNumbers : d.relativeNumbers,
+		minimap: typeof raw.minimap === "boolean" ? raw.minimap : d.minimap,
 	};
 }
 

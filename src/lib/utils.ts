@@ -51,3 +51,6 @@ export function errorText(err: unknown, fallback: string): string {
 		: typeof err === "string" ? err
 		: fallback;
 }
+
+// Windows hands back folders as \\?\E:\dir (or \\?\UNC\server\share); people and path comparisons want E:\dir
+export const cleanPath = (path: string) => path.replace(/^\\\\\?\\UNC\\/, "\\\\").replace(/^\\\\\?\\/, "");

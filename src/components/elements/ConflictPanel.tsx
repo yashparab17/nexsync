@@ -2,7 +2,7 @@
 // are kept and anyone can choose), or the merged record breaks a rule the workspace turned on (nothing to choose between;
 // someone has to fix the record)
 
-import { AlertTriangle, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ShieldAlert } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import type { Conflict, Violation } from "@/types/workspace";
@@ -33,8 +33,8 @@ export default function ConflictPanel({ conflicts, violations = [], show, canCho
 	return (
 		<>
 			{violations.length > 0 && (
-				<section aria-label="Rules this breaks" className="space-y-2 border border-amber-500/40 bg-amber-500/10 p-3">
-					<p className="flex items-center gap-2 text-sm font-semibold text-amber-500">
+				<section aria-label="Rules this breaks" className="space-y-2 border border-warning/40 bg-warning/10 p-3">
+					<p className="flex items-center gap-2 text-sm font-semibold text-warning">
 						<ShieldAlert className="size-4" aria-hidden />
 						This breaks a rule of the workspace
 					</p>
@@ -47,17 +47,17 @@ export default function ConflictPanel({ conflicts, violations = [], show, canCho
 				</section>
 			)}
 			{conflicts.length > 0 && (
-				<section aria-label="Changes to sort out" className="space-y-3 border border-amber-500/40 bg-amber-500/10 p-3">
-					<p className="flex items-center gap-2 text-sm font-semibold text-amber-500">
+				<section aria-label="Changes to sort out" className="space-y-3 border border-warning/40 bg-warning/10 p-3">
+					<p className="flex items-center gap-2 text-sm font-semibold text-warning">
 						<AlertTriangle className="size-4" aria-hidden />
 						{conflicts.length === 1 ? "Two people changed this at the same time" : "Two people changed some things at the same time"}
 					</p>
 					{conflicts.map((c) => (
-						<div key={c.field} className="space-y-1.5">
-							<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{fieldName(c.field)}</p>
-							<ul className="space-y-1.5">
+						<div key={c.field} className="space-y-2">
+							<p className="text-xs font-semibold text-muted-foreground">{fieldName(c.field)}</p>
+							<ul className="space-y-2">
 								{c.options.map((o, i) => (
-									<li key={i} className="flex items-center justify-between gap-2 border border-border/60 bg-background px-2 py-1.5 text-sm">
+									<li key={i} className="flex items-center justify-between gap-2 border border-border/60 bg-background px-2 py-2 text-sm">
 										<span className="min-w-0">
 											<span className="break-words">{show(c.field, o.value) || "(empty)"}</span>
 											<span className="block text-xs text-muted-foreground">
@@ -69,7 +69,7 @@ export default function ConflictPanel({ conflicts, violations = [], show, canCho
 										</span>
 										{canChoose && (
 											<Button type="button" size="sm" variant={i === 0 ? "default" : "outline"} onPress={() => onChoose(c.field, o.value)}>
-												Keep this
+												Keep This
 											</Button>
 										)}
 									</li>

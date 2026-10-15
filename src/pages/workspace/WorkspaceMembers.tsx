@@ -1,31 +1,11 @@
+import { MAX_WORKSPACE_NAME } from "@/lib/validation";
 import { useState } from "react";
-import {
-	Activity,
-	Crown,
-	KeyRound,
-	Pencil,
-	Shield,
-	ShieldCheck,
-	Trash2,
-	UserCheck,
-	UserPlus,
-} from "lucide-react";
+import { Activity, Trash2, Crown, KeyRound, Pencil, Shield, ShieldCheck, UserCheck, UserPlus, Plus } from "@/components/animate-icons";
 
+import { Page, PageBody, Panel } from "@/components/layout/Page";
+import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import Avatar from "@/components/elements/Avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,26 +30,26 @@ const ROLE_CONFIG: Record<
 	Owner: {
 		label: "Owner",
 		icon: Crown,
-		color: "text-amber-400",
-		bg: "bg-amber-500/10 border-amber-500/20",
+		color: "text-warning",
+		bg: "bg-warning/10 border-warning/20",
 	},
 	Admin: {
 		label: "Admin",
 		icon: ShieldCheck,
-		color: "text-violet-400",
-		bg: "bg-violet-500/10 border-violet-500/20",
+		color: "text-info",
+		bg: "bg-info/10 border-info/20",
 	},
 	Editor: {
 		label: "Editor",
 		icon: Shield,
-		color: "text-sky-400",
-		bg: "bg-sky-500/10 border-sky-500/20",
+		color: "text-info",
+		bg: "bg-info/10 border-info/20",
 	},
 	Viewer: {
 		label: "Viewer",
 		icon: UserCheck,
-		color: "text-emerald-400",
-		bg: "bg-emerald-500/10 border-emerald-500/20",
+		color: "text-success",
+		bg: "bg-success/10 border-success/20",
 	},
 };
 
@@ -138,7 +118,7 @@ export default function WorkspaceMembers() {
 	const presenceOf = (m: Member) => (m.deviceId ? presence[m.deviceId] : isJoinedCopy && m.role === "Owner" && hostPeer ? presence[hostPeer.id] : undefined);
 
 
-	// Add Member directly
+	// Add member directly
 	const handleAddMemberSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!workspace?.path || !metadata || !newMemberName.trim()) return;
@@ -261,55 +241,39 @@ export default function WorkspaceMembers() {
 		}
 	};
 
+	// Discord-style: people grouped under their role, highest first; a role the app does not know counts as Viewer
+	const roleGroups = ["Owner", "Admin", "Editor", "Viewer"]
+		.map((role) => ({ role, list: members.filter((m) => (ROLE_CONFIG[m.role] ? m.role : "Viewer") === role) }))
+		.filter((g) => g.list.length > 0);
+
 	return (
-		<div className="space-y-6">
-			{/* Header */}
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<h1 className="text-2xl font-bold tracking-tight">Members & Roles</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
-						Manage collaborators and role-based permissions in this workspace.
-					</p>
-				</div>
-				<div className="flex items-center gap-2">
-					<Button
-						variant="outline"
-						onPress={() => setIsInviteOpen(true)}
-						className="gap-1.5"
-					>
-						<KeyRound className="size-4 text-sky-400" />
-						Sharing & Invites
-						{peers.length > 0 && (
-							<span className="flex h-2 w-2 rounded-none bg-emerald-400 animate-ping ml-1" />
-						)}
-					</Button>
-					<Button
-						isDisabled={isJoinedCopy}
-						onPress={() => {
-							setNewMemberName("");
-							setNewMemberRole("Editor");
-							setIsAddMemberOpen(true);
-						}}
-						className="gap-1.5"
-					>
-						<UserPlus className="size-4" />
-						Add Member
-					</Button>
-				</div>
-			</div>
+		<Page>
+			<Toolbar>
+				<ToolbarTitle name="Members" meta={members.length || undefined} />
+				<span className="flex-1" />
+				<Button variant="outline" size="sm" onPress={() => setIsInviteOpen(true)}>
+					<KeyRound className="size-4 text-info" />
+					Sharing & Invites
+					{peers.length > 0 && <span className="ml-1 flex size-2 animate-ping rounded-md bg-success" />}
+				</Button>
+				<Button
+					size="sm"
+					isDisabled={isJoinedCopy}
+					onPress={() => {
+						setNewMemberName("");
+						setNewMemberRole("Editor");
+						setIsAddMemberOpen(true);
+					}}
+				>
+					<UserPlus className="size-4" />
+					Add Member
+				</Button>
+			</Toolbar>
 
 			{/* Members Grid & Roles Overview */}
-			<div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-				{/* Left 2 Cols: Member Directory */}
-				<div className="space-y-3 lg:col-span-2">
-					<Card>
-						<CardHeader>
-							<CardTitle className="text-base">Workspace Collaborators</CardTitle>
-							<CardDescription>
-								People who currently have access to this workspace and files.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-3">
+			<PageBody className="grid content-start grid-cols-1 gap-4 lg:grid-cols-3">
+				<Panel index="01" title="People" className="lg:col-span-2">
+					<div className="space-y-3">
 							{isJoinedCopy && (
 								<p className="text-xs text-muted-foreground">
 									{selfRole === "Admin"
@@ -322,10 +286,10 @@ export default function WorkspaceMembers() {
 									No members registered.
 								</p>
 							) : (
-								members.map((member) => {
-									const roleConf =
-										ROLE_CONFIG[member.role] || ROLE_CONFIG.Viewer;
-									const RoleIcon = roleConf.icon;
+								roleGroups.map(({ role, list }) => (
+									<div key={role} className="flex flex-col gap-1">
+										<h3 className="px-3 pb-1 font-mono text-[13px] text-muted-foreground">{role.toLowerCase()} / {list.length}</h3>
+										{list.map((member) => {
 									const isOwner = member.role.toLowerCase() === "owner";
 									const isYou = isJoinedCopy
 										? selfId ? member.deviceId === selfId : member.name === selfName
@@ -340,57 +304,48 @@ export default function WorkspaceMembers() {
 									return (
 										<div
 											key={member.id}
-											className="flex items-center justify-between rounded-none border bg-muted/20 p-3.5 transition-colors hover:bg-muted/30"
+											className="flex items-center justify-between gap-3 px-3 py-3 transition-colors hover:bg-muted"
 										>
 											<div className="flex items-center gap-3">
-												<Avatar name={member.name} className="size-10" />
+												<span className="relative">
+													<Avatar name={member.name} className={cn("size-10", !isOnline && !isYou && "opacity-50")} />
+													<span className={cn("absolute -right-0.5 -bottom-0.5 size-3 ring-2 ring-background", isOnline || isYou ? (here?.away ? "bg-warning" : "bg-success") : "bg-muted-foreground/50")} />
+												</span>
 												<div>
 													<div className="flex items-center gap-2">
 														<span className="font-semibold text-sm">
 															{member.name}
 														</span>
 														{isYou && (
-															<span className="text-[10px] text-muted-foreground">
+															<span className="text-xs text-muted-foreground">
 																(You)
 															</span>
 														)}
 														{isOnline && (
-															<span className={cn("inline-flex items-center gap-1 text-[10px]", here?.away ? "text-amber-400" : "text-emerald-400")}>
-																<span className={cn("size-1.5 rounded-none", here?.away ? "bg-amber-400" : "bg-emerald-400")} />
+															<span className={cn("inline-flex items-center gap-1 text-xs", here?.away ? "text-warning" : "text-success")}>
+																<span className={cn("size-1.5 rounded-md", here?.away ? "bg-warning" : "bg-success")} />
 																{here?.away ? "Away" : "Online"}
 																{here && !here.away && ` · ${placeLabel(here)}`}
 															</span>
 														)}
 														{isOnline && peer?.appVersion && (
-															<span className="text-[10px] text-muted-foreground">v{peer.appVersion}</span>
+															<span className="text-xs text-muted-foreground">v{peer.appVersion}</span>
 														)}
 														{isOnline && peer?.clockSkewMs != null && Math.abs(peer.clockSkewMs) >= 120_000 && (
-															<span className="text-[10px] text-amber-400">Their clock is {skewText(peer.clockSkewMs)}; Nexsync adjusts for it</span>
+															<span className="text-xs text-warning">Their clock is {skewText(peer.clockSkewMs)}; Nexsync adjusts for it</span>
 														)}
 														{isOnline && peer?.needsUpdate && (
-															<span className="text-[10px] text-amber-400">Runs a newer Nexsync: update to keep syncing</span>
+															<span className="text-xs text-warning">Runs a newer Nexsync: update to keep syncing</span>
 														)}
 														{!isOnline && !isYou && member.lastSeen && (
-															<span className="text-[10px] text-muted-foreground">Last seen {lastSeenText(member.lastSeen)}</span>
+															<span className="text-xs text-muted-foreground">Last seen {lastSeenText(member.lastSeen)}</span>
 														)}
 													</div>
 													{probes[member.id] && (
-															<p className="mt-0.5 text-[10px] text-muted-foreground">
+															<p className="mt-0.5 text-xs text-muted-foreground">
 																{probes[member.id] === "running" ? "Looking for them by device key…" : probeText(probes[member.id] as ProbeResult)}
 															</p>
 														)}
-														<div className="flex items-center gap-2 mt-0.5">
-														<span
-															className={cn(
-																"inline-flex items-center gap-1 rounded-none border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-																roleConf.color,
-																roleConf.bg,
-															)}
-														>
-															<RoleIcon className="size-3" />
-															{roleConf.label}
-														</span>
-													</div>
 												</div>
 											</div>
 
@@ -431,7 +386,7 @@ export default function WorkspaceMembers() {
 															setEditName(member.name);
 															setEditRole(member.role);
 														}}
-														aria-label="Edit Member"
+														aria-label="Edit member"
 													>
 														<Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
 													</Button>
@@ -445,7 +400,7 @@ export default function WorkspaceMembers() {
 		}}
 		aria-label="Make Host"
 	>
-		<Crown className="size-3.5 text-muted-foreground hover:text-amber-400" />
+		<Crown className="size-3.5 text-muted-foreground hover:text-warning" />
 	</Button>
 )}
 {!isOwner && !isJoinedCopy && (
@@ -462,27 +417,17 @@ export default function WorkspaceMembers() {
 											)}
 										</div>
 									);
-								})
+								})}
+									</div>
+								))
 							)}
-						</CardContent>
-					</Card>
-				</div>
+					</div>
+				</Panel>
 
-				{/* Right 1 Col: Permissions Summary */}
-				<div>
-					<Card className="bg-card/50">
-						<CardHeader>
-							<CardTitle className="text-base flex items-center gap-2">
-								<Shield className="size-4 text-primary" />
-								Role Permissions
-							</CardTitle>
-							<CardDescription>
-								Access levels configured for this workspace.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-4 text-xs">
-							<div className="rounded-none border p-3 bg-muted/10">
-								<div className="flex items-center gap-1.5 font-semibold text-amber-400">
+				<Panel index="02" title="Roles" className="self-start">
+					<div className="space-y-4 text-sm">
+							<div className="border-l-2 border-border py-1 pl-4">
+								<div className="flex items-center gap-2 font-semibold text-warning">
 									<Crown className="size-3.5" />
 									Owner
 								</div>
@@ -491,8 +436,8 @@ export default function WorkspaceMembers() {
 								</p>
 							</div>
 
-							<div className="rounded-none border p-3 bg-muted/10">
-								<div className="flex items-center gap-1.5 font-semibold text-violet-400">
+							<div className="border-l-2 border-border py-1 pl-4">
+								<div className="flex items-center gap-2 font-semibold text-info">
 									<ShieldCheck className="size-3.5" />
 									Admin
 								</div>
@@ -502,8 +447,8 @@ export default function WorkspaceMembers() {
 								</p>
 							</div>
 
-							<div className="rounded-none border p-3 bg-muted/10">
-								<div className="flex items-center gap-1.5 font-semibold text-sky-400">
+							<div className="border-l-2 border-border py-1 pl-4">
+								<div className="flex items-center gap-2 font-semibold text-info">
 									<Shield className="size-3.5" />
 									Editor
 								</div>
@@ -512,8 +457,8 @@ export default function WorkspaceMembers() {
 								</p>
 							</div>
 
-							<div className="rounded-none border p-3 bg-muted/10">
-								<div className="flex items-center gap-1.5 font-semibold text-emerald-400">
+							<div className="border-l-2 border-border py-1 pl-4">
+								<div className="flex items-center gap-2 font-semibold text-success">
 									<UserCheck className="size-3.5" />
 									Viewer
 								</div>
@@ -521,10 +466,9 @@ export default function WorkspaceMembers() {
 									Read-only access to files, assets, tasks, and kanban boards.
 								</p>
 							</div>
-						</CardContent>
-					</Card>
-				</div>
-			</div>
+					</div>
+				</Panel>
+			</PageBody>
 
 			{/* Real P2P WebRTC Connection & E2EE Handshake Dialog */}
 			<P2PConnectDialog
@@ -532,7 +476,7 @@ export default function WorkspaceMembers() {
 				onOpenChange={setIsInviteOpen}
 			/>
 
-			{/* Add Member Dialog */}
+			{/* Add member Dialog */}
 			{isAddMemberOpen && (
 				<Dialog
 					isOpen={isAddMemberOpen}
@@ -540,18 +484,14 @@ export default function WorkspaceMembers() {
 					className="max-w-md"
 				>
 					<form onSubmit={handleAddMemberSubmit} className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Add Member</DialogTitle>
-							<DialogDescription>
-								Add a collaborator to this workspace.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Plus className="size-6" />} title="Add Member" />
 
 						<div className="space-y-3">
 							<div>
 								<Label htmlFor="mem-name">Member Name *</Label>
 								<Input
 									id="mem-name"
+									maxLength={80}
 									required
 									value={newMemberName}
 									onChange={(e) => setNewMemberName(e.target.value)}
@@ -567,7 +507,7 @@ export default function WorkspaceMembers() {
 									id="mem-role"
 									value={newMemberRole}
 									onChange={(e) => setNewMemberRole(e.target.value)}
-									className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+									className="mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 								>
 									{ASSIGNABLE_ROLES.map((r) => (
 										<option key={r} value={r}>{r}</option>
@@ -604,29 +544,21 @@ export default function WorkspaceMembers() {
 					className="max-w-md"
 				>
 					<form onSubmit={handleEditRoleSubmit} className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Edit Member</DialogTitle>
-							<DialogDescription>
-								Update the name and permissions for{" "}
-								<span className="font-semibold text-foreground">
-									{editingMember.name}
-								</span>
-								.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Pencil className="size-6" />} title="Edit Member" />
 
 						{!isJoinedCopy && (
 						<div>
 							<Label htmlFor="edit-member-name">Name</Label>
 							<Input
 								id="edit-member-name"
+								maxLength={80}
 								required
 								value={editName}
 								onChange={(e) => setEditName(e.target.value)}
 								className="mt-1"
 							/>
 							{editingMember.role.toLowerCase() === "owner" && (
-								<p className="mt-1 text-[11px] text-muted-foreground">
+								<p className="mt-1 text-xs text-muted-foreground">
 									Collaborators see this name when you invite them.
 								</p>
 							)}
@@ -640,7 +572,7 @@ export default function WorkspaceMembers() {
 								id="edit-role-select"
 								value={editRole}
 								onChange={(e) => setEditRole(e.target.value)}
-								className="mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+								className="mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
 							>
 								{rolesFor(editingMember).map((r) => (
 									<option key={r} value={r}>{r}</option>
@@ -679,16 +611,12 @@ export default function WorkspaceMembers() {
 						}}
 						className="space-y-4"
 					>
-						<DialogHeader>
-							<DialogTitle>Change my name here</DialogTitle>
-							<DialogDescription>
-								This is the name others see in this workspace. It does not change the name you use elsewhere, and nobody else here can have the same one.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<Pencil className="size-6" />} title="Change My Name Here" />
 						<div>
 							<Label htmlFor="my-workspace-name">Name in this workspace</Label>
 							<Input
 								id="my-workspace-name"
+								maxLength={MAX_WORKSPACE_NAME}
 								value={renameValue}
 								onChange={(e) => {
 									setRenameValue(e.target.value);
@@ -715,20 +643,15 @@ export default function WorkspaceMembers() {
 {hostTarget && (
 	<Dialog isOpen onOpenChange={(open) => !open && !handoffBusy && setHostTarget(null)}>
 		<div className="space-y-4">
-			<DialogHeader>
-				<DialogTitle>Make {hostTarget.name} the Host</DialogTitle>
-				<DialogDescription>
-					{hostTarget.name} becomes the Owner and hosts this workspace from their device. You stay as an
-					Admin, and everyone reconnects to them automatically. They have to accept first.
-				</DialogDescription>
-			</DialogHeader>
+			<DialogHeading icon={<Crown className="size-6" />} tone="warning" title={`Make ${hostTarget.name} the Host`} description={<>{hostTarget.name} becomes the Owner and hosts this workspace from their device. You stay as an
+					Admin, and everyone reconnects to them automatically. They have to accept first.</>} />
 			{handoffError && <p className="text-xs text-destructive">{handoffError}</p>}
 			<DialogFooter>
 				<Button variant="outline" isDisabled={handoffBusy} onPress={() => setHostTarget(null)}>
 					Cancel
 				</Button>
 				<Button isDisabled={handoffBusy} onPress={handleTransferHost}>
-					{handoffBusy ? "Waiting for them…" : "Transfer Host"}
+					{handoffBusy ? "Waiting for Them…" : "Transfer Host"}
 				</Button>
 			</DialogFooter>
 		</div>
@@ -742,16 +665,11 @@ export default function WorkspaceMembers() {
 					onOpenChange={(open) => !open && setDeletingMember(null)}
 				>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Remove Collaborator</DialogTitle>
-							<DialogDescription>
-								Are you sure you want to remove{" "}
+						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Remove Collaborator" description={<>Are you sure you want to remove{" "}
 								<span className="font-semibold text-foreground">
 									{deletingMember.name}
 								</span>{" "}
-								from this workspace? They will be disconnected and cannot rejoin with an earlier invite or code.
-							</DialogDescription>
-						</DialogHeader>
+								from this workspace? They will be disconnected and cannot rejoin with an earlier invite or code.</>} />
 
 						<DialogFooter>
 							<Button
@@ -767,6 +685,6 @@ export default function WorkspaceMembers() {
 					</div>
 				</Dialog>
 			)}
-		</div>
+		</Page>
 	);
 }

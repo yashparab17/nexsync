@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 import { openSearchPanel } from "@codemirror/search";
 import { EditorView } from "@codemirror/view";
-import { AlertTriangle, Check, GitBranch, History, Loader2, MessageSquareDiff, Save, Search, Sparkles } from "lucide-react";
+import { AlertTriangle, GitBranch } from "@/components/animate-icons";
 
-import CodeEditor from "./CodeEditor";
+import CodeEditor, { type CursorInfo } from "./CodeEditor";
+import type { CodeTabHandle, CodeTabStatus } from "./codeTabTypes";
+import type { VimCommand } from "@/lib/editor/vimSetup";
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
 import { useAutoSnapshot } from "@/hooks/useAutoSnapshot";
@@ -43,10 +45,17 @@ interface CodeTabProps {
 	readOnly: boolean;
 	showBlame: boolean;
 	onDirtyChange: (path: string, dirty: boolean) => void;
+	// What the page shows in its tab, toolbar and status line
+	onStatus?: (path: string, status: CodeTabStatus) => void;
+	onCursor?: (path: string, info: CursorInfo) => void;
+	onText?: (path: string, text: string) => void;
+	onVimMode?: (mode: string) => void;
+	onVimCommand?: (command: VimCommand) => void;
 }
 
-// One open file in the Editor tab: a live shared document with format, find, save, problem markers and blame
-export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChange }: CodeTabProps) {
+// One open file in the Editor tab: a live shared document with format, find, save, problem markers and blame. The page
+// drives it through the handle and reads its state from onStatus, so one toolbar and one status line serve every file.
+const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path, active, readOnly, showBlame, onDirtyChange, onStatus, onCursor, onText, onVimMode, onVimCommand }, ref) {
 	const { workspace, metadata, addActivityEvent } = useWorkspace();
 	const { selfName, shareNamedVersion } = useP2P();
 	const logError = useErrorLog();
@@ -70,7 +79,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 	const [saved, setSaved] = useState<string | null>(null);
 	const [content, setContent] = useState("");
 	const [saving, setSaving] = useState(false);
-	const [problems, setProblems] = useState(0);
+	const [problemLines, setProblemLines] = useState<number[]>([]);
 	const [notice, setNotice] = useState<string | null>(null);
 	const [mergeWarning, setMergeWarning] = useState<number | null>(null);
 	// The last remote change that added errors, and the repair found for it ("none" when no part of it can be kept)
@@ -108,6 +117,8 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 		if (seeded) setContent(seeded.text);
 	}, [seeded]);
 
+	useEffect(() => onText?.(path, content), [path, content, onText]);
+
 	// Work on a branch is not the file, so it is never unsaved changes to it
 	const dirty = saved !== null && content !== saved && !branch;
 	useEffect(() => onDirtyChange(path, dirty), [path, dirty, onDirtyChange]);
@@ -124,7 +135,8 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 	};
 
 	const refreshProblems = useCallback(() => {
-		if (viewRef.current) setProblems(errorRanges(viewRef.current.state, 99).length);
+		const view = viewRef.current;
+		if (view) setProblemLines(errorRanges(view.state, 99).map((r) => view.state.doc.lineAt(r.from).number));
 	}, []);
 	useEffect(() => {
 		// The parse tree is ready shortly after the language loads
@@ -210,6 +222,42 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 		view.focus();
 	};
 
+	const canSuggest = !readOnly && !!collab;
+	useImperativeHandle(
+		ref,
+		() => ({
+			save,
+			format,
+			find: () => viewRef.current && (openSearchPanel(viewRef.current), viewRef.current.focus()),
+			history: () => setHistoryOpen(true),
+			branches: () => mainCollab && setBranchesOpen(true),
+			suggest: () => {
+				if (!canSuggest) return;
+				const { from, to } = viewRef.current?.state.selection.main ?? { from: 0, to: 0 };
+				setSuggesting({ from, to });
+			},
+			goToLine: jumpToLine,
+			focus: () => viewRef.current?.focus(),
+		}),
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[save, format, mainCollab, canSuggest],
+	);
+
+	const fileCanFormat = canFormat(fileName);
+	useEffect(() => {
+		onStatus?.(path, {
+			language: language?.name ?? "…",
+			dirty,
+			saving,
+			readOnly,
+			branch: branch?.name ?? null,
+			problemLines,
+			canFormat: !readOnly && fileCanFormat,
+			canSuggest,
+			hasBranches: !!mainCollab,
+		});
+	}, [onStatus, path, language, dirty, saving, readOnly, branch, problemLines, fileCanFormat, canSuggest, mainCollab]);
+
 	// Record who this session belongs to once they edit, so blame can name them
 	useEffect(() => (collab ? trackAuthor(collab.doc, userName) : undefined), [collab, userName]);
 
@@ -265,75 +313,33 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 
 	return (
 		<div className={cn("flex h-full min-h-0 flex-col", !active && "hidden")}>
-			<div className="flex flex-wrap items-center gap-2 border-b px-3 py-1.5 text-xs">
-				<span className="font-medium">{language?.name ?? "…"}</span>
-				{problems > 0 && (
-					<span className="flex items-center gap-1 bg-destructive/10 px-1.5 py-0.5 text-destructive">
-						<AlertTriangle className="size-3" />
-						{problems} problem{problems > 1 ? "s" : ""}
-					</span>
-				)}
-				{notice && <span className="truncate text-destructive">{notice}</span>}
-				<div className="ml-auto flex items-center gap-1">
-					<Button variant="ghost" size="xs" onPress={() => setHistoryOpen(true)}>
-						<History className="size-3.5" />
-						History
+			{notice && (
+				<div role="alert" className="flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+					<AlertTriangle className="size-3.5 shrink-0" />
+					<span className="min-w-0 flex-1 truncate">{notice}</span>
+					<Button variant="ghost" size="xs" onPress={() => setNotice(null)}>
+						Dismiss
 					</Button>
-					{mainCollab && (
-						<Button variant="ghost" size="xs" onPress={() => setBranchesOpen(true)}>
-							<GitBranch className="size-3.5" />
-							Branches
-						</Button>
-					)}
-					{!readOnly && collab && (
-						<Button
-							variant="ghost"
-							size="xs"
-							onPress={() => {
-								const { from, to } = viewRef.current?.state.selection.main ?? { from: 0, to: 0 };
-								setSuggesting({ from, to });
-							}}
-						>
-							<MessageSquareDiff className="size-3.5" />
-							Suggest edit
-						</Button>
-					)}
-					<Button variant="ghost" size="xs" onPress={() => viewRef.current && (openSearchPanel(viewRef.current), viewRef.current.focus())}>
-						<Search className="size-3.5" />
-						Find
-					</Button>
-					{!readOnly && canFormat(fileName) && (
-						<Button variant="ghost" size="xs" onPress={() => void format()}>
-							<Sparkles className="size-3.5" />
-							Format
-						</Button>
-					)}
-					{!readOnly && !branch && (
-						<Button size="xs" onPress={() => void save()} isDisabled={saving || !dirty}>
-							{saving ? <Loader2 className="size-3.5 animate-spin" /> : dirty ? <Save className="size-3.5" /> : <Check className="size-3.5" />}
-							{saving ? "Saving…" : dirty ? "Save" : "Saved"}
-						</Button>
-					)}
 				</div>
-			</div>
+			)}
 
 			{branch && (
-				<div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-1.5 text-xs">
+				<div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-2 text-xs">
 					<GitBranch className="size-3.5 shrink-0 text-primary" />
 					<span className="min-w-0 flex-1">
 						You are working on the branch <span className="font-semibold">{branch.name}</span>. {fileName} does not change until the branch is merged.
 					</span>
 					<Button size="xs" onPress={() => setBranchesOpen(true)}>
-						Review and merge
+						Review and Merge
 					</Button>
 					<Button variant="ghost" size="xs" onPress={() => openBranch(null)}>
-						Back to the file
+						Back to the File
 					</Button>
 				</div>
 			)}
 
 			{mergeWarning !== null && (
-				<div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400">
+				<div className="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
 					<AlertTriangle className="size-3.5 shrink-0" />
 					<span className="min-w-0 flex-1">
 						A collaborator&apos;s edit merged with yours and added {mergeWarning} syntax error{mergeWarning > 1 ? "s" : ""}.
@@ -347,11 +353,11 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 							if (first && viewRef.current) jumpToLine(viewRef.current.state.doc.lineAt(first.from).number);
 						}}
 					>
-						Show first
+						Show First
 					</Button>
 					{!readOnly && !repair && (
 						<Button variant="ghost" size="xs" onPress={findRepair}>
-							Suggest a fix
+							Suggest a Fix
 						</Button>
 					)}
 					<Button variant="ghost" size="xs" onPress={() => { setMergeWarning(null); setRepair(null); }}>
@@ -360,7 +366,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 				</div>
 			)}
 			{mergeWarning !== null && repair && (
-				<div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-xs">
+				<div className="flex items-center gap-2 border-b border-warning/30 bg-warning/5 px-3 py-2 text-xs">
 					{repair === "none" ? (
 						<span className="min-w-0 flex-1 text-muted-foreground">No part of their change can be kept without the errors, so it needs a manual fix.</span>
 					) : (
@@ -404,6 +410,9 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 							onReady={(view) => (viewRef.current = view)}
 							onLanguage={setLanguage}
 							extraExtensions={suggestionMarks}
+							onCursor={(info) => onCursor?.(path, info)}
+							onVimMode={onVimMode}
+							onVimCommand={onVimCommand}
 						/>
 					)}
 				</div>
@@ -415,7 +424,7 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 						) : (
 							<>
 								<section className="space-y-2">
-									<h3 className="font-semibold uppercase tracking-widest text-muted-foreground">Contributions</h3>
+									<h3 className="font-semibold text-muted-foreground">Contributions</h3>
 									{blame.people.map((person) => (
 										<div key={person.author} className="space-y-1">
 											<div className="flex justify-between gap-2">
@@ -428,13 +437,13 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 												<div className="h-full" style={{ width: `${person.percent}%`, background: colorForName(person.author) }} />
 											</div>
 											{person.lastEdit && (
-												<p className="text-[10px] text-muted-foreground">Last edit {new Date(person.lastEdit).toLocaleString()}</p>
+												<p className="text-xs text-muted-foreground">Last edit {new Date(person.lastEdit).toLocaleString()}</p>
 											)}
 										</div>
 									))}
 								</section>
 								<section className="space-y-1">
-									<h3 className="font-semibold uppercase tracking-widest text-muted-foreground">Blame</h3>
+									<h3 className="font-semibold text-muted-foreground">Blame</h3>
 									{blame.ranges.map((range) => (
 										<button
 											key={`${range.from}-${range.author}`}
@@ -485,4 +494,6 @@ export default function CodeTab({ path, active, readOnly, showBlame, onDirtyChan
 			)}
 		</div>
 	);
-}
+});
+
+export default CodeTab;

@@ -2,7 +2,7 @@
 export default function EraseOption({ checked, onChange, what }: { checked: boolean; onChange: (checked: boolean) => void; what: string }) {
 	return (
 		<label className="flex cursor-pointer items-start gap-3 text-sm">
-			<input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-1 size-4 accent-primary" />
+			<input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
 			<span>
 				Erase for good
 				<span className="block text-xs text-muted-foreground">

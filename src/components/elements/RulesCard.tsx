@@ -3,7 +3,8 @@
 
 import { useEffect, useState } from "react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ShieldCheck } from "@/components/animate-icons";
+import { SectionCard } from "@/components/elements/SettingsParts";
 import { errorText } from "@/lib/utils";
 import { getRules, setRule } from "@/lib/tauri";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -37,15 +38,7 @@ export default function RulesCard({ workspacePath }: { workspacePath: string }) 
 	};
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle className="text-base">Rules for tasks and cards</CardTitle>
-				<CardDescription>
-					Two people can each make a correct edit at the same time and still leave a task that breaks a rule, such as a finished task with nobody assigned. With a rule on, that task is flagged until
-					someone fixes it. {guest ? "The host of this workspace chooses these, and they apply to everyone." : "These apply to everyone in the workspace, and are sent to them whenever you change them."}
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-3">
+		<SectionCard id="rules" title="Rules for Tasks and Cards" icon={<ShieldCheck className="size-5" />}>
 				{error && (
 					<p role="alert" className="text-xs text-destructive">
 						{error}
@@ -53,14 +46,13 @@ export default function RulesCard({ workspacePath }: { workspacePath: string }) 
 				)}
 				{rules.map((rule) => (
 					<label key={rule.id} className="flex cursor-pointer items-start gap-3 text-sm">
-						<input type="checkbox" checked={rule.enabled} disabled={guest} onChange={(e) => void toggle(rule, e.target.checked)} className="mt-1 size-4 accent-primary" />
+						<input type="checkbox" checked={rule.enabled} disabled={guest} onChange={(e) => void toggle(rule, e.target.checked)} />
 						<span>
 							{rule.text}
 							<span className="block text-xs text-muted-foreground">Applies to {rule.applies_to}</span>
 						</span>
 					</label>
 				))}
-			</CardContent>
-		</Card>
+			</SectionCard>
 	);
 }

@@ -1,14 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Square, Trash2 } from "lucide-react";
+import { Trash2, Play, Square, AlertTriangle } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { extensionOf } from "@/lib/editor/languages";
 import { killRun, onRunExit, onRunOutput, runCommand } from "@/lib/tauri";
@@ -129,8 +123,8 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 
 	return (
 		<div className="flex h-full min-h-0 flex-col">
-			<div className="flex items-center gap-2 border-b px-3 py-1.5">
-				<span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Run</span>
+			<div className="flex items-center gap-2 border-b px-3 py-2">
+				<span className="text-xs font-semibold text-muted-foreground">Run</span>
 				<Input
 					value={command}
 					onChange={(e) => setCommand(e.target.value)}
@@ -165,7 +159,7 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 							key={line.id}
 							className={cn(
 								"whitespace-pre-wrap break-all",
-								line.stream === "stderr" && "text-red-400",
+								line.stream === "stderr" && "text-destructive",
 								line.stream === "info" && "text-muted-foreground",
 							)}
 						>
@@ -179,13 +173,8 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 			{confirming && (
 				<Dialog isOpen onOpenChange={setConfirming}>
 					<div className="space-y-4">
-						<DialogHeader>
-							<DialogTitle>Run a command on this device?</DialogTitle>
-							<DialogDescription>
-								The command runs with your permissions and can change files on this computer. Files from
-								collaborators can contain code too, so run only what you trust.
-							</DialogDescription>
-						</DialogHeader>
+						<DialogHeading icon={<AlertTriangle className="size-6" />} tone="warning" title="Run a Command on This Device?" description={<>The command runs with your permissions and can change files on this computer. Files from
+								collaborators can contain code too, so run only what you trust.</>} />
 						<p className="break-all border bg-muted/30 p-2 font-mono text-xs">{command}</p>
 						<DialogFooter>
 							<Button variant="outline" onPress={() => setConfirming(false)}>

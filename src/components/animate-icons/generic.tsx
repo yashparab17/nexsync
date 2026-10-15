@@ -1,0 +1,57 @@
+import { useEffect, useRef, type ComponentType } from 'react';
+import { motion, type TargetAndTransition, type Variants } from 'motion/react';
+import type { LucideIcon } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
+import { useAnimateIconContext } from './icon';
+
+// For lucide icons Animate UI has no hand-built version of: the whole glyph plays one small motion
+// whenever the surrounding AnimateIcon (a Button, a nav link, a card) says so. Same trigger API as the real ones.
+const presets = {
+  pop: { scale: [1, 1.18, 1], transition: { duration: 0.35, ease: 'easeOut' } },
+  tilt: { rotate: [0, -14, 12, -6, 0], transition: { duration: 0.5, ease: 'easeInOut' } },
+  nudge: { y: [0, -3, 0], transition: { duration: 0.35, ease: 'easeOut' } },
+  slide: { x: [0, 3, 0], transition: { duration: 0.35, ease: 'easeOut' } },
+  diag: { x: [0, 2.5, 0], y: [0, -2.5, 0], transition: { duration: 0.35, ease: 'easeOut' } },
+  shake: { x: [0, -2, 2, -2, 2, 0], transition: { duration: 0.4, ease: 'easeInOut' } },
+  back: { rotate: [0, -360], transition: { duration: 0.6, ease: 'easeInOut' } },
+} satisfies Record<string, TargetAndTransition>;
+
+export type Preset = keyof typeof presets;
+
+export function motionIcon(Icon: LucideIcon, preset: Preset = 'pop') {
+  const Motion = motion.create(Icon);
+  const variants: Variants = { initial: { scale: 1, rotate: 0, x: 0, y: 0 }, animate: presets[preset] as TargetAndTransition };
+  return function AnimatedIcon(props: React.ComponentProps<LucideIcon>) {
+    const { controls } = useAnimateIconContext();
+    const decorative = !props['aria-label'] && !props['aria-labelledby'];
+    return <Motion initial="initial" animate={controls} variants={variants} aria-hidden={decorative || undefined} {...(props as object)} />;
+  };
+}
+
+interface Handle {
+  startAnimation: () => void;
+  stopAnimation: () => void;
+}
+
+// Icons from AnimateIcons and lucide-animated animate themselves from a ref handle. This lets a surrounding AnimateIcon
+// (a Button, a nav link, a card) drive them the same way it drives the Animate UI ones, and sizes them from className.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function fromHandle(Icon: ComponentType<any>) {
+  return function DrivenIcon({ className, ...props }: { className?: string } & Record<string, unknown>) {
+    const { active } = useAnimateIconContext();
+    const ref = useRef<Handle>(null);
+    const playing = useRef(false);
+    useEffect(() => {
+      if (active) {
+        playing.current = true;
+        ref.current?.startAnimation();
+      } else if (playing.current) {
+        playing.current = false;
+        ref.current?.stopAnimation();
+      }
+    }, [active]);
+    const decorative = !props['aria-label'] && !props['aria-labelledby'];
+    return <Icon ref={ref} size={24} aria-hidden={decorative || undefined} className={cn('lucide [&>svg]:h-full! [&>svg]:w-full!', className)} {...props} />;
+  };
+}

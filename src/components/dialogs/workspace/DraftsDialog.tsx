@@ -3,11 +3,11 @@
 // side changed is kept, and what both changed is kept as a conflict for a person to choose.
 
 import { useCallback, useEffect, useState } from "react";
-import { FilePen, GitMerge, Trash2 } from "lucide-react";
+import { Trash2, FilePen, GitMerge } from "@/components/animate-icons";
 
 import { fieldName } from "@/components/elements/ConflictPanel";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,13 +31,13 @@ interface DraftsButtonProps {
 }
 
 const SELECT =
-	"mt-1 flex h-10 w-full rounded-none border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring";
+	"mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring";
 
 export default function DraftsButton({ workspacePath, entity, record, members, onMerged }: DraftsButtonProps) {
 	const [open, setOpen] = useState(false);
 	return (
 		<>
-			<Button type="button" variant="outline" size="sm" onPress={() => setOpen(true)} className="gap-1.5">
+			<Button type="button" variant="outline" size="sm" onPress={() => setOpen(true)} className="gap-2">
 				<FilePen className="size-3.5" />
 				Drafts
 			</Button>
@@ -148,16 +148,7 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 	return (
 		<Dialog isOpen onOpenChange={(isOpen) => !isOpen && onClose()} className="sm:max-w-2xl">
 			<div className="flex max-h-[75vh] min-h-0 flex-col gap-4 overflow-y-auto">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<FilePen className="size-4" />
-						Drafts of "{record.title}"
-					</DialogTitle>
-					<DialogDescription>
-						A draft is a private copy to change without touching the real {entity}. When it is ready, review what merging it would do, then merge it. Anything somebody else changed in the meantime is kept,
-						and a field you both changed is left for you to choose.
-					</DialogDescription>
-				</DialogHeader>
+				<DialogHeading icon={<FilePen className="size-6" />} title={`Drafts of "${record.title}"`} />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
@@ -176,7 +167,7 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 						>
 							<Input aria-label="Draft name" placeholder="Name the draft, for example Reword for the client" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
 							<Button type="submit" isDisabled={busy || !name.trim()}>
-								Start a draft
+								Start a Draft
 							</Button>
 						</form>
 						{drafts.length === 0 ? (
@@ -210,10 +201,10 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 						) : (
 							<>
 								{preview.changes.length === 0 && <p className="text-sm text-muted-foreground">Nothing. The draft matches the {entity} as it is now.</p>}
-								<ul className="space-y-1.5">
+								<ul className="space-y-2">
 									{preview.changes.map((c) => (
 										<li key={c.path} className="border px-3 py-2 text-sm">
-											<span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label(c.path)}</span>
+											<span className="text-xs font-semibold text-muted-foreground">{label(c.path)}</span>
 											<p className="break-words">
 												<span className="text-muted-foreground line-through">{show(c.path, c.live)}</span> → {show(c.path, c.draft)}
 											</p>
@@ -221,8 +212,8 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 									))}
 								</ul>
 								{preview.collisions.length > 0 && (
-									<div className="space-y-2 border border-amber-500/40 bg-amber-500/10 p-3">
-										<p className="text-sm font-semibold text-amber-500">Somebody else changed these too</p>
+									<div className="space-y-2 border border-warning/40 bg-warning/10 p-3">
+										<p className="text-sm font-semibold text-warning">Somebody else changed these too</p>
 										<ul className="space-y-1 text-sm">
 											{preview.collisions.map((c) => (
 												<li key={c.field}>
@@ -237,10 +228,10 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 						)}
 						<div className="flex flex-wrap justify-between gap-2">
 							<Button variant="ghost" isDisabled={busy} onPress={() => setPreview(null)}>
-								Back to editing
+								Back to Editing
 							</Button>
 							{!preview.deleted && (
-								<Button isDisabled={busy} onPress={() => void merge()} className="gap-1.5">
+								<Button isDisabled={busy} onPress={() => void merge()} className="gap-2">
 									<GitMerge className="size-3.5" />
 									Merge into the {entity}
 								</Button>
@@ -311,14 +302,14 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 									setForm(null);
 								}}
 							>
-								All drafts
+								All Drafts
 							</Button>
 							<div className="flex gap-2">
 								<Button type="button" variant="outline" isDisabled={busy} onPress={() => void save()}>
-									Save draft
+									Save Draft
 								</Button>
 								<Button type="submit" isDisabled={busy || !form.title.trim()}>
-									Review and merge
+									Review and Merge
 								</Button>
 							</div>
 						</div>

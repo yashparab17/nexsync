@@ -1,7 +1,7 @@
 // A comment thread for a task or card: who said what, @mentions highlighted, and a box to add one
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,11 +30,11 @@ export default function Comments({ comments, me, memberNames, canComment, onChan
 
 	return (
 		<section aria-label="Comments" className="space-y-2">
-			<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Comments ({comments.length})</p>
+			<p className="text-xs font-semibold text-muted-foreground">Comments ({comments.length})</p>
 			{comments.length > 0 && (
 				<ul className="max-h-48 space-y-2 overflow-y-auto">
 					{comments.map((c) => (
-						<li key={c.id} className="border border-border/60 bg-muted/30 px-2.5 py-1.5 text-sm">
+						<li key={c.id} className="border border-border/60 bg-muted/30 px-3 py-2 text-sm">
 							<div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
 								<span>
 									<span className="font-semibold text-foreground">{c.author}</span> · {new Date(c.at).toLocaleString()}
@@ -66,7 +66,7 @@ export default function Comments({ comments, me, memberNames, canComment, onChan
 				</ul>
 			)}
 			{canComment && (
-				<div className="space-y-1.5">
+				<div className="space-y-2">
 					<Textarea
 						aria-label="Write a comment"
 						value={draft}
@@ -82,13 +82,13 @@ export default function Comments({ comments, me, memberNames, canComment, onChan
 						}}
 					/>
 					{suggestions.length > 0 && (
-						<div className="flex flex-wrap gap-1.5">
+						<div className="flex flex-wrap gap-2">
 							{suggestions.map((name) => (
 								<button
 									key={name}
 									type="button"
 									onClick={() => setDraft(completeMention(draft, name))}
-									className="cursor-pointer border border-border px-1.5 py-0.5 text-xs hover:bg-muted"
+									className="cursor-pointer border border-border px-2 py-0.5 text-xs hover:bg-muted"
 								>
 									@{name}
 								</button>

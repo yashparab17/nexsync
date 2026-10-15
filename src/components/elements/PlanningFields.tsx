@@ -1,7 +1,7 @@
 // Small building blocks shared by the Tasks and Kanban pages: tags, due-date badge and a card checklist
 
 import { useState } from "react";
-import { Calendar, Plus, X } from "lucide-react";
+import { Plus, Calendar, X } from "@/components/animate-icons";
 
 import { addTags, dueState, tagHue, type DueState } from "@/lib/planning";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ export function TagChip({ tag, active, onClick }: { tag: string; active?: boolea
 		backgroundColor: `hsl(${hue} 60% 50% / ${active ? 0.35 : 0.15})`,
 		borderColor: `hsl(${hue} 60% 50% / 0.4)`,
 	};
-	const className = "inline-flex items-center rounded-none border px-1.5 py-0.5 text-[10px] font-semibold text-foreground";
+	const className = "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold text-foreground";
 	if (!onClick) {
 		return (
 			<span className={className} style={style}>
@@ -47,7 +47,7 @@ export function TagInput({
 		setDraft("");
 	};
 	return (
-		<div className="mt-1 flex min-h-10 flex-wrap items-center gap-1.5 rounded-none border border-input bg-background px-2 py-1.5">
+		<div className="mt-1 flex min-h-10 flex-wrap items-center gap-2 rounded-md border border-input bg-card px-2 py-2 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30">
 			{value.map((tag) => (
 				<span key={tag} className="inline-flex items-center gap-1">
 					<TagChip tag={tag} />
@@ -98,9 +98,9 @@ export function TagInput({
 }
 
 const DUE_STYLE: Record<DueState, string> = {
-	overdue: "border-rose-500/40 bg-rose-500/10 text-rose-400",
-	today: "border-amber-500/40 bg-amber-500/10 text-amber-400",
-	soon: "border-amber-500/30 bg-amber-500/5 text-amber-300",
+	overdue: "border-destructive/40 bg-destructive/10 text-destructive",
+	today: "border-warning/40 bg-warning/10 text-warning",
+	soon: "border-warning/30 bg-warning/5 text-warning",
 	later: "border-border text-muted-foreground",
 };
 const DUE_LABEL: Record<DueState, string> = { overdue: "Overdue", today: "Due today", soon: "Due soon", later: "Due" };
@@ -111,7 +111,7 @@ export function DueBadge({ due, done }: { due?: string | null; done: boolean }) 
 	const state = dueState(due, done) ?? "later";
 	const day = new Date(`${due.slice(0, 10)}T00:00:00`);
 	return (
-		<span className={cn("inline-flex items-center gap-1 rounded-none border px-1.5 py-0.5 text-[10px] font-medium", DUE_STYLE[state])}>
+		<span className={cn("inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium", DUE_STYLE[state])}>
 			<Calendar className="size-3" />
 			{DUE_LABEL[state]} {day.toLocaleDateString(undefined, { day: "numeric", month: "short" })}
 		</span>
@@ -127,7 +127,7 @@ export function ChecklistEditor({ value, onChange }: { value: ChecklistItem[]; o
 		setDraft("");
 	};
 	return (
-		<div className="mt-1 space-y-1.5">
+		<div className="mt-1 space-y-2">
 			{value.map((item) => (
 				<div key={item.id} className="flex items-center gap-2 text-sm">
 					<input
@@ -159,7 +159,7 @@ export function ChecklistEditor({ value, onChange }: { value: ChecklistItem[]; o
 					}}
 					aria-label="New checklist item"
 					placeholder="Add an item"
-					className="h-8 flex-1 rounded-none border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+					className="h-8 flex-1 rounded-md border border-input bg-input px-2 text-sm outline-none focus:ring-2 focus:ring-ring"
 				/>
 				<button
 					type="button"

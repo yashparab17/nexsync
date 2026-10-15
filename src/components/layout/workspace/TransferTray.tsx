@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -9,12 +9,12 @@ export default function TransferTray() {
 	if (transfers.length === 0) return null;
 
 	return (
-		<div className="fixed bottom-3 right-3 z-50 w-72 max-w-[calc(100vw-1.5rem)] space-y-2 border bg-card p-3 text-xs shadow-lg">
+		<div className="fixed bottom-3 right-3 z-50 w-72 max-w-[calc(100vw-1.5rem)] space-y-2 border bg-card p-3 text-xs rounded-lg ring-1 ring-foreground/10">
 			<div className="flex items-center justify-between">
 				<span className="font-semibold">Downloading {transfers.length} file{transfers.length > 1 ? "s" : ""}</span>
 				{transfers.length > 1 && (
 					<Button variant="ghost" size="xs" onPress={() => cancelTransfers()}>
-						Cancel all
+						Cancel All
 					</Button>
 				)}
 			</div>
@@ -34,7 +34,7 @@ export default function TransferTray() {
 							</span>
 						</div>
 						<div className="h-1 w-full bg-muted">
-							<div className="h-full bg-sky-400" style={{ width: `${percent}%` }} />
+							<div className="h-full bg-info" style={{ width: `${percent}%` }} />
 						</div>
 					</div>
 				);

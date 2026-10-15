@@ -2,7 +2,7 @@
 // move it for everyone, double-click a card to open the note. Other people's pointers show while they are on the board.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { ExternalLink, Link2, Trash2 } from "lucide-react";
+import { Trash2, ExternalLink, Link2 } from "@/components/animate-icons";
 import type { Awareness } from "y-protocols/awareness";
 
 import PresenceDots from "@/components/elements/PresenceDots";
@@ -194,11 +194,11 @@ export default function NoteBoard({ notes, positions, edges, activePath, onMove,
 							onKeyDown={(e) => e.key === "Enter" && onOpen(note.path)}
 							style={{ left: at.x, top: at.y, width: CARD_W, height: CARD_H }}
 							className={cn(
-								"group absolute flex cursor-pointer flex-col gap-1.5 overflow-hidden border bg-card p-3 text-card-foreground shadow-sm outline-none transition-shadow hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring",
+								"group absolute flex cursor-pointer flex-col gap-2 overflow-hidden border bg-muted/40 p-3 text-card-foreground outline-none transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-ring",
 								activePath === note.path && "border-primary ring-1 ring-primary",
 							)}
 						>
-							<div className="flex items-start gap-1.5">
+							<div className="flex items-start gap-2">
 								<h3 className="min-w-0 flex-1 truncate text-sm font-semibold">{noteTitle(note.name)}</h3>
 								<PresenceDots names={here} />
 								<div className="flex shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100" onPointerDown={(e) => e.stopPropagation()}>
@@ -244,7 +244,7 @@ export default function NoteBoard({ notes, positions, edges, activePath, onMove,
 						<svg width="14" height="14" viewBox="0 0 14 14" style={{ color: colorForName(p.name) }}>
 							<path d="M1 1l11 5-4.5 1.5L6 12z" fill="currentColor" />
 						</svg>
-						<span className="ml-3 -mt-1 inline-block px-1 text-[11px] font-medium text-white" style={{ background: colorForName(p.name) }}>
+						<span className="ml-3 -mt-1 inline-block px-1 text-xs font-medium text-white" style={{ background: colorForName(p.name) }}>
 							{p.name}
 						</span>
 					</div>

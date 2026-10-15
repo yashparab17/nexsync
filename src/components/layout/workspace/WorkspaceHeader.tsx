@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 // Icons
-import { Menu, Radio, Settings } from "lucide-react";
+import { Radio, Settings, Menu } from "@/components/animate-icons";
 
 // Components
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,11 @@ import NotificationBell from "@/components/layout/workspace/NotificationBell";
 import CatchUp from "@/components/layout/workspace/CatchUp";
 import PresenceStrip from "@/components/layout/workspace/PresenceStrip";
 import { useP2P } from "@/store/p2p/P2PContext";
-import P2PConnectDialog from "@/components/dialogs/workspace/P2PConnectDialog";
 import { cn } from "@/lib/utils";
 import { t } from "@/i18n";
 
+// Both dialogs load the first time they are opened
+const P2PConnectDialog = lazy(() => import("@/components/dialogs/workspace/P2PConnectDialog"));
 const WorkspaceSettings = lazy(() => import("@/pages/workspace/WorkspaceSettings"));
 
 // Header component for the workspace layout
@@ -36,18 +37,19 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 
 	const connectedCount = peers.filter((p) => p.status === "connected").length;
 
-	// One small colored dot says how the connection is: green when people are connected or the network is ready, amber while connecting, red when offline
+	// How the connection is, as a small dot on the button: green when people are connected or the network is ready,
+	// amber and pulsing while connecting, red when offline. The words are in the tooltip and the accessible name.
 	const connecting = connectionStatus === "connecting" || connectionStatus === "reconnecting";
 	const status = connectedCount > 0
-		? { label: `Collaborate, ${connectedCount} connected`, dot: "bg-emerald-400" }
+		? { label: `Collaborate: ${connectedCount} ${connectedCount === 1 ? "person" : "people"} connected`, short: `${connectedCount} connected`, dot: "bg-success" }
 		: !network.online
-			? { label: "Collaborate, offline", dot: "bg-red-400" }
+			? { label: "Collaborate: offline", short: "Offline", dot: "bg-destructive" }
 			: connecting
-				? { label: "Collaborate, connecting", dot: "bg-amber-400 animate-pulse" }
-				: { label: "Collaborate, online", dot: "bg-emerald-400" };
+				? { label: "Collaborate: connecting", short: "Connecting", dot: "bg-warning animate-pulse motion-reduce:animate-none" }
+				: { label: "Collaborate: online, ready to invite", short: "Online", dot: "bg-success" };
 
 	return (
-		<header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 lg:px-6">
+		<header className="flex h-12 shrink-0 items-center gap-3 border-b px-4">
 			{/* Opens the navigation drawer when the sidebar is hidden */}
 			{onOpenMenu && (
 				<Button variant="ghost" size="icon" onPress={onOpenMenu} aria-label={t("nav.open")} aria-expanded={menuOpen} className="md:hidden">
@@ -56,7 +58,7 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 			)}
 
 			{/* Search */}
-			<div className="flex min-w-0 flex-1 justify-center">
+			<div className="flex min-w-0 flex-1 justify-end">
 				<WorkspaceSearch />
 			</div>
 
@@ -65,17 +67,12 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 				<PresenceStrip />
 				<CatchUp />
 					<NotificationBell />
-				<span title={status.label}>
-				<Button
-					variant="ghost"
-					size="icon"
-					onPress={() => setIsP2POpen(true)}
-					aria-label={status.label}
-					className="relative"
-				>
-					<Radio className="size-5" />
-					<span className={cn("absolute right-1.5 top-1.5 size-2.5 rounded-full ring-2 ring-background", status.dot)} />
-				</Button>
+				<span title={status.label} className="inline-flex">
+					<Button variant="ghost" onPress={() => setIsP2POpen(true)} aria-label={status.label} className="gap-2 px-3" data-testid="connection-chip">
+						<Radio className="size-5" />
+						<span className={cn("size-2.5 shrink-0", status.dot)} aria-hidden />
+						<span className="hidden text-sm lg:inline">{status.short}</span>
+					</Button>
 				</span>
 
 				<Button
@@ -88,7 +85,11 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 				</Button>
 			</div>
 
-			<P2PConnectDialog open={isP2POpen} onOpenChange={setIsP2POpen} />
+			{isP2POpen && (
+				<Suspense fallback={null}>
+					<P2PConnectDialog open onOpenChange={setIsP2POpen} />
+				</Suspense>
+			)}
 
 			{/* The popup asks before closing with unsaved edits, so Escape and a click outside are off */}
 			<Dialog isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} showCloseButton={false} isDismissable={false} isKeyboardDismissDisabled className="overflow-hidden p-0 sm:max-w-5xl">

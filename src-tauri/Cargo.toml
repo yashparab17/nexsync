@@ -26,6 +26,7 @@ serde_json = "1"
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+tauri-plugin-decorum = "1.1.1"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
@@ -43,6 +44,7 @@ notify = "8"
 blake3 = "1"
 trash = "5"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+portable-pty = "0.9"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

@@ -3,6 +3,8 @@
 pub mod auth;
 pub mod config;
 pub mod editor_run;
+pub mod terminal;
+pub mod terminal_pty;
 pub mod system_open;
 pub mod updates;
 pub mod p2p;

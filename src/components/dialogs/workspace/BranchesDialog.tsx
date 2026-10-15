@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import * as Y from "yjs";
-import { GitBranch, GitMerge } from "lucide-react";
+import { GitBranch, GitMerge } from "@/components/animate-icons";
 
 import { DiffView } from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { branchDocId, closeBranch, listBranches, mergeBranch, previewMerge, startBranch, MAX_BRANCH_NAME, type Branch } from "@/lib/branches";
 import { diffLines, type DiffResult } from "@/lib/diff";
@@ -105,23 +105,14 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 	return (
 		<Dialog isOpen onOpenChange={(open) => !open && onClose()} className="sm:max-w-3xl">
 			<div className="flex max-h-[75vh] min-h-0 flex-col gap-4">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<GitBranch className="size-4" />
-						Branches of {fileName}
-					</DialogTitle>
-					<DialogDescription>
-						A branch is a copy to work on without changing the file. When it is ready, review what it would change, then merge it in. Merging adds exactly what was written on the branch, so nothing a
-						collaborator wrote in the file meanwhile is lost.
-					</DialogDescription>
-				</DialogHeader>
+				<DialogHeading icon={<GitBranch className="size-6" />} title={`Branches of ${fileName}`} />
 
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
 						{error}
 					</p>
 				)}
-				{done && <p className="p-2 text-xs text-emerald-400">{done}</p>}
+				{done && <p className="p-2 text-xs text-success">{done}</p>}
 
 				{review ? (
 					<div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -131,17 +122,17 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 							<>
 								<div className="flex flex-wrap items-center justify-between gap-2">
 									<p className="text-sm">
-										Merging <span className="font-semibold">{review.branch.name}</span> would change {fileName}: <span className="text-emerald-400">+{review.diff.added}</span>{" "}
-										<span className="text-red-400">-{review.diff.removed}</span>
+										Merging <span className="font-semibold">{review.branch.name}</span> would change {fileName}: <span className="text-success">+{review.diff.added}</span>{" "}
+										<span className="text-destructive">-{review.diff.removed}</span>
 									</p>
 									{canEdit && review.branch.status === "open" && (
 										<div className="flex gap-2">
-											<Button size="sm" onPress={merge} className="gap-1.5">
+											<Button size="sm" onPress={merge} className="gap-2">
 												<GitMerge className="size-3.5" />
-												Merge into the file
+												Merge into the File
 											</Button>
 											<Button size="sm" variant="outline" onPress={close}>
-												Close without merging
+												Close Without Merging
 											</Button>
 										</div>
 									)}
@@ -153,7 +144,7 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 						)}
 						<div>
 							<Button size="sm" variant="ghost" onPress={() => setReview(null)}>
-								Back to the list
+								Back to the List
 							</Button>
 						</div>
 					</div>
@@ -169,7 +160,7 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 							>
 								<Input aria-label="Branch name" placeholder="Name the branch, for example Try a new layout" value={name} maxLength={MAX_BRANCH_NAME} onChange={(e) => setName(e.target.value)} />
 								<Button type="submit" isDisabled={busy || !name.trim()}>
-									Start a branch
+									Start a Branch
 								</Button>
 							</form>
 						)}
@@ -200,11 +191,11 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 														onClose();
 													}}
 												>
-													Work on it
+													Work on It
 												</Button>
 											)}
 											<Button size="sm" variant="outline" onPress={() => void openReview(b)} isDisabled={busy}>
-												{b.status === "open" ? "Review" : "See changes"}
+												{b.status === "open" ? "Review" : "See Changes"}
 											</Button>
 										</div>
 									</li>
@@ -221,7 +212,7 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 										onClose();
 									}}
 								>
-									Go back to the file
+									Go Back to the File
 								</Button>
 							</div>
 						)}

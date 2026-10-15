@@ -2,8 +2,10 @@
 
 import type { ReactNode } from "react";
 
+import { X } from "@/components/animate-icons";
+import { Panel } from "@/components/layout/Page";
+import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 // A row inside a card: what the setting is on the left, its control on the right
@@ -28,74 +30,59 @@ export function Segmented<T extends string | number>({
 }: {
 	label: string;
 	value: T;
-	options: { value: T; label: string; icon?: ReactNode }[];
+	options: { value: T; label: string; icon?: ReactNode; count?: number }[];
 	onChange: (value: T) => void;
 }) {
 	return (
 		<div role="group" aria-label={label} className="inline-flex border">
 			{options.map((option) => (
-				<Button
+				<button
 					key={option.value}
-					size="xs"
-					variant={option.value === value ? "secondary" : "ghost"}
+					type="button"
 					aria-pressed={option.value === value}
-					onPress={() => onChange(option.value)}
+					onClick={() => onChange(option.value)}
+					className={cn(
+						"flex cursor-pointer items-center gap-2 px-3 py-2 text-sm font-medium transition-colors",
+						option.value === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+					)}
 				>
 					{option.icon}
 					{option.label}
-				</Button>
+					{option.count !== undefined && <span className="font-mono text-xs tabular-nums opacity-70">{option.count}</span>}
+				</button>
 			))}
 		</div>
 	);
 }
 
-// A titled card with an icon; `id` is what the section list on the left scrolls to
-export function SectionCard({
-	id,
-	title,
-	description,
-	icon,
-	children,
-	className,
-	titleClassName,
-}: {
-	id: string;
-	title: string;
-	description: string;
-	icon: ReactNode;
-	children: ReactNode;
-	className?: string;
-	titleClassName?: string;
-}) {
+// A titled panel with an icon
+export function SectionCard({ id, title, icon, children, className, titleClassName }: { id: string; title: string; icon: ReactNode; children: ReactNode; className?: string; titleClassName?: string }) {
 	return (
-		<Card id={id} className={cn("scroll-mt-8", className)}>
-			<CardHeader>
-				<CardTitle className={cn("flex items-center gap-2 text-base", titleClassName)}>
-					{icon}
-					{title}
-				</CardTitle>
-				<CardDescription>{description}</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-4">{children}</CardContent>
-		</Card>
+		<Panel id={id} title={title} icon={icon} titleClassName={titleClassName} className={cn("scroll-mt-3", className)}>
+			<div className="space-y-4">{children}</div>
+		</Panel>
 	);
 }
 
-// The list of sections down the left side; each button scrolls its card into view
-export function SectionNav({ label, sections }: { label: string; sections: { id: string; label: string; icon: ReactNode }[] }) {
+// The frame both Settings screens share, in the popup and as a page: a header that never scrolls away, with the title and
+// a Close button, then the sections, and a bar along the bottom while there is something to save
+export function SettingsShell({ title, onClose, footer, className, children }: { title: string; onClose: () => void; footer?: ReactNode; className?: string; children: ReactNode }) {
 	return (
-		<nav aria-label={label} className="sticky top-8 space-y-1">
-			{sections.map(({ id, label: text, icon }) => (
-				<button
-					key={id}
-					type="button"
-					onClick={() => document.getElementById(id)?.scrollIntoView?.({ behavior: "smooth", block: "start" })}
-					className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-				>
-					{icon}
-					{text}
-				</button>
-			))}
-		</nav>
+		<div className={cn("flex min-h-0 flex-col bg-background", className)}>
+			<Toolbar>
+				<ToolbarTitle name={title} />
+				<span className="flex-1" />
+				<Button variant="outline" size="sm" onPress={onClose} aria-label="Close settings">
+					<X className="size-4" />
+					Close
+				</Button>
+			</Toolbar>
+			<div className="flex min-h-0 flex-1">
+				<div data-settings-scroll className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-2">
+					<div className="space-y-3">{children}</div>
+				</div>
+			</div>
+			{footer && <div className="shrink-0 border-t bg-card/40">{footer}</div>}
+		</div>
 	);
 }

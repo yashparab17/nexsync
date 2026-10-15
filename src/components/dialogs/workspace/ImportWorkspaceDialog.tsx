@@ -5,21 +5,14 @@ import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Icons
-import { FolderOpen, FolderUp } from "lucide-react";
+import { FolderOpen, FolderUp } from "@/components/animate-icons";
 
 // Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-import {
-	Dialog,
-	DialogTrigger,
-	DialogHeader,
-	DialogTitle,
-	DialogDescription,
-	DialogFooter,
-} from "@/components/ui/dialog";
+import { cleanPath } from "@/lib/utils";
+import { Dialog, DialogTrigger, DialogHeading, DialogFooter } from "@/components/ui/dialog";
 
 // Tauri API
 import { open } from "@tauri-apps/plugin-dialog";
@@ -52,7 +45,7 @@ export default function ImportWorkspaceDialog({
 		});
 
 		if (selected && typeof selected === "string") {
-			setWorkspacePath(selected);
+			setWorkspacePath(cleanPath(selected));
 		}
 	};
 
@@ -80,49 +73,24 @@ export default function ImportWorkspaceDialog({
 			{children}
 
 			<Dialog className="sm:max-w-xl">
-				<DialogHeader>
-					<DialogTitle>Import Workspace</DialogTitle>
+				<DialogHeading icon={<FolderUp className="size-6" />} title="Import a Folder" />
 
-					<DialogDescription>
-						Open an existing Nexsync workspace from your computer.
-					</DialogDescription>
-				</DialogHeader>
-
-				<div className="space-y-6 py-4">
-					<div className="space-y-2">
-						<Label htmlFor="workspace-path">Workspace Folder</Label>
-
-						<div className="flex gap-2 border">
-							<Input
-								id="workspace-path"
-								readOnly
-								placeholder="Choose a Nexsync workspace..."
-								value={workspacePath}
-								className="border-0 pl-2"
-							/>
-
-							<Button variant="outline" onPress={pickWorkspace}>
-								<FolderOpen className="size-4" />
-								Browse
-							</Button>
-						</div>
+				<div className="flex flex-col gap-2">
+					<Label htmlFor="workspace-path">Workspace folder</Label>
+					<div className="flex gap-2">
+						<Input id="workspace-path" readOnly placeholder="Choose a folder" value={workspacePath} className="font-mono text-xs" />
+						<Button variant="outline" onPress={pickWorkspace}>
+							<FolderOpen className="size-4" />
+							Browse
+						</Button>
 					</div>
-
-					{error && (
-						<p className="text-sm text-destructive">{error}</p>
-					)}
+					{error && <p className="text-sm text-destructive">{error}</p>}
 				</div>
 
 				<DialogFooter>
-					<Button variant="outline" slot="close">
-						Cancel
-					</Button>
-
-					<Button
-						onPress={handleImportWorkspace}
-						isDisabled={!workspacePath}
-					>
-						<FolderUp className="mr-2 size-4" />
+					<Button variant="outline" slot="close">Cancel</Button>
+					<Button onPress={handleImportWorkspace} isDisabled={!workspacePath}>
+						<FolderUp className="size-4" />
 						Import Workspace
 					</Button>
 				</DialogFooter>

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Radio } from "@/components/animate-icons";
+import { SectionCard } from "@/components/elements/SettingsParts";
 import { errorText } from "@/lib/utils";
 import { useP2P, useSelfRole } from "@/store/p2p/P2PContext";
 
@@ -25,21 +26,14 @@ export default function HostRequiredCard() {
 	};
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle className="text-base">Host availability</CardTitle>
-				<CardDescription>
-					Choose whether people who joined this workspace can use it while its host is offline. {guest ? "The host and Admins choose this." : "Admins can change this too."}
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-3">
+		<SectionCard id="collaboration" title="Host Availability" icon={<Radio className="size-5" />}>
 				{error && (
 					<p role="alert" className="text-xs text-destructive">
 						{error}
 					</p>
 				)}
 				<label className="flex cursor-pointer items-start gap-3 text-sm">
-					<input type="checkbox" checked={requireHost} disabled={!canChange} onChange={(e) => void change(e.target.checked)} className="mt-1 size-4 accent-primary" />
+					<input type="checkbox" checked={requireHost} disabled={!canChange} onChange={(e) => void change(e.target.checked)} />
 					<span>
 						Only allow work while the host is online
 						<span className="block text-xs text-muted-foreground">
@@ -52,7 +46,6 @@ export default function HostRequiredCard() {
 						)}
 					</span>
 				</label>
-			</CardContent>
-		</Card>
+			</SectionCard>
 	);
 }
