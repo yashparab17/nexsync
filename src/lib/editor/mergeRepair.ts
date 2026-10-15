@@ -6,7 +6,7 @@
 // taken without adding errors. Each candidate is a deterministic function of the text and the hunks, and the person
 // previews it and chooses; applying it is an ordinary edit, so every device ends up with the same text.
 //
-// Kept free of imports so the merge study in research/ runs this same code.
+// Kept free of imports so it stays a plain, easily tested function.
 
 // A change to the local text, in the coordinates of that text before the change
 export interface Hunk {

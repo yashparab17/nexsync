@@ -10,9 +10,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "tauri": "tauri",
-    "study": "vitest run --config research/vitest.config.ts research/merge-study",
-    "study:anchors": "vitest run --config research/vitest.config.ts research/comment-anchors"
+    "tauri": "tauri"
   },
   "dependencies": {
     "@blocknote/core": "^0.54.2",

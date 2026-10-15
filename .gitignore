@@ -82,3 +82,6 @@ skills-lock.json
 # Local agent notes
 CLAUDE.md
 PRODUCT.md
+
+# Local design notes (kept out of the repo)
+DESIGN_STYLE.md
