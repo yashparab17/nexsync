@@ -8,6 +8,7 @@ import { listen } from "@tauri-apps/api/event";
 import { cleanPath } from "@/lib/utils";
 import type { EntryKind, LogEntry } from "@/lib/chat/entries";
 import type { ModerationView } from "@/lib/moderation";
+import type { DepsStatus, Doctor, EnvState, ProjectInfo, Recipe, RunRecord, Scan, ToolReq, Trust } from "@/types/projects";
 
 import type {
 	WorkspaceInfo,
@@ -928,4 +929,72 @@ export function exportZip(path: string, roots: string[], dest: string): Promise<
 // Save a finished export, such as a note as Markdown or PDF, to a path chosen in the save dialog
 export function writeExportFile(path: string, dest: string, contentBase64: string): Promise<void> {
 	return invoke("write_export_file", { path, dest, contentBase64 });
+}
+
+// ── Projects ──
+export function projectsList(path: string): Promise<ProjectInfo[]> {
+	return invoke("projects_list", { path });
+}
+export function projectSaveRecipe(path: string, project: string, recipe: Recipe): Promise<Recipe> {
+	return invoke("project_save_recipe", { path, project, recipe });
+}
+export function projectCreate(path: string, name: string): Promise<string> {
+	return invoke("project_create", { path, name });
+}
+export function projectAddIgnore(path: string, project: string, line: string): Promise<void> {
+	return invoke("project_add_ignore", { path, project, line });
+}
+export function projectDoctor(path: string, tools: ToolReq[]): Promise<Doctor> {
+	return invoke("project_doctor", { path, tools });
+}
+export function projectScan(path: string): Promise<Scan> {
+	return invoke("project_scan", { path });
+}
+export function projectTaskTrust(path: string, project: string, taskId: string): Promise<Trust> {
+	return invoke("project_task_trust", { path, project, taskId });
+}
+export function projectTaskApprove(path: string, project: string, taskId: string): Promise<void> {
+	return invoke("project_task_approve", { path, project, taskId });
+}
+// Starts a task; `once` says the person just chose Run Once for this command
+export function projectTaskStart(path: string, project: string, taskId: string, once: boolean): Promise<string> {
+	return invoke("project_task_start", { path, project, taskId, once });
+}
+export function projectTaskStop(runId: string): Promise<void> {
+	return invoke("project_task_stop", { runId });
+}
+export function projectRuns(path: string, project: string): Promise<RunRecord[]> {
+	return invoke("project_runs", { path, project });
+}
+export function projectRunLog(path: string, runId: string): Promise<string> {
+	return invoke("project_run_log", { path, runId });
+}
+export function projectEnvStatus(path: string, project: string): Promise<EnvState[]> {
+	return invoke("project_env_status", { path, project });
+}
+export function projectEnvSet(path: string, project: string, name: string, value: string, store: "file" | "credential"): Promise<void> {
+	return invoke("project_env_set", { path, project, name, value, store });
+}
+export function projectEnvClear(path: string, project: string, name: string): Promise<void> {
+	return invoke("project_env_clear", { path, project, name });
+}
+export function projectDepsStatus(path: string, project: string): Promise<DepsStatus> {
+	return invoke("project_deps_status", { path, project });
+}
+export function projectDepsMark(path: string, project: string): Promise<void> {
+	return invoke("project_deps_mark", { path, project });
+}
+// Pauses or resumes changes other devices make inside projects/; returns how many are waiting
+export function p2pHoldIncoming(hold: boolean): Promise<number> {
+	return invoke("p2p_hold_incoming", { hold });
+}
+export function p2pHeldCount(): Promise<[boolean, number]> {
+	return invoke("p2p_held_count");
+}
+// Saves plain text to a path chosen in the save dialog
+export function writeExportText(path: string, dest: string, text: string): Promise<void> {
+	const bytes = new TextEncoder().encode(text);
+	let binary = "";
+	for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+	return writeExportFile(path, dest, btoa(binary));
 }

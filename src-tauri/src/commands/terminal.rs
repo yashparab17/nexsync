@@ -38,7 +38,7 @@ fn session(state: &TerminalState, id: &str) -> Result<Arc<PtySession>, String> {
     state.sessions.lock().unwrap_or_else(|p| p.into_inner()).get(id).cloned().ok_or_else(|| "That terminal has ended.".to_string())
 }
 
-/// Opens a shell in a folder of the workspace's editor area and returns its id
+/// Opens a shell in a folder of the workspace's projects folder and returns its id
 #[tauri::command]
 pub fn terminal_open(
     app: AppHandle,
@@ -51,12 +51,12 @@ pub fn terminal_open(
 ) -> Result<String, String> {
     validate_allowed_root(&app, &workspace_path)?;
     let dir = dir.trim_matches('/');
-    if dir != "editor" && !dir.starts_with("editor/") {
-        return Err("Terminals start only inside the editor folder.".to_string());
+    if dir != "projects" && !dir.starts_with("projects/") {
+        return Err("Terminals start only inside the projects folder.".to_string());
     }
     let cwd = resolve_workspace_path(&workspace_path, dir)?;
-    if dir == "editor" {
-        std::fs::create_dir_all(&cwd).map_err(|e| format!("Could not create the editor folder: {e}"))?;
+    if dir == "projects" {
+        std::fs::create_dir_all(&cwd).map_err(|e| format!("Could not create the projects folder: {e}"))?;
     }
     if !cwd.is_dir() {
         return Err("That folder does not exist.".to_string());

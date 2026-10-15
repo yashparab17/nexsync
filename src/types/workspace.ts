@@ -92,6 +92,8 @@ export interface WorkspaceFile {
 	is_dir: boolean;
 	size: number;
 	modified_at: string;
+	// Kept on this device only: dependencies, build output, local environment files, what .nexignore names
+	ignored?: boolean;
 }
 
 // Summary metrics displayed on workspace dashboard

@@ -23,13 +23,14 @@ use super::{
     wire::{self, FileReply, FileRequest},
 };
 use crate::commands::path_utils::resolve_workspace_path;
+use crate::commands::workspace::syncignore::{always_blocked, hidden_name_skipped, Rules};
 
 pub const EVENT_FILE_PROGRESS: &str = "p2p://file-progress";
 /// A download ended, whether it finished, failed or was cancelled
 pub const EVENT_FILE_ENDED: &str = "p2p://file-ended";
 
 /// Workspace folders whose contents are shared with collaborators
-const SYNC_ROOTS: &[&str] = &["notes", "files", "assets", "editor"];
+const SYNC_ROOTS: &[&str] = &["notes", "files", "assets", "projects"];
 const MAX_TRANSFER_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const MAX_MANIFEST_ENTRIES: usize = 20_000;
 const MAX_DEPTH: usize = 32;
@@ -90,13 +91,13 @@ pub(crate) fn check_rel_path(rel_path: &str) -> Result<String, String> {
 
     let mut segments = trimmed.split('/');
     let root = segments.next().unwrap_or("");
-    if !SYNC_ROOTS.contains(&root) {
+    if !SYNC_ROOTS.contains(&root) || always_blocked(trimmed) {
         return Err(invalid());
     }
     let mut depth = 0;
     for segment in segments {
         if segment.is_empty()
-            || segment.starts_with('.')
+            || hidden_name_skipped(root, segment)
             || segment.contains('\\')
             || segment.contains(':')
         {
@@ -110,6 +111,16 @@ pub(crate) fn check_rel_path(rel_path: &str) -> Result<String, String> {
     Ok(trimmed.to_string())
 }
 
+/// Like [`check_rel_path`], and also refuses what this workspace keeps on the device: dependencies, build output, local
+/// environment files and anything its `.gitignore` or `.nexignore` names. Used wherever a path came from another device.
+pub(crate) fn check_rel_path_in(workspace: &str, rel_path: &str) -> Result<String, String> {
+    let rel = check_rel_path(rel_path)?;
+    if Rules::load(Path::new(workspace)).ignored(&rel, false) {
+        return Err(format!("{rel} stays on its own device."));
+    }
+    Ok(rel)
+}
+
 /// Recursively lists every shareable file in the workspace's synced folders
 pub fn list_shareable_files(workspace_path: &str) -> Result<Vec<ShareableFile>, String> {
     let root = PathBuf::from(workspace_path)
@@ -117,17 +128,18 @@ pub fn list_shareable_files(workspace_path: &str) -> Result<Vec<ShareableFile>, 
         .map_err(|e| format!("Failed to open workspace: {e}"))?;
 
     let mut files = Vec::new();
+    let mut rules = Rules::load(&root);
     for sub in SYNC_ROOTS {
         let dir = root.join(sub);
         if dir.is_dir() {
-            walk(&dir, sub, 0, &mut files)?;
+            walk(&dir, sub, 0, &mut files, &mut rules)?;
         }
     }
     files.sort_by(|a, b| a.rel_path.cmp(&b.rel_path));
     Ok(files)
 }
 
-fn walk(dir: &Path, rel: &str, depth: usize, out: &mut Vec<ShareableFile>) -> Result<(), String> {
+fn walk(dir: &Path, rel: &str, depth: usize, out: &mut Vec<ShareableFile>, rules: &mut Rules) -> Result<(), String> {
     if depth > MAX_DEPTH {
         return Ok(());
     }
@@ -137,7 +149,7 @@ fn walk(dir: &Path, rel: &str, depth: usize, out: &mut Vec<ShareableFile>) -> Re
         let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
             continue;
         };
-        if name.starts_with('.') {
+        if hidden_name_skipped(rel.split('/').next().unwrap_or(""), &name) {
             continue;
         }
         let Ok(meta) = entry.path().symlink_metadata() else {
@@ -148,9 +160,17 @@ fn walk(dir: &Path, rel: &str, depth: usize, out: &mut Vec<ShareableFile>) -> Re
         }
 
         let child_rel = format!("{rel}/{name}");
+        // Dependencies, build output, local environment files and the rest of what the project keeps on this device
+        if rules.ignored(&child_rel, meta.is_dir()) {
+            continue;
+        }
         if meta.is_dir() {
-            walk(&entry.path(), &child_rel, depth + 1, out)?;
+            walk(&entry.path(), &child_rel, depth + 1, out, rules)?;
         } else if meta.is_file() {
+            // Too big for a project to share: kept on this device (the Projects page lists it)
+            if crate::commands::workspace::syncignore::too_big(&child_rel, meta.len()) {
+                continue;
+            }
             if out.len() >= MAX_MANIFEST_ENTRIES {
                 return Err(format!(
                     "This workspace has more than {MAX_MANIFEST_ENTRIES} files, which is too many to sync at once."
@@ -393,7 +413,7 @@ async fn open_for_serving(node: &Arc<Node>, rel_path: &str) -> Result<(tokio::fs
     let workspace = node
         .workspace_path()
         .ok_or("The collaborator doesn't have this workspace open right now.")?;
-    let rel = check_rel_path(rel_path)?;
+    let rel = check_rel_path_in(&workspace, rel_path)?;
     let path = resolve_workspace_path(&workspace, &rel)?;
 
     let meta = tokio::fs::metadata(&path)
@@ -451,11 +471,34 @@ mod tests {
         std::fs::write(notes.join(".cache").join("c.md"), "x").unwrap();
 
         let mut out = Vec::new();
-        walk(&notes, "notes", 0, &mut out).unwrap();
+        walk(&notes, "notes", 0, &mut out, &mut Rules::load(&root)).unwrap();
         let mut paths: Vec<_> = out.iter().map(|f| (f.rel_path.as_str(), f.size)).collect();
         paths.sort();
         assert_eq!(paths, vec![("notes/a.md", 1), ("notes/sub/b.md", 2)]);
 
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_project_shares_its_source_and_dotfiles_but_not_dependencies_builds_or_secrets() {
+        let root = std::env::temp_dir().join(format!("nexsync_p2p_project_{}", uuid::Uuid::new_v4()));
+        let app = root.join("projects").join("app");
+        for dir in ["src", "node_modules/react", "target/debug", ".git", ".github/workflows"] {
+            std::fs::create_dir_all(app.join(dir)).unwrap();
+        }
+        for file in ["src/main.ts", "package.json", ".gitignore", ".env", ".env.example", "node_modules/react/index.js", "target/debug/app", ".git/config", ".github/workflows/ci.yml"] {
+            std::fs::write(app.join(file), "x").unwrap();
+        }
+        let listed: Vec<String> = list_shareable_files(root.to_str().unwrap()).unwrap().into_iter().map(|f| f.rel_path).collect();
+        assert_eq!(
+            listed,
+            [".env.example", ".github/workflows/ci.yml", ".gitignore", "package.json", "src/main.ts"].map(|p| format!("projects/app/{p}"))
+        );
+        // A path that came from another device is refused for the same reasons
+        assert!(check_rel_path_in(root.to_str().unwrap(), "projects/app/node_modules/react/index.js").is_err());
+        assert!(check_rel_path_in(root.to_str().unwrap(), "projects/app/.env").is_err());
+        assert!(check_rel_path_in(root.to_str().unwrap(), "projects/app/.git/config").is_err());
+        assert!(check_rel_path_in(root.to_str().unwrap(), "projects/app/src/main.ts").is_ok());
         let _ = std::fs::remove_dir_all(&root);
     }
 }

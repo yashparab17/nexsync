@@ -53,6 +53,7 @@ fn add_tree(
     depth: usize,
     skip: &Path,
     count: &mut usize,
+    rules: &mut super::syncignore::Rules,
 ) -> Result<(), String> {
     if depth > MAX_DEPTH {
         return Ok(());
@@ -72,13 +73,19 @@ fn add_tree(
         zip.add_directory(format!("{}/", name_of(dir)), options).map_err(|e| e.to_string())?;
     }
     for entry in entries {
-        if entry.file_name().to_string_lossy().starts_with('.') {
+        let path = entry.path();
+        let rel = name_of(&path);
+        // Hidden files stay out, except in a project, where what its rules keep on the device (dependencies, build output) is left out instead
+        let root = rel.split('/').next().unwrap_or("");
+        if super::syncignore::hidden_name_skipped(root, &entry.file_name().to_string_lossy()) {
             continue;
         }
-        let path = entry.path();
         let Ok(kind) = entry.file_type() else { continue };
+        if rules.ignored(&rel, kind.is_dir()) {
+            continue;
+        }
         if kind.is_dir() {
-            add_tree(zip, workspace, &path, depth + 1, skip, count)?;
+            add_tree(zip, workspace, &path, depth + 1, skip, count, rules)?;
         } else if kind.is_file() && path != skip {
             *count += 1;
             if *count > MAX_FILES {
@@ -114,9 +121,10 @@ pub fn write_zip(workspace: &str, roots: &[String], dest: &Path) -> Result<usize
     let mut zip = zip::ZipWriter::new(file);
     let skip = dest.canonicalize().unwrap_or_else(|_| dest.to_path_buf());
     let mut count = 0;
+    let mut rules = super::syncignore::Rules::load(&canonical);
     let result = targets
         .iter()
-        .try_for_each(|dir| add_tree(&mut zip, &canonical, dir, 0, &skip, &mut count))
+        .try_for_each(|dir| add_tree(&mut zip, &canonical, dir, 0, &skip, &mut count, &mut rules))
         .and_then(|_| zip.finish().map(|_| ()).map_err(|e| e.to_string()));
     if let Err(err) = result {
         let _ = fs::remove_file(dest);
@@ -129,7 +137,7 @@ pub fn write_zip(workspace: &str, roots: &[String], dest: &Path) -> Result<usize
 // Tauri commands — Export
 // ────────────────────────────
 
-/// Exports workspace folders as a zip, for a workspace backup or a snapshot of the code in `editor`
+/// Exports workspace folders as a zip, for a workspace backup or a snapshot of the code in `projects`
 #[tauri::command]
 pub fn export_zip(app_handle: tauri::AppHandle, path: String, roots: Vec<String>, dest: String) -> Result<usize, String> {
     validate_allowed_root(&app_handle, &path)?;
@@ -168,23 +176,23 @@ mod tests {
     #[test]
     fn zips_nested_folders_without_hidden_files_or_itself() {
         let dir = std::env::temp_dir().join(format!("nexsync-export-{}", Uuid::new_v4()));
-        fs::create_dir_all(dir.join("editor/src")).unwrap();
-        fs::create_dir_all(dir.join("editor/empty")).unwrap();
+        fs::create_dir_all(dir.join("projects/src")).unwrap();
+        fs::create_dir_all(dir.join("projects/empty")).unwrap();
         fs::create_dir_all(dir.join(".nexsync")).unwrap();
-        for file in ["editor/main.py", "editor/src/app.py", "editor/.env", ".nexsync/nexsync.db"] {
+        for file in ["projects/main.py", "projects/src/app.py", "projects/.env", ".nexsync/nexsync.db"] {
             fs::write(dir.join(file), file).unwrap();
         }
         let ws = dir.to_string_lossy().to_string();
-        let dest = dir.join("editor").join("snapshot.zip");
+        let dest = dir.join("projects").join("snapshot.zip");
 
-        let count = write_zip(&ws, &["editor".to_string()], &dest).unwrap();
+        let count = write_zip(&ws, &["projects".to_string()], &dest).unwrap();
         assert_eq!(count, 2);
-        assert_eq!(names(&dest), ["editor/empty/", "editor/main.py", "editor/src/app.py"]);
+        assert_eq!(names(&dest), ["projects/empty/", "projects/main.py", "projects/src/app.py"]);
 
         let mut archive = zip::ZipArchive::new(File::open(&dest).unwrap()).unwrap();
         let mut text = String::new();
-        archive.by_name("editor/src/app.py").unwrap().read_to_string(&mut text).unwrap();
-        assert_eq!(text, "editor/src/app.py");
+        archive.by_name("projects/src/app.py").unwrap().read_to_string(&mut text).unwrap();
+        assert_eq!(text, "projects/src/app.py");
 
         // Hidden folders and the internal folder cannot be requested, and a missing folder is an error
         assert!(write_zip(&ws, &[".nexsync".to_string()], &dest).is_err());

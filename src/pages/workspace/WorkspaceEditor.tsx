@@ -48,8 +48,8 @@ import type { WorkspaceFile } from "@/types/workspace";
 // Open files stay mounted while hidden, so each keeps its cursor, undo history and live connection
 const CodeTab = memo(CodeTabBase);
 
-// Folders shown in the explorer: code lives in editor, and files holds anything else worth opening here
-const ROOTS = ["editor", "files", "notes"];
+// Folders shown in the explorer: code lives in projects, and files holds anything else worth opening here
+const ROOTS = ["projects", "files", "notes"];
 
 const toRel = (path: string) => path.replace(/^\/+/, "");
 
@@ -86,9 +86,9 @@ export default function WorkspaceEditor() {
 	const prefs = useEditorPrefs();
 	const workspacePath = workspace?.path ?? "";
 
-	const [expanded, setExpanded] = useState<Set<string>>(new Set(["editor"]));
+	const [expanded, setExpanded] = useState<Set<string>>(new Set(["projects"]));
 	const [entries, setEntries] = useState<Record<string, WorkspaceFile[]>>({});
-	const [targetDir, setTargetDir] = useState("editor");
+	const [targetDir, setTargetDir] = useState("projects");
 	const [tabs, setTabs] = useState<string[]>([]);
 	const [active, setActive] = useState<string | null>(null);
 	// The file shown in the right-hand pane when the editor is split, and the one whose pane was used last
@@ -570,7 +570,7 @@ export default function WorkspaceEditor() {
 								onRefresh={refresh}
 								onCollapseAll={() => {
 									setExpanded(new Set());
-									setTargetDir("editor");
+									setTargetDir("projects");
 								}}
 								onFilterStart={() => void loadTree()}
 								onDropFiles={async (items, dir) => {

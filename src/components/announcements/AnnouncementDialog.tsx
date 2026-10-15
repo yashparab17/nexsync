@@ -90,7 +90,7 @@ export default function AnnouncementDialog({ existing, people, pinnedCount, onCl
 			>
 				<DialogHeading icon={<Megaphone className="size-6" />} title={existing ? "Edit Announcement" : "New Announcement"} />
 				<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
-				<SectionTitle n="01" title="Message" />
+				<SectionTitle title="Message" />
 				<div className="space-y-1">
 					<Label htmlFor="ann-title">Title</Label>
 					<Input id="ann-title" autoFocus value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} placeholder="Release on Friday" />
@@ -117,7 +117,7 @@ export default function AnnouncementDialog({ existing, people, pinnedCount, onCl
 					<p className="font-mono text-[13px] text-muted-foreground">{level === "info" ? "Goes to the bell." : level === "important" ? "Stays as a banner until each person says Got it." : "Opens a dialog when the app opens, and a pop-up if it is open now."}</p>
 				</div>
 
-				<SectionTitle n="02" title="Who" />
+				<SectionTitle title="Who" />
 				<div className="space-y-2">
 					<div role="group" aria-label="Audience" className="inline-flex">
 						{(["everyone", "chosen"] as const).map((s) => (
@@ -159,7 +159,7 @@ export default function AnnouncementDialog({ existing, people, pinnedCount, onCl
 					)}
 				</div>
 
-				<SectionTitle n="03" title="When" />
+				<SectionTitle title="When" />
 				<div className="grid gap-4 sm:grid-cols-2">
 					<div className="space-y-1">
 						<Label htmlFor="ann-from">Shows From</Label>

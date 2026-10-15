@@ -294,7 +294,7 @@ export default function WorkspaceMembers() {
 			{/* Members Grid & Roles Overview */}
 			<PageBody className="@container">
 			<div className="grid content-start grid-cols-1 gap-4 @4xl:grid-cols-3">
-				<Panel index="01" title="People" className="@4xl:col-span-2">
+				<Panel title="People" className="@4xl:col-span-2">
 					<div className="space-y-3">
 							{isJoinedCopy && (
 								<p className="text-xs text-muted-foreground">
@@ -461,7 +461,7 @@ export default function WorkspaceMembers() {
 					</div>
 				</Panel>
 
-				<Panel index="02" title="Roles" className="self-start @4xl:row-span-2">
+				<Panel title="Roles" className="self-start @4xl:row-span-2">
 					<div className="space-y-4 text-sm">
 							<div className="border-l-2 border-border py-1 pl-4">
 								<div className="flex items-center gap-2 font-semibold text-warning">

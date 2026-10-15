@@ -55,7 +55,7 @@ export default forwardRef<TerminalPanelHandle, EditorPanelProps>(function Editor
 			<div className="min-h-0 flex-1">
 				{/* Terminals stay mounted, so their shells survive switching tabs and hiding the panel */}
 				<div className={cn("h-full", tab !== "terminal" && "hidden")}>
-					<TerminalPanel ref={terminalRef} workspacePath={workspacePath} dir="editor" visible={open && tab === "terminal"} />
+					<TerminalPanel ref={terminalRef} workspacePath={workspacePath} dir="projects" visible={open && tab === "terminal"} />
 				</div>
 				{tab === "output" ? (
 					<RunPanel workspacePath={workspacePath} activePath={activePath} />

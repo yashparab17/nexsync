@@ -228,6 +228,25 @@ pub async fn p2p_cancel_transfers(state: State<'_, P2pState>, rel_path: Option<S
     Ok(state.existing().await.map_or(0, |node| node.sync().cancel_transfers(rel_path.as_deref())))
 }
 
+/// Pauses or resumes changes other devices make inside `projects/` (they wait, newest per file, and land on resume); returns how
+/// many are waiting
+#[tauri::command]
+pub async fn p2p_hold_incoming(state: State<'_, P2pState>, hold: bool) -> Result<usize, String> {
+    let Some(node) = state.existing().await else { return Ok(0) };
+    node.sync().set_hold(hold);
+    if hold {
+        return Ok(node.sync().held_count());
+    }
+    sync::release_held(node).await;
+    Ok(0)
+}
+
+/// Whether incoming changes are paused, and how many are waiting
+#[tauri::command]
+pub async fn p2p_held_count(state: State<'_, P2pState>) -> Result<(bool, usize), String> {
+    Ok(state.existing().await.map_or((false, 0), |node| (node.sync().holding(), node.sync().held_count())))
+}
+
 /// Disconnects a single peer
 #[tauri::command]
 pub async fn p2p_disconnect(state: State<'_, P2pState>, peer_id: String) -> Result<(), String> {

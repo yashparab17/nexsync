@@ -65,7 +65,7 @@ pub fn resolve_workspace_path(workspace_path: &str, rel_path: &str) -> Result<Pa
 
 /// Validates relative path segments to reject traversal patterns and invalid separators
 fn validate_rel_path(rel_path: &str) -> Result<(), String> {
-    const ALLOWED_ROOTS: &[&str] = &["notes", "files", "assets", "tasks", "kanban", "editor"];
+    const ALLOWED_ROOTS: &[&str] = &["notes", "files", "assets", "tasks", "kanban", "projects"];
     
     let rel_path = rel_path.trim_matches('/');
     if rel_path.is_empty() || rel_path == "." {

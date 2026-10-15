@@ -10,6 +10,7 @@ import Loading from "@/components/Loading";
 // Lazy-load sub-routes for optimized bundle splitting
 const WorkspaceFiles = lazy(() => import("@/pages/workspace/WorkspaceFiles"));
 const WorkspaceEditor = lazy(() => import("@/pages/workspace/WorkspaceEditor"));
+const WorkspaceProjects = lazy(() => import("@/pages/workspace/WorkspaceProjects"));
 const WorkspaceNotes = lazy(() => import("@/pages/workspace/WorkspaceNotes"));
 const WorkspaceAssets = lazy(() => import("@/pages/workspace/WorkspaceAssets"));
 const WorkspaceTasks = lazy(() => import("@/pages/workspace/WorkspaceTasks"));
@@ -67,6 +68,14 @@ export const router = createBrowserRouter([
 						element: (
 							<RouteSuspense>
 								<WorkspaceEditor />
+							</RouteSuspense>
+						),
+					},
+					{
+						path: "projects",
+						element: (
+							<RouteSuspense>
+								<WorkspaceProjects />
 							</RouteSuspense>
 						),
 					},

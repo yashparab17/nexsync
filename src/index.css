@@ -218,6 +218,12 @@
   outline-offset: 2px;
 }
 
+/* Panels that change size glide to the new one; while a splitter is being dragged they follow the pointer at once */
+.glide { transition: width 250ms cubic-bezier(.22, 1, .36, 1); }
+.glide-rows { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 250ms cubic-bezier(.22, 1, .36, 1); }
+.glide-rows[data-folded="true"] { grid-template-rows: 0fr; }
+body[data-resizing] .glide { transition: none; }
+
 /* People who ask their system for less motion get none, except the loading logo, which turns to a slow pulse */
 @media (prefers-reduced-motion: reduce) {
   *:not([role="status"] *), *:not([role="status"] *)::before, *:not([role="status"] *)::after {
@@ -372,7 +378,7 @@ input:not([type="checkbox"], [type="radio"], [type="color"], [type="range"]):foc
   outline: 1px solid var(--primary);
   outline-offset: 0;
 }
-.field-focus input:focus-visible { outline: none; }
+.field-focus input:focus-visible, .field-focus textarea:focus-visible { outline: none; }
 
 /* The edge of the page card: drawn on top of whatever a page paints, so no page can cover it */
 .window-edge { position: relative; }

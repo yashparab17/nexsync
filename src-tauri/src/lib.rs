@@ -7,6 +7,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(commands::p2p::P2pState::default())
         .manage(commands::editor_run::RunState::default())
+        .manage(commands::workspace::project_tasks::TaskState::default())
         .manage(commands::terminal::TerminalState::default())
         .setup(|app| {
             // A crash leaves a record in the local error log
@@ -194,6 +195,25 @@ pub fn run() {
             commands::p2p::p2p_network_change,
             commands::p2p::p2p_fetch_file,
             commands::p2p::p2p_list_shareable_files,
+            commands::workspace::projects::projects_list,
+            commands::workspace::projects::project_save_recipe,
+            commands::workspace::projects::project_create,
+            commands::workspace::projects::project_add_ignore,
+            commands::workspace::project_doctor::project_doctor,
+            commands::workspace::project_scan::project_scan,
+            commands::workspace::project_tasks::project_task_trust,
+            commands::workspace::project_tasks::project_task_approve,
+            commands::workspace::project_tasks::project_task_start,
+            commands::workspace::project_tasks::project_task_stop,
+            commands::workspace::project_tasks::project_runs,
+            commands::workspace::project_tasks::project_run_log,
+            commands::workspace::project_env::project_env_status,
+            commands::workspace::project_env::project_env_set,
+            commands::workspace::project_env::project_env_clear,
+            commands::workspace::project_env::project_deps_status,
+            commands::workspace::project_env::project_deps_mark,
+            commands::p2p::p2p_hold_incoming,
+            commands::p2p::p2p_held_count,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

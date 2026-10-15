@@ -44,7 +44,6 @@ export default function ModerationPanel() {
 
 	return (
 		<Panel
-			index="03"
 			title="Moderation"
 			className="@4xl:col-span-2"
 			right={

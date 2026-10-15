@@ -42,6 +42,7 @@ const PAGES: [string, string][] = [
 	["Kanban board", "/workspace/kanban"],
 	["Chat", "/workspace/chat"],
 	["Announcements", "/workspace/announcements"],
+	["Projects", "/workspace/projects"],
 	["Editor", "/workspace/editor"],
 	["Explorer", "/workspace/explorer"],
 	["Files", "/workspace/files"],

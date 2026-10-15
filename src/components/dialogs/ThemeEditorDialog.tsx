@@ -89,7 +89,7 @@ export default function ThemeEditorDialog({ mode, initial, onClose }: { mode: Th
 				<DialogHeading icon={<Palette className="size-6" />} title={initial ? "Edit Theme" : "New Theme"} />
 
 				<section className="space-y-2">
-					<SectionTitle n="01" title="Name" />
+					<SectionTitle title="Name" />
 					<div className="grid gap-4 sm:grid-cols-2">
 						<div>
 							<Label htmlFor="theme-name">Name</Label>
@@ -110,7 +110,7 @@ export default function ThemeEditorDialog({ mode, initial, onClose }: { mode: Th
 				</section>
 
 				<section className="space-y-2">
-					<SectionTitle n="02" title="Preview" />
+					<SectionTitle title="Preview" />
 					<Sample mode={mode} vars={vars} />
 					{themeWarnings(vars).length > 0 && (
 						<ul role="status" className="space-y-1 bg-warning/10 p-3 text-sm text-warning">
@@ -122,7 +122,7 @@ export default function ThemeEditorDialog({ mode, initial, onClose }: { mode: Th
 				</section>
 
 				<section className="space-y-4">
-					<SectionTitle n="03" title="Colours" />
+					<SectionTitle title="Colours" />
 					{GROUPS.map((g) => (
 						<div key={g.title} className="space-y-2">
 							<p className="font-mono text-[13px] text-muted-foreground">{g.title}</p>
@@ -167,7 +167,7 @@ export default function ThemeEditorDialog({ mode, initial, onClose }: { mode: Th
 				</section>
 
 				<section className="space-y-2">
-					<SectionTitle n="04" title="As CSS" />
+					<SectionTitle title="As CSS" />
 					<textarea
 						id="theme-css"
 						aria-label="As CSS"

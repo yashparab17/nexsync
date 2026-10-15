@@ -320,7 +320,7 @@ export default function WorkspaceSettings({ onClose }: { onClose?: () => void } 
 								setExporting(true);
 								setExportResult(null);
 								try {
-									const result = await exportFolders(workspace.path, ["notes", "files", "assets", "editor"], workspace.name);
+									const result = await exportFolders(workspace.path, ["notes", "files", "assets", "projects"], workspace.name);
 									if (result) setExportResult({ ok: true, text: `Saved ${result.count} ${result.count === 1 ? "file" : "files"} to ${result.dest}` });
 								} catch (err) {
 									setExportResult({ ok: false, text: errorText(err, "Could not export the workspace.") });

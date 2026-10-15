@@ -1,4 +1,4 @@
-//! Running a command in the workspace's `editor` folder and streaming its output to the Editor tab.
+//! Running a command in the workspace's `projects` folder and streaming its output to the Editor tab.
 //!
 //! Only the local user can start a run, from their own device; collaborators cannot trigger one.
 //! Each run has an id so the UI can stop it, and output is capped so a chatty program cannot flood the UI.
@@ -30,7 +30,7 @@ const MAX_LINE_LEN: usize = 4_000;
 /// How long to wait for output to drain after a run is stopped
 const DRAIN_TIMEOUT: Duration = Duration::from_secs(2);
 
-type Sink = Arc<dyn Fn(&'static str, String) + Send + Sync>;
+pub(crate) type Sink = Arc<dyn Fn(&'static str, String) + Send + Sync>;
 
 /// Runs in progress, each with the switch that stops it
 #[derive(Default)]
@@ -78,6 +78,10 @@ async fn stop(child: &mut tokio::process::Child) {
     if let Some(pid) = child.id() {
         let _ = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]).output();
     }
+    #[cfg(unix)]
+    if let Some(pid) = child.id() {
+        let _ = std::process::Command::new("kill").args(["-KILL", "--", &format!("-{pid}")]).output();
+    }
     let _ = child.kill().await;
 }
 
@@ -107,14 +111,20 @@ async fn pump(reader: impl AsyncRead + Unpin, stream: &'static str, sink: Sink) 
 }
 
 /// Runs `command` in `dir`, passing each output line to `sink`. Returns the exit code and whether it was stopped.
-async fn run_streaming(
+pub(crate) async fn run_streaming(
     dir: &Path,
     command: &str,
-    mut stop_rx: oneshot::Receiver<()>,
+    env: &[(String, String)],
+    stop_rx: &mut oneshot::Receiver<()>,
     sink: Sink,
 ) -> Result<(Option<i32>, bool), String> {
-    let mut child = shell(command)
+    let mut cmd = shell(command);
+    // Its own process group, so stopping it can end everything it started
+    #[cfg(unix)]
+    cmd.process_group(0);
+    let mut child = cmd
         .current_dir(dir)
+        .envs(env.iter().map(|(k, v)| (k, v)))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -126,7 +136,7 @@ async fn run_streaming(
 
     let (code, stopped) = tokio::select! {
         status = child.wait() => (status.ok().and_then(|s| s.code()), false),
-        _ = &mut stop_rx => {
+        _ = &mut *stop_rx => {
             stop(&mut child).await;
             (None, true)
         }
@@ -153,8 +163,8 @@ pub async fn run_command(
         return Err("Enter a command to run.".to_string());
     }
     let dir = dir.trim_matches('/');
-    if dir != "editor" && !dir.starts_with("editor/") {
-        return Err("Commands run only inside the editor folder.".to_string());
+    if dir != "projects" && !dir.starts_with("projects/") {
+        return Err("Commands run only inside the projects folder.".to_string());
     }
     let cwd = resolve_workspace_path(&workspace_path, dir)?;
     if !cwd.is_dir() {
@@ -174,7 +184,8 @@ pub async fn run_command(
         }
     });
     tokio::spawn(async move {
-        let result = run_streaming(&cwd, &command, stop_rx, sink).await;
+        let mut stop_rx = stop_rx;
+        let result = run_streaming(&cwd, &command, &[], &mut stop_rx, sink).await;
         let (code, stopped, error) = match result {
             Ok((code, stopped)) => (code, stopped, None),
             Err(e) => (None, false, Some(e)),
@@ -210,9 +221,9 @@ mod tests {
     #[tokio::test]
     async fn test_output_is_streamed_and_the_exit_code_reported() {
         let (sink, lines) = collect();
-        let (_tx, rx) = oneshot::channel();
+        let (_tx, mut rx) = oneshot::channel();
         let (code, stopped) =
-            run_streaming(&std::env::temp_dir(), "echo hello && echo oops 1>&2 && exit 3", rx, sink).await.unwrap();
+            run_streaming(&std::env::temp_dir(), "echo hello && echo oops 1>&2 && exit 3", &[], &mut rx, sink).await.unwrap();
         assert_eq!((code, stopped), (Some(3), false));
         let lines = lines.lock().unwrap();
         assert!(lines.iter().any(|(s, t)| *s == "stdout" && t.trim() == "hello"), "{lines:?}");
@@ -226,11 +237,11 @@ mod tests {
         #[cfg(not(windows))]
         let long = "sleep 30";
         let (sink, _lines) = collect();
-        let (tx, rx) = oneshot::channel();
+        let (tx, mut rx) = oneshot::channel();
         let started = std::time::Instant::now();
         let handle = tokio::spawn({
             let dir = std::env::temp_dir();
-            async move { run_streaming(&dir, long, rx, sink).await }
+            async move { run_streaming(&dir, long, &[], &mut rx, sink).await }
         });
         tokio::time::sleep(Duration::from_millis(500)).await;
         tx.send(()).unwrap();

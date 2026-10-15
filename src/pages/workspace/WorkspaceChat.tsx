@@ -410,7 +410,7 @@ export default function WorkspaceChat() {
 						onClose={() => setThreadId(null)}
 					/>
 				)}
-				{showMembers && !thread && <MemberList members={members} online={online} />}
+				<MemberList members={members} online={online} open={showMembers && !thread} />
 			</div>
 		</Page>
 	);

@@ -122,7 +122,7 @@ export default function WorkspaceInsights() {
 			<PageBody padded={false} className="@container">
 				{tab === "overview" ? (
 					<div className="grid gap-4 p-4 @4xl:grid-cols-6">
-						<Panel index="01" title="Last 14 Days" className="@4xl:col-span-4 @4xl:row-span-2">
+						<Panel title="Last 14 Days" className="@4xl:col-span-4 @4xl:row-span-2">
 							<DayColumns days={days} label={`Actions per day over the last ${DAYS} days`} tall />
 						</Panel>
 						<div className="grid grid-cols-2 gap-4 @4xl:col-span-2">
@@ -131,7 +131,7 @@ export default function WorkspaceInsights() {
 							<Stat label="Tasks finished" value={finishedTotal} />
 							<Stat label="Tasks still open" value={openTasks} />
 						</div>
-						<Panel index="02" title="Task Progress" className="@4xl:col-span-2">
+						<Panel title="Task Progress" className="@4xl:col-span-2">
 							{tasks.length === 0 ? (
 								<Empty>No tasks yet.</Empty>
 							) : (
@@ -162,20 +162,20 @@ export default function WorkspaceInsights() {
 							)}
 						</Panel>
 
-						<Panel index="03" title="Activity Calendar" className="@4xl:col-span-3">
+						<Panel title="Activity Calendar" className="@4xl:col-span-3">
 							<MonthCalendar days={year} label="Actions per day, by month" />
 						</Panel>
-						<Panel index="04" title="Last 16 Weeks" className="@4xl:col-span-3">
+						<Panel title="Last 16 Weeks" className="@4xl:col-span-3">
 							<Heatmap days={weeks} label={`Actions per day over the last ${WEEKS} weeks`} />
 						</Panel>
 
-						<Panel index="05" title="Actions by Person" className="@4xl:col-span-3">
+						<Panel title="Actions by Person" className="@4xl:col-span-3">
 							<BarRows rows={byPerson.map(([label, n]) => ({ label, parts: [{ value: n, bg: "bg-primary", title: "Actions" }] }))} lead={(l) => <Avatar name={l} className="size-6 text-xs" />} empty="Nothing recorded yet." />
 						</Panel>
-						<Panel index="06" title="Tasks Finished" className="@4xl:col-span-3">
+						<Panel title="Tasks Finished" className="@4xl:col-span-3">
 							<BarRows rows={finished.map(([label, n]) => ({ label, parts: [{ value: n, bg: "bg-success", title: "Finished" }] }))} lead={(l) => <Avatar name={l} className="size-6 text-xs" />} empty="No task has been finished yet." />
 						</Panel>
-						<Panel index="07" title="Open Work by Person" className="@4xl:col-span-3">
+						<Panel title="Open Work by Person" className="@4xl:col-span-3">
 							<BarRows
 								rows={load.map((w) => ({
 									label: w.name,
@@ -194,7 +194,7 @@ export default function WorkspaceInsights() {
 								</p>
 							)}
 						</Panel>
-						<Panel index="08" title="Where the Work Happens" className="@4xl:col-span-3">
+						<Panel title="Where the Work Happens" className="@4xl:col-span-3">
 							{byKind.length === 0 ? <Empty>Nothing recorded yet.</Empty> : <Donut label="Actions by part of the app" parts={byKind.slice(0, SERIES.length).map(([label, value]) => ({ label, value }))} center={<><span className="text-xl font-semibold tabular-nums">{events.length}</span><span className="text-sm text-muted-foreground">actions</span></>} />}
 						</Panel>
 					</div>

@@ -10,7 +10,7 @@ use serde::Serialize;
 use crate::commands::config::validate_allowed_root;
 
 /// Folders and the database directory that Nexsync creates inside a workspace
-const OWN_ITEMS: &[&str] = &["notes", "files", "assets", "editor", "tasks", "kanban", ".nexsync"];
+const OWN_ITEMS: &[&str] = &["notes", "files", "assets", "projects", "tasks", "kanban", ".nexsync"];
 /// Files the operating system adds on its own, which do not count as user content
 const OS_JUNK: &[&str] = &["desktop.ini", "thumbs.db", ".ds_store"];
 

@@ -96,6 +96,10 @@ pub struct LiveSync {
     transfers: Mutex<HashMap<(String, String), watch::Sender<bool>>>,
     /// Bumped when the user cancels everything, so catch-up loops stop starting new downloads
     generation: AtomicU64,
+    /// While on, changes other devices make inside `projects/` wait here (the newest per file) instead of landing, so a build or
+    /// test run is not disturbed mid-way; turning it off lets them through
+    hold: std::sync::atomic::AtomicBool,
+    held: Mutex<HashMap<String, (String, SyncMessage)>>,
 }
 
 impl LiveSync {
@@ -107,8 +111,26 @@ impl LiveSync {
             inflight: Mutex::new(HashMap::new()),
             transfers: Mutex::new(HashMap::new()),
             generation: AtomicU64::new(0),
+            hold: std::sync::atomic::AtomicBool::new(false),
+            held: Mutex::new(HashMap::new()),
         };
         (sync, rx)
+    }
+
+    pub fn holding(&self) -> bool {
+        self.hold.load(Ordering::SeqCst)
+    }
+
+    pub fn set_hold(&self, on: bool) {
+        self.hold.store(on, Ordering::SeqCst);
+    }
+
+    pub fn held_count(&self) -> usize {
+        self.held.lock().unwrap_or_else(|p| p.into_inner()).len()
+    }
+
+    fn take_held(&self) -> Vec<(String, SyncMessage)> {
+        self.held.lock().unwrap_or_else(|p| p.into_inner()).drain().map(|(_, v)| v).collect()
     }
 
     /// Registers a download and returns the receiver that turns `true` when it is cancelled
@@ -229,9 +251,19 @@ pub async fn run_local_changes(node: Arc<Node>, mut rx: mpsc::UnboundedReceiver<
         }
         let Some(workspace) = node.workspace_path() else { continue };
         let root = PathBuf::from(&workspace);
+        let mut rules = crate::commands::workspace::syncignore::Rules::load(&root);
         for path in batch {
             let Some(rel_path) = rel_path_of(&root, &path) else { continue };
+            // Dependencies, build output and local environment files never leave this device
+            if rules.ignored(&rel_path, false) {
+                continue;
+            }
             if let Some(message) = describe_local(&path, rel_path).await {
+                if let SyncMessage::Changed { rel_path, size, .. } = &message {
+                    if crate::commands::workspace::syncignore::too_big(rel_path, *size) {
+                        continue;
+                    }
+                }
                 if let Ok(value) = serde_json::to_value(&message) {
                     let _ = node.send(None, &value).await;
                 }
@@ -253,6 +285,13 @@ async fn already_matches(local: &Path, size: u64, hash: Option<&str>) -> bool {
     }
 }
 
+/// Lets through what was held while incoming changes were paused
+pub async fn release_held(node: Arc<Node>) {
+    for (peer_id, message) in node.sync().take_held() {
+        handle_remote(node.clone(), peer_id, message).await;
+    }
+}
+
 /// Applies a file change or deletion announced by a peer to the shared workspace
 pub async fn handle_remote(node: Arc<Node>, peer_id: String, message: SyncMessage) {
     if !node.peer_may_write(&peer_id) {
@@ -262,7 +301,11 @@ pub async fn handle_remote(node: Arc<Node>, peer_id: String, message: SyncMessag
 
     match message {
         SyncMessage::Changed { rel_path, size, hash } => {
-            let Ok(rel) = files::check_rel_path(&rel_path) else { return };
+            let Ok(rel) = files::check_rel_path_in(&workspace, &rel_path) else { return };
+            if node.sync().holding() && rel.starts_with("projects/") {
+                node.sync().held.lock().unwrap_or_else(|p| p.into_inner()).insert(rel.clone(), (peer_id, SyncMessage::Changed { rel_path: rel, size, hash }));
+                return;
+            }
             let Ok(local) = resolve_workspace_path(&workspace, &rel) else { return };
             if already_matches(&local, size, hash.as_deref()).await {
                 return;
@@ -274,7 +317,11 @@ pub async fn handle_remote(node: Arc<Node>, peer_id: String, message: SyncMessag
             fetch_coalesced(&node, &peer_id, &workspace, rel).await;
         }
         SyncMessage::Deleted { rel_path } => {
-            let Ok(rel) = files::check_rel_path(&rel_path) else { return };
+            let Ok(rel) = files::check_rel_path_in(&workspace, &rel_path) else { return };
+            if node.sync().holding() && rel.starts_with("projects/") {
+                node.sync().held.lock().unwrap_or_else(|p| p.into_inner()).insert(rel.clone(), (peer_id, SyncMessage::Deleted { rel_path: rel }));
+                return;
+            }
             let Ok(local) = resolve_workspace_path(&workspace, &rel) else { return };
             if tokio::fs::symlink_metadata(&local).await.is_err() {
                 return;
@@ -378,12 +425,16 @@ async fn handle_manifest(node: &Arc<Node>, peer_id: &str, workspace: &str, entri
         let ws = workspace.to_string();
         tokio::task::spawn_blocking(move || crate::commands::workspace::erase::erased_list(&ws)).await.unwrap_or_default()
     };
+    let mut rules = crate::commands::workspace::syncignore::Rules::load(Path::new(workspace));
     for entry in entries {
         // The user cancelled the transfers, so don't start the rest of this catch-up.
         if node.sync().generation() != generation {
             break;
         }
         let Ok(rel) = files::check_rel_path(&entry.rel_path) else { continue };
+        if rules.ignored(&rel, false) {
+            continue;
+        }
         if crate::commands::workspace::erase::covers(&erased, &rel, entry.modified) {
             continue;
         }
@@ -400,9 +451,12 @@ async fn handle_manifest(node: &Arc<Node>, peer_id: &str, workspace: &str, entri
                 if !entry.dirty || entry.modified <= local_modified {
                     continue;
                 }
-                if let Err(e) = keep_conflict_copy(&local).await {
-                    eprintln!("[P2P] Could not keep a copy of {rel}, skipping it: {e}");
-                    continue;
+                // A lock file is rewritten by a tool, so the newer one simply wins
+                if !crate::commands::workspace::syncignore::is_generated(&rel) {
+                    if let Err(e) = keep_conflict_copy(&local).await {
+                        eprintln!("[P2P] Could not keep a copy of {rel}, skipping it: {e}");
+                        continue;
+                    }
                 }
             } else if let Err(e) = copy_to_trash(workspace, &local, &rel).await {
                 eprintln!("[P2P] Could not back up {rel} before updating it, skipping: {e}");

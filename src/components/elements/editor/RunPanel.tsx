@@ -35,7 +35,7 @@ const MAX_LINES = 3000;
 // eslint-disable-next-line no-control-regex
 const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
 
-// The command that runs this file, with its path relative to the editor folder the command starts in
+// The command that runs this file, with its path relative to the projects folder the command starts in
 function suggestCommand(path: string | null): string {
 	if (!path) return "";
 	const template = RUNNERS[extensionOf(path)];
@@ -47,7 +47,7 @@ function suggestCommand(path: string | null): string {
 // Asked once per app session, because files from collaborators run with this person's permissions
 let confirmedThisSession = false;
 
-// Run output for the Editor tab: type or pick a command, run it in the editor folder, and stop it any time
+// Run output for the Editor tab: type or pick a command, run it in the projects folder, and stop it any time
 export default function RunPanel({ workspacePath, activePath }: { workspacePath: string; activePath: string | null }) {
 	const [command, setCommand] = useState("");
 	const [lines, setLines] = useState<OutputLine[]>([]);
@@ -106,7 +106,7 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 		startingRef.current = true;
 		runIdRef.current = null;
 		try {
-			const id = await runCommand(workspacePath, "editor", command);
+			const id = await runCommand(workspacePath, "projects", command);
 			// The run may already have ended while the id was on its way
 			if (startingRef.current && !runIdRef.current) runIdRef.current = id;
 		} catch (err) {
@@ -131,7 +131,7 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 					onKeyDown={(e) => {
 						if (e.key === "Enter") confirmedThisSession ? void start() : setConfirming(true);
 					}}
-					placeholder="Command to run in the editor folder, e.g. python main.py"
+					placeholder="Command to run in the projects folder, e.g. python main.py"
 					className="h-7 flex-1 font-mono text-xs"
 					aria-label="Command to run"
 				/>
@@ -152,7 +152,7 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 			</div>
 			<div className="min-h-0 flex-1 overflow-auto bg-muted/20 p-3 font-mono text-xs">
 				{lines.length === 0 ? (
-					<p className="text-muted-foreground">Output appears here. Commands start in the workspace editor folder.</p>
+					<p className="text-muted-foreground">Output appears here. Commands start in the workspace's projects folder.</p>
 				) : (
 					lines.map((line) => (
 						<div

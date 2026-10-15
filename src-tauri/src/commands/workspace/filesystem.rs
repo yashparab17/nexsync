@@ -32,13 +32,15 @@ pub fn list_workspace_files(
 
     let entries = fs::read_dir(&dir).map_err(|_| "Failed to list directory.".to_string())?;
     let mut files = vec![];
+    let root = clean_sub.split('/').next().unwrap_or("").to_string();
+    let mut rules = super::syncignore::Rules::load(std::path::Path::new(&path));
 
     for entry in entries {
         let entry = entry.map_err(|e| e.to_string())?;
         let file_name = entry.file_name().to_string_lossy().to_string();
         
-        // Hide internal .nexsync directory and hidden files
-        if file_name.starts_with('.') {
+        // Hide the internal .nexsync directory and hidden files; inside a project, dotfiles are part of it (except Git's own folder)
+        if super::syncignore::hidden_name_skipped(&root, &file_name) || file_name == ".git" {
             continue;
         }
 
@@ -67,12 +69,14 @@ pub fn list_workspace_files(
             format!("/{}/{}", clean_sub, file_name)
         };
 
+        let ignored = rules.ignored(item_path.trim_start_matches('/'), metadata.is_dir());
         files.push(WorkspaceFile {
             name: file_name.clone(),
             path: item_path,
             is_dir: metadata.is_dir(),
             size: metadata.len(),
             modified_at,
+            ignored,
         });
     }
 
@@ -332,6 +336,7 @@ pub fn import_asset_from_path(
         name: final_name.clone(),
         path: format!("/assets/{}", final_name),
         is_dir: false,
+        ignored: false,
         size: metadata.len(),
         modified_at,
     })
@@ -360,7 +365,7 @@ const SEARCH_TEXT_EXTENSIONS: &[&str] = &[
     "md", "markdown", "txt", "json", "csv", "toml", "yml", "yaml", "html", "htm", "css", "js", "ts", "tsx", "jsx", "rs",
 ];
 
-fn search_walk(dir: &std::path::Path, rel: &str, depth: usize, out: &mut Vec<SearchFile>, text_files: &mut usize) {
+fn search_walk(dir: &std::path::Path, rel: &str, depth: usize, out: &mut Vec<SearchFile>, text_files: &mut usize, rules: &mut super::syncignore::Rules) {
     let Ok(entries) = fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         if out.len() >= SEARCH_MAX_FILES {
@@ -368,13 +373,14 @@ fn search_walk(dir: &std::path::Path, rel: &str, depth: usize, out: &mut Vec<Sea
         }
         let Some(name) = entry.file_name().to_str().map(str::to_owned) else { continue };
         let Ok(meta) = entry.path().symlink_metadata() else { continue };
-        if name.starts_with('.') || meta.is_symlink() {
+        let path = format!("{rel}/{name}");
+        let root = path.split('/').nth(1).unwrap_or("");
+        if super::syncignore::hidden_name_skipped(root, &name) || meta.is_symlink() || rules.ignored(path.trim_start_matches('/'), meta.is_dir()) {
             continue;
         }
-        let path = format!("{rel}/{name}");
         if meta.is_dir() {
             if depth < SEARCH_MAX_DEPTH {
-                search_walk(&entry.path(), &path, depth + 1, out, text_files);
+                search_walk(&entry.path(), &path, depth + 1, out, text_files, rules);
             }
             continue;
         }
@@ -398,6 +404,7 @@ pub fn search_workspace_files(app_handle: tauri::AppHandle, path: String) -> Res
     validate_allowed_root(&app_handle, &path)?;
     let root = crate::commands::path_utils::resolve_workspace_path(&path, ".")?;
     let mut files = Vec::new();
-    search_walk(&root, "", 0, &mut files, &mut 0);
+    let mut rules = super::syncignore::Rules::load(&root);
+    search_walk(&root, "", 0, &mut files, &mut 0, &mut rules);
     Ok(files)
 }

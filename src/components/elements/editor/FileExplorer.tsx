@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import Toolbar, { ToolbarSearch, ToolbarTitle } from "@/components/layout/Toolbar";
-import { ChevronRight, Columns3, Copy, RefreshCw, Trash2, ChevronDown, ChevronsDownUp, Download, FilePlus, FolderPlus, Pencil } from "@/components/animate-icons";
+import { ChevronRight, Columns3, Copy, Eye, EyeOff, RefreshCw, Trash2, ChevronDown, ChevronsDownUp, Download, FilePlus, FolderPlus, Pencil } from "@/components/animate-icons";
 
 import FileKindIcon, { FolderKindIcon } from "./FileKindIcon";
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
@@ -15,7 +15,7 @@ import type { WorkspaceFile } from "@/types/workspace";
 const toRel = (path: string) => path.replace(/^\/+/, "");
 
 interface FileExplorerProps {
-	// Top-level folders shown, such as editor and files
+	// Top-level folders shown, such as projects and files
 	roots: string[];
 	// Folder path to its listing; a folder that is not loaded yet has no entry
 	entries: Record<string, WorkspaceFile[]>;
@@ -74,6 +74,7 @@ export default function FileExplorer({
 }: FileExplorerProps) {
 	const { open: openMenu, menu } = useContextMenu();
 	const [query, setQuery] = useState("");
+	const [showIgnored, setShowIgnored] = useState(false);
 	const treeRef = useRef<HTMLDivElement>(null);
 	// Dropped files go to the folder under the pointer: a folder row is itself, a file row its folder
 	const dirAt = (target: EventTarget | null) => (target as Element | null)?.closest?.("[data-drop-dir]")?.getAttribute("data-drop-dir") ?? targetDir;
@@ -148,6 +149,7 @@ export default function FileExplorer({
 
 	const renderDir = (dir: string): React.ReactNode =>
 		(entries[dir] ?? [])
+			.filter((entry) => showIgnored || !entry.ignored)
 			.filter((entry) => !filtering || matches(entry.name) || (entry.is_dir && hasMatch(toRel(entry.path))))
 			.map((entry) => {
 				const rel = toRel(entry.path);
@@ -160,6 +162,7 @@ export default function FileExplorer({
 							onContextMenu={(e) => openMenu(e, entryMenu(entry, rel))}
 							className={cn(
 								"group flex items-center pr-1 text-sm hover:bg-muted/50",
+								entry.ignored && "opacity-50",
 								dragging && dropDir === (entry.is_dir ? rel : rel.split("/").slice(0, -1).join("/")) && "bg-primary/15",
 								isActive && "bg-primary/10 shadow-[inset_2px_0_0_var(--color-primary)]",
 								entry.is_dir && targetDir === rel && !filtering && "bg-muted/60",
@@ -249,6 +252,9 @@ export default function FileExplorer({
 							</Button>
 						</>
 					)}
+					<Button variant="ghost" size="icon-xs" aria-label={showIgnored ? "Hide files kept on this device" : "Show files kept on this device"} aria-pressed={showIgnored} onPress={() => setShowIgnored((v) => !v)}>
+						{showIgnored ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+					</Button>
 					<Button variant="ghost" size="icon-xs" aria-label="Refresh files" onPress={onRefresh}>
 						<RefreshCw className="size-3.5" />
 					</Button>

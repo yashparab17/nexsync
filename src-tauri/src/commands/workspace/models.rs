@@ -233,6 +233,9 @@ pub struct WorkspaceFile {
     pub is_dir: bool,
     pub size: u64,
     pub modified_at: String,
+    /// Kept on this device only (dependencies, build output, local environment files, what `.nexignore` names)
+    #[serde(default)]
+    pub ignored: bool,
 }
 
 /// Aggregated metrics for workspace dashboard

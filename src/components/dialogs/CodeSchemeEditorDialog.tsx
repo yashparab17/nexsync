@@ -47,7 +47,7 @@ export default function CodeSchemeEditorDialog({ mode, initial, onClose }: { mod
 				<DialogHeading icon={<Palette className="size-6" />} title={initial ? "Edit Code Colours" : "New Code Colours"} />
 
 				<section className="space-y-2">
-					<SectionTitle n="01" title="Name" />
+					<SectionTitle title="Name" />
 					<div className="grid gap-4 sm:grid-cols-2">
 						<div>
 							<Label htmlFor="scheme-name">Name</Label>
@@ -68,12 +68,12 @@ export default function CodeSchemeEditorDialog({ mode, initial, onClose }: { mod
 				</section>
 
 				<section className="space-y-2">
-					<SectionTitle n="02" title="Preview" />
+					<SectionTitle title="Preview" />
 					<CodeSample vars={vars} />
 				</section>
 
 				<section className="space-y-2">
-					<SectionTitle n="03" title="Colours" />
+					<SectionTitle title="Colours" />
 					<div className="frame grid gap-px bg-[var(--rule)] sm:grid-cols-2">
 						{SYNTAX_TOKENS.map((t) => {
 							const value = typing[t.key] ?? vars[t.key];
@@ -111,7 +111,7 @@ export default function CodeSchemeEditorDialog({ mode, initial, onClose }: { mod
 				</section>
 
 				<section className="space-y-2">
-					<SectionTitle n="04" title="As CSS" />
+					<SectionTitle title="As CSS" />
 					<textarea
 						id="scheme-css"
 						aria-label="As CSS"

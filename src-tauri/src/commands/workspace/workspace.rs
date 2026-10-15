@@ -145,7 +145,7 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
     tx.commit().map_err(|e| e.to_string())?;
 
     // Create default content folders
-    let folders = ["notes", "files", "tasks", "kanban", "editor", "assets"];
+    let folders = ["notes", "files", "tasks", "kanban", "projects", "assets"];
     for folder in folders {
         fs::create_dir_all(workspace_path.join(folder)).map_err(|e| e.to_string())?;
     }
@@ -476,26 +476,32 @@ fn persist_metadata(db: &WorkspaceDb, canonical_path_str: &str, metadata: &Works
 /// Deepest folder level counted, so a runaway tree cannot stall the dashboard
 const MAX_COUNT_DEPTH: usize = 12;
 
-/// Counts the files in a folder and all its subfolders, skipping hidden entries and symlinks
-fn count_files(dir: &Path, depth: usize) -> usize {
+/// Counts the files in a folder and all its subfolders, skipping hidden entries, symlinks and what a project keeps on the
+/// device (dependencies, build output): `rel` is the folder's path in the workspace
+fn count_files(dir: &Path, depth: usize, rel: &str, rules: &mut super::syncignore::Rules) -> usize {
     if depth > MAX_COUNT_DEPTH {
         return 0;
     }
     let Ok(entries) = fs::read_dir(dir) else { return 0 };
-    entries
-        .filter_map(Result::ok)
-        .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
-        .filter_map(|e| e.file_type().ok().map(|t| (e.path(), t)))
-        .map(|(path, kind)| {
-            if kind.is_file() {
-                1
-            } else if kind.is_dir() {
-                count_files(&path, depth + 1)
-            } else {
-                0
-            }
-        })
-        .sum()
+    let root = rel.split('/').next().unwrap_or("").to_string();
+    let mut total = 0;
+    for e in entries.filter_map(Result::ok) {
+        let name = e.file_name().to_string_lossy().to_string();
+        let Ok(kind) = e.file_type() else { continue };
+        if super::syncignore::hidden_name_skipped(&root, &name) {
+            continue;
+        }
+        let child = format!("{rel}/{name}");
+        if (kind.is_file() || kind.is_dir()) && rules.ignored(&child, kind.is_dir()) {
+            continue;
+        }
+        if kind.is_file() {
+            total += 1;
+        } else if kind.is_dir() {
+            total += count_files(&e.path(), depth + 1, &child, rules);
+        }
+    }
+    total
 }
 
 /// Retrieves aggregate metrics for files, tasks, and members in the workspace
@@ -509,7 +515,8 @@ pub fn get_workspace_stats(app_handle: tauri::AppHandle, path: String) -> Result
         return Err("The workspace path does not exist.".to_string());
     }
 
-    let count_entries = |subdir: &str| count_files(&workspace_path.join(subdir), 0);
+    let mut rules = super::syncignore::Rules::load(workspace_path);
+    let mut count_entries = |subdir: &str| count_files(&workspace_path.join(subdir), 0, subdir, &mut rules);
 
     let db = WorkspaceDb::open_existing(&path)?;
     let ws_id: String = get_workspace_id(&db)?;
@@ -536,7 +543,7 @@ pub fn get_workspace_stats(app_handle: tauri::AppHandle, path: String) -> Result
         .map_err(|e| e.to_string())?;
 
     Ok(super::models::WorkspaceStats {
-        files: count_entries("files") + count_entries("notes") + count_entries("editor"),
+        files: count_entries("files") + count_entries("notes") + count_entries("projects"),
         assets: count_entries("assets"),
         tasks: task_count as usize,
         kanban_cards: kanban_count as usize,
@@ -556,8 +563,9 @@ mod tests {
         for file in ["main.py", "src/app.py", "src/deep/util.py", ".git/config", ".env"] {
             fs::write(dir.join(file), "x").unwrap();
         }
-        assert_eq!(count_files(&dir, 0), 3);
-        assert_eq!(count_files(&dir.join("missing"), 0), 0);
+        let mut rules = super::super::syncignore::Rules::load(&dir);
+        assert_eq!(count_files(&dir, 0, "notes", &mut rules), 3);
+        assert_eq!(count_files(&dir.join("missing"), 0, "notes/missing", &mut rules), 0);
         let _ = fs::remove_dir_all(&dir);
     }
 

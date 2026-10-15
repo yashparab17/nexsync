@@ -34,6 +34,13 @@ pub mod data_sync;
 pub mod workspace_delete;
 pub mod versions;
 pub mod export;
+pub mod syncignore;
+pub mod projects;
+pub mod project_doctor;
+pub mod project_scan;
+pub mod project_env;
+pub mod secret_scan;
+pub mod project_tasks;
 
 // Re-exports for command invocation surface
 pub use workspace::*;

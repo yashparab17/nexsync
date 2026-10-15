@@ -33,7 +33,8 @@ export default function Splitter({ orientation, size, onResize, grows, label, cl
 			onPointerDown={(e) => {
 				e.currentTarget.setPointerCapture(e.pointerId);
 				drag.current = { start: vertical ? e.clientX : e.clientY, size };
-				document.body.style.userSelect = "none";
+					document.body.style.userSelect = "none";
+					document.body.dataset.resizing = "";
 			}}
 			onPointerMove={(e) => {
 				if (!drag.current) return;
@@ -43,7 +44,8 @@ export default function Splitter({ orientation, size, onResize, grows, label, cl
 			onPointerUp={(e) => {
 				drag.current = null;
 				e.currentTarget.releasePointerCapture(e.pointerId);
-				document.body.style.userSelect = "";
+					document.body.style.userSelect = "";
+					delete document.body.dataset.resizing;
 			}}
 			onDoubleClick={() => onResize(0)}
 			onKeyDown={(e) => {

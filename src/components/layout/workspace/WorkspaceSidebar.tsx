@@ -1,5 +1,5 @@
 // React
-import { AnimateIcon, Code2, Files, FolderClose, FolderTree, ListTodo, MessageSquareText, Megaphone, StickyNote } from "@/components/animate-icons";
+import { AnimateIcon, Code2, Files, Network, FolderClose, FolderTree, ListTodo, MessageSquareText, Megaphone, StickyNote } from "@/components/animate-icons";
 import { useCallback, useState, type ElementType } from "react";
 
 // React Router
@@ -56,6 +56,12 @@ const navigation: NavigationItem[] = [
 		icon: Code2,
 	},
 	{
+		name: "Projects",
+		label: "nav.projects",
+		path: "/workspace/projects",
+		icon: Network,
+	},
+	{
 		name: "Explorer",
 		label: "nav.explorer",
 		path: "/workspace/explorer",
@@ -106,7 +112,7 @@ const byPath = (path: string) => navigation.find((item) => item.path === path)!;
 const navGroups: { id: string; label?: MessageKey; items: NavigationItem[] }[] = [
 	{ id: "top", items: [byPath("/workspace"), byPath("/workspace/explorer")] },
 	{ id: "talk", label: "nav.groupTalk", items: [byPath("/workspace/announcements"), byPath("/workspace/chat")] },
-	{ id: "write", label: "nav.groupWrite", items: [byPath("/workspace/notes"), byPath("/workspace/editor")] },
+	{ id: "write", label: "nav.groupWrite", items: [byPath("/workspace/notes"), byPath("/workspace/projects"), byPath("/workspace/editor")] },
 	{ id: "storage", label: "nav.groupStorage", items: [byPath("/workspace/files"), byPath("/workspace/assets")] },
 	{ id: "plan", label: "nav.groupPlan", items: [byPath("/workspace/tasks"), byPath("/workspace/kanban")] },
 ];
@@ -250,7 +256,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 		<div className="relative flex h-full shrink-0">
 		<aside
 			style={!expanded ? { width: shownWidth } : undefined}
-			className={cn("flex h-full shrink-0 flex-col overflow-hidden bg-sidebar", expanded && "w-64 border-r")}
+			className={cn("glide flex h-full shrink-0 flex-col overflow-hidden bg-sidebar", expanded && "w-64 border-r")}
 		>
 			{/* Workspace identity */}
 			<div className={cn("flex h-12 shrink-0 items-center gap-2", "justify-start pl-[14px]")}>
@@ -284,7 +290,11 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 									{t(group.label)}
 								</button>
 							)}
-							{open && group.items.map((item) => <NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />)}
+								<div className="glide-rows" data-folded={!open} inert={!open}>
+									<div className="flex min-h-0 flex-col gap-0.5 overflow-hidden">
+										{group.items.map((item) => <NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />)}
+									</div>
+								</div>
 						</div>
 					);
 				})}

@@ -9,19 +9,22 @@ import { cn } from "@/lib/utils";
 interface MemberListProps {
 	members: Member[];
 	online: Set<string>; // Names of the people who are here now
+	open?: boolean; // Folded away it stays mounted, so it can slide shut
 }
 
-export default function MemberList({ members, online }: MemberListProps) {
+export default function MemberList({ members, online, open = true }: MemberListProps) {
 	const here = members.filter((m) => online.has(m.name));
 	const away = members.filter((m) => !online.has(m.name));
 	return (
-		<aside aria-label="Members" className="hidden h-full w-56 shrink-0 flex-col overflow-y-auto bg-panel @4xl:flex">
-			<Toolbar variant="header">
-				<h2 className="px-1 text-sm font-semibold">Members</h2>
-			</Toolbar>
-			<div className="space-y-2 pt-2">
-				<Group title="Online" list={here} online />
-				<Group title="Offline" list={away} online={false} />
+		<aside aria-label="Members" inert={!open} className={cn("glide hidden h-full shrink-0 overflow-hidden bg-panel @4xl:block", open ? "w-56" : "w-0")}>
+			<div className="flex h-full w-56 flex-col overflow-y-auto">
+				<Toolbar variant="header">
+					<h2 className="px-1 text-sm font-semibold">Members</h2>
+				</Toolbar>
+				<div className="space-y-2 pt-2">
+					<Group title="Online" list={here} online />
+					<Group title="Offline" list={away} online={false} />
+				</div>
 			</div>
 		</aside>
 	);

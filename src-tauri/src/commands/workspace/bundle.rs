@@ -239,8 +239,12 @@ pub fn import(path: &str, bundle: &Bundle) -> Result<Report, String> {
         let rows = stmt.query_map(params![], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?;
         rows.filter_map(Result::ok).map(|p| p.trim_matches('/').to_string()).collect()
     };
+    let mut rules = super::syncignore::Rules::load(std::path::Path::new(path));
     for f in content.files {
         let Ok(rel) = check_rel_path(&f.path) else { continue };
+        if rules.ignored(&rel, false) {
+            continue;
+        }
         if erased.iter().any(|e| rel == *e || rel.starts_with(&format!("{e}/"))) {
             continue;
         }
