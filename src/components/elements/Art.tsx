@@ -1,4 +1,4 @@
-// The illustrations (unDraw, recoloured to theme tokens by scripts/recolour-art.py): loaded the first time one is shown and drawn
+// The illustrations (unDraw, recoloured to theme tokens: every colour in the files is a CSS variable): loaded the first time one is shown and drawn
 // inline, so their colours follow whichever theme is on. Purely decorative, so hidden from screen readers.
 
 import { useEffect, useState } from "react";

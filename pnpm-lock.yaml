@@ -144,9 +144,6 @@ importers:
         specifier: ^13.6.32
         version: 13.6.32
     devDependencies:
-      '@iconify-json/catppuccin':
-        specifier: ^1.2.17
-        version: 1.2.17
       '@tauri-apps/cli':
         specifier: ^2.11.4
         version: 2.11.4
@@ -726,12 +723,6 @@ packages:
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
-
-  '@iconify-json/catppuccin@1.2.17':
-    resolution: {integrity: sha512-l1pFOADEUlw+j7V+yfFzBowdE4deeMuI4amqfKaN+7uTI9B0Ho24C86DitQk5zb62NkEM9poOyfuG7WS2bw6jg==}
-
-  '@iconify/types@2.0.0':
-    resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
 
   '@internationalized/date@3.12.4':
     resolution: {integrity: sha512-M1dEn4c1U1HsSlaVR8upZtSqvXrTkHDfv18H01uCSJyjVLDxnBR38v/fMxecmlwXKR4i9HeZcmgQAPE6A+aGJQ==}
@@ -4008,12 +3999,6 @@ snapshots:
   '@hono/node-server@1.19.15(hono@4.13.12)':
     dependencies:
       hono: 4.13.12
-
-  '@iconify-json/catppuccin@1.2.17':
-    dependencies:
-      '@iconify/types': 2.0.0
-
-  '@iconify/types@2.0.0': {}
 
   '@internationalized/date@3.12.4':
     dependencies:
