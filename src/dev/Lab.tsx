@@ -6,13 +6,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Awareness } from "y-protocols/awareness";
 import * as Y from "yjs";
 
-import DocumentWorkspace from "@/components/documents/DocumentWorkspace";
-import SheetWorkspace from "@/components/sheets/SheetWorkspace";
-import SlideWorkspace from "@/components/slides/SlideWorkspace";
-import type { SheetIn } from "@/lib/sheet";
+import DocumentWorkspace from "@/features/office/documents/components/DocumentWorkspace";
+import SheetWorkspace from "@/features/office/sheets/components/SheetWorkspace";
+import SlideWorkspace from "@/features/office/slides/components/SlideWorkspace";
+import type { SheetIn } from "@/features/office/sheets/lib/sheet";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
 
-const SAMPLE = `<h1>Quarterly Review</h1>
+const SAMPLE = `<h1 style="text-align:center">Centered Title</h1><p style="text-align:center">Centered paragraph</p><p style="text-align:right">Right paragraph</p>
+<h1><span style="color:#0f4761;font-size:20pt;font-family:'Aptos Display'">Quarterly Review</span></h1>
+<p><span style="font-family:'Georgia';font-size:14pt;color:#C00000">Georgia red 14pt</span> <span style="font-family:'Courier New'">Courier</span></p>
 <p>This report covers the <strong>second quarter</strong>, with <em>notes</em> from each team and a look ahead. See the <a href="https://example.com">dashboard</a> for the numbers.</p>
 <h2>Highlights</h2>
 <ul><li>Revenue grew by twelve percent</li><li>Support response time fell below four hours</li><li>The new onboarding shipped on schedule</li></ul>
@@ -57,10 +59,26 @@ export default function Lab({ which }: { which: string }) {
 	useEffect(() => {
 		mockIPC((cmd, args) => viaLab(cmd, args));
 	}, []);
-	const collab = useMemo<CollabDoc>(() => {
+	const base = useMemo(() => {
 		const doc = new Y.Doc();
-		return { doc, awareness: new Awareness(doc), synced: true };
+		(window as unknown as { __labSave: (drop?: string) => void }).__labSave = (drop) => {
+			if (drop) doc.getMap(drop).clear();
+			sessionStorage.setItem("labDoc", btoa(Array.from(Y.encodeStateAsUpdate(doc), (b) => String.fromCharCode(b)).join("")));
+		};
+		return { doc, awareness: new Awareness(doc) };
 	}, []);
+	// ?restore: start from the document `__labSave()` kept, loaded a moment later the way the app loads a file opened before
+	const kept = new URLSearchParams(location.search).has("restore") ? sessionStorage.getItem("labDoc") : null;
+	const [synced, setSynced] = useState(!kept);
+	useEffect(() => {
+		if (!kept) return;
+		const t = setTimeout(() => {
+			Y.applyUpdate(base.doc, Uint8Array.from(atob(kept), (c) => c.charCodeAt(0)));
+			setSynced(true);
+		}, 500);
+		return () => clearTimeout(t);
+	}, [base, kept]);
+	const collab = useMemo<CollabDoc>(() => ({ ...base, synced }), [base, synced]);
 	const [readOnly] = useState(false);
 	(window as unknown as { __lab: unknown }).__lab = collab;
 	const [deck, setDeck] = useState<{ base: string; slides: string[]; notes: string[] } | null>(null);
@@ -70,21 +88,29 @@ export default function Lab({ which }: { which: string }) {
 	if (which === "slides")
 		return (
 			<div style={{ height: new URLSearchParams(location.search).get("h") ?? "100vh" }}>
-				{deck ? <SlideWorkspace collab={collab} opened={deck} name="Deck.pptx" rel="files/Deck.pptx" workspacePath="/lab" author="Ana" readOnly={readOnly} /> : null}
+				{deck ? <SlideWorkspace collab={collab} opened={deck} name="Deck.pptx" rel="office/slides/Deck.pptx" workspacePath="/lab" author="Ana" readOnly={readOnly} /> : null}
 			</div>
 		);
 	if (which === "sheets")
 		return (
 			<div style={{ height: new URLSearchParams(location.search).get("h") ?? "100vh" }}>
-				<SheetWorkspace collab={collab} opened={{ sheets: SHEETS, notes: [] }} name="Sales.xlsx" rel="files/Sales.xlsx" workspacePath="/lab" author="Ana" readOnly={readOnly} />
+				<SheetWorkspace collab={collab} opened={{ sheets: SHEETS, notes: [] }} name="Sales.xlsx" rel="office/sheets/Sales.xlsx" workspacePath="/lab" author="Ana" readOnly={readOnly} />
 			</div>
 		);
+	const fileParam = new URLSearchParams(location.search).get("file");
+	const [opened, setOpened] = useState<{ html: string; layout: never; sourceId: string } | null>(null);
+	useEffect(() => {
+		if (fileParam) void viaLab("office_import_file", { path: fileParam }).then((o) => setOpened(o as never));
+	}, [fileParam]);
+	if (fileParam && !opened) return <p className="p-6">Opening…</p>;
 	if (which !== "documents") return <p className="p-6">The lab has no “{which}” yet.</p>;
 	return (
 		<div style={{ height: new URLSearchParams(location.search).get("h") ?? "100vh" }}>
 			<DocumentWorkspace
 				collab={collab}
-				initialHtml={SAMPLE}
+				fileLayout={(opened as unknown as { layout?: never } | null)?.layout}
+				sourceId={(opened as unknown as { sourceId?: string } | null)?.sourceId}
+				initialHtml={opened ? (opened as unknown as { html: string }).html : new URLSearchParams(location.search).has("long") ? SAMPLE + Array.from({ length: 40 }, (_, i) => `<h2>Section ${i + 1}</h2><p>${"Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(5)}</p>`).join("") : SAMPLE}
 				name="Quarterly Review.docx"
 				title="Quarterly Review"
 				author="Ana"

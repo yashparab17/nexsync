@@ -1,3 +1,4 @@
+import { forgetWorkspace } from "@/lib/forgetWorkspace";
 // Typed wrapper around Tauri IPC commands
 // All backend invocations go through these functions to keep IPC calls type-safe
 // P2P commands live in src/lib/p2p/transport.ts
@@ -6,13 +7,13 @@ import type { LoggedWrite } from "@/lib/timescrub";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { cleanPath } from "@/lib/utils";
-import type { EntryKind, LogEntry } from "@/lib/chat/entries";
-import type { ModerationView } from "@/lib/moderation";
-import type { LspStatus } from "@/types/projects";
-import type { ImportAnswer, OfficeInspect, OfficeLayout } from "@/types/office";
-import type { ChartPrim, SheetIn, SheetOut } from "@/lib/sheet";
-import type { Frame } from "@/lib/deck";
-import type { Audit, Bisected, Containers, RuntimeInfo, DepsStatus, Found, Impact, GeneratorList, HttpFile, HttpResponse, Planned, Doctor, EnvState, ImportPreview, ProjectInfo, Recipe, ReportFile, RunRecord, Scan, Template, ToolReq, Trust } from "@/types/projects";
+import type { EntryKind, LogEntry } from "@/features/chat/lib/entries";
+import type { ModerationView } from "@/features/moderation/lib/moderation";
+import type { LspStatus } from "@/features/projects/types";
+import type { ImportAnswer, OfficeInspect, OfficeLayout } from "@/features/office/types";
+import type { ChartPrim, SheetIn, SheetOut } from "@/features/office/sheets/lib/sheet";
+import type { Frame } from "@/features/office/slides/lib/deck";
+import type { Audit, Bisected, Containers, RuntimeInfo, DepsStatus, Found, Impact, GeneratorList, HttpFile, HttpResponse, Planned, Doctor, EnvState, ImportPreview, ProjectInfo, Recipe, ReportFile, RunRecord, Scan, Template, ToolReq, Trust } from "@/features/projects/types";
 
 import type {
 	WorkspaceInfo,
@@ -142,7 +143,9 @@ const tidy = (w: WorkspaceInfo): WorkspaceInfo => ({ ...w, path: cleanPath(w.pat
 export function createWorkspace(
 	request: CreateWorkspaceRequest,
 ): Promise<WorkspaceInfo> {
-	return invoke<WorkspaceInfo>("create_workspace", { request: { ...request, path: cleanPath(request.path) } }).then(tidy);
+	return invoke<WorkspaceInfo>("create_workspace", { request: { ...request, path: cleanPath(request.path) } })
+		.then(tidy)
+		.then((w) => (forgetWorkspace(w.path), w));
 }
 
 // Import an existing workspace from disk
@@ -960,8 +963,8 @@ export function officeImport(path: string, rel: string, password?: string | null
 	return invoke("office_import", { path, rel, password: password ?? null });
 }
 // Writes the editor's HTML as the file `dest` names (.docx, .odt, .rtf, .md, .html, .txt, .tex); `author` empty leaves the file unnamed
-export function officeExport(path: string, dest: string, html: string, title: string, author: string, layout?: OfficeLayout | null): Promise<number> {
-	return invoke("office_export", { path, dest, html, title, author, layout: layout ?? null });
+export function officeExport(path: string, dest: string, html: string, title: string, author: string, layout?: OfficeLayout | null, sourceId?: string | null): Promise<number> {
+	return invoke("office_export", { path, dest, html, title, author, layout: layout ?? null, sourceId: sourceId ?? null });
 }
 export function officeInspect(path: string, rel: string): Promise<OfficeInspect> {
 	return invoke("office_inspect", { path, rel });
@@ -1208,4 +1211,26 @@ export interface ProofProblem {
 }
 export function proofCheck(text: string): Promise<ProofProblem[]> {
 	return invoke("proof_check", { text });
+}
+
+// A document's pages as pictures, laid out and drawn by the word-processor engine (for Print Layout)
+export interface PageImage {
+	png: string;
+	widthPt: number;
+	heightPt: number;
+}
+export function officeRender(html: string, title: string, layout: OfficeLayout | null, scale: number, sourceId?: string | null): Promise<PageImage[]> {
+	return invoke("office_render", { html, title, layout, scale, sourceId: sourceId ?? null });
+}
+
+// A document laid out once (the slow part), kept on the backend under a session id; its pages are then drawn one at a time as they scroll into view
+export interface PageList {
+	session: number;
+	sizes: [number, number][];
+}
+export function officeLayout(html: string, title: string, layout: OfficeLayout | null, sourceId?: string | null): Promise<PageList> {
+	return invoke("office_layout", { html, title, layout, sourceId: sourceId ?? null });
+}
+export function officePage(session: number, index: number, scale: number): Promise<PageImage> {
+	return invoke("office_page", { session, index, scale });
 }

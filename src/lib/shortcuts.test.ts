@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shortcutFor } from "./shortcuts";
+import { shortcutFor } from "@/lib/shortcuts";
 
 const press = (o: Partial<KeyboardEvent>) => shortcutFor({ key: "", code: "", ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...o });
 

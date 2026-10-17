@@ -7,12 +7,12 @@ import { Dialog, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import Loading from "@/components/Loading";
 import PdfViewer from "@/components/elements/PdfViewer";
 import FieldDiscussion from "@/components/elements/FieldDiscussion";
-import { buildThreads, docChannel, type Point } from "@/lib/chat/entries";
+import { buildThreads, docChannel, type Point } from "@/features/chat/lib/entries";
 import { useChat } from "@/store/chat/ChatContext";
 import { useIsViewer } from "@/store/p2p/P2PContext";
 
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
-import { displaySize } from "@/lib/assets/displaySize";
+import { displaySize } from "@/features/assets/lib/displaySize";
 import { readWorkspaceBinaryFile } from "@/lib/tauri";
 import { cn, formatBytes, getMimeType } from "@/lib/utils";
 import type { AssetItem } from "@/types/workspace";

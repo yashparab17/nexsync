@@ -2,7 +2,7 @@
 
 import { Decoration, EditorView, MatchDecorator, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 
-import { linkAt } from "@/lib/notes/links";
+import { linkAt } from "@/features/notes/lib/links";
 
 const matcher = new MatchDecorator({
 	regexp: /\[\[[^\]\n]+\]\]/g,

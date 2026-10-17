@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { authorOf, countBy, filterEvents, isCompletion, itemTarget, kindOf, perDay, workload } from "./insights";
+import { authorOf, countBy, filterEvents, isCompletion, itemTarget, kindOf, perDay, workload } from "@/lib/insights";
 import type { ActivityEvent, KanbanColumn, Member, Task } from "@/types/workspace";
 
 const ev = (over: Partial<ActivityEvent>): ActivityEvent => ({ id: "e", timestamp: "2026-03-10T12:00:00", action: "Created task", detail: "Created task: A", ...over });

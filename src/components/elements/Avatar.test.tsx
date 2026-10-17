@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render } from "@testing-library/react";
 
-import Avatar, { initialOf } from "./Avatar";
+import Avatar, { initialOf } from "@/components/elements/Avatar";
 
 afterEach(cleanup);
 

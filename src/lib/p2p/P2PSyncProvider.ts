@@ -7,7 +7,7 @@ import {
 	encodeAwarenessUpdate,
 	applyAwarenessUpdate,
 } from "y-protocols/awareness";
-import type { P2PMessage } from "./types";
+import type { P2PMessage } from "@/lib/p2p/types";
 import { uint8ArrayToBase64 as bytesToBase64, base64ToUint8Array as base64ToBytes } from "@/lib/tauri";
 
 // Sends a message to a single peer

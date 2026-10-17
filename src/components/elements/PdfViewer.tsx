@@ -7,7 +7,7 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 import { Minus, Plus } from "@/components/animate-icons";
 import Loading from "@/components/Loading";
 import { Button } from "@/components/ui/button";
-import { base64Bytes, loadPdfjs } from "@/lib/assets/previews";
+import { base64Bytes, loadPdfjs } from "@/features/assets/lib/previews";
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 

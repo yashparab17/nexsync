@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 
-import { P2PSyncProvider } from "./P2PSyncProvider";
+import { P2PSyncProvider } from "@/lib/p2p/P2PSyncProvider";
 
 // Two devices wired together in memory; a message to a device whose editor is not open yet is simply lost, as it is live
 function device(name: string, net: Map<string, P2PSyncProvider>, text = "") {

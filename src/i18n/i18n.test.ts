@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { formatNumber, locale, registerLocale, setLocale, t } from "./index";
+import { formatNumber, locale, registerLocale, setLocale, t } from "@/i18n/index";
 
 afterEach(() => setLocale("en"));
 

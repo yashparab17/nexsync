@@ -20,10 +20,11 @@ use std::collections::{HashMap, HashSet};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 
-use super::chatlog::{self, Role};
+use super::chat::chatlog::{self, Role};
 use super::crdt::{self, Crdt, RecordState, Sibling};
 use super::models::{KanbanCard, Task};
-use super::{data_sync, moderation};
+use super::chat::moderation;
+use super::data_sync;
 use crate::commands::config::validate_allowed_root;
 use crate::database::WorkspaceDb;
 
@@ -434,7 +435,7 @@ pub fn held_discard(app: tauri::AppHandle, path: String, id: i64) -> Result<(), 
 mod tests {
     use super::*;
     use crate::commands::p2p::membership;
-    use crate::commands::workspace::{chatlog::Entry, signing};
+    use crate::commands::workspace::{chat::chatlog::Entry, signing};
     use iroh::SecretKey;
     use serde_json::json;
 

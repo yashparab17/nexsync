@@ -3,7 +3,7 @@ import { motion, type TargetAndTransition, type Variants } from 'motion/react';
 import type { LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { useAnimateIconContext } from './icon';
+import { useAnimateIconContext } from '@/components/animate-icons/icon';
 
 // For lucide icons Animate UI has no hand-built version of: the whole glyph plays one small motion
 // whenever the surrounding AnimateIcon (a Button, a nav link, a card) says so. Same trigger API as the real ones.

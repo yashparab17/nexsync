@@ -57,6 +57,8 @@ wordcraft-formats = { git = "https://github.com/storytold/wordcraft", rev = "eae
 wordcraft-docbin = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
 wordcraft-pdf = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
 wordcraft-proof = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
+wordcraft-layout = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
+wordcraft-render = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
 # Spreadsheet engine and .xlsx files (Phase 21): GridCraft, by commit. MIT OR Apache-2.0; see THIRD_PARTY_NOTICES.md.
 gridcraft-engine = { git = "https://github.com/storytold/gridcraft", rev = "f1894c6da64d4326022ae644c767581816a23c2c" }
 gridcraft-xlsx = { git = "https://github.com/storytold/gridcraft", rev = "f1894c6da64d4326022ae644c767581816a23c2c" }
@@ -175,3 +177,6 @@ opt-level = 3
 # Required by craft-pdf (used by wordcraft-pdf): the PDF backend must be the patched one, which rejects writers that failed while unwinding.
 [patch.crates-io]
 krilla = { git = "https://github.com/storytold/craft-libs", rev = "c3487320b2d1de657b860b3c8abb44e1f2b32bd8" }
+
+[profile.dev.package.wordcraft-render]
+opt-level = 3

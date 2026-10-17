@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dueReminders } from "./reminders";
+import { dueReminders } from "@/lib/reminders";
 import type { KanbanColumn, Task } from "@/types/workspace";
 
 const task = (id: string, over: Partial<Task>) => ({ id, title: id, status: "todo", assignee_id: "me", ...over }) as Task;

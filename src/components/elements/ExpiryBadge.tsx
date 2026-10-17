@@ -6,12 +6,12 @@
 import { useMemo, useState } from "react";
 
 import { AnimateIcon, Hourglass } from "@/components/animate-icons";
-import { fromLocalInput, toLocalInput } from "@/components/announcements/AnnouncementDialog";
+import { fromLocalInput, toLocalInput } from "@/features/announcements/components/AnnouncementDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { timeUntil } from "@/lib/announcements";
+import { timeUntil } from "@/features/announcements/lib/announcements";
 import { useChat } from "@/store/chat/ChatContext";
 import { useSelfRole } from "@/store/p2p/P2PContext";
 

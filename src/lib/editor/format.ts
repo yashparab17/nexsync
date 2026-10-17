@@ -1,6 +1,6 @@
 // Code formatting with Prettier. The formatter and each language plugin load only when first used.
 
-import { extensionOf } from "./languages";
+import { extensionOf } from "@/lib/editor/languages";
 
 type PluginLoader = () => Promise<unknown>;
 

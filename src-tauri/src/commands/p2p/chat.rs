@@ -21,7 +21,7 @@ use tauri::{AppHandle, State};
 use super::node::Node;
 use super::P2pState;
 use crate::commands::config::validate_allowed_root;
-use crate::commands::workspace::chatlog::{self, Ctx, Entry, Role};
+use crate::commands::workspace::chat::chatlog::{self, Ctx, Entry, Role};
 use crate::commands::workspace::{crdt, signing};
 use crate::database::WorkspaceDb;
 
@@ -199,7 +199,7 @@ async fn on_entries(node: Arc<Node>, from: String, workspace: String, message: s
         return;
     }
     node.emit(EVENT_LOG, serde_json::json!({ "count": merged.added.len() }));
-    if merged.added.iter().any(|e| e.kind == crate::commands::workspace::moderation::KIND) {
+    if merged.added.iter().any(|e| e.kind == crate::commands::workspace::chat::moderation::KIND) {
         node.refresh_moderation();
     }
     // Pass what was new on to the other links; each of them ignores what it already has
@@ -244,7 +244,7 @@ pub async fn chat_post(app: AppHandle, state: State<'_, P2pState>, path: String,
     };
     if let Some(node) = node {
         publish(&node, &entry).await;
-        if entry.kind == crate::commands::workspace::moderation::KIND {
+        if entry.kind == crate::commands::workspace::chat::moderation::KIND {
             node.refresh_moderation();
         }
     }
@@ -255,7 +255,7 @@ pub async fn chat_post(app: AppHandle, state: State<'_, P2pState>, path: String,
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModerationView {
-    pub state: crate::commands::workspace::moderation::State,
+    pub state: crate::commands::workspace::chat::moderation::State,
     /// Keys of the people who were removed from the workspace, for the Removed badge
     pub removed: Vec<String>,
     pub me: String,
@@ -266,7 +266,7 @@ pub struct ModerationView {
 pub fn moderation_state(app: AppHandle, path: String) -> Result<ModerationView, String> {
     validate_allowed_root(&app, &path)?;
     let db = WorkspaceDb::open_existing(&path)?;
-    let (list, state) = crate::commands::workspace::moderation::load(&db.conn, crdt::now_ms());
+    let (list, state) = crate::commands::workspace::chat::moderation::load(&db.conn, crdt::now_ms());
     Ok(ModerationView { state, removed: list.map(|m| m.removed).unwrap_or_default(), me: signing::device_key().unwrap_or_default(), held: crate::commands::workspace::held::count(&db.conn) })
 }
 
@@ -293,20 +293,20 @@ pub fn chat_state(app: AppHandle, path: String) -> Result<ChatState, String> {
 #[tauri::command]
 pub fn dm_seal(to: String, text: String) -> Result<String, String> {
     let key = signing::device_secret().ok_or("This device has no key yet.")?;
-    crate::commands::workspace::dm::body_for(key, &to, &text).ok_or_else(|| "That member's device key is not valid.".to_string())
+    crate::commands::workspace::chat::dm::body_for(key, &to, &text).ok_or_else(|| "That member's device key is not valid.".to_string())
 }
 
 #[tauri::command]
 pub fn dm_channel(with: String) -> Result<String, String> {
     let me = signing::device_key().ok_or("This device has no key yet.")?;
-    Ok(crate::commands::workspace::dm::channel_of(&me, &with))
+    Ok(crate::commands::workspace::chat::dm::channel_of(&me, &with))
 }
 
 /// Opens the direct messages among the given entries that this device wrote or was sent: entry id to text
 #[tauri::command]
 pub fn dm_open(entries: Vec<(String, String, String)>) -> std::collections::HashMap<String, String> {
     let Some(key) = signing::device_secret() else { return Default::default() };
-    entries.into_iter().filter_map(|(id, author, body)| crate::commands::workspace::dm::read_entry(key, &author, &body).map(|t| (id, t))).collect()
+    entries.into_iter().filter_map(|(id, author, body)| crate::commands::workspace::chat::dm::read_entry(key, &author, &body).map(|t| (id, t))).collect()
 }
 
 #[tauri::command]

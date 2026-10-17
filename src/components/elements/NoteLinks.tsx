@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { FileText } from "@/components/animate-icons";
 import { useNavigate } from "react-router-dom";
 
-import { extractLinks, noteTitle, resolveLink } from "@/lib/notes/links";
+import { extractLinks, noteTitle, resolveLink } from "@/features/notes/lib/links";
 import { listWorkspaceFiles } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { WorkspaceFile } from "@/types/workspace";

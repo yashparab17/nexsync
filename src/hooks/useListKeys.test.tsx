@@ -1,6 +1,6 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useListKeys } from "./useListKeys";
+import { useListKeys } from "@/hooks/useListKeys";
 
 function Page({ onNew }: { onNew: () => void }) {
 	useListKeys(onNew);

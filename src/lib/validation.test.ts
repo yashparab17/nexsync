@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { safeUploadName, validateFileName, validateWorkspaceName } from "./validation";
+import { safeUploadName, validateFileName, validateWorkspaceName } from "@/lib/validation";
 
 describe("validateFileName", () => {
 	it("accepts ordinary names and leaves an empty one to the dialog", () => {

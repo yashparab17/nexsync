@@ -10,7 +10,7 @@ export const PAGE_KEYS = [
 	["Notes", "/workspace/notes"],
 	["Editor", "/workspace/editor"],
 	["Explorer", "/workspace/explorer"],
-	["Files", "/workspace/files"],
+	["Others", "/workspace/others"],
 	["Assets", "/workspace/assets"],
 	["Tasks", "/workspace/tasks"],
 	["Kanban board", "/workspace/kanban"],

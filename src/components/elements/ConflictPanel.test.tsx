@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-import ConflictPanel from "./ConflictPanel";
+import ConflictPanel from "@/components/elements/ConflictPanel";
 import type { Conflict } from "@/types/workspace";
 
 afterEach(cleanup);

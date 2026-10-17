@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { KanbanCard, KanbanColumn } from "@/types/workspace";
-import { addTags, byOrder, collectTags, dueState, endPosition, monthGrid, normalizeTag, planMove, tagHue, MAX_TAGS, type CardMove } from "./planning";
+import { addTags, byOrder, collectTags, dueState, endPosition, monthGrid, normalizeTag, planMove, tagHue, MAX_TAGS, type CardMove } from "@/lib/planning";
 
 describe("tags", () => {
 	it("normalizes to a short lowercase slug without a leading #", () => {

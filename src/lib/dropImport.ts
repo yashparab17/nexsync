@@ -1,6 +1,6 @@
 // Files and folders dropped from the desktop, and saving them into a workspace folder.
 
-import { readFileBase64 } from "@/lib/assets/uploadScale";
+import { readFileBase64 } from "@/features/assets/lib/uploadScale";
 import { listWorkspaceFiles, writeWorkspaceBinaryFile } from "@/lib/tauri";
 import { safeUploadName } from "@/lib/validation";
 

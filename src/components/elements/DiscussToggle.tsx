@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { AnimateIcon, MessageSquareText } from "@/components/animate-icons";
 import FieldDiscussion from "@/components/elements/FieldDiscussion";
-import { openThreadCounts } from "@/lib/chat/entries";
+import { openThreadCounts } from "@/features/chat/lib/entries";
 import { useChat } from "@/store/chat/ChatContext";
 
 export default function DiscussToggle({ channel, canComment }: { channel: string; canComment: boolean }) {

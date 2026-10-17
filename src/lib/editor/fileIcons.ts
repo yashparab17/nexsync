@@ -1,6 +1,6 @@
 // Which Catppuccin icon a file or folder gets, by its name
 
-import { EXTENSION_ICONS, FILE_NAME_ICONS, FILE_NAME_PATTERNS, FOLDER_ICONS, ICON_BODIES } from "./fileIconData";
+import { EXTENSION_ICONS, FILE_NAME_ICONS, FILE_NAME_PATTERNS, FOLDER_ICONS, ICON_BODIES } from "@/lib/editor/fileIconData";
 
 export function fileIconName(name: string): string {
 	const lower = name.toLowerCase();

@@ -6,8 +6,8 @@ import { StateEffect, StateField, type Extension, type Range } from "@codemirror
 import { Decoration, EditorView, keymap, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import * as Y from "yjs";
 
-import { locateAnchor } from "@/lib/chat/anchors";
-import type { Anchor } from "@/lib/chat/entries";
+import { locateAnchor } from "@/features/chat/lib/anchors";
+import type { Anchor } from "@/features/chat/lib/entries";
 
 export interface MarkedThread {
 	id: string;

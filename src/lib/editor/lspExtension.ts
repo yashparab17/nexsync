@@ -6,7 +6,7 @@ import { forceLinting, linter, type Diagnostic } from "@codemirror/lint";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView, hoverTooltip, keymap, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 
-import { completionsOf, diagnosticsOf, firstPlace, hoverText, offsetOf, onFileDiagnostics, severityOf, type LspPosition } from "@/lib/lsp";
+import { completionsOf, diagnosticsOf, firstPlace, hoverText, offsetOf, onFileDiagnostics, severityOf, type LspPosition } from "@/features/projects/lib/lsp";
 import { lspClose, lspRequest, lspSync } from "@/lib/tauri";
 
 export interface LspOptions {

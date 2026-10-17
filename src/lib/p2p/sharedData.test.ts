@@ -18,7 +18,7 @@ vi.mock("@/lib/tauri", () => {
 	};
 });
 
-import { applyDataChange } from "./sharedData";
+import { applyDataChange } from "@/lib/p2p/sharedData";
 
 beforeEach(() => {
 	calls.length = 0;

@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import MarkdownText from "./MarkdownText";
+import MarkdownText from "@/components/elements/MarkdownText";
 
 describe("MarkdownText", () => {
 	it("shows bold, lists and code as elements", () => {

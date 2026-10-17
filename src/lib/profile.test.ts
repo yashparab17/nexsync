@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { LogEntry } from "./chat/entries";
-import { colorOf, NEUTRAL, PALETTE } from "./collabColor";
-import { ensureLocalColor, getLocalProfile, parseProfile, profilesFromEntries, setProfiles } from "./profile";
+import type { LogEntry } from "@/features/chat/lib/entries";
+import { colorOf, NEUTRAL, PALETTE } from "@/lib/collabColor";
+import { ensureLocalColor, getLocalProfile, parseProfile, profilesFromEntries, setProfiles } from "@/lib/profile";
 
 const entry = (author: string, name: string, ts: number, body: string): LogEntry => ({ id: `${author}${ts}`, kind: "profile", channel: "profiles", parent: "", author, name, ts, body, sig: "" });
 

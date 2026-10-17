@@ -65,7 +65,7 @@ pub fn resolve_workspace_path(workspace_path: &str, rel_path: &str) -> Result<Pa
 
 /// Validates relative path segments to reject traversal patterns and invalid separators
 fn validate_rel_path(rel_path: &str) -> Result<(), String> {
-    const ALLOWED_ROOTS: &[&str] = &["notes", "files", "assets", "tasks", "kanban", "projects"];
+    const ALLOWED_ROOTS: &[&str] = crate::commands::workspace::layout::ALLOWED;
     
     let rel_path = rel_path.trim_matches('/');
     if rel_path.is_empty() || rel_path == "." {
@@ -105,13 +105,13 @@ mod tests {
     #[test]
     fn test_valid_path() {
         let temp_dir = std::env::temp_dir().join(format!("nexsync_test_{}", uuid::Uuid::new_v4()));
-        let files_dir = temp_dir.join("files");
+        let files_dir = temp_dir.join("others");
         fs::create_dir_all(&files_dir).expect("create test dirs");
         let test_file = files_dir.join("test.txt");
         fs::write(&test_file, "hello").expect("write test file");
 
         let workspace_str = temp_dir.to_string_lossy().to_string();
-        let result = resolve_workspace_path(&workspace_str, "files/test.txt");
+        let result = resolve_workspace_path(&workspace_str, "others/test.txt");
         assert!(result.is_ok());
 
         let _ = fs::remove_dir_all(&temp_dir);
@@ -137,13 +137,13 @@ mod tests {
 
     #[test]
     fn test_double_dot_current_dir_rejected() {
-        let result = resolve_workspace_path("/tmp/workspace", "files/./test.txt");
+        let result = resolve_workspace_path("/tmp/workspace", "others/./test.txt");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_double_slash_rejected() {
-        let result = resolve_workspace_path("/tmp/workspace", "files//test.txt");
+        let result = resolve_workspace_path("/tmp/workspace", "others//test.txt");
         assert!(result.is_err());
     }
 
@@ -168,11 +168,11 @@ mod tests {
     #[test]
     fn test_non_existent_file_path() {
         let temp_dir = std::env::temp_dir().join(format!("nexsync_test_{}", uuid::Uuid::new_v4()));
-        let files_dir = temp_dir.join("files");
+        let files_dir = temp_dir.join("others");
         fs::create_dir_all(&files_dir).expect("create test dirs");
 
         let workspace_str = temp_dir.to_string_lossy().to_string();
-        let result = resolve_workspace_path(&workspace_str, "files/new_uncreated_file.txt");
+        let result = resolve_workspace_path(&workspace_str, "others/new_uncreated_file.txt");
         assert!(result.is_ok());
 
         let _ = fs::remove_dir_all(&temp_dir);

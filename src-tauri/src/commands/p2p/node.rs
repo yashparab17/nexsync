@@ -386,7 +386,7 @@ struct NodeState {
     /// What the linked devices say the time is, to notice and correct a clock that is out
     skew: clock::SkewWatch,
     /// What the moderation entries of the log say is in force: timeouts, bans, kicks to carry out
-    moderation: crate::commands::workspace::moderation::State,
+    moderation: crate::commands::workspace::chat::moderation::State,
     /// Whether this device has looked for the other members since its list was loaded. Until it has, its list may be out of
     /// date, so it does not let a member in by key: otherwise a removed member could get in during the moments after a
     /// device that missed their removal comes back online.
@@ -1038,7 +1038,7 @@ impl Node {
     pub fn refresh_moderation(self: &Arc<Self>) {
         let Some(path) = self.workspace_path() else { return };
         let Ok(db) = crate::database::WorkspaceDb::open_existing(&path) else { return };
-        let (_, state) = crate::commands::workspace::moderation::load(&db.conn, crate::commands::workspace::crdt::now_ms());
+        let (_, state) = crate::commands::workspace::chat::moderation::load(&db.conn, crate::commands::workspace::crdt::now_ms());
         let leaving: Vec<String> = {
             let mut st = self.lock();
             let changed = st.moderation != state;
@@ -3121,7 +3121,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "needs network access for Iroh relays and address lookup"]
     async fn test_chat_entries_travel_are_role_checked_and_catch_up() {
-        use crate::commands::workspace::chatlog::{self, Ctx, Entry, Role};
+        use crate::commands::workspace::chat::chatlog::{self, Ctx, Entry, Role};
         let mut host = start_test_node("log-host").await;
         let editor = start_test_node("log-editor").await;
         let viewer = start_test_node("log-viewer").await;
@@ -3184,8 +3184,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "needs network access for Iroh relays and address lookup"]
     async fn test_a_timeout_disconnects_a_ban_stays_through_a_new_invite_and_both_can_be_lifted() {
-        use crate::commands::workspace::chatlog::{self, Ctx, Entry, Role};
-        use crate::commands::workspace::{crdt, moderation};
+        use crate::commands::workspace::chat::chatlog::{self, Ctx, Entry, Role};
+        use crate::commands::workspace::{chat::moderation, crdt};
         let host = start_test_node("mod-host").await;
         let guest = start_test_node("mod-guest").await;
         seed_workspace(&host, vec![]);

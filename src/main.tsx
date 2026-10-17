@@ -1,17 +1,17 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import "./index.css";
+import "@/index.css";
 
 import { RouterProvider } from "react-router-dom";
-import { router } from "./routes/router";
+import { router } from "@/routes/router";
 
-import { WorkspaceProvider } from "./store/workspace/WorkspaceContext";
-import { P2PProvider } from "./store/p2p/P2PContext";
-import { ThemeProvider } from "./store/ThemeContext";
-import { NotificationProvider } from "./store/notifications/NotificationContext";
-import WorkspaceLoader from "./components/WorkspaceLoader";
-import ErrorBoundary from "./components/ErrorBoundary";
-import { initSecurityPolicies } from "./lib/security";
+import { WorkspaceProvider } from "@/store/workspace/WorkspaceContext";
+import { P2PProvider } from "@/store/p2p/P2PContext";
+import { ThemeProvider } from "@/store/ThemeContext";
+import { NotificationProvider } from "@/store/notifications/NotificationContext";
+import WorkspaceLoader from "@/components/WorkspaceLoader";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { initSecurityPolicies } from "@/lib/security";
 
 // Enforce desktop security policies: disable right-click, dev tools, and history tracking
 initSecurityPolicies();
@@ -19,7 +19,7 @@ initSecurityPolicies();
 // Development only: /?lab=documents shows an editor on its own (src/dev/Lab.tsx)
 const lab = import.meta.env.DEV ? new URLSearchParams(location.search).get("lab") : null;
 if (lab) {
-	void import("./dev/Lab").then(({ default: Lab }) => {
+	void import("@/dev/Lab").then(({ default: Lab }) => {
 		ReactDOM.createRoot(document.getElementById("root")!).render(
 			<ThemeProvider>
 				<Lab which={lab} />

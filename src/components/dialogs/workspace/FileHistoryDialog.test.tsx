@@ -11,7 +11,7 @@ vi.mock("@/lib/tauri", () => ({
 
 import { listFileVersions, readFileVersion, readWorkspaceFile, recordFileVersion, restoreFileVersion } from "@/lib/tauri";
 import type { FileVersion } from "@/types/workspace";
-import FileHistoryDialog from "./FileHistoryDialog";
+import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 
 const version = (id: number, over: Partial<FileVersion> = {}): FileVersion => ({
 	id,

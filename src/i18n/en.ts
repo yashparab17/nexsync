@@ -11,7 +11,7 @@ const en = {
 	"nav.editor": "Editor",
 	"nav.projects": "Projects",
 	"nav.explorer": "Explorer",
-	"nav.files": "Files",
+	"nav.others": "Others",
 	"nav.assets": "Assets",
 	"nav.tasks": "Tasks",
 	"nav.kanban": "Kanban",

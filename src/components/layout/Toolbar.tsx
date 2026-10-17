@@ -18,7 +18,7 @@ const VARIANTS = {
 };
 
 export default function Toolbar({ variant = "bar", className, ...props }: { variant?: keyof typeof VARIANTS } & ComponentProps<"div">) {
-	return <div {...props} className={cn("flex shrink-0 border-b", VARIANTS[variant], className)} />;
+	return <div {...props} data-page-toolbar={variant === "bar" ? "" : undefined} className={cn("flex shrink-0 border-b", VARIANTS[variant], className)} />;
 }
 
 // Filter tabs with a count each, like the kinds of asset: one is chosen, and the chosen one is filled

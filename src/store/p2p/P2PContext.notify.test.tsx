@@ -32,7 +32,7 @@ vi.mock("@/store/workspace/WorkspaceContext", () => ({
 }));
 
 import { NotificationProvider, useNotifications } from "@/store/notifications/NotificationContext";
-import { P2PProvider } from "./P2PContext";
+import { P2PProvider } from "@/store/p2p/P2PContext";
 
 let notifications: ReturnType<typeof useNotifications>;
 function Probe() {

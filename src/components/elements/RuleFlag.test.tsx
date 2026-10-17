@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
-import ConflictPanel from "./ConflictPanel";
-import RuleFlag from "./RuleFlag";
+import ConflictPanel from "@/components/elements/ConflictPanel";
+import RuleFlag from "@/components/elements/RuleFlag";
 
 afterEach(cleanup);
 

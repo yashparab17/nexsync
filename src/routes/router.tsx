@@ -2,28 +2,29 @@ import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
 
 import App from "@/App";
-import Welcome from "@/pages/Welcome";
-import Workspace from "@/pages/workspace/WorkspaceWrapper";
-import WorkspaceDashboard from "@/pages/workspace/WorkspaceDashboard";
+import Welcome from "@/features/welcome/WelcomePage";
+import Workspace from "@/features/shell/WorkspaceShell";
+import DashboardPage from "@/features/dashboard/DashboardPage";
 import Loading from "@/components/Loading";
 
 // Lazy-load sub-routes for optimized bundle splitting
-const WorkspaceFiles = lazy(() => import("@/pages/workspace/WorkspaceFiles"));
-const WorkspaceEditor = lazy(() => import("@/pages/workspace/WorkspaceEditor"));
-const WorkspaceProjects = lazy(() => import("@/pages/workspace/WorkspaceProjects"));
-const WorkspaceNotes = lazy(() => import("@/pages/workspace/WorkspaceNotes"));
-const WorkspaceDocuments = lazy(() => import("@/pages/workspace/WorkspaceDocuments"));
-const WorkspaceSheets = lazy(() => import("@/pages/workspace/WorkspaceSheets"));
-const WorkspaceSlides = lazy(() => import("@/pages/workspace/WorkspaceSlides"));
-const WorkspaceAssets = lazy(() => import("@/pages/workspace/WorkspaceAssets"));
-const WorkspaceTasks = lazy(() => import("@/pages/workspace/WorkspaceTasks"));
-const WorkspaceKanban = lazy(() => import("@/pages/workspace/WorkspaceKanban"));
-const WorkspaceChat = lazy(() => import("@/pages/workspace/WorkspaceChat"));
-const WorkspaceAnnouncements = lazy(() => import("@/pages/workspace/WorkspaceAnnouncements"));
-const WorkspaceInsights = lazy(() => import("@/pages/workspace/WorkspaceInsights"));
-const WorkspaceMembers = lazy(() => import("@/pages/workspace/WorkspaceMembers"));
-const WorkspaceTrash = lazy(() => import("@/pages/workspace/WorkspaceTrash"));
-const Unavailable = lazy(() => import("@/pages/Unavailable"));
+const ExplorerPage = lazy(() => import("@/features/explorer/ExplorerPage"));
+const OthersPage = lazy(() => import("@/features/others/OthersPage"));
+const EditorPage = lazy(() => import("@/features/editor/EditorPage"));
+const ProjectsPage = lazy(() => import("@/features/projects/ProjectsPage"));
+const NotesPage = lazy(() => import("@/features/notes/NotesPage"));
+const DocumentsPage = lazy(() => import("@/features/office/documents/DocumentsPage"));
+const SheetsPage = lazy(() => import("@/features/office/sheets/SheetsPage"));
+const SlidesPage = lazy(() => import("@/features/office/slides/SlidesPage"));
+const AssetsPage = lazy(() => import("@/features/assets/AssetsPage"));
+const TasksPage = lazy(() => import("@/features/tasks/TasksPage"));
+const KanbanPage = lazy(() => import("@/features/kanban/KanbanPage"));
+const ChatPage = lazy(() => import("@/features/chat/ChatPage"));
+const AnnouncementsPage = lazy(() => import("@/features/announcements/AnnouncementsPage"));
+const InsightsPage = lazy(() => import("@/features/insights/InsightsPage"));
+const MembersPage = lazy(() => import("@/features/members/MembersPage"));
+const TrashPage = lazy(() => import("@/features/trash/TrashPage"));
+const Unavailable = lazy(() => import("@/features/welcome/UnavailablePage"));
 
 // Suspense fallback wrapper for lazy-loaded route components
 function RouteSuspense({ children }: { children: React.ReactNode }) {
@@ -52,41 +53,41 @@ export const router = createBrowserRouter([
 				children: [
 					{
 						index: true,
-						element: <WorkspaceDashboard />,
+						element: <DashboardPage />,
 					},
 					{
 						path: "dashboard",
-						element: <WorkspaceDashboard />,
+						element: <DashboardPage />,
 					},
 					{
 						path: "notes",
 						element: (
 							<RouteSuspense>
-								<WorkspaceNotes />
+								<NotesPage />
 							</RouteSuspense>
 						),
 					},
 					{
-						path: "documents",
+						path: "office/documents",
 						element: (
 							<RouteSuspense>
-								<WorkspaceDocuments />
+								<DocumentsPage />
 							</RouteSuspense>
 						),
 					},
 					{
-						path: "sheets",
+						path: "office/sheets",
 						element: (
 							<RouteSuspense>
-								<WorkspaceSheets />
+								<SheetsPage />
 							</RouteSuspense>
 						),
 					},
 					{
-						path: "slides",
+						path: "office/slides",
 						element: (
 							<RouteSuspense>
-								<WorkspaceSlides />
+								<SlidesPage />
 							</RouteSuspense>
 						),
 					},
@@ -94,7 +95,7 @@ export const router = createBrowserRouter([
 						path: "editor",
 						element: (
 							<RouteSuspense>
-								<WorkspaceEditor />
+								<EditorPage />
 							</RouteSuspense>
 						),
 					},
@@ -102,7 +103,7 @@ export const router = createBrowserRouter([
 						path: "projects",
 						element: (
 							<RouteSuspense>
-								<WorkspaceProjects />
+								<ProjectsPage />
 							</RouteSuspense>
 						),
 					},
@@ -110,15 +111,15 @@ export const router = createBrowserRouter([
 						path: "explorer",
 						element: (
 							<RouteSuspense>
-								<WorkspaceFiles mode="explorer" />
+								<ExplorerPage />
 							</RouteSuspense>
 						),
 					},
 					{
-						path: "files",
+						path: "others",
 						element: (
 							<RouteSuspense>
-								<WorkspaceFiles mode="files" />
+								<OthersPage />
 							</RouteSuspense>
 						),
 					},
@@ -126,7 +127,7 @@ export const router = createBrowserRouter([
 						path: "assets",
 						element: (
 							<RouteSuspense>
-								<WorkspaceAssets />
+								<AssetsPage />
 							</RouteSuspense>
 						),
 					},
@@ -134,7 +135,7 @@ export const router = createBrowserRouter([
 						path: "tasks",
 						element: (
 							<RouteSuspense>
-								<WorkspaceTasks />
+								<TasksPage />
 							</RouteSuspense>
 						),
 					},
@@ -142,7 +143,7 @@ export const router = createBrowserRouter([
 						path: "insights",
 						element: (
 							<RouteSuspense>
-								<WorkspaceInsights />
+								<InsightsPage />
 							</RouteSuspense>
 						),
 					},
@@ -150,7 +151,7 @@ export const router = createBrowserRouter([
 						path: "kanban",
 						element: (
 							<RouteSuspense>
-								<WorkspaceKanban />
+								<KanbanPage />
 							</RouteSuspense>
 						),
 					},
@@ -158,7 +159,7 @@ export const router = createBrowserRouter([
 						path: "chat",
 						element: (
 							<RouteSuspense>
-								<WorkspaceChat />
+								<ChatPage />
 							</RouteSuspense>
 						),
 					},
@@ -166,7 +167,7 @@ export const router = createBrowserRouter([
 						path: "announcements",
 						element: (
 							<RouteSuspense>
-								<WorkspaceAnnouncements />
+								<AnnouncementsPage />
 							</RouteSuspense>
 						),
 					},
@@ -174,7 +175,7 @@ export const router = createBrowserRouter([
 						path: "members",
 						element: (
 							<RouteSuspense>
-								<WorkspaceMembers />
+								<MembersPage />
 							</RouteSuspense>
 						),
 					},
@@ -182,7 +183,7 @@ export const router = createBrowserRouter([
 						path: "trash",
 						element: (
 							<RouteSuspense>
-								<WorkspaceTrash />
+								<TrashPage />
 							</RouteSuspense>
 						),
 					},

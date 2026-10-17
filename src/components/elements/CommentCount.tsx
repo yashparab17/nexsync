@@ -2,7 +2,7 @@
 
 import { MessageSquare } from "@/components/animate-icons";
 
-import { openThreadCounts, itemChannel } from "@/lib/chat/entries";
+import { openThreadCounts, itemChannel } from "@/features/chat/lib/entries";
 import { useChat } from "@/store/chat/ChatContext";
 import { useMemo } from "react";
 

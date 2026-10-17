@@ -401,6 +401,21 @@ select option:checked { background-color: var(--accent); color: var(--foreground
 .doc-page .bn-editor {
 	padding-inline: 0;
 }
+.doc-page .bn-block-outer {
+	background: transparent;
+	/* Keeps a block's own margins inside its box, so the height measured for the page breaks counts them */
+	display: flow-root;
+}
+/* A paragraph whose spacing comes from the file: the spacing is drawn on the block, so the editor's own is taken off */
+.doc-page .nx-sp > .bn-block > .bn-block-content[data-content-type],
+.doc-page .nx-sp > .bn-block > .bn-block-content[data-content-type] :is(h1, h2, h3, h4, h5, h6, p) {
+	margin-block: 0;
+}
+/* A line of a table of contents ("Title<tab>12"): the tab stops just short of the right edge, so the page number ends there */
+.doc-page .nx-toc .bn-inline-content {
+	white-space: pre-wrap;
+	tab-size: calc(var(--doc-w, 600px) - var(--nx-left, 0pt) - 3ch);
+}
 .doc-page .bn-block-content {
 	line-height: var(--doc-ls, 1.15);
 	padding-block: 0;
@@ -446,4 +461,9 @@ select option:checked { background-color: var(--accent); color: var(--foreground
 		box-shadow: none;
 		zoom: 1 !important;
 	}
+}
+
+/* "Hide the headers": the workspace bar above the page and the page's own toolbar are folded away together */
+[data-hide-toolbars] [data-page-toolbar] {
+	display: none;
 }

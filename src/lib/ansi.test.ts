@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ansiPieces, plain } from "./ansi";
+import { ansiPieces, plain } from "@/lib/ansi";
 
 describe("ansi", () => {
 	it("keeps the text and gives coloured pieces the theme's colours", () => {

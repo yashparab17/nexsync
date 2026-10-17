@@ -9,7 +9,7 @@ vi.mock("@/lib/tauri", () => ({
 }));
 
 import { exportZip, writeExportFile } from "@/lib/tauri";
-import { exportFolders, exportNote } from "./index";
+import { exportFolders, exportNote } from "@/lib/export/index";
 
 beforeEach(() => vi.clearAllMocks());
 

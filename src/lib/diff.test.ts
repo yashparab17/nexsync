@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { diffLines, diffWords, splitLines } from "./diff";
+import { diffLines, diffWords, splitLines } from "@/lib/diff";
 
 describe("splitLines", () => {
 	it("ignores one final line break and CRLF", () => {

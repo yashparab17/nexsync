@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { whyConflict } from "./conflictWhy";
+import { whyConflict } from "@/lib/conflictWhy";
 
 describe("whyConflict", () => {
 	it("names both writers, oldest first, and says neither probably saw the other", () => {

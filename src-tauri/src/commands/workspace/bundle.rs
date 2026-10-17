@@ -26,9 +26,10 @@ use base64::prelude::{Engine, BASE64_STANDARD};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
-use super::chatlog::{self, Ctx, Entry, Role};
+use super::chat::chatlog::{self, Ctx, Entry, Role};
 use super::data_sync::{self, DataState};
-use super::{crdt, moderation, signing};
+use super::chat::moderation;
+use super::{crdt, signing};
 use crate::commands::config::validate_allowed_root;
 use crate::commands::p2p::files::{check_rel_path, list_shareable_files};
 use crate::commands::p2p::membership::{self, Membership};
@@ -302,7 +303,7 @@ pub fn bundle_import(app: tauri::AppHandle, path: String, source: String) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::workspace::chatlog::Entry;
+    use crate::commands::workspace::chat::chatlog::Entry;
 
     fn workspace_dir(tag: &str) -> String {
         let dir = std::env::temp_dir().join(format!("nexsync-bundle-{tag}-{}", uuid::Uuid::new_v4()));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BUILTIN_THEMES, TOKENS, cleanCustomThemes, contrast, isColor, textToVars, themeCss, secondaryShare, themeWarnings, THEME_FAMILIES, varsToText } from "./themes";
+import { BUILTIN_THEMES, TOKENS, cleanCustomThemes, contrast, isColor, textToVars, themeCss, secondaryShare, themeWarnings, THEME_FAMILIES, varsToText } from "@/lib/themes";
 
 describe("themes", () => {
 	it("has six light and six dark themes, each with every colour", () => {

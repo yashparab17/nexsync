@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GLYPHS, getIcon, iconFromEntries, parseIcon, setIcon } from "./workspaceIcon";
+import { GLYPHS, getIcon, iconFromEntries, parseIcon, setIcon } from "@/lib/workspaceIcon";
 
 describe("workspace icon", () => {
 	it("reads a picture, an emoji or a letter, and nothing else", () => {

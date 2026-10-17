@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { bindGuestMember, canChangeRole, canCommentRole, canEditRole, roleTable } from "./roles";
+import { bindGuestMember, canChangeRole, canCommentRole, canEditRole, roleTable } from "@/lib/roles";
 import type { Member } from "@/types/workspace";
 
 const owner: Member = { id: "o", name: "Owen", role: "Owner" };

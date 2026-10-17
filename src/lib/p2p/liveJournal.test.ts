@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as Y from "yjs";
 
-import { LiveJournal } from "./liveJournal";
-import { P2PSyncProvider } from "./P2PSyncProvider";
-import type { P2PMessage } from "./types";
+import { LiveJournal } from "@/lib/p2p/liveJournal";
+import { P2PSyncProvider } from "@/lib/p2p/P2PSyncProvider";
+import type { P2PMessage } from "@/lib/p2p/types";
 
 describe("LiveJournal", () => {
 	beforeEach(() => vi.useFakeTimers());

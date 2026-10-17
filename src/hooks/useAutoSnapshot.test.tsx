@@ -4,7 +4,7 @@ import { renderHook } from "@testing-library/react";
 vi.mock("@/lib/tauri", () => ({ recordFileVersion: vi.fn(async () => {}) }));
 
 import { recordFileVersion } from "@/lib/tauri";
-import { useAutoSnapshot } from "./useAutoSnapshot";
+import { useAutoSnapshot } from "@/hooks/useAutoSnapshot";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {

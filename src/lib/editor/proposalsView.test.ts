@@ -4,7 +4,7 @@ import { EditorView } from "@codemirror/view";
 import * as Y from "yjs";
 
 import { openProposals, propose } from "@/lib/proposals";
-import { proposalMarks } from "./proposalsView";
+import { proposalMarks } from "@/lib/editor/proposalsView";
 
 let view: EditorView | null = null;
 afterEach(() => {

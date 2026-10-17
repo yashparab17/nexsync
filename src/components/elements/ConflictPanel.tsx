@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { AlertTriangle, MessageSquareText, ShieldAlert } from "@/components/animate-icons";
 import FieldDiscussion from "@/components/elements/FieldDiscussion";
-import { buildThreads, itemChannel } from "@/lib/chat/entries";
+import { buildThreads, itemChannel } from "@/features/chat/lib/entries";
 import { whyConflict } from "@/lib/conflictWhy";
 import { useChat } from "@/store/chat/ChatContext";
 

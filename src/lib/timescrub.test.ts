@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { arrivedLate, laneOf, stops, valuesAt, type LoggedWrite } from "./timescrub";
+import { arrivedLate, laneOf, stops, valuesAt, type LoggedWrite } from "@/lib/timescrub";
 
 const w = (path: string, ts: number, value: string, who = "Ana", seenAt = ts): LoggedWrite => ({ path, ts, who, by: "", replica: "r", value: JSON.stringify(value), seenAt });
 

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-import Toaster from "./Toaster";
+import Toaster from "@/components/Toaster";
 import { NotificationProvider, useNotifications } from "@/store/notifications/NotificationContext";
 
 afterEach(() => {

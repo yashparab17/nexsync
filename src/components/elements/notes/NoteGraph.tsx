@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { degrees, graphLabel, layoutGraph, type GraphEdge, type NoteInfo } from "@/lib/notes/graph";
+import { degrees, graphLabel, layoutGraph, type GraphEdge, type NoteInfo } from "@/features/notes/lib/graph";
 import { cn } from "@/lib/utils";
 
 interface NoteGraphProps {

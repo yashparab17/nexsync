@@ -10,7 +10,7 @@ use serde::Serialize;
 use crate::commands::config::validate_allowed_root;
 
 /// Folders and the database directory that Nexsync creates inside a workspace
-const OWN_ITEMS: &[&str] = &["notes", "files", "assets", "projects", "tasks", "kanban", ".nexsync"];
+const OWN_ITEMS: &[&str] = &["notes", "office", "others", "assets", "projects", "tasks", "kanban", ".nexsync"];
 /// Files the operating system adds on its own, which do not count as user content
 const OS_JUNK: &[&str] = &["desktop.ini", "thumbs.db", ".ds_store"];
 
@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn test_folder_with_only_nexsync_content_goes_whole() {
-        assert_eq!(plan_delete(&names(&["notes", "files", "assets", ".nexsync"])), DeletePlan::WholeFolder);
+        assert_eq!(plan_delete(&names(&["notes", "office", "others", "assets", ".nexsync"])), DeletePlan::WholeFolder);
         assert_eq!(plan_delete(&names(&["notes", ".nexsync", "Desktop.ini", ".DS_Store"])), DeletePlan::WholeFolder);
     }
 

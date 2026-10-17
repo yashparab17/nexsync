@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPdf, encode, parseBlocks, wrap } from "./pdf";
+import { buildPdf, encode, parseBlocks, wrap } from "@/lib/export/pdf";
 
 const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 

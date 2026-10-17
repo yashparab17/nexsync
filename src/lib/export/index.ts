@@ -2,7 +2,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 
 import { isMarkdownFile } from "@/lib/editor/languages";
 import { exportZip, uint8ArrayToBase64, writeExportFile } from "@/lib/tauri";
-import { buildPdf } from "./pdf";
+import { buildPdf } from "@/lib/export/pdf";
 
 export type NoteFormat = "md" | "pdf";
 

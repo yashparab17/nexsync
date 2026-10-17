@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 
-import { resolveLink, type NoteRef } from "@/lib/notes/links";
+import { resolveLink, type NoteRef } from "@/features/notes/lib/links";
 
 interface MarkdownPreviewProps {
 	text: string;

@@ -12,7 +12,7 @@ vi.mock("@/lib/tauri", async (importOriginal) => ({
 	listYjsDocs: async (path: string) => [...store(path).keys()],
 }));
 
-import { applyCatchUp, buildInventory, updatesFor } from "./yjsCatchUp";
+import { applyCatchUp, buildInventory, updatesFor } from "@/lib/p2p/yjsCatchUp";
 import { base64ToUint8Array } from "@/lib/tauri";
 
 function text(path: string, id: string): string {

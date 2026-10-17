@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 import type { ChecklistItem, Task } from "@/types/workspace";
-import { ChecklistEditor, DueBadge, TagInput } from "./PlanningFields";
-import TaskCalendar from "./TaskCalendar";
+import { ChecklistEditor, DueBadge, TagInput } from "@/components/elements/PlanningFields";
+import TaskCalendar from "@/components/elements/TaskCalendar";
 
 afterEach(cleanup);
 

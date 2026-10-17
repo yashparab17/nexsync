@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { BUILTIN_SCHEMES, SYNTAX_TOKENS, cleanCustomSchemes, schemeCss, syntaxToText, textToSyntax } from "./codeSchemes";
-import { isColor } from "./themes";
+import { BUILTIN_SCHEMES, SYNTAX_TOKENS, cleanCustomSchemes, schemeCss, syntaxToText, textToSyntax } from "@/lib/codeSchemes";
+import { isColor } from "@/lib/themes";
 
 describe("code schemes", () => {
 	it("has ready-made schemes for both modes, each with every colour", () => {

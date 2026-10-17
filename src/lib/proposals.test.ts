@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
-import { accept, isCurrent, listProposals, locate, openProposals, propose, reject } from "./proposals";
+import { accept, isCurrent, listProposals, locate, openProposals, propose, reject } from "@/lib/proposals";
 
 const doc = (text: string) => {
 	const d = new Y.Doc();

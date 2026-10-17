@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const files = import.meta.glob("../../assets/art/*.svg", { query: "?raw", import: "default" }) as Record<string, () => Promise<string>>;
 
-export type ArtName = "tasks" | "kanban" | "files" | "assets" | "trash" | "notes" | "editor" | "recent" | "insights" | "members" | "welcome" | "search" | "announcements" | "chat" | "direct" | "mailbox" | "approval" | "bundle";
+export type ArtName = "tasks" | "kanban" | "files" | "assets" | "trash" | "notes" | "editor" | "recent" | "insights" | "members" | "welcome" | "search" | "announcements" | "chat" | "direct" | "mailbox" | "approval" | "bundle" | "caught-up" | "offline" | "missing" | "explorer" | "welcome-back" | "projects" | "pending-approval" | "sheets" | "documents" | "slides";
 
 export default function Art({ name, className }: { name: ArtName; className?: string }) {
 	const [svg, setSvg] = useState("");

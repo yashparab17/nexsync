@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_LAYOUT, moveTile, parseLayout } from "./dashboardLayout";
+import { DEFAULT_LAYOUT, moveTile, parseLayout } from "@/lib/dashboardLayout";
 
 describe("dashboardLayout", () => {
 	it("falls back to the default for nothing or nonsense", () => {

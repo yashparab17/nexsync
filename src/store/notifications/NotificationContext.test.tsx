@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-import NotificationBell from "@/components/layout/workspace/NotificationBell";
-import { MAX_NOTIFICATIONS, NotificationProvider, useNotifications } from "./NotificationContext";
+import NotificationBell from "@/features/shell/components/NotificationBell";
+import { MAX_NOTIFICATIONS, NotificationProvider, useNotifications } from "@/store/notifications/NotificationContext";
 
 afterEach(cleanup);
 

@@ -30,7 +30,7 @@ pub const EVENT_FILE_PROGRESS: &str = "p2p://file-progress";
 pub const EVENT_FILE_ENDED: &str = "p2p://file-ended";
 
 /// Workspace folders whose contents are shared with collaborators
-const SYNC_ROOTS: &[&str] = &["notes", "files", "assets", "projects"];
+const SYNC_ROOTS: &[&str] = crate::commands::workspace::layout::SYNCED;
 const MAX_TRANSFER_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const MAX_MANIFEST_ENTRIES: usize = 20_000;
 const MAX_DEPTH: usize = 32;
@@ -122,7 +122,7 @@ pub(crate) fn check_rel_path_in(workspace: &str, rel_path: &str) -> Result<Strin
         return Err(format!("{rel} stays on its own device."));
     }
     // A name this system cannot hold would fail half way; say so now (checked on Windows, where it matters)
-    if cfg!(windows) && !crate::commands::workspace::project_scan::path_problems(std::slice::from_ref(&rel)).is_empty() {
+    if cfg!(windows) && !crate::commands::workspace::projects::scan::path_problems(std::slice::from_ref(&rel)).is_empty() {
         return Err(format!("{rel} has a name this system cannot hold."));
     }
     Ok(rel)
@@ -626,7 +626,7 @@ mod perf {
         }
         println!("Withhold::check over {} files (warm): {:?} ({hits})", listed.len(), t.elapsed());
         let t = Instant::now();
-        let scan = crate::commands::workspace::project_scan::scan(&root);
+        let scan = crate::commands::workspace::projects::scan::scan(&root);
         println!("project_scan: heavy={} secrets={} in {:?}", scan.heavy.len(), scan.secrets.len(), t.elapsed());
         let t = Instant::now();
         let rt = tokio::runtime::Runtime::new().unwrap();

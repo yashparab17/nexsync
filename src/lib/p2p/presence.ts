@@ -3,7 +3,7 @@
 import type { ProbeResult } from "@/lib/p2p/transport";
 
 // Pages a person can be on; anything else a peer sends is ignored, since following sends this device there
-const PAGES = ["dashboard", "notes", "documents", "sheets", "slides", "projects", "editor", "explorer", "files", "assets", "tasks", "kanban", "chat", "announcements", "insights", "members", "trash", "settings"] as const;
+const PAGES = ["dashboard", "notes", "documents", "sheets", "slides", "projects", "editor", "explorer", "others", "assets", "tasks", "kanban", "chat", "announcements", "insights", "members", "trash", "settings"] as const;
 
 export interface Presence {
 	page: string; // One of PAGES
@@ -37,9 +37,15 @@ export function parsePresence(payload: string | undefined): Presence | null {
 	}
 }
 
-// "/workspace/notes" is the notes page, "/workspace" the dashboard; null outside a workspace page
+// Where each page lives: the office pages sit under /workspace/office, the dashboard is /workspace itself, the rest are /workspace/<page>
+export function routeOf(page: string): string {
+	if (page === "dashboard") return "/workspace";
+	return ["documents", "sheets", "slides"].includes(page) ? `/workspace/office/${page}` : `/workspace/${page}`;
+}
+
+// "/workspace/notes" is the notes page, "/workspace/office/sheets" the sheets page, "/workspace" the dashboard; null outside a workspace page
 export function pageOf(pathname: string): string | null {
-	const m = /^\/workspace(?:\/([^/]+))?/.exec(pathname);
+	const m = /^\/workspace(?:\/office)?(?:\/([^/]+))?/.exec(pathname);
 	if (!m) return null;
 	const page = m[1] ?? "dashboard";
 	return (PAGES as readonly string[]).includes(page) ? page : null;
@@ -55,7 +61,7 @@ export function placeLabel(p: Presence): string {
 
 // The route that shows what someone is looking at; every page opens `?open=` items itself
 export function followPath(p: Presence): string {
-	const base = p.page === "dashboard" ? "/workspace" : `/workspace/${p.page}`;
+	const base = routeOf(p.page);
 	// In the editor the line goes along ("#L12"), and the editor jumps to it
 	return p.item ? `${base}?open=${encodeURIComponent((p.page === "editor" || p.page === "slides") && p.line ? `${p.item}#L${p.line}` : p.item)}` : base;
 }

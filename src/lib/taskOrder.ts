@@ -1,7 +1,7 @@
 // The order to start a project's tasks in: each one after the tasks it waits on. Start All asks for the tasks that keep running
 // (servers and watchers); what they wait on (an install, a database) comes in with them.
 
-import type { TaskSpec } from "@/types/projects";
+import type { TaskSpec } from "@/features/projects/types";
 
 export function startOrder(tasks: TaskSpec[], wanted: string[]): TaskSpec[] {
 	const byId = new Map(tasks.map((t) => [t.id, t]));

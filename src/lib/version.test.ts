@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { APP_VERSION } from "./version";
+import { APP_VERSION } from "@/lib/version";
 
 // Tests run from the project folder
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");

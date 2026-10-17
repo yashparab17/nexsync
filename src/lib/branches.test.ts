@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
-import { branchDocId, closeBranch, listBranches, mergeBranch, previewMerge, startBranch } from "./branches";
+import { branchDocId, closeBranch, listBranches, mergeBranch, previewMerge, startBranch } from "@/lib/branches";
 
 const textOf = (doc: Y.Doc) => doc.getText("content").toString();
 

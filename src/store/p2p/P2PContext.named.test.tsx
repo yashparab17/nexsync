@@ -36,7 +36,7 @@ vi.mock("@/store/workspace/WorkspaceContext", () => ({
 }));
 
 import { receiveNamedVersion } from "@/lib/tauri";
-import { P2PProvider, useP2P } from "./P2PContext";
+import { P2PProvider, useP2P } from "@/store/p2p/P2PContext";
 
 let api: ReturnType<typeof useP2P>;
 function Probe() {

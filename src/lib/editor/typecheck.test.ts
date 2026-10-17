@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { canTypeCheck, firstNewError, loadTypeScript, typeErrors } from "./typecheck";
+import { canTypeCheck, firstNewError, loadTypeScript, typeErrors } from "@/lib/editor/typecheck";
 
 beforeAll(async () => {
 	await loadTypeScript();
@@ -25,7 +25,7 @@ describe("type check of a merge", () => {
 		expect(typeErrors("a.ts", wider)!.length).toBe(1);
 	});
 	it("does not follow imports, so an imported name is not an error, and says where the new one is", () => {
-		expect(typeErrors("a.ts", "import { thing } from './other';\nthing(1);\n")).toEqual([]);
+		expect(typeErrors("a.ts", "import { thing } from '@/lib/editor/other';\nthing(1);\n")).toEqual([]);
 		const was = [{ line: 1, message: "Cannot find name 'a'." }];
 		const now = [...was, { line: 5, message: "Cannot find name 'b'." }];
 		expect(firstNewError(was, now)?.line).toBe(5);

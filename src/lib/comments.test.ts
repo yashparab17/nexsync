@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { completeMention, makeComment, mentionSuggestions, mentions, newMentions, splitMentions } from "./comments";
+import { completeMention, makeComment, mentionSuggestions, mentions, newMentions, splitMentions } from "@/lib/comments";
 import type { Comment } from "@/types/workspace";
 
 const c = (id: string, author: string, text: string): Comment => ({ id, author, text, at: "2026-01-01T00:00:00Z" });

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-import { DateField } from "./date-field";
+import { DateField } from "@/components/ui/date-field";
 
 afterEach(cleanup);
 

@@ -4,7 +4,7 @@
 // is picked once at startup (the browser's language if a catalog for it is registered), so changing it
 // takes effect after a restart.
 
-import en from "./en";
+import en from "@/i18n/en";
 
 export type MessageKey = keyof typeof en;
 export type Catalog = Partial<Record<MessageKey, string>>;

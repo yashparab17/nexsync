@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { forgetWorkspace } from "@/lib/forgetWorkspace";
 import { p2p } from "@/lib/p2p";
 import { deleteWorkspace, removeRecentWorkspace } from "@/lib/tauri";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -28,6 +29,7 @@ export function useLeaveWorkspace() {
 			// Closing saves the workspace (and re-adds it to recents), which a deleted folder cannot do.
 			await clearWorkspace({ save: !deleteFiles });
 			await removeRecentWorkspace(id);
+			if (deleteFiles) forgetWorkspace(path);
 			navigate("/");
 			return outcome;
 		},

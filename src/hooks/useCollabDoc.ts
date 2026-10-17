@@ -17,7 +17,7 @@ export function useCollabDoc(
 	docId: string | undefined,
 ): CollabDoc | null {
 	const { createSyncProvider } = useP2P();
-	const [state, setState] = useState<{ doc: Y.Doc; awareness: Awareness } | null>(null);
+	const [state, setState] = useState<{ doc: Y.Doc; awareness: Awareness; key: string } | null>(null);
 	const [synced, setSynced] = useState(false);
 
 	useEffect(() => {
@@ -33,7 +33,8 @@ export function useCollabDoc(
 		const syncProvider = createSyncProvider(doc, docId, awareness);
 
 		setSynced(false);
-		setState({ doc, awareness });
+		setState({ doc, awareness, key: `${workspacePath}
+${docId}` });
 		const offSynced = persistence.onSynced(() => setSynced(true));
 
 		return () => {
@@ -47,6 +48,9 @@ export function useCollabDoc(
 		};
 	}, [workspacePath, docId, createSyncProvider]);
 
-	// A stable object: callers put it in effect and memo dependencies, and a new one each render would loop them
-	return useMemo(() => (state ? { doc: state.doc, awareness: state.awareness, synced } : null), [state, synced]);
+	// A stable object: callers put it in effect and memo dependencies, and a new one each render would loop them. Right after the id
+	// changes, the state still holds the previous document until the effect above runs; that one is never handed out under the new id.
+	const current = state && state.key === `${workspacePath}
+${docId}` ? state : null;
+	return useMemo(() => (current ? { doc: current.doc, awareness: current.awareness, synced } : null), [current, synced]);
 }

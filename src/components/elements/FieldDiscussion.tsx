@@ -5,11 +5,11 @@
 import { useMemo, useState } from "react";
 import { AnimateIcon, Bell, BellRing, CornerUpLeft } from "@/components/animate-icons";
 import { Button } from "@/components/ui/button";
-import ReactionBar from "@/components/chat/ReactionBar";
-import RichText from "@/components/chat/RichText";
+import ReactionBar from "@/features/chat/components/ReactionBar";
+import RichText from "@/features/chat/components/RichText";
 import Avatar from "@/components/elements/Avatar";
-import { buildThreads, type Point } from "@/lib/chat/entries";
-import { encodeMentions } from "@/lib/chat/mentions";
+import { buildThreads, type Point } from "@/features/chat/lib/entries";
+import { encodeMentions } from "@/features/chat/lib/mentions";
 import { useChat } from "@/store/chat/ChatContext";
 
 interface FieldDiscussionProps {

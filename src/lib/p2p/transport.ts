@@ -2,7 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { ConnectedPeerInfo, P2PMessage } from "./types";
+import type { ConnectedPeerInfo, P2PMessage } from "@/lib/p2p/types";
 
 export interface InviteInfo {
 	ticket: string;

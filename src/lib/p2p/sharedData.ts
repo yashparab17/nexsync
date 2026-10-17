@@ -2,7 +2,7 @@
 
 import { createKanbanColumn, deleteKanbanCard, deleteKanbanColumn, deleteTask, eraseFileForGood, eraseRecordForGood, mergeCardRecord, mergeTaskRecord } from "@/lib/tauri";
 import type { KanbanCard, Task } from "@/types/workspace";
-import type { DataChange } from "./types";
+import type { DataChange } from "@/lib/p2p/types";
 
 // A collaborator's copy of a task or card is merged into ours field by field, so edits made to different fields
 // while apart both stay, and two values for the same field are kept as a conflict for someone to settle

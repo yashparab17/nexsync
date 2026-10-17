@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
-import { applyHunks, hunksFromDelta, suggestRepair, type Hunk } from "./mergeRepair";
+import { applyHunks, hunksFromDelta, suggestRepair, type Hunk } from "@/lib/editor/mergeRepair";
 
 // Stands in for a parser: how far the braces are from balanced
 const braces = (text: string) => Math.abs((text.match(/\{/g) ?? []).length - (text.match(/\}/g) ?? []).length);

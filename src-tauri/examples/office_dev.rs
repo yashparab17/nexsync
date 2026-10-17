@@ -31,6 +31,19 @@ fn call(cmd: &str, a: &Value) -> Result<Value, String> {
             let (b, sh) = deck::add_picture(&s("base"), &s("name"), &s("data"), n("id") as u32, n("x"), n("y"), n("w"), n("h"))?;
             Ok(json!([b, sh]))
         }
+        "office_import_file" => {
+            let path = s("path");
+            let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+            let o = office::import(&path, &bytes, None).map_err(|e| e.message)?;
+            ok(serde_json::to_value(o))
+        }
+        "office_layout" => {
+            let layout = serde_json::from_value(a["layout"].clone()).ok();
+            let src = a.get("sourceId").and_then(Value::as_str);
+            ok(serde_json::to_value(office::lay_out(&s("html"), &s("title"), layout.as_ref(), src)?))
+        }
+        "office_page" => ok(serde_json::to_value(office::draw_page(n("session") as u64, n("index") as usize, n("scale") as f32)?)),
+        "office_render" => ok(serde_json::to_value(office::render_pages(&s("html"), &s("title"), None, n("scale") as f32)?)),
         "deck_new" => ok(serde_json::to_value(deck::blank()?)),
         "deck_register" => Ok(json!(deck::register(&s("base"))?)),
         "deck_render" => ok(serde_json::to_value(deck::render(&s("baseId"), &s("slide"), n("scale"))?)),

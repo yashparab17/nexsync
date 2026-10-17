@@ -4152,8 +4152,10 @@ dependencies = [
  "wordcraft-docbin",
  "wordcraft-docx",
  "wordcraft-formats",
+ "wordcraft-layout",
  "wordcraft-pdf",
  "wordcraft-proof",
+ "wordcraft-render",
  "zip 2.4.2",
 ]
 
@@ -8680,6 +8682,21 @@ source = "git+https://github.com/storytold/wordcraft?rev=eae242176108d328c5dd81f
 dependencies = [
  "log",
  "miniz_oxide",
+]
+
+[[package]]
+name = "wordcraft-render"
+version = "0.7.0"
+source = "git+https://github.com/storytold/wordcraft?rev=eae242176108d328c5dd81fbc10370c51ab90706#eae242176108d328c5dd81fbc10370c51ab90706"
+dependencies = [
+ "image",
+ "log",
+ "vello_cpu",
+ "wordcraft-doc",
+ "wordcraft-fonts",
+ "wordcraft-geom",
+ "wordcraft-layout",
+ "wordcraft-metafile",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
-import { seedText } from "./seed";
+import { seedText } from "@/lib/yjs/seed";
 
 const sync = (a: Y.Doc, b: Y.Doc) => {
 	Y.applyUpdate(b, Y.encodeStateAsUpdate(a, Y.encodeStateVector(b)));

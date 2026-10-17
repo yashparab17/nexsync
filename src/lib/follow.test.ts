@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { followEvents, type Snapshot } from "./follow";
+import { followEvents, type Snapshot } from "@/lib/follow";
 
 const item = (over: Partial<Snapshot[string]> = {}) => ({ title: "Plan", assignee: "", sig: "a", ...over });
 

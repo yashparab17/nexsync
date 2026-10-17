@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-import NoteBoard from "./NoteBoard";
-import NoteGraph from "./NoteGraph";
-import { buildEdges } from "@/lib/notes/graph";
+import NoteBoard from "@/components/elements/notes/NoteBoard";
+import NoteGraph from "@/components/elements/notes/NoteGraph";
+import { buildEdges } from "@/features/notes/lib/graph";
 
 afterEach(cleanup);
 

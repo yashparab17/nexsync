@@ -5,16 +5,16 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { buildChannels, buildConversations, buildMessages, commentText, GENERAL, isThread, unreadCount, type Channel, type Conversation, type EntryKind, type LogEntry, type Reaction } from "@/lib/chat/entries";
+import { buildChannels, buildConversations, buildMessages, commentText, GENERAL, isThread, unreadCount, type Channel, type Conversation, type EntryKind, type LogEntry, type Reaction } from "@/features/chat/lib/entries";
 import { ensureLocalColor, getLocalProfile, profilesFromEntries, setProfiles } from "@/lib/profile";
 import { getIcon, iconFromEntries, setIcon, type WorkspaceIcon } from "@/lib/workspaceIcon";
-import { buildAnnouncements, CHANNEL as ANNOUNCEMENTS, type Announcement, type AnnouncementDraft } from "@/lib/announcements";
-import { encodeMentions, type Person } from "@/lib/chat/mentions";
-import { EMPTY_VIEW, parseAction, type ModerationAction, type ModerationView, type TimedOutMember } from "@/lib/moderation";
+import { buildAnnouncements, CHANNEL as ANNOUNCEMENTS, type Announcement, type AnnouncementDraft } from "@/features/announcements/lib/announcements";
+import { encodeMentions, type Person } from "@/features/chat/lib/mentions";
+import { EMPTY_VIEW, parseAction, type ModerationAction, type ModerationView, type TimedOutMember } from "@/features/moderation/lib/moderation";
 import { canCommentRole } from "@/lib/roles";
 import { p2p } from "@/lib/p2p";
 import { myName } from "@/lib/p2p/selfName";
-import { plainPreview } from "@/lib/chat/preview";
+import { plainPreview } from "@/features/chat/lib/preview";
 import { dmChannel, dmOpen, dmSeal, chatMarkRead, chatPost, chatSetMuted, chatState, inboxAdd, inboxClear, inboxList, inboxMarkRead, moderationState, type InboxItem } from "@/lib/tauri";
 import { useNotifications } from "@/store/notifications/NotificationContext";
 import { useP2P, useSelfRole } from "@/store/p2p/P2PContext";
@@ -423,10 +423,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 		setProfiles(map);
 	}, [entries, name]);
 	useEffect(() => {
-		if (!workspace || !me || entries.length === 0) return;
+		if (!workspace || !me || !name.trim() || entries.length === 0) return;
 		const share = () => {
 			const mine = getLocalProfile();
 			const published = profilesFromEntries(entries.filter((e) => e.author === me)).get(name.trim().toLowerCase()) ?? {};
+			if (!mine.color && !mine.image) return;
 			if ((mine.color ?? "") === (published.color ?? "") && (mine.image ?? "") === (published.image ?? "")) return;
 			void post({ kind: "profile", channel: "profiles", body: JSON.stringify(mine) }).catch(() => {});
 		};

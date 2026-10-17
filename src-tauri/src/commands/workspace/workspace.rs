@@ -18,6 +18,14 @@ use super::models::{CreateWorkspaceRequest, History, Permissions, WorkspaceInfo,
 // Tauri commands — Workspace creation / import
 // ────────────────────────────
 
+/// Is there nothing at `path`, or only an empty folder?
+fn folder_is_free(path: &Path) -> bool {
+    match fs::read_dir(path) {
+        Ok(mut entries) => entries.next().is_none(),
+        Err(_) => !path.exists(),
+    }
+}
+
 /// Creates a new workspace on disk and initializes its SQLite database
 #[tauri::command]
 pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRequest) -> Result<WorkspaceInfo, String> {
@@ -30,6 +38,11 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
 
     let workspace_id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
+
+    // A folder that already holds something is not a new workspace: reusing it would bring back an old workspace's notes and files
+    if !folder_is_free(&workspace_path) {
+        return Err(format!("A folder named \"{}\" with files in it already exists there. Choose another name, or delete that folder first.", request.name));
+    }
 
     // Create directories
     fs::create_dir_all(&workspace_path).map_err(|e| e.to_string())?;
@@ -145,8 +158,7 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
     tx.commit().map_err(|e| e.to_string())?;
 
     // Create default content folders
-    let folders = ["notes", "files", "tasks", "kanban", "projects", "assets"];
-    for folder in folders {
+    for folder in super::layout::CREATED {
         fs::create_dir_all(workspace_path.join(folder)).map_err(|e| e.to_string())?;
     }
 
@@ -544,7 +556,7 @@ pub fn get_workspace_stats(app_handle: tauri::AppHandle, path: String) -> Result
         .map_err(|e| e.to_string())?;
 
     Ok(super::models::WorkspaceStats {
-        files: count_entries("files") + count_entries("notes") + count_entries("projects"),
+        files: super::layout::COUNTED.iter().map(|f| count_entries(f)).sum(),
         assets: count_entries("assets"),
         tasks: task_count as usize,
         kanban_cards: kanban_count as usize,
@@ -553,6 +565,18 @@ pub fn get_workspace_stats(app_handle: tauri::AppHandle, path: String) -> Result
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_folder_with_anything_in_it_is_not_free_for_a_new_workspace() {
+        let dir = std::env::temp_dir().join(format!("nexsync-free-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(super::folder_is_free(&dir));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(super::folder_is_free(&dir));
+        std::fs::create_dir_all(dir.join("notes")).unwrap();
+        assert!(!super::folder_is_free(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     use super::*;
 
     #[test]

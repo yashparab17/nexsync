@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 
 import { writeWorkspaceBinaryFile } from "@/lib/tauri";
-import { canDownscale, fileToBase64, MIN_SCALE, readImageSize, scaledSize } from "@/lib/assets/uploadScale";
+import { canDownscale, fileToBase64, MIN_SCALE, readImageSize, scaledSize } from "@/features/assets/lib/uploadScale";
 import { safeUploadName } from "@/lib/validation";
 import { formatBytes } from "@/lib/utils";
 

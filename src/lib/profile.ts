@@ -5,7 +5,7 @@
 
 import { useSyncExternalStore } from "react";
 
-import type { LogEntry } from "@/lib/chat/entries";
+import type { LogEntry } from "@/features/chat/lib/entries";
 import { PALETTE, randomColor, setChosenColors } from "@/lib/collabColor";
 
 export interface Profile {

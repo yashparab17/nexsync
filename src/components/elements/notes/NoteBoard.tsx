@@ -8,9 +8,9 @@ import type { Awareness } from "y-protocols/awareness";
 import PresenceDots from "@/components/elements/PresenceDots";
 import { Button } from "@/components/ui/button";
 import { colorOf } from "@/lib/collabColor";
-import { CARD_H, CARD_W, clampZoom, summarize } from "@/lib/notes/board";
-import { degrees, type GraphEdge, type NoteInfo, type Point } from "@/lib/notes/graph";
-import { noteTitle } from "@/lib/notes/links";
+import { CARD_H, CARD_W, clampZoom, summarize } from "@/features/notes/lib/board";
+import { degrees, type GraphEdge, type NoteInfo, type Point } from "@/features/notes/lib/graph";
+import { noteTitle } from "@/features/notes/lib/links";
 import { cn } from "@/lib/utils";
 
 interface View {

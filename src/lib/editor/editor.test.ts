@@ -2,10 +2,10 @@ import { javascript } from "@codemirror/lang-javascript";
 import * as Y from "yjs";
 import { describe, expect, it } from "vitest";
 
-import { blameLines, blameRanges, contributions, recordAuthor, trackAuthor } from "./blame";
-import { minimalChange } from "./format";
-import { editorRouteFor, loadLanguage } from "./languages";
-import { countSyntaxErrors } from "./syntax";
+import { blameLines, blameRanges, contributions, recordAuthor, trackAuthor } from "@/lib/editor/blame";
+import { minimalChange } from "@/lib/editor/format";
+import { editorRouteFor, loadLanguage } from "@/lib/editor/languages";
+import { countSyntaxErrors } from "@/lib/editor/syntax";
 
 describe("file routing", () => {
 	it("sends rich-text notes to notes, word-processor files to Documents, other office files to the system app and everything else, Markdown included, to the editor", () => {

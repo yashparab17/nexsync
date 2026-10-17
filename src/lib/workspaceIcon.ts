@@ -2,7 +2,7 @@
 // member's device shows the same one; each device also keeps a copy in the browser's storage under the workspace's id, which
 // is what the Welcome screen reads for workspaces that are not open.
 
-import type { LogEntry } from "@/lib/chat/entries";
+import type { LogEntry } from "@/features/chat/lib/entries";
 import { PALETTE } from "@/lib/collabColor";
 
 
