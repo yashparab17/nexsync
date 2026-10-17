@@ -16,6 +16,17 @@ import { initSecurityPolicies } from "./lib/security";
 // Enforce desktop security policies: disable right-click, dev tools, and history tracking
 initSecurityPolicies();
 
+// Development only: /?lab=documents shows an editor on its own (src/dev/Lab.tsx)
+const lab = import.meta.env.DEV ? new URLSearchParams(location.search).get("lab") : null;
+if (lab) {
+	void import("./dev/Lab").then(({ default: Lab }) => {
+		ReactDOM.createRoot(document.getElementById("root")!).render(
+			<ThemeProvider>
+				<Lab which={lab} />
+			</ThemeProvider>,
+		);
+	});
+} else
 // Application root bootstrap mounting React providers and router
 ReactDOM.createRoot(document.getElementById("root")!).render(
 	<React.StrictMode>

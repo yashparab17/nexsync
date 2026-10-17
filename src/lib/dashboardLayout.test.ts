@@ -10,7 +10,7 @@ describe("dashboardLayout", () => {
 	it("keeps stored choices and adds tiles added since", () => {
 		const l = parseLayout({ order: ["cards", "tasks"], size: { tasks: "l" }, hidden: ["files"] });
 		expect(l.order.slice(0, 2)).toEqual(["cards", "tasks"]);
-		expect(l.order).toHaveLength(7);
+		expect(l.order).toHaveLength(8);
 		expect(l.size.tasks).toBe("l");
 		expect(l.hidden).toEqual(["files"]);
 	});

@@ -9,6 +9,10 @@ describe("presence messages", () => {
 		expect(parsePresence('{"page":"https://evil"}')).toBeNull();
 		expect(parsePresence('{"page":"notes","item":7}')).toBeNull();
 		expect(parsePresence(`{"page":"notes","item":"${"x".repeat(301)}"}`)).toBeNull();
+		expect(parsePresence('{"page":"editor","item":"a.ts","line":42}')).toEqual({ page: "editor", item: "a.ts", away: false, line: 42 });
+		expect(parsePresence('{"page":"editor","item":"a.ts","line":0}')?.line).toBeUndefined();
+		expect(parsePresence('{"page":"editor","item":"a.ts","line":"9"}')?.line).toBeUndefined();
+		expect(followPath({ page: "editor", item: "src/a.ts", away: false, line: 7 })).toBe("/workspace/editor?open=src%2Fa.ts%23L7");
 		expect(parsePresence("not json")).toBeNull();
 		expect(parsePresence(undefined)).toBeNull();
 	});

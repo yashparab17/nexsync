@@ -23,7 +23,7 @@ export default function PresenceStrip() {
 	const there = following ? presence[following] : undefined;
 	useEffect(() => {
 		if (there) navigate(followPath(there));
-	}, [there?.page, there?.item]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [there?.page, there?.item, there?.line]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Someone who disconnects can no longer be followed
 	useEffect(() => {

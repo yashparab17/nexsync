@@ -2,21 +2,32 @@
 // run its tasks (after approving each command), watch their output and problems, keep the environment, and see when the
 // dependencies the team changed need installing.
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { AlertTriangle, Check, EyeOff, Clock, FolderPlus, Info, Network, Play, RefreshCw, X } from "@/components/animate-icons";
+import { AlertTriangle, Check, EyeOff, Clock, FolderPlus, Info, Network, Play, RefreshCw, Terminal, X } from "@/components/animate-icons";
+import TerminalView from "@/components/elements/editor/TerminalView";
 import { EmptyState, Page, PageBody, Panel } from "@/components/layout/Page";
 import Toolbar, { ToolbarSelect, ToolbarTabs, ToolbarTitle } from "@/components/layout/Toolbar";
+import ContainersPanel from "@/components/projects/ContainersPanel";
+import AuditPanel from "@/components/projects/AuditPanel";
+import GeneratorsPanel from "@/components/projects/GeneratorsPanel";
 import EnvPanel from "@/components/projects/EnvPanel";
 import NewProjectDialog from "@/components/projects/NewProjectDialog";
+import PreviewPane from "@/components/projects/PreviewPane";
+import SearchPanel from "@/components/projects/SearchPanel";
+import RequestsPanel from "@/components/projects/RequestsPanel";
+import TeamPanel from "@/components/projects/TeamPanel";
+import TestsPanel from "@/components/projects/TestsPanel";
 import RunOutput from "@/components/projects/RunOutput";
 import TaskTrustDialog from "@/components/projects/TaskTrustDialog";
 import { Button } from "@/components/ui/button";
 import { useErrorLog } from "@/hooks/useErrorLog";
-import { forgetFinished, listenToRuns, runsNow, sameProblem, useRuns, waitForRun } from "@/lib/projectRuns";
+import { useLspProblems } from "@/lib/lsp";
+import { forgetFinished, listenToRuns, runsNow, sameProblem, useRuns, waitForRun, type Run } from "@/lib/projectRuns";
 import { ignoreRule, insideProject, problemPath, recipeFromDetected, tasksOf, toolsOf } from "@/lib/projects";
 import { serverIds, startOrder } from "@/lib/taskOrder";
+import { all, envChannel, envShareOf, newest, reproChannel, runChannel, runShareOf, tailOf, type EnvShare, type ReproShare, type RunShare } from "@/lib/teamStatus";
 import {
 	p2pHeldCount,
 	p2pHoldIncoming,
@@ -25,9 +36,13 @@ import {
 	projectDepsMark,
 	projectDepsStatus,
 	projectDoctor,
+	projectRuntime,
+	projectRuntimeSet,
 	projectEnvStatus,
+	projectRuns,
 	projectSaveRecipe,
 	projectScan,
+	projectSecretAllow,
 	projectsList,
 	projectTaskApprove,
 	projectTaskStart,
@@ -35,22 +50,34 @@ import {
 	projectTaskTrust,
 } from "@/lib/tauri";
 import { cn, errorText, formatBytes } from "@/lib/utils";
+import { useChat } from "@/store/chat/ChatContext";
 import { useIsViewer } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
-import type { DepsStatus, Doctor, EnvState, ProjectInfo, Problem, Scan, TaskSpec, Trust } from "@/types/projects";
+import type { DepsStatus, Doctor, EnvState, ProjectInfo, Problem, RuntimeInfo, Scan, TaskSpec, Trust } from "@/types/projects";
 
-type Tab = "overview" | "output" | "problems";
+type Tab = "overview" | "output" | "problems" | "preview" | "tests" | "search" | "requests" | "team";
+
+// Whether this device shares its tools and what it runs with the workspace, per workspace; off until chosen
+const shareKey = (id: string) => `nexsync-share-setup:${id}`;
+const readShare = (id: string) => {
+	try {
+		return localStorage.getItem(shareKey(id)) === "1";
+	} catch {
+		return false;
+	}
+};
 
 const openUrl = (url: string) => void import("@tauri-apps/plugin-opener").then((m) => m.openUrl(url)).catch(() => {});
-// A secret the person said is fine, remembered on this device
-const allowedKey = (path: string, file: string, kind: string) => `nexsync.secret-ok.${path}:${file}:${kind}`;
 
 export default function WorkspaceProjects() {
 	const { workspace } = useWorkspace();
 	const navigate = useNavigate();
+	const [params, setParams] = useSearchParams();
 	const isViewer = useIsViewer();
 	const logError = useErrorLog();
+	const chat = useChat();
 	const path = workspace?.path ?? "";
+	const [sharing, setSharing] = useState(() => (workspace ? readShare(workspace.id) : false));
 
 	const [projects, setProjects] = useState<ProjectInfo[] | null>(null);
 	const [selected, setSelected] = useState<string | null>(null);
@@ -58,12 +85,15 @@ export default function WorkspaceProjects() {
 	const [scan, setScan] = useState<Scan | null>(null);
 	const [doctor, setDoctor] = useState<Doctor | null>(null);
 	const [env, setEnv] = useState<EnvState[]>([]);
+	const [runtime, setRuntime] = useState<RuntimeInfo>({ distros: [], wsl: null });
 	const [deps, setDeps] = useState<DepsStatus | null>(null);
 	const [creating, setCreating] = useState(false);
 	const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 	const [ask, setAsk] = useState<{ label: string; trust: Trust; resolve: (c: "once" | "always" | null) => void } | null>(null);
 	const [held, setHeld] = useState<{ holding: boolean; count: number }>({ holding: false, count: 0 });
 	const [, bump] = useState(0);
+	// Tasks running in a real terminal (the ones that ask questions), until closed
+	const [terminals, setTerminals] = useState<{ key: number; label: string; dir: string; command: string; exited: number | null | undefined }[]>([]);
 
 	useEffect(() => {
 		listenToRuns();
@@ -92,13 +122,19 @@ export default function WorkspaceProjects() {
 	const runs = useRuns(projectId ?? undefined);
 	const running = runs.filter((r) => r.status !== "done");
 
+	// Where this device runs the project's tasks (this system, or a WSL distribution), asked again when the project changes
+	useEffect(() => {
+		if (!path || !projectId) return setRuntime({ distros: [], wsl: null });
+		projectRuntime(path, projectId).then(setRuntime).catch(() => setRuntime({ distros: [], wsl: null }));
+	}, [path, projectId]);
+
 	// This device's answer for the project's tools, asked again when the list changes
 	const check = useCallback(() => {
 		setDoctor(null);
 		if (!path || tools.length === 0) return;
-		projectDoctor(path, tools).then(setDoctor).catch((err) => logError(err, { source: "projects", workspace: path }));
+		projectDoctor(path, tools, runtime.wsl).then(setDoctor).catch((err) => logError(err, { source: "projects", workspace: path }));
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- toolKey stands for the list
-	}, [path, toolKey, logError]);
+	}, [path, toolKey, logError, runtime.wsl]);
 	useEffect(check, [check]);
 
 	// The environment and the dependencies of the open project, again when a run ends (an install changes the second)
@@ -133,22 +169,44 @@ export default function WorkspaceProjects() {
 		}
 	};
 
-	// Asks, if this device has not approved the task as it is now, and starts it. Returns the run's id, or null when declined.
+	// Asks, if this device has not approved the task as it is now. Returns whether it may run, and whether that was for once only.
+	const approve = useCallback(
+		async (task: TaskSpec): Promise<{ once: boolean } | null> => {
+			if (!projectId) return null;
+			const trust = await projectTaskTrust(path, projectId, task.id);
+			if (trust.trusted) return { once: false };
+			const choice = await new Promise<"once" | "always" | null>((resolve) => setAsk({ label: task.label, trust, resolve }));
+			setAsk(null);
+			if (!choice) return null;
+			if (choice === "always") await projectTaskApprove(path, projectId, task.id);
+			return { once: choice === "once" };
+		},
+		[path, projectId],
+	);
+
+	// The same approval, then the command typed into a real terminal in the task's folder: for tasks that ask questions
+	const runInTerminal = async (task: TaskSpec) => {
+		if (!projectId || !project) return;
+		setNotice(null);
+		try {
+			if (!(await approve(task))) return;
+			const dir = [project.path, task.cwd].filter(Boolean).join("/");
+			setTerminals((t) => [...t, { key: Date.now(), label: task.label, dir, command: task.command, exited: undefined }]);
+			setTab("output");
+		} catch (err) {
+			setNotice({ ok: false, text: errorText(err, "The terminal did not open.") });
+		}
+	};
+
+	// Starts the task, asking first if needed. Returns the run's id, or null when declined.
 	const runTask = useCallback(
-		async (task: TaskSpec, goToOutput = true): Promise<string | null> => {
+		async (task: TaskSpec, goToOutput = true, args?: string[]): Promise<string | null> => {
 			if (!projectId) return null;
 			setNotice(null);
 			try {
-				const trust = await projectTaskTrust(path, projectId, task.id);
-				let once = false;
-				if (!trust.trusted) {
-					const choice = await new Promise<"once" | "always" | null>((resolve) => setAsk({ label: task.label, trust, resolve }));
-					setAsk(null);
-					if (!choice) return null;
-					if (choice === "always") await projectTaskApprove(path, projectId, task.id);
-					once = choice === "once";
-				}
-				const id = await projectTaskStart(path, projectId, task.id, once);
+				const allowed = await approve(task);
+				if (!allowed) return null;
+				const id = await projectTaskStart(path, projectId, task.id, allowed.once, args);
 				if (goToOutput) setTab("output");
 				return id;
 			} catch (err) {
@@ -156,7 +214,7 @@ export default function WorkspaceProjects() {
 				return null;
 			}
 		},
-		[path, projectId],
+		[path, projectId, approve],
 	);
 
 	// The servers and watchers, each after what it waits on, and each ready before the next starts
@@ -175,13 +233,111 @@ export default function WorkspaceProjects() {
 		}
 	};
 
+	// `?run=project:task`, from the command palette: open that project and start the task (asking first, as always)
+	const wanted = params.get("run");
+	const [pending, setPending] = useState<{ project: string; task: string } | null>(null);
+	useEffect(() => {
+		if (!wanted || !projects) return;
+		const [id, taskId] = wanted.split(":");
+		const target = projects.find((p) => p.id === id);
+		setParams({}, { replace: true });
+		if (!target || !tasksOf(target).some((t) => t.id === taskId)) return setNotice({ ok: false, text: "That task is no longer in the project." });
+		setSelected(target.path);
+		setPending({ project: id, task: taskId });
+	}, [wanted, projects, setParams]);
+	// It starts once that project is the open one, so the task runs in the right folder
+	useEffect(() => {
+		if (!pending || projectId !== pending.project) return;
+		const task = tasks.find((t) => t.id === pending.task);
+		setPending(null);
+		if (task) void (task.interactive ? runInTerminal(task) : runTask(task));
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- once per request
+	}, [pending, projectId]);
+
+	// What this device shares, when it chose to: its tools, and what it is running. An entry is written only when it says
+	// something new, so a quiet project adds nothing to the log.
+	const posted = useRef(new Map<string, string>());
+	const runningKey = running.map((r) => r.task).sort().join(",");
+	const installed = !deps || deps.state === "current" || deps.state === "none";
+	useEffect(() => {
+		if (!sharing || !projectId || !doctor || !chat.canPost || !chat.me) return;
+		const env = envShareOf(doctor, installed);
+		const last = newest<EnvShare>(chat.entries, "devenv", envChannel(projectId)).find((m) => m.key === chat.me)?.data;
+		const body = JSON.stringify(env);
+		if (JSON.stringify(last) !== body && posted.current.get("env") !== body) {
+			posted.current.set("env", body);
+			void chat.post({ kind: "devenv", channel: envChannel(projectId), body }).catch(() => posted.current.delete("env"));
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- the entries are read, not watched: a post answers itself
+	}, [sharing, projectId, doctor, installed, chat.canPost, chat.me]);
+	useEffect(() => {
+		if (!sharing || !projectId || !chat.canPost || !chat.me) return;
+		let live = true;
+		void projectRuns(path, projectId).then((history) => {
+			if (!live) return;
+			const run = runShareOf(runningKey ? runningKey.split(",") : [], history, Date.now());
+			const last = newest<RunShare>(chat.entries, "devrun", runChannel(projectId)).find((m) => m.key === chat.me)?.data;
+			const strip = (r?: RunShare) => JSON.stringify(r && { ...r, at: 0 });
+			const body = JSON.stringify(run);
+			if (strip(last) === strip(run) || posted.current.get("run") === strip(run)) return;
+			posted.current.set("run", strip(run));
+			void chat.post({ kind: "devrun", channel: runChannel(projectId), body }).catch(() => posted.current.delete("run"));
+		}).catch(() => {});
+		return () => {
+			live = false;
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- as above
+	}, [sharing, projectId, runningKey, finished, chat.canPost, chat.me]);
+	const teamEnvs = useMemo(() => (projectId ? newest<EnvShare>(chat.entries, "devenv", envChannel(projectId)) : []), [chat.entries, projectId]);
+	const teamRuns = useMemo(() => (projectId ? newest<RunShare>(chat.entries, "devrun", runChannel(projectId)) : []), [chat.entries, projectId]);
+	const teamFailures = useMemo(() => (projectId ? all<ReproShare>(chat.entries, "devrepro", reproChannel(projectId)) : []), [chat.entries, projectId]);
+	// A failed run, shared as a signed entry: the task, how it ended, the end of its output, and the tools on this device
+	const shareFailure = async (run: Run) => {
+		if (!projectId) return;
+		const task = tasks.find((t) => t.id === run.task);
+		const { text, cut } = tailOf(run.lines.map((l) => l.text));
+		const repro: ReproShare = {
+			task: run.task,
+			command: task?.command ?? "",
+			code: run.code,
+			durationMs: Date.now() - run.startedAt,
+			startedAt: run.startedAt,
+			os: doctor ? envShareOf(doctor, installed).os : "",
+			tools: doctor ? envShareOf(doctor, installed).tools : [],
+			log: text,
+			cut: cut || run.dropped > 0,
+			problems: run.problems.slice(0, 10).map((p) => ({ file: p.file, line: p.line, message: p.message.slice(0, 200) })),
+		};
+		await chat.post({ kind: "devrepro", channel: reproChannel(projectId), body: JSON.stringify(repro) });
+	};
+	const share = (on: boolean) => {
+		setSharing(on);
+		try {
+			if (workspace) localStorage.setItem(shareKey(workspace.id), on ? "1" : "0");
+		} catch {
+			/* blocked storage: the choice lasts until the page closes */
+		}
+	};
+
 	const stopAll = () => running.forEach((r) => void projectTaskStop(r.runId));
 
+	// The ports a preview can show: those a running task opened, the recipe's, and the ports its servers are declared to use
+	const previewPorts = useMemo(() => {
+		const ports: number[] = [];
+		const add = (p?: number | null) => p && !ports.includes(p) && ports.push(p);
+		running.forEach((r) => r.ports.forEach((p) => add(p.port)));
+		if (running.length > 0) tasks.filter((t) => t.watch && running.some((r) => r.task === t.id)).forEach((t) => t.ports.forEach(add));
+		return ports;
+	}, [running, tasks]);
+
+	// What the project's language servers report joins what its tasks reported
+	const lspProblems = useLspProblems(projectId);
 	const problems = useMemo(() => {
 		const all: { problem: Problem; cwd: string }[] = [];
 		for (const r of runs) for (const p of r.problems) if (!all.some((x) => sameProblem(x.problem, p))) all.push({ problem: p, cwd: tasks.find((t) => t.id === r.task)?.cwd ?? "" });
+		for (const p of lspProblems) if (!all.some((x) => sameProblem(x.problem, p))) all.push({ problem: p, cwd: "" });
 		return all;
-	}, [runs, tasks]);
+	}, [runs, tasks, lspProblems]);
 
 	const hold = async (on: boolean) => {
 		const count = await p2pHoldIncoming(on).catch(() => 0);
@@ -204,6 +360,11 @@ export default function WorkspaceProjects() {
 							{ key: "overview", label: "Overview" },
 							{ key: "output", label: "Output", count: running.length || undefined },
 							{ key: "problems", label: "Problems", count: problems.length || undefined },
+							{ key: "preview", label: "Preview" },
+								{ key: "tests", label: "Tests" },
+								{ key: "search", label: "Search" },
+								{ key: "requests", label: "Requests" },
+								{ key: "team", label: "Team" },
 						]}
 					/>
 				)}
@@ -263,14 +424,71 @@ export default function WorkspaceProjects() {
 							)}
 
 							{tab === "output" && projectId ? (
-								<RunOutput workspacePath={path} project={projectId} runs={runs} onRerun={(id) => { const t = tasks.find((x) => x.id === id); if (t) void runTask(t); }} onOpenUrl={(port) => openUrl(`http://localhost:${port}`)} />
-							) : tab === "problems" && projectId ? (
+								<>
+								{terminals.map((term) => (
+									<section key={term.key} aria-label={`${term.label} in a terminal`} className="frame flex h-80 shrink-0 flex-col overflow-hidden">
+										<header className="flex h-10 shrink-0 items-center gap-3 border-b px-3">
+											<Terminal className="size-4 text-muted-foreground" />
+											<span className="min-w-0 flex-1 truncate text-sm font-medium">{term.label}</span>
+											<span className="font-mono text-[13px] text-muted-foreground">{term.exited === undefined ? "running" : `ended${term.exited ? ` with code ${term.exited}` : ""}`}</span>
+											<Button variant="ghost" size="icon-xs" aria-label="Close the terminal" onPress={() => setTerminals((all) => all.filter((x) => x.key !== term.key))}>
+												<X className="size-3.5" />
+											</Button>
+										</header>
+										<div className="min-h-0 flex-1">
+											<TerminalView workspacePath={path} dir={term.dir} command={term.command} visible onExit={(code) => setTerminals((all) => all.map((x) => (x.key === term.key ? { ...x, exited: code } : x)))} onFailed={(m) => setNotice({ ok: false, text: m })} />
+										</div>
+									</section>
+								))}
+								<RunOutput workspacePath={path} project={projectId} runs={runs} onShare={chat.canPost ? shareFailure : undefined} onRerun={(id) => { const t = tasks.find((x) => x.id === id); if (t) void runTask(t); }} onOpenUrl={(port) => openUrl(`http://localhost:${port}`)} />
+								</>
+							) : tab === "preview" && projectId ? (
+								<PreviewPane
+									ports={previewPorts}
+									running={running.length > 0}
+									startLabel={tasks.find((t) => t.watch) ? `Start ${tasks.find((t) => t.watch)!.label}` : null}
+									onStart={() => {
+										const t = tasks.find((x) => x.watch);
+										if (t) void runTask(t, false);
+									}}
+									onOpenUrl={openUrl}
+								/>
+							) : tab === "tests" && projectId ? (
+								<TestsPanel
+									path={path}
+									project={projectId}
+									runs={runs}
+									tasks={tasks}
+										canRun={!isViewer}
+										onOpenFile={(rel) => navigate(`/workspace/editor?open=${encodeURIComponent(`/${project.path}/${rel}`)}`)}
+										onRunOne={(taskId, args) => {
+										const t = tasks.find((x) => x.id === taskId);
+										if (t) void runTask(t, true, args);
+									}}
+								/>
+								) : tab === "search" && projectId ? (
+									<SearchPanel path={path} project={projectId} canReplace={!isViewer} onOpen={(rel, line) => navigate(`/workspace/editor?open=${encodeURIComponent(`/${project.path}/${rel}#L${line}`)}`)} />
+								) : tab === "requests" && projectId ? (
+									<RequestsPanel path={path} project={projectId} onOpenFile={(rel) => navigate(`/workspace/editor?open=${encodeURIComponent(`/${project.path}/${rel}`)}`)} />
+								) : tab === "team" && projectId ? (
+									<TeamPanel
+										me={chat.me}
+										envs={teamEnvs}
+										runs={teamRuns}
+										failures={teamFailures}
+										myTools={doctor ? envShareOf(doctor, installed).tools : []}
+										recipe={{ server: tasks.filter((t) => t.watch).map((t) => t.id), tests: tasks.some((t) => t.id === "test"), install: tasks.some((t) => t.id === "install") }}
+										sharing={sharing}
+										canShare={chat.canPost}
+										onShare={share}
+									/>
+								) : tab === "problems" && projectId ? (
 								<ProblemsList
 									items={problems}
 									onClear={() => forgetFinished(projectId)}
 									onOpen={({ problem, cwd }) => {
 										const rel = problemPath(path, project, cwd, problem.file);
-										if (rel) navigate(`/workspace/editor?open=${encodeURIComponent(`/${rel}`)}`);
+										if (rel) navigate(`/workspace/editor?open=${encodeURIComponent(`/${rel}#L${problem.line}`)}`);
 									}}
 									canOpen={({ problem, cwd }) => problemPath(path, project, cwd, problem.file) !== null}
 								/>
@@ -372,11 +590,16 @@ export default function WorkspaceProjects() {
 																		Stop
 																	</Button>
 																) : (
-																	<Button variant="outline" size="xs" onPress={() => void runTask(t)}>
+																	<Button variant="outline" size="xs" onPress={() => void (t.interactive ? runInTerminal(t) : runTask(t))}>
 																		<Play className="size-3" />
 																		Run
 																	</Button>
 																))}
+															{projectId && !isViewer && !live && !t.interactive && (
+																<Button variant="ghost" size="icon-xs" aria-label={`Run ${t.label} in a terminal`} onPress={() => void runInTerminal(t)}>
+																	<Terminal className="size-3.5" />
+																</Button>
+															)}
 														</li>
 													);
 												})}
@@ -416,9 +639,23 @@ export default function WorkspaceProjects() {
 
 									{projectId ? <EnvPanel path={path} project={projectId} vars={env} canEdit={!isViewer} onChanged={refreshLocal} /> : null}
 
-									<KeptHere
-										className="@4xl:col-span-2"
-										path={path}
+										{projectId && (
+											<ContainersPanel
+												path={path}
+												project={projectId}
+												kinds={project.detected.kinds.map((k) => k.id)}
+												tasks={tasks}
+												runtime={runtime}
+												canRun={!isViewer}
+												onRun={(t) => void runTask(t)}
+												onRuntime={(wsl) => void projectRuntimeSet(path, projectId, wsl).then(() => projectRuntime(path, projectId)).then(setRuntime).catch((e) => setNotice({ ok: false, text: errorText(e, "That did not change.") }))}
+											/>
+										)}
+										{projectId && !isViewer && <GeneratorsPanel key={`g${projectId}`} path={path} project={projectId} onCreated={(first) => navigate(`/workspace/editor?open=${encodeURIComponent(`/${project.path}/${first}`)}`)} />}
+										{projectId && <AuditPanel key={projectId} path={path} project={projectId} />}
+
+										<KeptHere
+											className="@4xl:col-span-2"
 										scan={scan}
 										heavy={mine(scan?.heavy ?? [])}
 										held={mine(scan?.held ?? [])}
@@ -426,14 +663,7 @@ export default function WorkspaceProjects() {
 										secrets={mine(scan?.secrets ?? [])}
 										canAct={!isViewer && !project.scratch}
 										onIgnore={(p, folder) => void act(() => projectAddIgnore(path, project.id, ignoreRule(project, p, folder)), "Added to this project's .nexignore. It stops syncing.")}
-										onAllow={(p, kind) => {
-											try {
-												localStorage.setItem(allowedKey(path, p, kind), "1");
-											} catch {
-												// Not remembered this time
-											}
-											bump((n) => n + 1);
-										}}
+										onAllow={(p) => void act(() => projectSecretAllow(path, p), "Allowed. The file is shared from now on.")}
 									/>
 								</div>
 							)}
@@ -445,12 +675,19 @@ export default function WorkspaceProjects() {
 			{ask && <TaskTrustDialog taskLabel={ask.label} trust={ask.trust} onChoose={ask.resolve} />}
 			{creating && (
 				<NewProjectDialog
+					path={path}
 					existing={(projects ?? []).map((p) => p.id)}
 					onClose={() => setCreating(false)}
-					onCreate={async (name) => {
+					onCreateEmpty={async (name) => {
 						await projectCreate(path, name);
 						setSelected(`projects/${name}`);
 						await load();
+					}}
+					onDone={(name) => {
+						setCreating(false);
+						setSelected(`projects/${name}`);
+						setTab("overview");
+						void load();
 					}}
 				/>
 			)}
@@ -493,14 +730,8 @@ function ProblemsList({ items, onOpen, canOpen, onClear }: { items: { problem: P
 
 // What was found that needs a look before the project is shared: secrets, folders that look generated, files held back for
 // size, and paths another operating system cannot hold
-function KeptHere({ path, scan, heavy, held, hazards, secrets, canAct, onIgnore, onAllow, className }: { path: string; scan: Scan | null; heavy: Scan["heavy"]; held: Scan["held"]; hazards: Scan["hazards"]; secrets: Scan["secrets"]; canAct: boolean; onIgnore: (path: string, folder: boolean) => void; onAllow: (path: string, kind: string) => void; className?: string }) {
-	const open = secrets.filter((s) => {
-		try {
-			return localStorage.getItem(allowedKey(path, s.path, s.kind)) === null;
-		} catch {
-			return true;
-		}
-	});
+function KeptHere({ scan, heavy, held, hazards, secrets, canAct, onIgnore, onAllow, className }: { scan: Scan | null; heavy: Scan["heavy"]; held: Scan["held"]; hazards: Scan["hazards"]; secrets: Scan["secrets"]; canAct: boolean; onIgnore: (path: string, folder: boolean) => void; onAllow: (path: string) => void; className?: string }) {
+	const open = secrets;
 	const none = heavy.length + held.length + hazards.length + open.length === 0;
 	return (
 		<Panel title="Before You Share" icon={<EyeOff />} hint={scan?.truncated ? "partial" : undefined} className={className} flush={!none}>
@@ -511,16 +742,16 @@ function KeptHere({ path, scan, heavy, held, hazards, secrets, canAct, onIgnore,
 			) : (
 				<div className="divide-y">
 					{open.length > 0 && (
-						<Group title="Look Like Secrets (a guess; it misses some and flags harmless text)">
+						<Group title="Look Like Secrets: Not Shared Until You Decide (a guess; it misses some and flags harmless text)">
 							{open.map((s) => (
-								<Row key={`${s.path}:${s.line}`} main={`${s.path}:${s.line}`} sub={`${s.kind}. If this file is shared, everyone in the workspace can read it.`}>
+								<Row key={`${s.path}:${s.line}`} main={`${s.path}:${s.line}`} sub={`${s.kind}. This file is held back from everyone else until you decide.`}>
 									{canAct && (
 										<>
 											<Button variant="outline" size="xs" onPress={() => onIgnore(s.path, false)}>
 												Keep on This Device
 											</Button>
-											<Button variant="ghost" size="xs" onPress={() => onAllow(s.path, s.kind)}>
-												It Is Fine
+											<Button variant="ghost" size="xs" onPress={() => onAllow(s.path)}>
+												It Is Fine, Share It
 											</Button>
 										</>
 									)}

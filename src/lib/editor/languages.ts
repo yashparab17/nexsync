@@ -19,12 +19,24 @@ export function extensionOf(fileName: string): string {
 
 export const isMarkdownFile = (fileName: string) => ["md", "markdown"].includes(extensionOf(fileName));
 export const isNoteFile = (fileName: string) => NOTE_EXTENSIONS.includes(extensionOf(fileName));
+// Word-processing files the Documents page opens and writes
+const OFFICE_DOCUMENT_EXTENSIONS = ["docx", "docm", "dotx", "dotm", "doc", "dot", "odt", "rtf"];
+export const isOfficeDocument = (fileName: string) => OFFICE_DOCUMENT_EXTENSIONS.includes(extensionOf(fileName));
+// Spreadsheet files the Sheets page opens
+const SPREADSHEET_EXTENSIONS = ["xlsx", "xlsm", "xlsb", "xls", "ods", "csv", "tsv"];
+export const isSpreadsheet = (fileName: string) => SPREADSHEET_EXTENSIONS.includes(extensionOf(fileName));
+// Slide decks the Slides page opens
+const DECK_EXTENSIONS = ["pptx", "pptm", "potx", "ppsx"];
+export const isDeck = (fileName: string) => DECK_EXTENSIONS.includes(extensionOf(fileName));
 export const isDocumentFile = (fileName: string) => DOCUMENT_EXTENSIONS.includes(extensionOf(fileName));
 export const isBinaryFile = (fileName: string) => BINARY_EXTENSIONS.includes(extensionOf(fileName));
 
 // Where a file opens: notes for text documents, the system app for binaries and office files, the code editor otherwise
-export function editorRouteFor(fileName: string): "notes" | "system" | "editor" {
+export function editorRouteFor(fileName: string): "notes" | "documents" | "sheets" | "slides" | "system" | "editor" {
 	if (isNoteFile(fileName)) return "notes";
+	if (isOfficeDocument(fileName)) return "documents";
+	if (isDeck(fileName)) return "slides";
+	if (isSpreadsheet(fileName) && !["csv", "tsv"].includes(extensionOf(fileName))) return "sheets";
 	if (isDocumentFile(fileName) || isBinaryFile(fileName)) return "system";
 	return "editor";
 }

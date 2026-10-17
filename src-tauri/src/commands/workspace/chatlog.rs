@@ -32,7 +32,7 @@ pub const HISTORY_DEFAULT: usize = 200;
 /// Most ids a device names when it asks for what it is missing
 pub const HAVE_LIMIT: usize = 20_000;
 
-const KINDS: &[&str] = &["message", "edit", "delete", "react", "unreact", "channel", "comment", "resolve", "reopen", "dm", "icon", "profile", super::announce::KIND, super::announce::END, super::announce::ACK, super::announce::EXPIRE, super::moderation::KIND];
+const KINDS: &[&str] = &["message", "edit", "delete", "react", "unreact", "channel", "comment", "resolve", "reopen", "dm", "icon", "profile", "devenv", "devrun", "devrepro", super::announce::KIND, super::announce::END, super::announce::ACK, super::announce::EXPIRE, super::moderation::KIND];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -244,6 +244,22 @@ fn refusal(conn: &Connection, e: &Entry, ctx: &Ctx) -> Result<Option<&'static st
             let newer: bool = conn.query_row("SELECT COUNT(*) > 0 FROM log_entries WHERE kind = 'profile' AND author = ?1 AND ts > ?2", params![e.author, e.ts as i64], |r| r.get(0)).map_err(err)?;
             Ok(newer.then_some("a newer profile is already set"))
         }
+        // What a member chose to share about a project on their device: the tools it has (`devenv`) or what it is running (`devrun`).
+        // The channel names the kind and the project; the newest entry of each author and channel wins.
+        "devenv" | "devrun" => {
+            let prefix = if e.kind == "devenv" { "devenv:" } else { "devrun:" };
+            let ok = e.channel.starts_with(prefix) && e.channel.len() <= 120 && e.body.len() <= 4_000 && serde_json::from_str::<serde_json::Value>(&e.body).is_ok_and(|v| v.is_object());
+            if !ok {
+                return Ok(Some("not a valid project status"));
+            }
+            let newer: bool = conn.query_row("SELECT COUNT(*) > 0 FROM log_entries WHERE kind = ?1 AND channel = ?2 AND author = ?3 AND ts > ?4", params![e.kind, e.channel, e.author, e.ts as i64], |r| r.get(0)).map_err(err)?;
+            Ok(newer.then_some("a newer status is already set"))
+        }
+        // A failure a member shared so others can see it (the task, its output, the tools on that device); kept, not replaced
+        "devrepro" => {
+            let ok = e.channel.starts_with("devrepro:") && e.channel.len() <= 120 && serde_json::from_str::<serde_json::Value>(&e.body).is_ok_and(|v| v.is_object());
+            Ok((!ok).then_some("not a valid shared failure"))
+        }
         // A direct message names a member it is for; the words are sealed (dm.rs) and cannot be checked here
         "dm" => match super::dm::recipient(&e.body) {
             Some(to) if (ctx.role_of)(&to).is_some() && e.channel == super::dm::channel_of(&e.author, &to) => Ok(None),
@@ -294,6 +310,9 @@ fn store(conn: &Connection, e: &Entry) -> Result<bool, String> {
     if n > 0 && matches!(e.kind.as_str(), "icon" | "profile") {
         // What a newer one replaces is not kept: the icon of the workspace, and the profile of each author
         conn.execute("DELETE FROM log_entries WHERE kind = ?1 AND id != ?2 AND ts <= ?3 AND (?1 = 'icon' OR author = ?4)", params![e.kind, e.id, e.ts as i64, e.author]).map_err(err)?;
+    }
+    if n > 0 && matches!(e.kind.as_str(), "devenv" | "devrun") {
+        conn.execute("DELETE FROM log_entries WHERE kind = ?1 AND channel = ?2 AND author = ?3 AND id != ?4 AND ts <= ?5", params![e.kind, e.channel, e.author, e.id, e.ts as i64]).map_err(err)?;
     }
     if n > 0 {
         conn.execute("INSERT OR IGNORE INTO log_seen (id, at) VALUES (?1, ?2)", params![e.id, super::crdt::now_ms() as i64]).map_err(err)?;
@@ -709,6 +728,28 @@ mod tests {
         assert_eq!(merge_as(&conn, vec![profile(3, 1_200, "{}")], 1, 2_500).refused, 1);
         let kept: i64 = conn.query_row("SELECT COUNT(*) FROM log_entries WHERE kind = 'profile' AND author = ?1", [key(3).public().to_string()], |r| r.get(0)).unwrap();
         assert_eq!(kept, 1);
+    }
+
+    #[test]
+    fn a_project_status_is_per_project_and_author_and_only_the_newest_is_kept() {
+        let conn = db();
+        let env = |by: u8, ch: &str, ts: u64, body: &str| Entry::signed_with(&key(by), "devenv", ch, "", body, ts);
+        let m = merge_as(&conn, vec![env(3, "devenv:projects/app", 1_000, r#"{"tools":[]}"#), env(3, "devenv:projects/api", 1_000, "{}"), env(3, "devrun:projects/app", 1_000, "{}"), env(3, "devenv:x", 1_000, "[1]")], 1, 2_000);
+        // A run status in an environment channel and a body that is not an object are refused
+        assert_eq!((m.added.len(), m.refused), (2, 2));
+        assert_eq!(merge_as(&conn, vec![env(3, "devenv:projects/app", 1_500, r#"{"tools":[1]}"#)], 1, 2_000).added.len(), 1);
+        assert_eq!(merge_as(&conn, vec![env(3, "devenv:projects/app", 1_200, "{}")], 1, 2_000).refused, 1);
+        let kept: i64 = conn.query_row("SELECT COUNT(*) FROM log_entries WHERE kind = 'devenv' AND channel = 'devenv:projects/app'", [], |r| r.get(0)).unwrap();
+        assert_eq!(kept, 1);
+    }
+
+    #[test]
+    fn a_shared_failure_is_kept_for_its_project_and_needs_an_object() {
+        let conn = db();
+        let repro = |by: u8, ch: &str, ts: u64, body: &str| Entry::signed_with(&key(by), "devrepro", ch, "", body, ts);
+        let m = merge_as(&conn, vec![repro(3, "devrepro:projects/app", 1_000, r#"{"task":"test","code":1}"#), repro(3, "devrepro:projects/app", 2_000, r#"{"task":"test","code":2}"#), repro(3, "general", 2_100, "{}"), repro(3, "devrepro:p", 2_200, "text"), repro(5, "devrepro:p", 2_300, "{}")], 1, 3_000);
+        // Both failures stay (they are a history); a wrong channel, a body that is not an object and a Viewer are refused
+        assert_eq!((m.added.len(), m.refused), (2, 3));
     }
 
     #[test]

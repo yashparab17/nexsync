@@ -44,6 +44,9 @@ const BUFFER_SIZE: usize = 64 * 1024;
 pub struct ShareableFile {
     pub rel_path: String,
     pub size: u64,
+    /// Milliseconds since the Unix epoch, from the same directory listing as the size; not sent to the page
+    #[serde(skip)]
+    pub modified_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -118,6 +121,10 @@ pub(crate) fn check_rel_path_in(workspace: &str, rel_path: &str) -> Result<Strin
     if Rules::load(Path::new(workspace)).ignored(&rel, false) {
         return Err(format!("{rel} stays on its own device."));
     }
+    // A name this system cannot hold would fail half way; say so now (checked on Windows, where it matters)
+    if cfg!(windows) && !crate::commands::workspace::project_scan::path_problems(std::slice::from_ref(&rel)).is_empty() {
+        return Err(format!("{rel} has a name this system cannot hold."));
+    }
     Ok(rel)
 }
 
@@ -129,17 +136,18 @@ pub fn list_shareable_files(workspace_path: &str) -> Result<Vec<ShareableFile>, 
 
     let mut files = Vec::new();
     let mut rules = Rules::load(&root);
+    let hold = crate::commands::workspace::secret_scan::Withhold::load(&root);
     for sub in SYNC_ROOTS {
         let dir = root.join(sub);
         if dir.is_dir() {
-            walk(&dir, sub, 0, &mut files, &mut rules)?;
+            walk(&dir, sub, 0, &mut files, &mut rules, &hold)?;
         }
     }
     files.sort_by(|a, b| a.rel_path.cmp(&b.rel_path));
     Ok(files)
 }
 
-fn walk(dir: &Path, rel: &str, depth: usize, out: &mut Vec<ShareableFile>, rules: &mut Rules) -> Result<(), String> {
+fn walk(dir: &Path, rel: &str, depth: usize, out: &mut Vec<ShareableFile>, rules: &mut Rules, hold: &crate::commands::workspace::secret_scan::Withhold) -> Result<(), String> {
     if depth > MAX_DEPTH {
         return Ok(());
     }
@@ -152,7 +160,8 @@ fn walk(dir: &Path, rel: &str, depth: usize, out: &mut Vec<ShareableFile>, rules
         if hidden_name_skipped(rel.split('/').next().unwrap_or(""), &name) {
             continue;
         }
-        let Ok(meta) = entry.path().symlink_metadata() else {
+        // The listing already carries the size and time (on Windows without another call), and does not follow links
+        let Ok(meta) = entry.metadata() else {
             continue;
         };
         if meta.is_symlink() {
@@ -161,14 +170,14 @@ fn walk(dir: &Path, rel: &str, depth: usize, out: &mut Vec<ShareableFile>, rules
 
         let child_rel = format!("{rel}/{name}");
         // Dependencies, build output, local environment files and the rest of what the project keeps on this device
-        if rules.ignored(&child_rel, meta.is_dir()) {
+        if rules.ignored_entry(&child_rel, meta.is_dir()) {
             continue;
         }
         if meta.is_dir() {
-            walk(&entry.path(), &child_rel, depth + 1, out, rules)?;
+            walk(&entry.path(), &child_rel, depth + 1, out, rules, hold)?;
         } else if meta.is_file() {
             // Too big for a project to share: kept on this device (the Projects page lists it)
-            if crate::commands::workspace::syncignore::too_big(&child_rel, meta.len()) {
+            if crate::commands::workspace::syncignore::too_big(&child_rel, meta.len()) || hold.check_at(&child_rel, meta.len(), meta.modified().ok()) {
                 continue;
             }
             if out.len() >= MAX_MANIFEST_ENTRIES {
@@ -176,7 +185,9 @@ fn walk(dir: &Path, rel: &str, depth: usize, out: &mut Vec<ShareableFile>, rules
                     "This workspace has more than {MAX_MANIFEST_ENTRIES} files, which is too many to sync at once."
                 ));
             }
+            let modified_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
             out.push(ShareableFile {
+                modified_ms,
                 rel_path: child_rel,
                 size: meta.len(),
             });
@@ -214,8 +225,8 @@ pub async fn fetch(node: &Arc<Node>, peer_id: &str, workspace_path: &str, rel_pa
     let reply: FileReply = tokio::time::timeout(REPLY_TIMEOUT, wire::read_json(&mut recv, wire::MAX_SMALL_FRAME))
         .await
         .map_err(|_| "The collaborator didn't respond to the file request.".to_string())??;
-    let (size, version, start) = match reply {
-        FileReply::Ok { size, version, offset } => (size, version, offset),
+    let (size, version, start, exec) = match reply {
+        FileReply::Ok { size, version, offset, exec } => (size, version, offset, exec),
         FileReply::Error { error } => {
             if let Some(p) = &partial {
                 let _ = tokio::fs::remove_file(&p.path).await;
@@ -258,6 +269,9 @@ pub async fn fetch(node: &Arc<Node>, peer_id: &str, workspace_path: &str, rel_pa
     rename_with_retry(&part, &target)
         .await
         .map_err(|e| format!("Failed to save {rel}: {e}"))?;
+    if exec {
+        set_executable(&target).await;
+    }
     // Keep what arrived as a version, off the async threads since it reads the file back
     let (workspace, rel_copy, saved) = (workspace_path.to_string(), rel.clone(), target.clone());
     let _ = tokio::task::spawn_blocking(move || {
@@ -266,6 +280,33 @@ pub async fn fetch(node: &Arc<Node>, peer_id: &str, workspace_path: &str, rel_pa
     .await;
     Ok(size)
 }
+
+/// Whether the file is executable where it lives (the bit exists on Unix systems only)
+#[cfg(unix)]
+async fn is_executable(file: &tokio::fs::File) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    file.metadata().await.map(|m| m.permissions().mode() & 0o111 != 0).unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+async fn is_executable(_file: &tokio::fs::File) -> bool {
+    false
+}
+
+/// Gives a received file the executable bit wherever it can be read, as the sender had it
+#[cfg(unix)]
+async fn set_executable(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    if let Ok(meta) = tokio::fs::metadata(path).await {
+        let mut permissions = meta.permissions();
+        let mode = permissions.mode();
+        permissions.set_mode(mode | ((mode & 0o444) >> 2));
+        let _ = tokio::fs::set_permissions(path, permissions).await;
+    }
+}
+
+#[cfg(not(unix))]
+async fn set_executable(_path: &Path) {}
 
 /// Moves a finished download into place. A virus scanner or indexer can hold a file for a moment right after it is
 /// written, and the folder is made again in case something removed it, so a failed rename is tried a few more times.
@@ -397,7 +438,8 @@ async fn serve_inner(node: &Arc<Node>, send: &mut SendStream, recv: &mut RecvStr
                 0
             };
             file.seek(std::io::SeekFrom::Start(offset)).await.map_err(|e| e.to_string())?;
-            wire::write_json(send, &FileReply::Ok { size, version, offset }).await?;
+            let exec = is_executable(&file).await;
+            wire::write_json(send, &FileReply::Ok { size, version, offset, exec }).await?;
             let mut limited = file.take(size - offset);
             tokio::io::copy(&mut limited, send).await.map_err(|e| e.to_string())?;
         }
@@ -415,6 +457,9 @@ async fn open_for_serving(node: &Arc<Node>, rel_path: &str) -> Result<(tokio::fs
         .ok_or("The collaborator doesn't have this workspace open right now.")?;
     let rel = check_rel_path_in(&workspace, rel_path)?;
     let path = resolve_workspace_path(&workspace, &rel)?;
+    if crate::commands::workspace::secret_scan::Withhold::load(Path::new(&workspace)).check(&rel, std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0)) {
+        return Err(format!("{rel} is held back on the collaborator's device until they decide it is safe to share."));
+    }
 
     let meta = tokio::fs::metadata(&path)
         .await
@@ -471,11 +516,36 @@ mod tests {
         std::fs::write(notes.join(".cache").join("c.md"), "x").unwrap();
 
         let mut out = Vec::new();
-        walk(&notes, "notes", 0, &mut out, &mut Rules::load(&root)).unwrap();
+        walk(&notes, "notes", 0, &mut out, &mut Rules::load(&root), &crate::commands::workspace::secret_scan::Withhold::load(&root)).unwrap();
         let mut paths: Vec<_> = out.iter().map(|f| (f.rel_path.as_str(), f.size)).collect();
         paths.sort();
         assert_eq!(paths, vec![("notes/a.md", 1), ("notes/sub/b.md", 2)]);
 
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_project_with_thousands_of_installed_files_shares_only_its_source() {
+        let root = std::env::temp_dir().join(format!("nexsync_p2p_installed_{}", uuid::Uuid::new_v4()));
+        let app = root.join("projects").join("web");
+        std::fs::create_dir_all(app.join("src")).unwrap();
+        for i in 0..40 {
+            std::fs::write(app.join("src").join(format!("m{i}.ts")), "export {};").unwrap();
+        }
+        for pkg in 0..120 {
+            let dir = app.join("node_modules").join(format!("pkg{pkg}")).join("lib");
+            std::fs::create_dir_all(&dir).unwrap();
+            for f in 0..30 {
+                std::fs::write(dir.join(format!("f{f}.js")), "x").unwrap();
+            }
+        }
+        std::fs::create_dir_all(app.join("dist")).unwrap();
+        std::fs::write(app.join("dist").join("big.js"), vec![b'x'; 2_000_000]).unwrap();
+        let started = std::time::Instant::now();
+        let listed = list_shareable_files(root.to_str().unwrap()).unwrap();
+        assert_eq!(listed.len(), 40, "3,600 dependency files and the build output stay on the device");
+        assert!(listed.iter().all(|f| f.rel_path.starts_with("projects/web/src/")));
+        assert!(started.elapsed() < Duration::from_secs(5), "the dependencies are not even walked");
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -499,6 +569,81 @@ mod tests {
         assert!(check_rel_path_in(root.to_str().unwrap(), "projects/app/.env").is_err());
         assert!(check_rel_path_in(root.to_str().unwrap(), "projects/app/.git/config").is_err());
         assert!(check_rel_path_in(root.to_str().unwrap(), "projects/app/src/main.ts").is_ok());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}
+
+#[cfg(test)]
+mod perf {
+    use super::*;
+    use std::time::Instant;
+
+    /// Timings on a big project, printed: `cargo test --lib perf_big_project -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn perf_big_project() {
+        let root = std::env::temp_dir().join(format!("nexsync_perf_{}", uuid::Uuid::new_v4()));
+        let app = root.join("projects").join("big");
+        let body = "export const value = 1;\n".repeat(40);
+        for d in 0..200 {
+            let dir = app.join("src").join(format!("mod{d}")).join("inner");
+            std::fs::create_dir_all(&dir).unwrap();
+            for f in 0..100 {
+                std::fs::write(dir.join(format!("file{f}.ts")), &body).unwrap();
+            }
+        }
+        for p in 0..300 {
+            let dir = app.join("node_modules").join(format!("p{p}")).join("lib");
+            std::fs::create_dir_all(&dir).unwrap();
+            for f in 0..100 {
+                std::fs::write(dir.join(format!("f{f}.js")), "x").unwrap();
+            }
+        }
+        let ws = root.to_str().unwrap();
+        let t = Instant::now();
+        let listed = list_shareable_files(ws).unwrap();
+        println!("list_shareable_files: {} files in {:?}", listed.len(), t.elapsed());
+        let t = Instant::now();
+        let _ = list_shareable_files(ws).unwrap();
+        println!("list_shareable_files again (warm): {:?}", t.elapsed());
+        let t = Instant::now();
+        fn raw(dir: &Path, n: &mut usize) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let m = e.path().symlink_metadata().unwrap();
+                if m.is_dir() { raw(&e.path(), n) } else { *n += 1 }
+            }
+        }
+        let mut n = 0;
+        raw(&root.join("projects/big/src"), &mut n);
+        println!("raw walk of the {n} source files (read_dir + one stat each): {:?}", t.elapsed());
+        let t = Instant::now();
+        let hold = crate::commands::workspace::secret_scan::Withhold::load(&root);
+        let mut hits = 0;
+        for f in &listed {
+            if hold.check(&f.rel_path, f.size) {
+                hits += 1;
+            }
+        }
+        println!("Withhold::check over {} files (warm): {:?} ({hits})", listed.len(), t.elapsed());
+        let t = Instant::now();
+        let scan = crate::commands::workspace::project_scan::scan(&root);
+        println!("project_scan: heavy={} secrets={} in {:?}", scan.heavy.len(), scan.secrets.len(), t.elapsed());
+        let t = Instant::now();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let first = rt.block_on(crate::commands::p2p::sync::build_manifest_for_test(ws));
+        println!("manifest of {} files (cold hashes): {:?}", first, t.elapsed());
+        let t = Instant::now();
+        let again = rt.block_on(crate::commands::p2p::sync::build_manifest_for_test(ws));
+        println!("manifest of {} files (warm): {:?}", again, t.elapsed());
+        let t = Instant::now();
+        let mut rules = Rules::load(&root);
+        let mut n = 0;
+        for f in &listed {
+            if rules.ignored(&f.rel_path, false) {
+                n += 1;
+            }
+        }
+        println!("Rules::ignored over {} listed paths: {:?} ({n} ignored)", listed.len(), t.elapsed());
         let _ = std::fs::remove_dir_all(&root);
     }
 }

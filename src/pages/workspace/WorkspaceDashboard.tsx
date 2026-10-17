@@ -13,7 +13,8 @@ import Art from "@/components/elements/Art";
 import { DEFAULT_LAYOUT, loadLayout, moveTile, saveLayout, type DashboardLayout, type TileId, type TileSize } from "@/lib/dashboardLayout";
 import { formatAction } from "@/lib/insights";
 import { readRecent } from "@/lib/recentFiles";
-import { getTasks, loadConfig } from "@/lib/tauri";
+import { useRuns } from "@/lib/projectRuns";
+import { getTasks, loadConfig, projectRuns, projectsList } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -52,6 +53,11 @@ export default function WorkspaceDashboard() {
 	const navigate = useNavigate();
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [me, setMe] = useState("");
+	// How many projects there are, and how the last test run of each went on this device
+	const [projectStats, setProjectStats] = useState<{ count: number; passing: number; failing: number }>({ count: 0, passing: 0, failing: 0 });
+	const liveRuns = useRuns();
+	const runningNow = liveRuns.filter((r) => r.status !== "done").length;
+	const finishedRuns = liveRuns.filter((r) => r.status === "done").length;
 	// The tiles the person chose to show, in their order and size; remembered per workspace
 	const [layout, setLayout] = useState<DashboardLayout>(() => loadLayout(workspace?.id ?? ""));
 	const [editing, setEditing] = useState(false);
@@ -72,6 +78,25 @@ export default function WorkspaceDashboard() {
 		if (!workspace) return;
 		getTasks(workspace.path).then(setTasks).catch(() => setTasks([]));
 	}, [workspace]);
+
+	useEffect(() => {
+		if (!workspace) return;
+		let live = true;
+		void (async () => {
+			const list = ((await projectsList(workspace.path).catch(() => [])) ?? []).filter((p) => !p.scratch);
+			let passing = 0;
+			let failing = 0;
+			for (const p of list) {
+				const last = (await projectRuns(workspace.path, p.id).catch(() => [])).find((r) => /test/i.test(r.task) && !r.stopped);
+				if (last) last.code === 0 ? passing++ : failing++;
+			}
+			if (live) setProjectStats({ count: list.length, passing, failing });
+		})();
+		return () => {
+			live = false;
+		};
+		// A run that ends changes the answer
+	}, [workspace, finishedRuns]);
 
 	const activity = metadata?.activity.events ?? [];
 	// Files opened in the Editor or Notes on this device, newest first
@@ -212,6 +237,15 @@ export default function WorkspaceDashboard() {
 					)}
 				</Panel>
 		),
+		projects: (
+			<Tile title="Projects" value={projectStats.count} onClick={goTo("/workspace/projects")} className="h-full">
+				<span className="text-sm text-muted-foreground">
+					{runningNow > 0 ? `${runningNow} running · ` : ""}
+					{projectStats.passing + projectStats.failing === 0 ? "No test runs on this device yet" : `Tests: ${projectStats.passing} passing`}
+					{projectStats.failing > 0 && <span className="text-destructive"> · {projectStats.failing} failing</span>}
+				</span>
+			</Tile>
+		),
 		cards: (
 				<Tile title="Kanban Cards" value={stats?.kanban_cards ?? 0} onClick={goTo("/workspace/kanban")} className="h-full">
 					<span className="text-sm text-muted-foreground">{members.length} {members.length === 1 ? "member" : "members"} share this board</span>
@@ -267,7 +301,7 @@ export default function WorkspaceDashboard() {
 	);
 }
 
-const TITLES: Record<TileId, string> = { pickup: "Pick Up Where You Left Off", tasks: "Open Tasks", files: "Files", due: "Due Soon", people: "People", activity: "Activity", cards: "Kanban Cards" };
+const TITLES: Record<TileId, string> = { pickup: "Pick Up Where You Left Off", tasks: "Open Tasks", files: "Files", due: "Due Soon", people: "People", activity: "Activity", cards: "Kanban Cards", projects: "Projects" };
 
 // Where each size starts from at the narrow, medium and wide container widths; every tile then grows to share what is left of its row
 const SPAN: Record<TileSize, string> = {

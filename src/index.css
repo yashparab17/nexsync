@@ -387,3 +387,63 @@ input:not([type="checkbox"], [type="radio"], [type="color"], [type="range"]):foc
 /* The list a dropdown opens is drawn by the system: give it the theme's popup colours so the text can be read in every theme */
 select option, select optgroup { background-color: var(--popover); color: var(--foreground); }
 select option:checked { background-color: var(--accent); color: var(--foreground); }
+
+/* The page of a document: the look of a word processor, whatever the app's own theme is */
+.doc-page .bn-container,
+.doc-page .bn-editor {
+	font-family: var(--doc-font);
+	font-size: 11pt;
+	color: #000;
+	background: transparent;
+	--bn-colors-editor-background: transparent;
+	--bn-colors-editor-text: #000;
+}
+.doc-page .bn-editor {
+	padding-inline: 0;
+}
+.doc-page .bn-block-content {
+	line-height: var(--doc-ls, 1.15);
+	padding-block: 0;
+}
+.doc-page [data-content-type="heading"] h1,
+.doc-page [data-content-type="heading"] h2,
+.doc-page [data-content-type="heading"] h3,
+.doc-page [data-content-type="heading"] h4 {
+	font-weight: 400;
+	color: #2f5496;
+	font-family: "Calibri Light", Carlito, var(--doc-font);
+	line-height: 1.1;
+}
+.doc-page [data-content-type="heading"] h1 {
+	font-size: 16pt;
+	margin-top: 14pt;
+}
+.doc-page [data-content-type="heading"] h2 {
+	font-size: 13pt;
+	margin-top: 10pt;
+}
+.doc-page [data-content-type="heading"] h3 {
+	font-size: 12pt;
+	color: #1f3763;
+	margin-top: 8pt;
+}
+.doc-page [data-content-type="paragraph"] {
+	margin-bottom: 8pt;
+}
+.doc-page [data-content-type="bulletListItem"],
+.doc-page [data-content-type="numberedListItem"],
+.doc-page [data-content-type="checkListItem"] {
+	margin-bottom: 2pt;
+}
+.doc-page [data-content-type="table"] {
+	margin-block: 4pt 8pt;
+}
+.doc-page .bn-block-group .bn-block-outer {
+	margin-block: 0;
+}
+@media print {
+	.doc-page {
+		box-shadow: none;
+		zoom: 1 !important;
+	}
+}

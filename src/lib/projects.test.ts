@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ignoreRule, insideProject, problemPath, recipeFromDetected, tasksOf } from "./projects";
 import type { ProjectInfo } from "@/types/projects";
 
-const task = (id: string, watch = false, ports: number[] = []) => ({ id, label: id, command: id, cwd: "", env: [], ports, dependsOn: [], watch, readyWhen: "" });
+const task = (id: string, watch = false, ports: number[] = []) => ({ id, label: id, command: id, cwd: "", env: [], ports, dependsOn: [], watch, interactive: false, readyWhen: "" });
 const project = (over: Partial<ProjectInfo> = {}): ProjectInfo => ({
 	id: "app", path: "projects/app", name: "app", scratch: false, recipe: null, recipeError: null,
 	detected: { kinds: [{ id: "vite", label: "Vite", group: "Web" }], packageManager: "pnpm", tasks: [task("install"), task("dev", true, [5173])], tools: [{ name: "node", range: ">=20" }], env: [] },

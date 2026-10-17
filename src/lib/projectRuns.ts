@@ -10,6 +10,8 @@ import type { Problem } from "@/types/projects";
 export interface RunLine {
 	stream: "stdout" | "stderr";
 	text: string;
+	// When it arrived, for putting the output of several runs in order; lines read from a saved log have none
+	at?: number;
 }
 
 export interface Run {
@@ -31,14 +33,23 @@ export interface Run {
 
 export const MAX_LINES = 3000;
 
+// The output of several runs as one stream, in the order it arrived, each line with the run it came from. Lines that arrived in the
+// same instant stay in the order of their run. At most `max` of the newest lines.
+export function mergeRuns(all: Run[], max = MAX_LINES): { task: string; line: RunLine }[] {
+	const merged = all.flatMap((r, i) => r.lines.map((line, n) => ({ task: r.task, line, i, n })));
+	merged.sort((a, b) => (a.line.at ?? 0) - (b.line.at ?? 0) || a.i - b.i || a.n - b.n);
+	return merged.slice(-max).map(({ task, line }) => ({ task, line }));
+}
+
 let runs: Run[] = [];
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
 const blank = (runId: string, project: string, task: string): Run => ({ runId, project, task, startedAt: Date.now(), status: "running", code: null, stopped: false, restarts: 0, error: null, lines: [], dropped: 0, ports: [], problems: [] });
 
-// Changes one run (making it if it is new) and tells whoever is looking
+// Changes one run (making it if it is new) and tells whoever is looking; lines that are waiting go first, so the order holds
 function update(runId: string, project: string, task: string, change: (r: Run) => Run) {
+	flushOutput();
 	const at = runs.findIndex((r) => r.runId === runId);
 	const next = change(at < 0 ? blank(runId, project, task) : runs[at]);
 	runs = at < 0 ? [next, ...runs] : runs.map((r, i) => (i === at ? next : r));
@@ -47,10 +58,40 @@ function update(runId: string, project: string, task: string, change: (r: Run) =
 
 export const sameProblem = (a: Problem, b: Problem) => a.file === b.file && a.line === b.line && a.column === b.column && a.message === b.message;
 
-// Pure: the run after a line of output
-export function withLine(r: Run, line: RunLine): Run {
-	const lines = r.lines.length >= MAX_LINES ? [...r.lines.slice(r.lines.length - MAX_LINES + 1), line] : [...r.lines, line];
-	return { ...r, lines, dropped: r.dropped + (r.lines.length >= MAX_LINES ? 1 : 0) };
+// Pure: the run after some lines of output (one copy of the list, however many arrive)
+export function withLines(r: Run, added: RunLine[]): Run {
+	if (added.length === 0) return r;
+	const all = r.lines.length + added.length > MAX_LINES ? [...r.lines, ...added].slice(-MAX_LINES) : [...r.lines, ...added];
+	return { ...r, lines: all, dropped: r.dropped + (r.lines.length + added.length - all.length) };
+}
+
+export const withLine = (r: Run, line: RunLine): Run => withLines(r, [line]);
+
+// A busy task prints thousands of lines a second. They wait here and are added together, at most every 50 milliseconds, so the
+// page draws once per batch and not once per line.
+const FLUSH_MS = 50;
+const waiting = new Map<string, { project: string; task: string; lines: RunLine[] }>();
+let timer: ReturnType<typeof setTimeout> | null = null;
+
+function flushOutput() {
+	if (timer) clearTimeout(timer);
+	timer = null;
+	if (waiting.size === 0) return;
+	const batches = [...waiting];
+	waiting.clear();
+	for (const [runId, b] of batches) {
+		const at = runs.findIndex((r) => r.runId === runId);
+		const next = withLines(at < 0 ? blank(runId, b.project, b.task) : runs[at], b.lines);
+		runs = at < 0 ? [next, ...runs] : runs.map((r, i) => (i === at ? next : r));
+	}
+	emit();
+}
+
+function queueLine(runId: string, project: string, task: string, line: RunLine) {
+	const batch = waiting.get(runId) ?? { project, task, lines: [] };
+	batch.lines.push({ ...line, at: Date.now() });
+	waiting.set(runId, batch);
+	timer ??= setTimeout(flushOutput, FLUSH_MS);
 }
 
 interface Ids {
@@ -64,7 +105,7 @@ let listening: Promise<UnlistenFn[]> | null = null;
 // Starts listening to the backend, once
 export function listenToRuns() {
 	listening ??= Promise.all([
-		listen<Ids & { stream: RunLine["stream"]; text: string }>("project://output", ({ payload: p }) => update(p.runId, p.project, p.task, (r) => withLine(r, { stream: p.stream, text: p.text }))),
+		listen<Ids & { stream: RunLine["stream"]; text: string }>("project://output", ({ payload: p }) => queueLine(p.runId, p.project, p.task, { stream: p.stream, text: p.text })),
 		listen<Ids>("project://ready", ({ payload: p }) => update(p.runId, p.project, p.task, (r) => (r.status === "running" ? { ...r, status: "ready" } : r))),
 		listen<Ids & { code: number | null; stopped: boolean; restarts: number; error: string | null }>("project://exit", ({ payload: p }) => update(p.runId, p.project, p.task, (r) => ({ ...r, status: "done", code: p.code, stopped: p.stopped, restarts: p.restarts, error: p.error }))),
 		listen<{ runId: string; project: string; port: number; open: boolean }>("project://port", ({ payload: p }) => update(p.runId, p.project, "", (r) => (r.ports.some((x) => x.port === p.port) ? r : { ...r, ports: [...r.ports, { port: p.port, open: p.open }] }))),
@@ -84,6 +125,9 @@ export const useRuns = (project?: string): Run[] => {
 };
 
 export const runsNow = () => runs;
+
+// Test only: lets what is waiting through now
+export const flushRuns = flushOutput;
 
 export function forgetRun(runId: string) {
 	runs = runs.filter((r) => r.runId !== runId);

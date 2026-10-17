@@ -1,0 +1,205 @@
+// A slide deck as a shared document, in pieces people can change at the same time: the deck's base (everything but the slides, one JSON
+// text), the order of the slides, and for each slide its own settings and each of its shapes. Two people moving different shapes
+// both keep their moves; two people changing the same shape keep the later change. The backend turns the pieces into a picture or a file.
+
+import * as Y from "yjs";
+
+export interface Xfrm {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+	rot?: number;
+}
+
+// A shape as the model writes it; only what the editor reads is named
+export interface ShapeJson {
+	id: number;
+	name?: string;
+	xfrm?: Xfrm | null;
+	ph?: unknown;
+	text?: { paragraphs: { runs: { text: string }[] }[] } | null;
+	[extra: string]: unknown;
+}
+
+export interface SlideJson {
+	id: number;
+	layout: number;
+	shapes: ShapeJson[];
+	[extra: string]: unknown;
+}
+
+export interface Frame {
+	id: number;
+	name: string;
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+	rot: number;
+	kind: string;
+	placeholder: boolean;
+}
+
+export const keyId = () => Math.random().toString(36).slice(2, 10);
+
+const meta = (doc: Y.Doc) => doc.getMap<string>("deck");
+export const slideOrder = (doc: Y.Doc) => doc.getArray<string>("slides");
+const slideMap = (doc: Y.Doc, key: string) => doc.getMap<string>(`slide:${key}`);
+const shapeOrder = (doc: Y.Doc, key: string) => doc.getArray<number>(`shapes:${key}`);
+
+export const getBase = (doc: Y.Doc): string | null => meta(doc).get("base") ?? null;
+// A new base after something was added to it (a picture)
+export const setBase = (doc: Y.Doc, base: string) => meta(doc).set("base", base);
+
+// A slide's own settings (everything but its shapes), changed whole: notes, transition, background, hidden
+export function setSlideMeta(doc: Y.Doc, key: string, slide: SlideJson) {
+	const { shapes: _shapes, ...rest } = slide; // eslint-disable-line @typescript-eslint/no-unused-vars
+	slideMap(doc, key).set("meta", JSON.stringify(rest));
+}
+
+export const notesOf = (s: SlideJson): string => textOf({ id: 0, text: s.notes as ShapeJson["text"] });
+export const transitionOf = (s: SlideJson): string => (s.transition as { kind?: string } | null | undefined)?.kind ?? "none";
+export const slideKeys = (doc: Y.Doc): string[] => slideOrder(doc).toArray();
+
+function writeSlide(doc: Y.Doc, key: string, slide: SlideJson) {
+	const { shapes, ...rest } = slide;
+	const map = slideMap(doc, key);
+	map.set("meta", JSON.stringify(rest));
+	const order = shapeOrder(doc, key);
+	if (order.length > 0) order.delete(0, order.length);
+	order.push(shapes.map((s) => s.id));
+	for (const s of shapes) map.set(`s:${s.id}`, JSON.stringify(s));
+}
+
+// Fills an empty document from a deck read from a file; does nothing when it already has slides
+export function seed(doc: Y.Doc, base: string, slides: string[]): boolean {
+	if (slideOrder(doc).length > 0 || getBase(doc)) return false;
+	doc.transact(() => {
+		meta(doc).set("base", base);
+		const keys = slides.map((s) => {
+			const key = keyId();
+			writeSlide(doc, key, JSON.parse(s) as SlideJson);
+			return key;
+		});
+		slideOrder(doc).push(keys);
+	});
+	return true;
+}
+
+// A slide whole again, from its pieces
+export function readSlide(doc: Y.Doc, key: string): SlideJson | null {
+	const map = slideMap(doc, key);
+	const m = map.get("meta");
+	if (!m) return null;
+	const shapes: ShapeJson[] = [];
+	for (const id of shapeOrder(doc, key).toArray()) {
+		const text = map.get(`s:${id}`);
+		if (text) shapes.push(JSON.parse(text) as ShapeJson);
+	}
+	return { ...(JSON.parse(m) as SlideJson), shapes };
+}
+
+export const readSlides = (doc: Y.Doc): string[] => slideKeys(doc).map((k) => readSlide(doc, k)).filter((s): s is SlideJson => !!s).map((s) => JSON.stringify(s));
+
+export function setShape(doc: Y.Doc, key: string, shape: ShapeJson) {
+	slideMap(doc, key).set(`s:${shape.id}`, JSON.stringify(shape));
+}
+
+export function addShape(doc: Y.Doc, key: string, shape: ShapeJson) {
+	doc.transact(() => {
+		setShape(doc, key, shape);
+		shapeOrder(doc, key).push([shape.id]);
+	});
+}
+
+export function removeShape(doc: Y.Doc, key: string, id: number) {
+	doc.transact(() => {
+		const order = shapeOrder(doc, key);
+		const at = order.toArray().indexOf(id);
+		if (at >= 0) order.delete(at, 1);
+		slideMap(doc, key).delete(`s:${id}`);
+	});
+}
+
+// Moves a shape to the front, the back, or one step either way (the later in the list, the nearer the front)
+export function arrange(doc: Y.Doc, key: string, id: number, to: "front" | "back" | "forward" | "backward") {
+	doc.transact(() => {
+		const order = shapeOrder(doc, key);
+		const list = order.toArray();
+		const at = list.indexOf(id);
+		if (at < 0) return;
+		const target = to === "front" ? list.length - 1 : to === "back" ? 0 : Math.max(0, Math.min(list.length - 1, at + (to === "forward" ? 1 : -1)));
+		if (target === at) return;
+		order.delete(at, 1);
+		order.insert(target, [id]);
+	});
+}
+
+export function nextShapeId(slide: SlideJson): number {
+	return slide.shapes.reduce((m, s) => Math.max(m, s.id), slide.id) + 1;
+}
+
+// Adds a slide after another (or at the end) and returns its key
+export function addSlide(doc: Y.Doc, slide: SlideJson, after?: string): string {
+	const key = keyId();
+	doc.transact(() => {
+		writeSlide(doc, key, slide);
+		const at = after ? slideKeys(doc).indexOf(after) + 1 : slideOrder(doc).length;
+		slideOrder(doc).insert(at, [key]);
+	});
+	return key;
+}
+
+export function duplicateSlide(doc: Y.Doc, key: string): string | null {
+	const s = readSlide(doc, key);
+	return s ? addSlide(doc, s, key) : null;
+}
+
+export function deleteSlide(doc: Y.Doc, key: string): string | null {
+	const keys = slideKeys(doc);
+	if (keys.length <= 1) return "A deck keeps at least one slide.";
+	const at = keys.indexOf(key);
+	if (at >= 0) slideOrder(doc).delete(at, 1);
+	return null;
+}
+
+export function moveSlide(doc: Y.Doc, key: string, by: number) {
+	doc.transact(() => {
+		const keys = slideKeys(doc);
+		const at = keys.indexOf(key);
+		const to = Math.max(0, Math.min(keys.length - 1, at + by));
+		if (at < 0 || to === at) return;
+		slideOrder(doc).delete(at, 1);
+		slideOrder(doc).insert(to, [key]);
+	});
+}
+
+// The text of a shape, paragraphs joined by line breaks
+export const textOf = (s: ShapeJson): string => (s.text?.paragraphs ?? []).map((p) => p.runs.map((r) => r.text).join("")).join("\n");
+
+// A frame moved or resized by a drag: the box before, the handle, and how far the pointer went (in points)
+export type Handle = "move" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
+export function dragged(box: Xfrm, handle: Handle, dx: number, dy: number, keepRatio = false): Xfrm {
+	const min = 8;
+	if (handle === "move") return { ...box, x: box.x + dx, y: box.y + dy };
+	let { x, y, w, h } = box;
+	if (handle.includes("e")) w = Math.max(min, box.w + dx);
+	if (handle.includes("s")) h = Math.max(min, box.h + dy);
+	if (handle.includes("w")) {
+		w = Math.max(min, box.w - dx);
+		x = box.x + box.w - w;
+	}
+	if (handle.includes("n")) {
+		h = Math.max(min, box.h - dy);
+		y = box.y + box.h - h;
+	}
+	if (keepRatio && handle.length === 2 && box.h > 0) {
+		const ratio = box.w / box.h;
+		const nh = w / ratio;
+		if (handle.includes("n")) y = box.y + box.h - nh;
+		h = nh;
+	}
+	return { ...box, x, y, w, h };
+}

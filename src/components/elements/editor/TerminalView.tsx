@@ -29,6 +29,8 @@ interface TerminalViewProps {
 	visible: boolean;
 	onExit: (code: number | null) => void;
 	onFailed: (message: string) => void;
+	// Typed into the shell once it is ready, as if the person had typed it and pressed Enter
+	command?: string;
 }
 
 // The colours of the app, so the terminal matches the editor in both themes
@@ -63,7 +65,7 @@ function themeFromTokens(): ITheme {
 
 const fromBase64 = (data: string) => Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
 
-const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function TerminalView({ workspacePath, dir, shell, visible, onExit, onFailed }, ref) {
+const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function TerminalView({ workspacePath, dir, shell, visible, onExit, onFailed, command }, ref) {
 	const host = useRef<HTMLDivElement>(null);
 	const term = useRef<XTerm | null>(null);
 	const fit = useRef<FitAddon | null>(null);
@@ -139,6 +141,7 @@ const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function Term
 				early.filter((e) => e.id === id).forEach((e) => write(e.data));
 
 				t.onData((data) => void writeTerminal(id, data).catch(() => {}));
+				if (command) void writeTerminal(id, `${command}\r`).catch(() => {});
 				t.onResize(({ cols, rows }) => void resizeTerminal(id, cols, rows).catch(() => {}));
 
 				// Copy and paste as other terminals do: Ctrl+Shift+C and V (Cmd+C with a selection on a Mac); Ctrl+Shift+F searches

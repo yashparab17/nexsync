@@ -25,6 +25,7 @@ export const SHORTCUT_GROUPS: { title: string; items: Shortcut[] }[] = [
 			{ keys: [MOD, "K"], label: "Search everything" },
 			{ keys: [MOD, "Shift", "F"], label: "Search everything" },
 			{ keys: [MOD, "Shift", "E"], label: "Open the Explorer" },
+			{ keys: ["Alt", "← / →"], label: "Go back / forward" },
 			{ keys: [MOD, ","], label: "Workspace settings" },
 			{ keys: ["F1"], label: "Show these shortcuts" },
 			{ keys: ["Esc"], label: "Close a popup or clear a search" },

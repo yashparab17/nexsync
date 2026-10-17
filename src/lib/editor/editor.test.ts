@@ -8,10 +8,14 @@ import { editorRouteFor, loadLanguage } from "./languages";
 import { countSyntaxErrors } from "./syntax";
 
 describe("file routing", () => {
-	it("sends rich-text notes to notes, office files to the system app and everything else, Markdown included, to the editor", () => {
+	it("sends rich-text notes to notes, word-processor files to Documents, other office files to the system app and everything else, Markdown included, to the editor", () => {
 		expect(editorRouteFor("todo.md")).toBe("editor");
 		expect(editorRouteFor("readme.TXT")).toBe("notes");
-		expect(editorRouteFor("report.docx")).toBe("system");
+		expect(editorRouteFor("report.docx")).toBe("documents");
+		expect(editorRouteFor("letter.ODT")).toBe("documents");
+		expect(editorRouteFor("sheet.xlsx")).toBe("sheets");
+		expect(editorRouteFor("deck.pptx")).toBe("slides");
+		expect(editorRouteFor("old.ppt")).toBe("system");
 		expect(editorRouteFor("logo.png")).toBe("system");
 		expect(editorRouteFor("main.rs")).toBe("editor");
 		expect(editorRouteFor("Dockerfile")).toBe("editor");

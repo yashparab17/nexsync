@@ -100,6 +100,9 @@ pub struct LiveSync {
     /// test run is not disturbed mid-way; turning it off lets them through
     hold: std::sync::atomic::AtomicBool,
     held: Mutex<HashMap<String, (String, SyncMessage)>>,
+    /// Changes inside `projects/` wait here a moment so a burst (a branch switch, a formatter run) lands as one batch
+    settling: Mutex<HashMap<String, (String, SyncMessage)>>,
+    settle_gen: AtomicU64,
 }
 
 impl LiveSync {
@@ -113,6 +116,8 @@ impl LiveSync {
             generation: AtomicU64::new(0),
             hold: std::sync::atomic::AtomicBool::new(false),
             held: Mutex::new(HashMap::new()),
+            settling: Mutex::new(HashMap::new()),
+            settle_gen: AtomicU64::new(0),
         };
         (sync, rx)
     }
@@ -127,6 +132,14 @@ impl LiveSync {
 
     pub fn held_count(&self) -> usize {
         self.held.lock().unwrap_or_else(|p| p.into_inner()).len()
+    }
+
+    fn hold_message(&self, rel: String, peer: String, message: SyncMessage) {
+        self.held.lock().unwrap_or_else(|p| p.into_inner()).insert(rel, (peer, message));
+    }
+
+    fn take_settling(&self) -> Vec<(String, SyncMessage)> {
+        self.settling.lock().unwrap_or_else(|p| p.into_inner()).drain().map(|(_, v)| v).collect()
     }
 
     fn take_held(&self) -> Vec<(String, SyncMessage)> {
@@ -176,7 +189,11 @@ impl LiveSync {
                     return;
                 }
                 for p in event.paths {
-                    let _ = tx.send(p);
+                    // An install or a build writes tens of thousands of files that never sync: they are dropped here, before they
+                    // are queued, hashed into a batch and looked up in the ignore rules one by one
+                    if !in_noisy_folder(&p) {
+                        let _ = tx.send(p);
+                    }
                 }
             }
         };
@@ -193,6 +210,11 @@ impl LiveSync {
         }
         *guard = Some(watcher);
     }
+}
+
+/// Folders whose changes are never worth looking at: Git's own, and where package managers and Python put what they install
+pub(crate) fn in_noisy_folder(path: &Path) -> bool {
+    path.components().any(|c| matches!(c, Component::Normal(n) if n == ".git" || n == "node_modules" || n == "__pycache__" || n == ".pnpm-store"))
 }
 
 /// Converts a watched absolute path into a syncable workspace-relative path
@@ -252,10 +274,15 @@ pub async fn run_local_changes(node: Arc<Node>, mut rx: mpsc::UnboundedReceiver<
         let Some(workspace) = node.workspace_path() else { continue };
         let root = PathBuf::from(&workspace);
         let mut rules = crate::commands::workspace::syncignore::Rules::load(&root);
+        let secrets = crate::commands::workspace::secret_scan::Withhold::load(&root);
         for path in batch {
             let Some(rel_path) = rel_path_of(&root, &path) else { continue };
             // Dependencies, build output and local environment files never leave this device
             if rules.ignored(&rel_path, false) {
+                continue;
+            }
+            // A project file that looks like it holds a secret waits for the person's decision
+            if secrets.check(&rel_path, tokio::fs::metadata(&path).await.map(|m| m.len()).unwrap_or(0)) {
                 continue;
             }
             if let Some(message) = describe_local(&path, rel_path).await {
@@ -288,12 +315,44 @@ async fn already_matches(local: &Path, size: u64, hash: Option<&str>) -> bool {
 /// Lets through what was held while incoming changes were paused
 pub async fn release_held(node: Arc<Node>) {
     for (peer_id, message) in node.sync().take_held() {
-        handle_remote(node.clone(), peer_id, message).await;
+        apply_remote(node.clone(), peer_id, message, true).await;
     }
 }
 
-/// Applies a file change or deletion announced by a peer to the shared workspace
+/// How long changes inside a project wait for more to arrive before they land together
+const SETTLE: Duration = Duration::from_millis(1200);
+
+/// Waits for a quiet moment, then applies everything that came in meanwhile
+fn settle(node: &Arc<Node>, rel: String, peer: String, message: SyncMessage) {
+    let sync = node.sync();
+    sync.settling.lock().unwrap_or_else(|p| p.into_inner()).insert(rel, (peer, message));
+    let generation = sync.settle_gen.fetch_add(1, Ordering::SeqCst) + 1;
+    let node = node.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(SETTLE).await;
+        if node.sync().settle_gen.load(Ordering::SeqCst) != generation {
+            return;
+        }
+        for (peer, message) in node.sync().take_settling() {
+            // Paused in the meantime: it waits with the rest
+            if node.sync().holding() {
+                if let SyncMessage::Changed { rel_path, .. } | SyncMessage::Deleted { rel_path } = &message {
+                    node.sync().hold_message(rel_path.clone(), peer, message.clone());
+                }
+                continue;
+            }
+            apply_remote(node.clone(), peer, message, true).await;
+        }
+    });
+}
+
 pub async fn handle_remote(node: Arc<Node>, peer_id: String, message: SyncMessage) {
+    apply_remote(node, peer_id, message, false).await;
+}
+
+/// Applies a file change or deletion announced by a peer to the shared workspace. `direct` means it has already waited its turn
+/// (paused, or settling) and is applied now.
+async fn apply_remote(node: Arc<Node>, peer_id: String, message: SyncMessage, direct: bool) {
     if !node.peer_may_write(&peer_id) {
         return;
     }
@@ -302,8 +361,13 @@ pub async fn handle_remote(node: Arc<Node>, peer_id: String, message: SyncMessag
     match message {
         SyncMessage::Changed { rel_path, size, hash } => {
             let Ok(rel) = files::check_rel_path_in(&workspace, &rel_path) else { return };
-            if node.sync().holding() && rel.starts_with("projects/") {
-                node.sync().held.lock().unwrap_or_else(|p| p.into_inner()).insert(rel.clone(), (peer_id, SyncMessage::Changed { rel_path: rel, size, hash }));
+            if !direct && rel.starts_with("projects/") {
+                let message = SyncMessage::Changed { rel_path: rel.clone(), size, hash };
+                if node.sync().holding() {
+                    node.sync().hold_message(rel, peer_id, message);
+                } else {
+                    settle(&node, rel, peer_id, message);
+                }
                 return;
             }
             let Ok(local) = resolve_workspace_path(&workspace, &rel) else { return };
@@ -318,8 +382,13 @@ pub async fn handle_remote(node: Arc<Node>, peer_id: String, message: SyncMessag
         }
         SyncMessage::Deleted { rel_path } => {
             let Ok(rel) = files::check_rel_path_in(&workspace, &rel_path) else { return };
-            if node.sync().holding() && rel.starts_with("projects/") {
-                node.sync().held.lock().unwrap_or_else(|p| p.into_inner()).insert(rel.clone(), (peer_id, SyncMessage::Deleted { rel_path: rel }));
+            if !direct && rel.starts_with("projects/") {
+                let message = SyncMessage::Deleted { rel_path: rel.clone() };
+                if node.sync().holding() {
+                    node.sync().hold_message(rel, peer_id, message);
+                } else {
+                    settle(&node, rel, peer_id, message);
+                }
                 return;
             }
             let Ok(local) = resolve_workspace_path(&workspace, &rel) else { return };
@@ -342,6 +411,27 @@ pub async fn handle_remote(node: Arc<Node>, peer_id: String, message: SyncMessag
 
 fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+/// What each file hashed to the last time, with the size and time it had then: a manifest is built on every connect and a file
+/// that has not changed is not read again
+/// Size, time and hash of a file
+type Hashed = (u64, u64, Option<String>);
+static HASHED: std::sync::LazyLock<Mutex<HashMap<PathBuf, Hashed>>> = std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn hash_cached(path: &Path, size: u64, modified: u64) -> Option<String> {
+    if let Some((len, at, hash)) = HASHED.lock().unwrap_or_else(|p| p.into_inner()).get(path) {
+        if *len == size && *at == modified {
+            return hash.clone();
+        }
+    }
+    let hash = if size > LAZY_FILE_BYTES { None } else { std::fs::read(path).ok().map(|bytes| blake3::hash(&bytes).to_hex().to_string()) };
+    let mut cache = HASHED.lock().unwrap_or_else(|p| p.into_inner());
+    if cache.len() > 200_000 {
+        cache.clear();
+    }
+    cache.insert(path.to_path_buf(), (size, modified, hash.clone()));
+    hash
 }
 
 fn modified_ms(meta: &std::fs::Metadata) -> u64 {
@@ -382,29 +472,28 @@ pub async fn send_catch_up(node: Arc<Node>, peer_id: String) {
     }
 }
 
+/// How many entries a manifest has; for timing
+#[cfg(test)]
+pub(crate) async fn build_manifest_for_test(workspace: &str) -> usize {
+    build_manifest(workspace).await.len()
+}
+
+/// The list of files this device offers, with the size, time and hash of each. All of it runs in one blocking task: the sizes and times
+/// come from the same directory listing, the paths come from that listing too (so they need no check against the workspace, which
+/// costs a few calls each), and a file that has not changed is not read again.
 async fn build_manifest(workspace: &str) -> Vec<ManifestEntry> {
     let last_sync = read_last_sync(workspace);
     let ws = workspace.to_string();
-    let listed = tokio::task::spawn_blocking(move || files::list_shareable_files(&ws))
-        .await
-        .ok()
-        .and_then(Result::ok)
-        .unwrap_or_default();
-    let mut out = Vec::with_capacity(listed.len());
-    for f in listed {
-        let Ok(path) = resolve_workspace_path(workspace, &f.rel_path) else { continue };
-        let Ok(meta) = tokio::fs::metadata(&path).await else { continue };
-        let modified = modified_ms(&meta);
-        // ponytail: hashes every small file on each connect, add a (path, size, mtime) cache if that gets slow.
-        out.push(ManifestEntry {
-            hash: hash_file(&path, f.size).await,
-            size: f.size,
-            modified,
-            dirty: modified > last_sync,
-            rel_path: f.rel_path,
-        });
-    }
-    out
+    tokio::task::spawn_blocking(move || {
+        let listed = files::list_shareable_files(&ws).unwrap_or_default();
+        let root = Path::new(&ws);
+        listed
+            .into_iter()
+            .map(|f| ManifestEntry { hash: hash_cached(&root.join(&f.rel_path), f.size, f.modified_ms), size: f.size, modified: f.modified_ms, dirty: f.modified_ms > last_sync, rel_path: f.rel_path })
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
 }
 
 /// Downloads a file, or offers it as a placeholder when it is too large to fetch eagerly.
@@ -462,6 +551,11 @@ async fn handle_manifest(node: &Arc<Node>, peer_id: &str, workspace: &str, entri
                 eprintln!("[P2P] Could not back up {rel} before updating it, skipping: {e}");
                 continue;
             }
+        }
+        // Paused: what a reconnect catches up on waits with the rest
+        if node.sync().holding() && rel.starts_with("projects/") {
+            node.sync().hold_message(rel.clone(), peer_id.to_string(), SyncMessage::Changed { rel_path: rel, size: entry.size, hash: entry.hash.clone() });
+            continue;
         }
         pull(node, peer_id, workspace, rel, entry.size).await;
     }
@@ -581,6 +675,15 @@ mod tests {
         assert_eq!(serde_json::from_value::<SyncMessage>(json).unwrap(), msg);
         let del = serde_json::to_value(SyncMessage::Deleted { rel_path: "files/x".into() }).unwrap();
         assert_eq!(del["kind"], "FILE_DELETED");
+    }
+
+    #[test]
+    fn what_an_install_writes_is_dropped_before_it_is_queued() {
+        assert!(in_noisy_folder(Path::new("/w/projects/app/node_modules/react/index.js")));
+        assert!(in_noisy_folder(Path::new("/w/projects/app/.git/index.lock")));
+        assert!(in_noisy_folder(Path::new("C:\\w\\projects\\app\\__pycache__\\a.pyc")) || cfg!(not(windows)));
+        assert!(!in_noisy_folder(Path::new("/w/projects/app/src/node_modules_notes.md")));
+        assert!(!in_noisy_folder(Path::new("/w/notes/a.md")));
     }
 
     #[test]

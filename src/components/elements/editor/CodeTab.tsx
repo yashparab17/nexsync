@@ -16,6 +16,10 @@ import { useChat } from "@/store/chat/ChatContext";
 import { useFileComments } from "@/components/elements/editor/useFileComments";
 import { useCanComment } from "@/store/p2p/P2PContext";
 import { proposalMarks } from "@/lib/editor/proposalsView";
+import { coverageGutter, useCoverage } from "@/lib/coverage";
+import { listenToLsp, lspTarget } from "@/lib/lsp";
+import { lspExtension } from "@/lib/editor/lspExtension";
+import type { LspStatus } from "@/types/projects";
 import { useCollabDoc } from "@/hooks/useCollabDoc";
 import { useSeededText } from "@/hooks/useSeededText";
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -35,7 +39,7 @@ import type { LoadedLanguage } from "@/lib/editor/languages";
 import { hunksFromDelta, suggestRepair, type Hunk, type Suggestion } from "@/lib/editor/mergeRepair";
 import { countSyntaxErrors, errorRanges } from "@/lib/editor/syntax";
 import { canTypeCheck, firstNewError, loadTypeScript, typeErrors } from "@/lib/editor/typecheck";
-import { readWorkspaceFile, writeWorkspaceFile } from "@/lib/tauri";
+import { lspEnable, lspStatus, readWorkspaceFile, writeWorkspaceFile } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -55,11 +59,13 @@ interface CodeTabProps {
 	onText?: (path: string, text: string) => void;
 	onVimMode?: (mode: string) => void;
 	onVimCommand?: (command: VimCommand) => void;
+	// Opens a place in another file of the workspace (go to definition); the path is the workspace's
+	onOpenAt?: (path: string, line: number) => void;
 }
 
 // One open file in the Editor tab: a live shared document with format, find, save, problem markers and blame. The page
 // drives it through the handle and reads its state from onStatus, so one toolbar and one status line serve every file.
-const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path, active, readOnly, showBlame, onDirtyChange, onStatus, onCursor, onText, onVimMode, onVimCommand }, ref) {
+const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path, active, readOnly, showBlame, onDirtyChange, onStatus, onCursor, onText, onVimMode, onVimCommand, onOpenAt }, ref) {
 	const { workspace, metadata, addActivityEvent } = useWorkspace();
 	const { selfName, shareNamedVersion } = useP2P();
 	const logError = useErrorLog();
@@ -69,6 +75,8 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 
 	// The file's own document is always open (it holds the list of branches); a branch being worked on is a second one
 	const mainCollab = useCollabDoc(workspacePath, path);
+	// Lines the last coverage report says the tests reached or missed, as bars in the gutter
+	const coverage = useCoverage(path);
 	const [branch, setBranch] = useState<{ id: string; name: string } | null>(null);
 	const [branchesOpen, setBranchesOpen] = useState(false);
 	const branchCollab = useCollabDoc(workspacePath, branch ? branchDocId(branch.id) : undefined);
@@ -100,6 +108,25 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 	const { removedNames } = useChat();
 	const comments = useFileComments({ path, doc: mainCollab && !branch ? mainCollab.doc : null, canComment });
 	const suggestionMarks = useMemo(() => [comments.extension, ...(collab ? [proposalMarks(collab.doc, collab.doc.getText("content"), userName, !readOnly)] : [])], [collab, userName, readOnly, comments.extension]);
+	// Language intelligence (hover, problems, completion, go to definition) for a file of a project, once this device turned it on
+	const target = lspTarget(path);
+	const [lsp, setLsp] = useState<LspStatus | null>(null);
+	const [lspNotice, setLspNotice] = useState<string | null>(null);
+	useEffect(() => {
+		listenToLsp();
+		if (!target || !workspacePath) return setLsp(null);
+		lspStatus(workspacePath, target.project).then(setLsp).catch(() => setLsp(null));
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- the project stands for the target
+	}, [workspacePath, target?.project]);
+	const ext = path.split(".").pop()?.toLowerCase() ?? "";
+	const lspServer = lsp?.servers.find((s) => s.extensions.includes(ext)) ?? null;
+	const lspOn = !!lspServer && lspServer.installed && lsp?.enabled === true;
+	const lspExt = useMemo(
+		() => (target && lspOn ? lspExtension({ workspacePath, project: target.project, rel: target.rel, onOpen: (rel, line) => onOpenAt?.(`projects/${target.project}/${rel}`, line), onNotice: setLspNotice }) : null),
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- the target is its project and file
+		[workspacePath, target?.project, target?.rel, lspOn],
+	);
+	const extensionsWithCoverage = useMemo(() => [...(coverage ? [...suggestionMarks, coverageGutter(coverage)] : suggestionMarks), ...(lspExt ? [lspExt] : [])], [suggestionMarks, coverage, lspExt]);
 	const [blame, setBlame] = useState<{ ranges: BlameRange[]; people: Contribution[] } | null>(null);
 
 	// Read the file from disk; the shared document is seeded from it the first time it is opened
@@ -468,6 +495,25 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 				</div>
 			)}
 
+			{target && lspServer && lspServer.installed && lsp && !lsp.enabled && !readOnly && (
+				<div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-3 py-2 text-xs">
+					<span className="min-w-0 flex-1">
+						{lspServer.label} intelligence (problems, hover, completion, go to definition) is available for this project. It starts the {lspServer.label} language server on this device, which can run code from the project, such as build scripts and plugins.
+					</span>
+					<Button size="xs" onPress={() => void lspEnable(workspacePath, target.project, true).then(() => lspStatus(workspacePath, target.project)).then(setLsp).catch((e) => setLspNotice(String(e?.message ?? e)))}>
+						Turn On for This Project
+					</Button>
+				</div>
+			)}
+			{lspNotice && (
+				<div role="status" className="flex items-center gap-2 border-b bg-muted/40 px-3 py-1.5 text-xs">
+					<span className="min-w-0 flex-1 truncate">{lspNotice}</span>
+					<Button variant="ghost" size="xs" onPress={() => setLspNotice(null)}>
+						Dismiss
+					</Button>
+				</div>
+			)}
+
 			<div className="flex min-h-0 flex-1">
 				<div className="relative min-w-0 flex-1">
 					{saved !== null && collab && seeded && !branch && comments.controls}
@@ -488,7 +534,7 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 								comments.onReady(view);
 							}}
 							onLanguage={setLanguage}
-							extraExtensions={suggestionMarks}
+							extraExtensions={extensionsWithCoverage}
 							onCursor={(info) => onCursor?.(path, info)}
 							onVimMode={onVimMode}
 							onVimCommand={onVimCommand}

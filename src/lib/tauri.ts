@@ -8,7 +8,11 @@ import { listen } from "@tauri-apps/api/event";
 import { cleanPath } from "@/lib/utils";
 import type { EntryKind, LogEntry } from "@/lib/chat/entries";
 import type { ModerationView } from "@/lib/moderation";
-import type { DepsStatus, Doctor, EnvState, ProjectInfo, Recipe, RunRecord, Scan, ToolReq, Trust } from "@/types/projects";
+import type { LspStatus } from "@/types/projects";
+import type { ImportAnswer, OfficeInspect, OfficeLayout } from "@/types/office";
+import type { ChartPrim, SheetIn, SheetOut } from "@/lib/sheet";
+import type { Frame } from "@/lib/deck";
+import type { Audit, Bisected, Containers, RuntimeInfo, DepsStatus, Found, Impact, GeneratorList, HttpFile, HttpResponse, Planned, Doctor, EnvState, ImportPreview, ProjectInfo, Recipe, ReportFile, RunRecord, Scan, Template, ToolReq, Trust } from "@/types/projects";
 
 import type {
 	WorkspaceInfo,
@@ -944,8 +948,142 @@ export function projectCreate(path: string, name: string): Promise<string> {
 export function projectAddIgnore(path: string, project: string, line: string): Promise<void> {
 	return invoke("project_add_ignore", { path, project, line });
 }
-export function projectDoctor(path: string, tools: ToolReq[]): Promise<Doctor> {
-	return invoke("project_doctor", { path, tools });
+// `wsl` asks inside that Windows Subsystem for Linux distribution instead of on this system
+export function projectDoctor(path: string, tools: ToolReq[], wsl?: string | null): Promise<Doctor> {
+	return invoke("project_doctor", { path, tools, wsl: wsl ?? null });
+}
+export function projectContainers(path: string, project: string): Promise<Containers> {
+	return invoke("project_containers", { path, project });
+}
+// Opens a document file of the workspace (.docx, .odt, .rtf, .md, .html, .txt) as HTML for the editor, with what it holds
+export function officeImport(path: string, rel: string, password?: string | null): Promise<ImportAnswer> {
+	return invoke("office_import", { path, rel, password: password ?? null });
+}
+// Writes the editor's HTML as the file `dest` names (.docx, .odt, .rtf, .md, .html, .txt, .tex); `author` empty leaves the file unnamed
+export function officeExport(path: string, dest: string, html: string, title: string, author: string, layout?: OfficeLayout | null): Promise<number> {
+	return invoke("office_export", { path, dest, html, title, author, layout: layout ?? null });
+}
+export function officeInspect(path: string, rel: string): Promise<OfficeInspect> {
+	return invoke("office_inspect", { path, rel });
+}
+// What each cell of a workbook shows, worked out by the spreadsheet engine from what was typed
+export function sheetCalculate(sheets: SheetIn[]): Promise<{ sheets: SheetOut[]; truncated: boolean; refused: [string, string, string][] }> {
+	return invoke("sheet_calculate", { sheets });
+}
+// Inserts or deletes rows or columns (at is 0-based); the engine rewrites the formulas that point at moved cells
+export function sheetRestructure(sheets: SheetIn[], sheet: string, op: "insertRows" | "deleteRows" | "insertCols" | "deleteCols", at: number, count: number): Promise<SheetIn[]> {
+	return invoke("sheet_restructure", { sheets, sheet, op, at, count });
+}
+export function sheetOpen(path: string, rel: string): Promise<{ sheets: SheetIn[]; notes: string[] }> {
+	return invoke("sheet_open", { path, rel });
+}
+// Saves the workbook as .xlsx, or the named sheet as .csv or .tsv
+export function sheetSave(path: string, dest: string, sheets: SheetIn[], sheet: string): Promise<number> {
+	return invoke("sheet_save", { path, dest, sheets, sheet });
+}
+// Sorts the rows of a range by one column, keeping each row's looks with it
+export function sheetSort(sheets: SheetIn[], sheet: string, range: string, column: string, descending: boolean, header: boolean): Promise<SheetIn[]> {
+	return invoke("sheet_sort", { sheets, sheet, range, column, descending, header });
+}
+// A chart of a range, as shapes and text to paint
+export function sheetChart(sheets: SheetIn[], sheet: string, spec: { range: string; kind: string; title: string; w: number; h: number }): Promise<ChartPrim[]> {
+	return invoke("sheet_chart", { sheets, sheet, spec });
+}
+// Slide decks: the pieces of a deck from a file, a slide drawn as a picture, and the small edits the slide editor makes
+export interface DeckParts {
+	base: string;
+	slides: string[];
+}
+export interface DeckRendered {
+	png: string;
+	widthPt: number;
+	heightPt: number;
+	frames: Frame[];
+}
+export function deckNew(): Promise<{ parts: DeckParts; notes: string[] }> {
+	return invoke("deck_new");
+}
+export function deckOpen(path: string, rel: string): Promise<{ parts: DeckParts; notes: string[] }> {
+	return invoke("deck_open", { path, rel });
+}
+// Keeps the deck's base on the backend for drawing; returns its id
+export function deckRegister(base: string): Promise<string> {
+	return invoke("deck_register", { base });
+}
+export function deckRender(baseId: string, slide: string, scale: number): Promise<DeckRendered> {
+	return invoke("deck_render", { baseId, slide, scale });
+}
+export function deckLayouts(baseId: string): Promise<{ id: number; name: string }[]> {
+	return invoke("deck_layouts", { baseId });
+}
+export function deckNewSlide(baseId: string, layout: number): Promise<string> {
+	return invoke("deck_new_slide", { baseId, layout });
+}
+export function deckNewShape(kind: string, id: number, x: number, y: number, w: number, h: number): Promise<string> {
+	return invoke("deck_new_shape", { kind, id, x, y, w, h });
+}
+export interface ShapeEdit {
+	text?: string;
+	// RRGGBB, or "" for no fill
+	fill?: string;
+	bold?: boolean;
+	italic?: boolean;
+	size?: number;
+	color?: string;
+	x?: number;
+	y?: number;
+	w?: number;
+	h?: number;
+	rot?: number;
+	underline?: boolean;
+	font?: string;
+	align?: "left" | "center" | "right" | "justify";
+	// The outline: RRGGBB, or "" for none
+	line?: string;
+	lineWidth?: number;
+}
+// The settings of a slide that are not its shapes
+export interface SlideEdit {
+	notes?: string;
+	transition?: string;
+	hidden?: boolean;
+	// RRGGBB, or "" to follow the layout
+	background?: string;
+}
+export function deckEditSlide(slide: string, edit: SlideEdit): Promise<string> {
+	return invoke("deck_edit_slide", { slide, edit });
+}
+// A picture for the deck: the new base that holds it, and the picture shape for a slide
+export function deckAddPicture(base: string, name: string, data: string, id: number, x: number, y: number, w: number, h: number): Promise<[string, string]> {
+	return invoke("deck_add_picture", { base, name, data, id, x, y, w, h });
+}
+export function deckEditShape(shape: string, edit: ShapeEdit): Promise<string> {
+	return invoke("deck_edit_shape", { shape, edit });
+}
+export function deckSave(path: string, dest: string, base: string, slides: string[]): Promise<number> {
+	return invoke("deck_save", { path, dest, base, slides });
+}
+export function lspStatus(path: string, project: string): Promise<LspStatus> {
+	return invoke("lsp_status", { path, project });
+}
+export function lspEnable(path: string, project: string, on: boolean): Promise<void> {
+	return invoke("lsp_enable", { path, project, on });
+}
+// Tells the language server the text of an open file; returns its name, or null when none handles the file
+export function lspSync(path: string, project: string, rel: string, text: string, version: number): Promise<string | null> {
+	return invoke("lsp_sync", { path, project, rel, text, version });
+}
+export function lspClose(path: string, project: string, rel: string): Promise<void> {
+	return invoke("lsp_close", { path, project, rel });
+}
+export function lspRequest<T = unknown>(path: string, project: string, rel: string, method: string, params: unknown): Promise<T> {
+	return invoke("lsp_request", { path, project, rel, method, params });
+}
+export function projectRuntime(path: string, project: string): Promise<RuntimeInfo> {
+	return invoke("project_runtime", { path, project });
+}
+export function projectRuntimeSet(path: string, project: string, wsl: string | null): Promise<void> {
+	return invoke("project_runtime_set", { path, project, wsl });
 }
 export function projectScan(path: string): Promise<Scan> {
 	return invoke("project_scan", { path });
@@ -957,8 +1095,70 @@ export function projectTaskApprove(path: string, project: string, taskId: string
 	return invoke("project_task_approve", { path, project, taskId });
 }
 // Starts a task; `once` says the person just chose Run Once for this command
-export function projectTaskStart(path: string, project: string, taskId: string, once: boolean): Promise<string> {
-	return invoke("project_task_start", { path, project, taskId, once });
+// `args` are added after the approved command, each in quotes (a test's name, to run just that test)
+export function projectTaskStart(path: string, project: string, taskId: string, once: boolean, args?: string[]): Promise<string> {
+	return invoke("project_task_start", { path, project, taskId, once, args: args ?? null });
+}
+// Known-vulnerable and out-of-date packages; contacts the package registries, so only when asked
+export function projectAudit(path: string, project: string): Promise<Audit[]> {
+	return invoke("project_audit", { path, project });
+}
+export function projectGenerators(path: string, project: string): Promise<GeneratorList> {
+	return invoke("project_generators", { path, project });
+}
+// The files a generator would write for these values (`dryRun`), or writes them; nothing is written if one exists
+export function projectGenerate(path: string, project: string, generator: string, values: Record<string, string>, dryRun: boolean): Promise<Planned[]> {
+	return invoke("project_generate", { path, project, generator, values, dryRun });
+}
+// The test files that changes since `since` (milliseconds; 0 for none known) can reach
+export function projectTestImpact(path: string, project: string, since: number): Promise<Impact> {
+	return invoke("project_test_impact", { path, project, since });
+}
+// Puts the edits since the last pass (`since`, milliseconds) back one at a time in a copy and runs the task to find the one that broke it
+export function projectBisect(path: string, project: string, taskId: string, since: number): Promise<Bisected> {
+	return invoke("project_bisect", { path, project, taskId, since });
+}
+export function projectBisectCancel(): Promise<void> {
+	return invoke("project_bisect_cancel");
+}
+export function projectSearch(path: string, project: string, query: string, regex: boolean, caseSensitive: boolean): Promise<Found> {
+	return invoke("project_search", { path, project, query, regex, caseSensitive });
+}
+// Replaces in the files named (from a search); returns how many replacements were made
+export function projectReplace(path: string, project: string, query: string, regex: boolean, caseSensitive: boolean, replacement: string, files: string[]): Promise<number> {
+	return invoke("project_replace", { path, project, query, regex, caseSensitive, replacement, files });
+}
+export function projectHttpFiles(path: string, project: string): Promise<HttpFile[]> {
+	return invoke("project_http_files", { path, project });
+}
+// Sends request number `index` of a .http file, with the variables of one environment (empty for none)
+export function projectHttpSend(path: string, project: string, file: string, index: number, env: string): Promise<HttpResponse> {
+	return invoke("project_http_send", { path, project, file, index, env });
+}
+export function projectReports(path: string, project: string): Promise<ReportFile[]> {
+	return invoke("project_reports", { path, project });
+}
+export function projectReadReport(path: string, project: string, file: string): Promise<string> {
+	return invoke("project_read_report", { path, project, file });
+}
+export function projectSecretAllow(path: string, relPath: string): Promise<void> {
+	return invoke("project_secret_allow", { path, relPath });
+}
+export function projectTemplates(): Promise<Template[]> {
+	return invoke("project_templates");
+}
+export function projectScaffoldPreview(template: string, name: string, options: [string, string][]): Promise<string> {
+	return invoke("project_scaffold_preview", { template, name, options });
+}
+// Runs a template in the projects folder; the output streams under the new project's name
+export function projectScaffold(path: string, template: string, name: string, options: [string, string][]): Promise<string> {
+	return invoke("project_scaffold", { path, template, name, options });
+}
+export function projectImportPreview(path: string, source: string): Promise<ImportPreview> {
+	return invoke("project_import_preview", { path, source });
+}
+export function projectImport(path: string, source: string, name: string, skipKept: boolean): Promise<number> {
+	return invoke("project_import", { path, source, name, skipKept });
 }
 export function projectTaskStop(runId: string): Promise<void> {
 	return invoke("project_task_stop", { runId });
@@ -997,4 +1197,15 @@ export function writeExportText(path: string, dest: string, text: string): Promi
 	let binary = "";
 	for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
 	return writeExportFile(path, dest, btoa(binary));
+}
+
+// Spelling and grammar of a text: each distinct problem once, with what to write instead
+export interface ProofProblem {
+	text: string;
+	kind: "spelling" | "grammar";
+	message: string;
+	suggestions: string[];
+}
+export function proofCheck(text: string): Promise<ProofProblem[]> {
+	return invoke("proof_check", { text });
 }

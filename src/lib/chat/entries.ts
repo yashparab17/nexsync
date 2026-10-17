@@ -6,7 +6,7 @@
 //
 // The Rust side has already refused entries from people who may not write, so edits and deletions found here are valid.
 
-export type EntryKind = "message" | "edit" | "delete" | "react" | "unreact" | "channel" | "comment" | "resolve" | "reopen" | "dm" | "icon" | "profile" | "announce" | "announce_end" | "ack" | "expire" | "moderation";
+export type EntryKind = "message" | "edit" | "delete" | "react" | "unreact" | "channel" | "comment" | "resolve" | "reopen" | "dm" | "icon" | "profile" | "devenv" | "devrun" | "devrepro" | "announce" | "announce_end" | "ack" | "expire" | "moderation";
 
 export interface LogEntry {
 	id: string;

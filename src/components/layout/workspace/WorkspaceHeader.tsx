@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 // React Router
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 // Icons
-import { Radio, Settings, Menu } from "@/components/animate-icons";
+import { ChevronLeft, ChevronRight, Radio, Settings, Menu } from "@/components/animate-icons";
+import { bottomNavigation, navigation } from "@/components/layout/workspace/WorkspaceSidebar";
 
 // Components
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,24 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 		setParams({}, { replace: true });
 	}, [wantsSettings, setParams]);
 
-	const connectedCount = peers.filter((p) => p.status === "connected").length;
+	const navigate = useNavigate();
+	const { pathname } = useLocation();
+	const here = navigation.find((n) => (n.end ? pathname === n.path : pathname === n.path || pathname.startsWith(`${n.path}/`))) ?? bottomNavigation.find((n) => pathname.startsWith(n.path));
+	const openFile = params.get("open");
+	// Alt+Left and Alt+Right go back and forward, as in a browser
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+			const el = e.target as HTMLElement;
+			if (el.closest("input,textarea,select,[contenteditable='true'],.cm-editor")) return;
+			e.preventDefault();
+			navigate(e.key === "ArrowLeft" ? -1 : 1);
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [navigate]);
+
+	const connectedCount =peers.filter((p) => p.status === "connected").length;
 
 	// How the connection is, as a small dot on the button: green when people are connected or the network is ready,
 	// amber and pulsing while connecting, red when offline. The words are in the tooltip and the accessible name.
@@ -56,6 +74,25 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 					<Menu className="size-5" />
 				</Button>
 			)}
+
+			{/* Back, forward and where you are */}
+			<div className="flex min-w-0 items-center gap-1">
+				<Button variant="ghost" size="icon" onPress={() => navigate(-1)} aria-label="Back" className="hidden sm:inline-flex">
+					<ChevronLeft className="size-5" />
+				</Button>
+				<Button variant="ghost" size="icon" onPress={() => navigate(1)} aria-label="Forward" className="hidden sm:inline-flex">
+					<ChevronRight className="size-5" />
+				</Button>
+				<nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm">
+					<span className="shrink-0 font-medium">{here ? t(here.label) : ""}</span>
+					{openFile && (
+						<>
+							<span aria-hidden className="text-muted-foreground">/</span>
+							<span className="truncate text-muted-foreground" title={openFile}>{openFile.split("/").pop()}</span>
+						</>
+					)}
+				</nav>
+			</div>
 
 			{/* Search */}
 			<div className="flex min-w-0 flex-1 justify-end">

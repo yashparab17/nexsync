@@ -1,5 +1,5 @@
 // React
-import { AnimateIcon, Code2, Files, Network, FolderClose, FolderTree, ListTodo, MessageSquareText, Megaphone, StickyNote } from "@/components/animate-icons";
+import { AnimateIcon, Code2, FileText, Monitor, Table, Files, Network, FolderClose, FolderTree, ListTodo, MessageSquareText, Megaphone, StickyNote } from "@/components/animate-icons";
 import { useCallback, useState, type ElementType } from "react";
 
 // React Router
@@ -35,7 +35,7 @@ interface NavigationItem {
 }
 
 // Workspace feature navigation links
-const navigation: NavigationItem[] = [
+export const navigation: NavigationItem[] = [
 	{
 		name: "Dashboard",
 		label: "nav.dashboard",
@@ -48,6 +48,24 @@ const navigation: NavigationItem[] = [
 		label: "nav.notes",
 		path: "/workspace/notes",
 		icon: StickyNote,
+	},
+	{
+		name: "Documents",
+		label: "nav.documents",
+		path: "/workspace/documents",
+		icon: FileText,
+	},
+	{
+		name: "Sheets",
+		label: "nav.sheets",
+		path: "/workspace/sheets",
+		icon: Table,
+	},
+	{
+		name: "Slides",
+		label: "nav.slides",
+		path: "/workspace/slides",
+		icon: Monitor,
 	},
 	{
 		name: "Editor",
@@ -112,13 +130,14 @@ const byPath = (path: string) => navigation.find((item) => item.path === path)!;
 const navGroups: { id: string; label?: MessageKey; items: NavigationItem[] }[] = [
 	{ id: "top", items: [byPath("/workspace"), byPath("/workspace/explorer")] },
 	{ id: "talk", label: "nav.groupTalk", items: [byPath("/workspace/announcements"), byPath("/workspace/chat")] },
-	{ id: "write", label: "nav.groupWrite", items: [byPath("/workspace/notes"), byPath("/workspace/projects"), byPath("/workspace/editor")] },
+	{ id: "office", label: "nav.groupOffice", items: [byPath("/workspace/documents"), byPath("/workspace/sheets"), byPath("/workspace/slides"), byPath("/workspace/notes")] },
+	{ id: "code", label: "nav.groupCode", items: [byPath("/workspace/projects"), byPath("/workspace/editor")] },
 	{ id: "storage", label: "nav.groupStorage", items: [byPath("/workspace/files"), byPath("/workspace/assets")] },
 	{ id: "plan", label: "nav.groupPlan", items: [byPath("/workspace/tasks"), byPath("/workspace/kanban")] },
 ];
 
 // Bottom workspace navigation links
-const bottomNavigation: NavigationItem[] = [
+export const bottomNavigation: NavigationItem[] = [
 	{
 		name: "Members",
 		label: "nav.members",

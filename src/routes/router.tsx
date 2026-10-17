@@ -12,6 +12,9 @@ const WorkspaceFiles = lazy(() => import("@/pages/workspace/WorkspaceFiles"));
 const WorkspaceEditor = lazy(() => import("@/pages/workspace/WorkspaceEditor"));
 const WorkspaceProjects = lazy(() => import("@/pages/workspace/WorkspaceProjects"));
 const WorkspaceNotes = lazy(() => import("@/pages/workspace/WorkspaceNotes"));
+const WorkspaceDocuments = lazy(() => import("@/pages/workspace/WorkspaceDocuments"));
+const WorkspaceSheets = lazy(() => import("@/pages/workspace/WorkspaceSheets"));
+const WorkspaceSlides = lazy(() => import("@/pages/workspace/WorkspaceSlides"));
 const WorkspaceAssets = lazy(() => import("@/pages/workspace/WorkspaceAssets"));
 const WorkspaceTasks = lazy(() => import("@/pages/workspace/WorkspaceTasks"));
 const WorkspaceKanban = lazy(() => import("@/pages/workspace/WorkspaceKanban"));
@@ -60,6 +63,30 @@ export const router = createBrowserRouter([
 						element: (
 							<RouteSuspense>
 								<WorkspaceNotes />
+							</RouteSuspense>
+						),
+					},
+					{
+						path: "documents",
+						element: (
+							<RouteSuspense>
+								<WorkspaceDocuments />
+							</RouteSuspense>
+						),
+					},
+					{
+						path: "sheets",
+						element: (
+							<RouteSuspense>
+								<WorkspaceSheets />
+							</RouteSuspense>
+						),
+					},
+					{
+						path: "slides",
+						element: (
+							<RouteSuspense>
+								<WorkspaceSlides />
 							</RouteSuspense>
 						),
 					},

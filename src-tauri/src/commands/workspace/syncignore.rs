@@ -55,7 +55,7 @@ const DEFAULTS: &[&str] = &[
     // Other
     "_build/", ".godot/", ".terraform/",
     // Local environment files: names are shared in `.env.example`, values stay put
-    ".env", ".env.*", "!.env.example", "!.env.sample", "!.env.template",
+    ".env", ".env.*", "!.env.example", "!.env.sample", "!.env.template", "http-client.private.env.json",
 ];
 
 /// Paths that are never synced and cannot be re-included: Git's own folder (every device has its own copy), the half of a
@@ -68,42 +68,57 @@ pub fn always_blocked(rel: &str) -> bool {
 pub struct Rules {
     root: PathBuf,
     layers: HashMap<String, Option<Gitignore>>,
+    /// A folder elsewhere on the disk looked at as if it were at this path of the workspace (an import, before it is copied)
+    mount: Option<(String, PathBuf)>,
 }
 
 impl Rules {
     pub fn load(workspace: &Path) -> Self {
-        Self { root: workspace.to_path_buf(), layers: HashMap::new() }
+        Self { root: workspace.to_path_buf(), layers: HashMap::new(), mount: None }
     }
 
-    /// The rules written in one folder (`""` is the workspace root), or `None` when it has none
+    /// Rules for `real`, a folder outside the workspace, as they will apply once it is at `prefix` (such as `projects/import`)
+    pub fn mounted(workspace: &Path, prefix: &str, real: &Path) -> Self {
+        Self { mount: Some((prefix.to_string(), real.to_path_buf())), ..Self::load(workspace) }
+    }
+
+    /// Builds the rules written in one folder (`""` is the workspace root); `None` when it has none
+    fn build_layer(&self, dir: &str) -> Option<Gitignore> {
+        let base = match &self.mount {
+            Some((prefix, real)) if dir == prefix => real.clone(),
+            Some((prefix, real)) if dir.starts_with(prefix.as_str()) && dir.as_bytes().get(prefix.len()) == Some(&b'/') => real.join(&dir[prefix.len() + 1..]),
+            _ if dir.is_empty() => self.root.clone(),
+            _ => self.root.join(dir),
+        };
+        let mut builder = GitignoreBuilder::new(&base);
+        let mut any = false;
+        if dir == PROJECTS_ROOT {
+            // The defaults apply to every project, so they sit in the layer of the projects folder
+            for line in DEFAULTS {
+                let _ = builder.add_line(None, line);
+            }
+            any = true;
+        }
+        let mut files = vec![".gitignore", SHARED_FILE];
+        if dir.is_empty() {
+            files.push(LOCAL_FILE);
+        }
+        for file in files {
+            let p = base.join(file);
+            if p.is_file() && builder.add(&p).is_none() {
+                any = true;
+            }
+        }
+        if any { builder.build().ok() } else { None }
+    }
+
+    /// The rules written in one folder, built the first time they are asked for
     fn layer(&mut self, dir: &str) -> Option<&Gitignore> {
-        let root = self.root.clone();
-        self.layers
-            .entry(dir.to_string())
-            .or_insert_with(|| {
-                let base = if dir.is_empty() { root.clone() } else { root.join(dir) };
-                let mut builder = GitignoreBuilder::new(&base);
-                let mut any = false;
-                if dir == PROJECTS_ROOT {
-                    // The defaults apply to every project, so they sit in the layer of the projects folder
-                    for line in DEFAULTS {
-                        let _ = builder.add_line(None, line);
-                    }
-                    any = true;
-                }
-                let mut files = vec![".gitignore", SHARED_FILE];
-                if dir.is_empty() {
-                    files.push(LOCAL_FILE);
-                }
-                for file in files {
-                    let p = base.join(file);
-                    if p.is_file() && builder.add(&p).is_none() {
-                        any = true;
-                    }
-                }
-                if any { builder.build().ok() } else { None }
-            })
-            .as_ref()
+        if !self.layers.contains_key(dir) {
+            let built = self.build_layer(dir);
+            self.layers.insert(dir.to_string(), built);
+        }
+        self.layers.get(dir).and_then(|l| l.as_ref())
     }
 
     /// Whether `rel` (workspace-relative, no leading slash) is kept on this device
@@ -111,24 +126,30 @@ impl Rules {
         if always_blocked(rel) {
             return true;
         }
-        let parts: Vec<&str> = rel.split('/').filter(|s| !s.is_empty()).collect();
+        let ends = segment_ends(rel);
         // A folder that is ignored takes everything in it along, whatever a rule inside says
-        for end in 1..=parts.len() {
-            let dir = end < parts.len() || is_dir;
-            if self.decide(&parts[..end], dir) {
-                return true;
-            }
-        }
-        false
+        (0..ends.len()).any(|k| self.decide(rel, &ends, k, k + 1 < ends.len() || is_dir))
     }
 
-    /// The nearest folder with an opinion wins; inside one folder the later rule wins
-    fn decide(&mut self, parts: &[&str], is_dir: bool) -> bool {
-        for depth in (0..parts.len()).rev() {
-            let dir = parts[..depth].join("/");
-            let inside = parts[depth..].join("/");
-            if let Some(layer) = self.layer(&dir) {
-                let m = layer.matched(Path::new(&inside), is_dir);
+    /// For a walker that only goes into folders that are not ignored: the parents are known to be fine, so just the entry is decided.
+    /// A walk over a big project asks this for every file, and the answer for the whole path would repeat the parents' every time.
+    pub fn ignored_entry(&mut self, rel: &str, is_dir: bool) -> bool {
+        let name = rel.rsplit('/').next().unwrap_or(rel);
+        if name == ".git" || name == LOCAL_FILE || name.ends_with(".nexsync-part") {
+            return true;
+        }
+        let ends = segment_ends(rel);
+        ends.is_empty() || self.decide(rel, &ends, ends.len() - 1, is_dir)
+    }
+
+    /// Whether the first `k + 1` segments of `rel` are ignored: the nearest folder with an opinion wins, and inside one folder the
+    /// later rule wins
+    fn decide(&mut self, rel: &str, ends: &[usize], k: usize, is_dir: bool) -> bool {
+        let path = &rel[..ends[k]];
+        for depth in (0..=k).rev() {
+            let (dir, inside) = if depth == 0 { ("", path) } else { (&rel[..ends[depth - 1]], &path[ends[depth - 1] + 1..]) };
+            if let Some(layer) = self.layer(dir) {
+                let m = layer.matched(Path::new(inside), is_dir);
                 if m.is_ignore() {
                     return true;
                 }
@@ -139,6 +160,15 @@ impl Rules {
         }
         false
     }
+}
+
+/// Where each segment of a path ends: `a/b/c` gives the offsets of the end of `a`, `a/b` and `a/b/c`
+fn segment_ends(rel: &str) -> Vec<usize> {
+    let mut ends: Vec<usize> = rel.match_indices('/').map(|(i, _)| i).filter(|i| *i > 0).collect();
+    if !rel.is_empty() && !rel.ends_with('/') {
+        ends.push(rel.len());
+    }
+    ends
 }
 
 /// Whether a name inside `root` is skipped when listing for sync, before any rule: dotfiles in every shared folder but
@@ -214,6 +244,20 @@ mod tests {
         assert!(!too_big("projects/app/data.bin", MAX_PROJECT_FILE_BYTES));
         assert!(!too_big("assets/video.mp4", MAX_PROJECT_FILE_BYTES * 10));
         assert!(is_generated("projects/app/pnpm-lock.yaml") && is_generated("Cargo.lock") && !is_generated("projects/app/lock.ts"));
+    }
+
+    #[test]
+    fn deciding_just_the_entry_agrees_with_deciding_the_whole_path_for_anything_a_walk_reaches() {
+        let ws = workspace();
+        std::fs::write(ws.join("projects/app/.gitignore"), "generated/\n*.tmp\n").unwrap();
+        std::fs::write(ws.join("projects/app/.nexignore"), "!dist/\n").unwrap();
+        let mut r = Rules::load(&ws);
+        for (path, dir) in [("projects/app/src", true), ("projects/app/src/a.ts", false), ("projects/app/generated", true), ("projects/app/x.tmp", false), ("projects/app/dist", true), ("projects/app/node_modules", true), ("projects/app/.env", false), ("projects/app/.git", true), ("notes/a.md", false)] {
+            assert_eq!(r.ignored_entry(path, dir), r.ignored(path, dir), "{path}");
+        }
+        assert_eq!(segment_ends("a/b/c"), [1, 3, 5]);
+        assert!(segment_ends("").is_empty());
+        let _ = std::fs::remove_dir_all(ws);
     }
 
     #[test]

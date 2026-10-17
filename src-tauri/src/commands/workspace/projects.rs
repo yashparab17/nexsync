@@ -46,6 +46,9 @@ pub struct TaskSpec {
     /// A task that keeps running until stopped (a dev server, a test watcher)
     #[serde(default)]
     pub watch: bool,
+    /// A task that asks questions or needs a real terminal: it runs in one, not in the output list
+    #[serde(default)]
+    pub interactive: bool,
     /// Text in the output, or a port, that says the task is ready
     #[serde(default)]
     pub ready_when: String,
@@ -67,6 +70,18 @@ pub struct EnvVar {
     pub name: String,
     #[serde(default)]
     pub description: String,
+}
+
+/// A way to read problems out of a task's output, written by the team: a regular expression with the groups `file` and `line`, and
+/// optionally `column`, `message` and `severity`. It is only ever matched against output, never run.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MatcherSpec {
+    pub name: String,
+    pub pattern: String,
+    /// `error` or `warning`, when the pattern has no `severity` group
+    #[serde(default)]
+    pub severity: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -93,6 +108,9 @@ pub struct Recipe {
     pub env: Vec<EnvVar>,
     #[serde(default)]
     pub preview: Option<Preview>,
+    /// More ways to find problems in output, beside the ones Nexsync knows
+    #[serde(default)]
+    pub matchers: Vec<MatcherSpec>,
     /// Fields from a newer version of Nexsync are kept as they are, not dropped
     #[serde(flatten)]
     pub extra: serde_json::Map<String, Value>,
@@ -108,6 +126,17 @@ pub(crate) fn valid_name(name: &str) -> bool {
 
 /// A recipe is text from another person, so it is checked before anything uses it: version known, names well formed, a task's
 /// folder inside the project, no task waiting on one that does not exist
+/// The expression of a matcher, or why it cannot be used: it has to compile (within a size limit, so a recipe cannot make
+/// matching slow) and name the groups `file` and `line`
+pub fn compile_matcher(m: &MatcherSpec) -> Result<regex::Regex, String> {
+    let re = regex::RegexBuilder::new(&m.pattern).size_limit(256 * 1024).build().map_err(|e| format!("Matcher \"{}\" is not a valid pattern: {e}", m.name))?;
+    let names: Vec<_> = re.capture_names().flatten().collect();
+    if !names.contains(&"file") || !names.contains(&"line") {
+        return Err(format!("Matcher \"{}\" needs the groups (?P<file>...) and (?P<line>...).", m.name));
+    }
+    Ok(re)
+}
+
 pub fn check_recipe(mut r: Recipe) -> Result<Recipe, String> {
     if r.schema == 0 || r.schema > RECIPE_SCHEMA {
         return Err(format!("This recipe is version {}, and this Nexsync reads version {RECIPE_SCHEMA}. Update Nexsync to use it.", r.schema));
@@ -152,6 +181,16 @@ pub fn check_recipe(mut r: Recipe) -> Result<Recipe, String> {
     for e in &mut r.env {
         e.description = clean(&e.description);
     }
+    if r.matchers.len() > 10 {
+        return Err("A recipe may have at most 10 problem matchers.".to_string());
+    }
+    for m in &mut r.matchers {
+        m.name = clean(&m.name);
+        compile_matcher(m)?;
+        if !m.severity.is_empty() && m.severity != "error" && m.severity != "warning" {
+            return Err(format!("Matcher \"{}\": severity is error or warning.", m.name));
+        }
+    }
     if r.env.iter().any(|e| !valid_name(&e.name)) {
         return Err("An environment variable name is not valid.".to_string());
     }
@@ -182,7 +221,7 @@ const RULES: &[Rule] = &[
     Rule { id: "vite", label: "Vite", group: "Web", files: &["vite.config.ts", "vite.config.js", "vite.config.mjs"], needs: None },
     Rule { id: "next", label: "Next.js", group: "Web", files: &["next.config.js", "next.config.mjs", "next.config.ts"], needs: None },
     Rule { id: "nuxt", label: "Nuxt", group: "Web", files: &["nuxt.config.ts", "nuxt.config.js"], needs: None },
-    Rule { id: "sveltekit", label: "SvelteKit", group: "Web", files: &["svelte.config.js", "svelte.config.ts"], needs: Some((PKG, "@sveltejs/kit")) },
+    Rule { id: "sveltekit", label: "SvelteKit", group: "Web", files: PKG, needs: Some((PKG, "@sveltejs/kit")) },
     Rule { id: "astro", label: "Astro", group: "Web", files: &["astro.config.mjs", "astro.config.ts", "astro.config.js"], needs: None },
     Rule { id: "remix", label: "Remix", group: "Web", files: PKG, needs: Some((PKG, "@remix-run")) },
     Rule { id: "angular", label: "Angular", group: "Web", files: &["angular.json"], needs: None },
@@ -285,7 +324,20 @@ pub fn detect_kinds(dir: &Path) -> Vec<Kind> {
         }
         out.push(Kind { id: rule.id, label: rule.label, group: rule.group });
     }
+    if out.len() > 1 {
+        out.retain(|k| k.id != "static");
+    }
     out
+}
+
+/// A Python project run with uv: it has a lock file, or says so, or is what `uv init` makes (a `.python-version` and a `pyproject.toml`
+/// and none of the other tools' files)
+fn uses_uv(dir: &Path, kinds: &[Kind]) -> bool {
+    if kinds.iter().any(|k| k.id == "uv") {
+        return true;
+    }
+    let toml = read(dir, "pyproject.toml").unwrap_or_default();
+    kinds.iter().any(|k| k.id == "python") && (toml.contains("[tool.uv]") || (has(dir, ".python-version") && !toml.is_empty() && !toml.contains("[tool.poetry]") && !has(dir, "requirements.txt") && !has(dir, "Pipfile")))
 }
 
 /// The package manager a Node project uses, from its lock file
@@ -318,7 +370,8 @@ pub fn default_tasks(dir: &Path, kinds: &[Kind]) -> Vec<TaskSpec> {
     let is = |id: &str| kinds.iter().any(|k| k.id == id);
     let mut tasks: Vec<TaskSpec> = Vec::new();
     let mut add = |t: TaskSpec| {
-        if !tasks.iter().any(|x| x.id == t.id) {
+        // A task that does what another already does (a Makefile's `build` next to the default one) is not listed twice
+        if !tasks.iter().any(|x| x.id == t.id || x.command == t.command) {
             tasks.push(t);
         }
     };
@@ -336,7 +389,7 @@ pub fn default_tasks(dir: &Path, kinds: &[Kind]) -> Vec<TaskSpec> {
             .and_then(|t| serde_json::from_str::<Value>(&t).ok())
             .and_then(|v| v.get("scripts").and_then(Value::as_object).map(|o| o.keys().cloned().collect()))
             .unwrap_or_default();
-        let port = [("next", 3000), ("nuxt", 3000), ("astro", 4321), ("angular", 4200), ("cra", 3000), ("gatsby", 8000), ("docusaurus", 3000), ("vite", 5173), ("sveltekit", 5173), ("remix", 3000)]
+        let port = [("expo", 8081), ("react-native", 8081), ("next", 3000), ("nuxt", 3000), ("astro", 4321), ("angular", 4200), ("cra", 3000), ("gatsby", 8000), ("docusaurus", 3000), ("vite", 5173), ("sveltekit", 5173), ("remix", 3000)]
             .into_iter()
             .find(|(id, _)| is(id))
             .map(|(_, p)| p);
@@ -354,11 +407,16 @@ pub fn default_tasks(dir: &Path, kinds: &[Kind]) -> Vec<TaskSpec> {
                 add(task(script, label, run(script)));
             }
         }
+        // Tauri: the desktop app is started by its own command, not by the web dev server
+        if is("tauri") && scripts.iter().any(|s| s == "tauri") {
+            add(TaskSpec { watch: true, ..task("tauri-dev", "Start the Desktop App", format!("{} dev", run("tauri"))) });
+            add(task("tauri-build", "Build the Desktop App", format!("{} build", run("tauri"))));
+        }
     }
 
     if is("python") {
         let toml = read(dir, "pyproject.toml").unwrap_or_default();
-        let (prefix, install) = if is("uv") {
+        let (prefix, install) = if uses_uv(dir, kinds) {
             ("uv run ", "uv sync".to_string())
         } else if is("poetry") || toml.contains("[tool.poetry]") {
             ("poetry run ", "poetry install".to_string())
@@ -381,6 +439,12 @@ pub fn default_tasks(dir: &Path, kinds: &[Kind]) -> Vec<TaskSpec> {
             add(server("dev", "Start the App", format!("{prefix}streamlit run app.py"), 8501));
         }
         let text = format!("{toml}{}{}", read(dir, "requirements.txt").unwrap_or_default(), read(dir, "Pipfile").unwrap_or_default()).to_lowercase();
+        // A plain script project: run its entry file
+        if !is("django") && !is("fastapi") && !is("flask") && !is("streamlit") {
+            if let Some(entry) = ["main.py", "app.py", "hello.py", "__main__.py"].iter().find(|f| has(dir, f)) {
+                add(task("run", "Run", format!("{prefix}python {entry}")));
+            }
+        }
         if (text.contains("pytest") || has(dir, "tests")) && !is("django") {
             add(task("test", "Test", format!("{prefix}pytest")));
         }
@@ -469,6 +533,17 @@ pub fn default_tasks(dir: &Path, kinds: &[Kind]) -> Vec<TaskSpec> {
         add(TaskSpec { watch: true, ..task("up", "Start the Services", "docker compose up") });
         add(task("down", "Stop the Services", "docker compose down"));
         add(task("build", "Build the Images", "docker compose build"));
+        add(TaskSpec { watch: true, ..task("logs", "Follow the Logs", "docker compose logs -f --tail 100") });
+        add(task("ps", "List the Containers", "docker compose ps"));
+    } else if is("docker") {
+        // One image from the Dockerfile at the top, tagged with the folder's name, and a run that publishes the ports it EXPOSEs
+        let tag: String = dir.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default().chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' { c } else { '-' }).collect();
+        if !tag.is_empty() && dir.join("Dockerfile").is_file() {
+            let ports = read(dir, "Dockerfile").map(|t| super::project_containers::expose_ports(&t)).unwrap_or_default();
+            let publish: String = ports.iter().map(|p| format!(" -p {p}:{p}")).collect();
+            add(task("build", "Build the Image", format!("docker build -t {tag} .")));
+            add(TaskSpec { watch: true, ports: ports.clone(), ..task("run", "Run the Image", format!("docker run --rm{publish} {tag}")) });
+        }
     }
     if is("terraform") {
         add(task("install", "Initialise", "terraform init"));
@@ -489,6 +564,10 @@ pub fn default_tasks(dir: &Path, kinds: &[Kind]) -> Vec<TaskSpec> {
     if is("mdbook") {
         add(server("dev", "Serve the Book", "mdbook serve", 3000));
         add(task("build", "Build", "mdbook build"));
+    }
+    // What the folder's own files name: Makefile targets, justfile recipes, a Taskfile, a Procfile, scripts/
+    for t in super::project_targets::discover(dir).0 {
+        add(t);
     }
     tasks
 }
@@ -531,14 +610,14 @@ pub fn default_tools(dir: &Path, kinds: &[Kind]) -> Vec<ToolReq> {
             .unwrap_or_default();
         let range = [first_line(".python-version"), tool_version(&["python"]), requires].into_iter().find(|s| !s.is_empty()).unwrap_or_default();
         add("python", range);
-        if is("uv") {
+        if uses_uv(dir, kinds) {
             add("uv", String::new());
         }
         if is("poetry") {
             add("poetry", String::new());
         }
     }
-    if is("rust") {
+    if is("rust") || is("tauri") {
         add("cargo", String::new());
         add("rustc", String::new());
     }
@@ -588,6 +667,9 @@ pub fn default_tools(dir: &Path, kinds: &[Kind]) -> Vec<ToolReq> {
     }
     if is("terraform") {
         add("terraform", String::new());
+    }
+    for t in super::project_targets::discover(dir).1 {
+        add(&t.name, String::new());
     }
     tools
 }
@@ -711,6 +793,11 @@ pub fn list(workspace: &Path) -> Vec<ProjectInfo> {
 }
 
 /// A project folder named by the caller, inside `projects/` and nowhere else
+/// The problem matchers a project's recipe adds
+pub fn matchers_of(dir: &Path) -> Vec<(MatcherSpec, regex::Regex)> {
+    load_recipe(dir).0.map(|r| r.matchers.into_iter().filter_map(|m| compile_matcher(&m).ok().map(|re| (m, re))).collect()).unwrap_or_default()
+}
+
 pub(crate) fn project_dir(workspace: &str, project: &str) -> Result<PathBuf, String> {
     if project.is_empty() || project.contains(['/', '\\']) || project.starts_with('.') {
         return Err("That is not a project folder.".to_string());
@@ -804,6 +891,24 @@ mod tests {
     }
 
     #[test]
+    fn what_the_templates_make_is_found_as_what_they_are() {
+        // Checked against the real output of uv init, sv create and create-tauri-app
+        let uv = folder(&[("pyproject.toml", "[project]\nname=\"a\"\nrequires-python = \">=3.12\"\n"), (".python-version", "3.12\n"), ("hello.py", "print(1)")]);
+        let d = detect(&uv);
+        assert_eq!(d.tasks.iter().map(|t| t.command.as_str()).collect::<Vec<_>>(), ["uv sync", "uv run python hello.py"]);
+        assert_eq!(d.tools.iter().map(|t| t.name.as_str()).collect::<Vec<_>>(), ["python", "uv"]);
+        let kit = folder(&[("package.json", r#"{"devDependencies":{"@sveltejs/kit":"^3.0.0"},"scripts":{"dev":"vite dev"}}"#), ("vite.config.ts", "")]);
+        assert!(ids(&kit).contains(&"sveltekit"));
+        let tauri = folder(&[("package.json", r#"{"scripts":{"dev":"vite","tauri":"tauri"}}"#), ("src-tauri/tauri.conf.json", "{}"), ("index.html", ""), ("vite.config.ts", "")]);
+        let d = detect(&tauri);
+        assert!(!d.kinds.iter().any(|k| k.id == "static"), "index.html is not the project when the project is something else");
+        assert!(d.tasks.iter().any(|t| t.id == "tauri-dev" && t.watch && t.command == "npm run tauri dev"));
+        assert!(d.tools.iter().any(|t| t.name == "cargo"));
+        let expo = folder(&[("package.json", r#"{"dependencies":{"expo":"~54"},"scripts":{"start":"expo start"}}"#), ("app.json", "{}")]);
+        assert_eq!(detect(&expo).tasks.iter().find(|t| t.id == "start").map(|t| t.ports.clone()), Some(vec![8081]));
+    }
+
+    #[test]
     fn a_vite_project_is_node_typescript_and_vite_with_scripts_for_tasks() {
         let dir = folder(&[("package.json", r#"{"scripts":{"dev":"vite","build":"vite build","test":"vitest"},"engines":{"node":">=20"}}"#), ("pnpm-lock.yaml", ""), ("vite.config.ts", ""), ("tsconfig.json", "{}"), (".env.example", "# The API the app talks to\nAPI_URL=http://x\nPLAIN=1\n")]);
         assert_eq!(ids(&dir), ["node", "typescript", "vite"]);
@@ -883,5 +988,22 @@ mod tests {
         assert_eq!(list.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), ["Scratch", "api", "web"]);
         assert!(list[0].scratch && !list[1].scratch);
         let _ = fs::remove_dir_all(ws);
+    }
+}
+
+#[cfg(test)]
+mod generated_projects {
+    use super::*;
+
+    /// Looks at the projects the templates really make. Run on purpose, with `NEXSYNC_TEMPLATE_DIR` set to a folder holding them:
+    /// `NEXSYNC_TEMPLATE_DIR=... cargo test --lib looks_at_real_template_output -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn looks_at_real_template_output() {
+        let Ok(dir) = std::env::var("NEXSYNC_TEMPLATE_DIR") else { return };
+        for e in fs::read_dir(dir).unwrap().filter_map(Result::ok).filter(|e| e.path().is_dir()) {
+            let d = detect(&e.path());
+            println!("{}: kinds={:?} pm={:?}\n    tasks={:?}\n    tools={:?}", e.file_name().to_string_lossy(), d.kinds.iter().map(|k| k.id).collect::<Vec<_>>(), d.package_manager, d.tasks.iter().map(|t| format!("{}={}", t.id, t.command)).collect::<Vec<_>>(), d.tools.iter().map(|t| format!("{}{}", t.name, t.range)).collect::<Vec<_>>());
+        }
     }
 }

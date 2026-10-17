@@ -1,6 +1,6 @@
 // Which dashboard tiles show, in what order and at what size. Remembered per workspace on this device.
 
-export const TILE_IDS = ["pickup", "tasks", "files", "due", "people", "activity", "cards"] as const;
+export const TILE_IDS = ["pickup", "tasks", "files", "due", "people", "activity", "cards", "projects"] as const;
 export type TileId = (typeof TILE_IDS)[number];
 export type TileSize = "s" | "m" | "l";
 
@@ -12,7 +12,7 @@ export interface DashboardLayout {
 
 export const DEFAULT_LAYOUT: DashboardLayout = {
 	order: [...TILE_IDS],
-	size: { pickup: "m", tasks: "s", files: "s", due: "s", people: "s", activity: "m", cards: "s" },
+	size: { pickup: "m", tasks: "s", files: "s", due: "s", people: "s", activity: "m", cards: "s", projects: "s" },
 	hidden: [],
 };
 

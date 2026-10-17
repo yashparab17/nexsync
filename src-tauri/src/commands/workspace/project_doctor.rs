@@ -51,6 +51,8 @@ const KNOWN: &[Known] = &[
     Known { name: "swift", programs: &["swift"], arg: "--version", url: "https://www.swift.org/install/" },
     Known { name: "flutter", programs: &["flutter"], arg: "--version", url: "https://docs.flutter.dev/get-started/install" },
     Known { name: "cmake", programs: &["cmake"], arg: "--version", url: "https://cmake.org/download/" },
+    Known { name: "just", programs: &["just"], arg: "--version", url: "https://just.systems/man/en/packages.html" },
+    Known { name: "task", programs: &["task"], arg: "--version", url: "https://taskfile.dev/installation/" },
     Known { name: "make", programs: &["make"], arg: "--version", url: "https://www.gnu.org/software/make/" },
     Known { name: "docker", programs: &["docker"], arg: "--version", url: "https://docs.docker.com/get-docker/" },
     Known { name: "terraform", programs: &["terraform"], arg: "--version", url: "https://developer.hashicorp.com/terraform/install" },
@@ -59,6 +61,18 @@ const KNOWN: &[Known] = &[
 
 /// Programs that keep several versions of a language side by side; shown so a wrong version has an easy fix
 const MANAGERS: &[(&str, &str)] = &[("fnm", "--version"), ("volta", "--version"), ("nvm", "--version"), ("rustup", "--version"), ("pyenv", "--version"), ("asdf", "--version"), ("mise", "--version")];
+
+/// Asks inside a WSL distribution: its login shell finds the programs its own PATH holds
+fn start_in(distro: &str, program: &str, arg: &str) -> Command {
+    let mut c = Command::new("wsl.exe");
+    c.args(["-d", distro, "--", "sh", "-lc", &format!("{program} {arg}")]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(0x0800_0000);
+    }
+    c
+}
 
 #[cfg(windows)]
 fn start(program: &str, arg: &str) -> Command {
@@ -78,8 +92,11 @@ fn start(program: &str, arg: &str) -> Command {
 }
 
 /// What the program printed when asked for its version, or `None` when it is not there, fails or takes too long
-fn ask(program: &str, arg: &str) -> Option<String> {
-    let mut command = start(program, arg);
+fn ask(wsl: Option<&str>, program: &str, arg: &str) -> Option<String> {
+    let mut command = match wsl {
+        Some(d) => start_in(d, program, arg),
+        None => start(program, arg),
+    };
     command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
@@ -180,23 +197,26 @@ pub struct Doctor {
 }
 
 /// Checks each tool of the list against this device
-pub fn check(tools: &[ToolReq]) -> Doctor {
+pub fn check(tools: &[ToolReq], wsl: Option<&str>) -> Doctor {
     let tools = tools
         .iter()
-        .map(|t| status(t, |k| k.programs.iter().find_map(|p| ask(p, k.arg))))
+        .map(|t| status(t, |k| k.programs.iter().find_map(|p| ask(wsl, p, k.arg))))
         .collect();
-    let managers = MANAGERS.iter().filter(|(p, a)| ask(p, a).is_some()).map(|(p, _)| p.to_string()).collect();
+    let managers = MANAGERS.iter().filter(|(p, a)| ask(wsl, p, a).is_some()).map(|(p, _)| p.to_string()).collect();
     Doctor { tools, managers }
 }
 
 /// Checks this device against a project's tools; run off the main thread because each program is started
 #[tauri::command]
-pub async fn project_doctor(app_handle: tauri::AppHandle, path: String, tools: Vec<ToolReq>) -> Result<Doctor, String> {
+pub async fn project_doctor(app_handle: tauri::AppHandle, path: String, tools: Vec<ToolReq>, wsl: Option<String>) -> Result<Doctor, String> {
     validate_allowed_root(&app_handle, &path)?;
+    if wsl.as_deref().is_some_and(|d| !super::project_runtime::valid_distro(d)) {
+        return Err("That is not a distribution name.".to_string());
+    }
     if tools.len() > 40 {
         return Err("Too many tools to check.".to_string());
     }
-    tokio::task::spawn_blocking(move || check(&tools)).await.map_err(|e| e.to_string())
+    tokio::task::spawn_blocking(move || check(&tools, wsl.as_deref())).await.map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

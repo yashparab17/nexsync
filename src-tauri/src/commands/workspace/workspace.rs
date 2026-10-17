@@ -487,12 +487,13 @@ fn count_files(dir: &Path, depth: usize, rel: &str, rules: &mut super::syncignor
     let mut total = 0;
     for e in entries.filter_map(Result::ok) {
         let name = e.file_name().to_string_lossy().to_string();
+        // file_type comes with the listing: no call per entry
         let Ok(kind) = e.file_type() else { continue };
         if super::syncignore::hidden_name_skipped(&root, &name) {
             continue;
         }
         let child = format!("{rel}/{name}");
-        if (kind.is_file() || kind.is_dir()) && rules.ignored(&child, kind.is_dir()) {
+        if (kind.is_file() || kind.is_dir()) && rules.ignored_entry(&child, kind.is_dir()) {
             continue;
         }
         if kind.is_file() {

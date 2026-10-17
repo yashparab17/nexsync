@@ -3,13 +3,14 @@
 import type { ProbeResult } from "@/lib/p2p/transport";
 
 // Pages a person can be on; anything else a peer sends is ignored, since following sends this device there
-const PAGES = ["dashboard", "notes", "projects", "editor", "explorer", "files", "assets", "tasks", "kanban", "chat", "announcements", "insights", "members", "trash", "settings"] as const;
+const PAGES = ["dashboard", "notes", "documents", "sheets", "slides", "projects", "editor", "explorer", "files", "assets", "tasks", "kanban", "chat", "announcements", "insights", "members", "trash", "settings"] as const;
 
 export interface Presence {
 	page: string; // One of PAGES
 	item: string | null; // The file path, card id or task id open on that page
 	away: boolean; // No input for a while
 	typing?: string; // The chat channel being typed in, for a few seconds at a time
+	line?: number; // In the editor: the line the cursor is on; in Slides: the slide being shown. Someone following arrives at the same place
 }
 
 export interface PeerPresence extends Presence {
@@ -29,7 +30,8 @@ export function parsePresence(payload: string | undefined): Presence | null {
 		if (!p || typeof p.page !== "string" || !(PAGES as readonly string[]).includes(p.page)) return null;
 		if (p.item != null && (typeof p.item !== "string" || p.item.length > 300)) return null;
 		const typing = typeof p.typing === "string" && p.typing.length > 0 && p.typing.length <= 80 ? { typing: p.typing } : {};
-		return { page: p.page, item: p.item ?? null, away: p.away === true, ...typing };
+		const line = Number.isInteger(p.line) && (p.line as number) >= 1 && (p.line as number) <= 10_000_000 ? { line: p.line as number } : {};
+		return { page: p.page, item: p.item ?? null, away: p.away === true, ...typing, ...line };
 	} catch {
 		return null;
 	}
@@ -54,7 +56,8 @@ export function placeLabel(p: Presence): string {
 // The route that shows what someone is looking at; every page opens `?open=` items itself
 export function followPath(p: Presence): string {
 	const base = p.page === "dashboard" ? "/workspace" : `/workspace/${p.page}`;
-	return p.item ? `${base}?open=${encodeURIComponent(p.item)}` : base;
+	// In the editor the line goes along ("#L12"), and the editor jumps to it
+	return p.item ? `${base}?open=${encodeURIComponent((p.page === "editor" || p.page === "slides") && p.line ? `${p.item}#L${p.line}` : p.item)}` : base;
 }
 
 // How long a "typing" notice counts after it arrived: the sender clears it, but a device that went away cannot

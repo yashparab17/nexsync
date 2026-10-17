@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { SquareKanban as KanbanSquare, Clock, Code2, Compass, File, FileText, ListTodo, Megaphone, MessageSquareText, X } from "@/components/animate-icons";
 
 import { cn } from "@/lib/utils";
-import { isBinaryFile, isDocumentFile, isNoteFile } from "@/lib/editor/languages";
-import { getKanban, getTasks, searchWorkspaceFiles } from "@/lib/tauri";
+import { isBinaryFile, isDocumentFile, isNoteFile, isDeck, isOfficeDocument, isSpreadsheet } from "@/lib/editor/languages";
+import { getKanban, getTasks, projectsList, searchWorkspaceFiles } from "@/lib/tauri";
 import { chatHits, hitTitle } from "@/lib/chat/search";
 import { channelLabel, routeForChannel } from "@/lib/chat/routes";
 import { forMe, LEVEL_NAMES } from "@/lib/announcements";
@@ -38,6 +38,9 @@ const ICONS = { Note: FileText, Code: Code2, File, Asset: File, Task: ListTodo, 
 const PAGES: [string, string][] = [
 	["Dashboard", "/workspace/dashboard"],
 	["Notes", "/workspace/notes"],
+	["Documents", "/workspace/documents"],
+	["Sheets", "/workspace/sheets"],
+	["Slides", "/workspace/slides"],
 	["Tasks", "/workspace/tasks"],
 	["Kanban board", "/workspace/kanban"],
 	["Chat", "/workspace/chat"],
@@ -106,16 +109,20 @@ export default function WorkspaceSearch() {
 		if (!workspace?.path) return;
 		if (builtAt.current.path === workspace.path && Date.now() - builtAt.current.at < 20_000) return;
 		builtAt.current = { path: workspace.path, at: Date.now() };
-		const [files, tasks, columns] = await Promise.all([
+		const [files, tasks, columns, projects] = await Promise.all([
 			searchWorkspaceFiles(workspace.path).catch(() => []),
 			getTasks(workspace.path).catch(() => []),
 			getKanban(workspace.path).catch(() => []),
+			projectsList(workspace.path).catch(() => []),
 		]);
 		setIndex([
 			...files.map((f): Hit => {
 				const isNote = isNoteFile(f.name) && /^\/(notes|files)\/[^/]+$/.test(f.path);
 				const isAsset = /^\/assets\/[^/]+$/.test(f.path);
-				const isCode = !isNote && !isAsset && /^\/(editor|files|notes)\//.test(f.path) && !isBinaryFile(f.name) && !isDocumentFile(f.name);
+				const isOffice = isOfficeDocument(f.name);
+				const isSlides = isDeck(f.name);
+				const isSheet = isSpreadsheet(f.name) && !/.(csv|tsv)$/i.test(f.name);
+				const isCode = !isNote && !isAsset && !isOffice && /^\/(projects|files|notes)\//.test(f.path) && !isBinaryFile(f.name) && !isDocumentFile(f.name);
 				const open = encodeURIComponent(f.path);
 				return {
 					key: `f:${f.path}`,
@@ -123,9 +130,17 @@ export default function WorkspaceSearch() {
 					title: f.name,
 					sub: f.path,
 					body: f.body,
-					to: `/workspace/${isNote ? "notes" : isAsset ? "assets" : isCode ? "editor" : "files"}?open=${open}`,
+					to: `/workspace/${isNote ? "notes" : isAsset ? "assets" : isOffice ? "documents" : isSheet ? "sheets" : isSlides ? "slides" : isCode ? "editor" : "files"}?open=${open}`,
 				};
 			}),
+			...projects
+				.filter((p) => !p.scratch)
+				.flatMap((p) =>
+					(p.recipe?.tasks ?? p.detected.tasks).map((t): Hit => ({
+						key: `run:${p.id}:${t.id}`, kind: "Go to", title: `Run ${t.label} in ${p.name}`,
+						sub: t.command, to: `/workspace/projects?run=${encodeURIComponent(`${p.id}:${t.id}`)}`,
+					})),
+				),
 			...tasks.map((t): Hit => ({
 				key: `t:${t.id}`, kind: "Task", title: t.title,
 				sub: `${t.description} ${t.status}`, to: `/workspace/tasks?open=${t.id}`,

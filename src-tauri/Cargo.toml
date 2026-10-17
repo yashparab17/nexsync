@@ -50,6 +50,23 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 portable-pty = "0.9"
 ignore = "0.4.33"
 regex = "1.13.1"
+# Office file formats (Phase 21): the format crates of WordCraft, by commit. MIT OR Apache-2.0; see THIRD_PARTY_NOTICES.md.
+wordcraft-doc = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
+wordcraft-docx = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
+wordcraft-formats = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
+wordcraft-docbin = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
+wordcraft-pdf = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
+wordcraft-proof = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
+# Spreadsheet engine and .xlsx files (Phase 21): GridCraft, by commit. MIT OR Apache-2.0; see THIRD_PARTY_NOTICES.md.
+gridcraft-engine = { git = "https://github.com/storytold/gridcraft", rev = "f1894c6da64d4326022ae644c767581816a23c2c" }
+gridcraft-xlsx = { git = "https://github.com/storytold/gridcraft", rev = "f1894c6da64d4326022ae644c767581816a23c2c" }
+gridcraft-chart = { git = "https://github.com/storytold/gridcraft", rev = "f1894c6da64d4326022ae644c767581816a23c2c" }
+# Slide decks (Phase 21): DeckCraft, by commit. MIT OR Apache-2.0; see THIRD_PARTY_NOTICES.md.
+deckcraft-model = { git = "https://github.com/storytold/deckcraft", rev = "1dc69720db64323370dda061226becb09ad79fd4" }
+deckcraft-geom = { git = "https://github.com/storytold/deckcraft", rev = "1dc69720db64323370dda061226becb09ad79fd4" }
+deckcraft-color = { git = "https://github.com/storytold/deckcraft", rev = "1dc69720db64323370dda061226becb09ad79fd4" }
+deckcraft-pptx = { git = "https://github.com/storytold/deckcraft", rev = "1dc69720db64323370dda061226becb09ad79fd4" }
+deckcraft-render = { git = "https://github.com/storytold/deckcraft", rev = "1dc69720db64323370dda061226becb09ad79fd4" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
@@ -66,3 +83,95 @@ opt-level = 3
 # The device key goes in the OS credential store on these systems
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 keyring = { version = "3", default-features = false, features = ["windows-native", "apple-native"] }
+
+# Pattern matching runs over every file of a big project (ignore rules, secret scan); unoptimised it is slow enough to
+# make a debug build misleading about how the release one behaves
+[profile.dev.package.regex-automata]
+opt-level = 3
+[profile.dev.package.regex-syntax]
+opt-level = 3
+[profile.dev.package.aho-corasick]
+opt-level = 3
+[profile.dev.package.memchr]
+opt-level = 3
+[profile.dev.package.globset]
+opt-level = 3
+[profile.dev.package.ignore]
+opt-level = 3
+
+# The office engines are slow unoptimised (a 10,000-cell sheet took 1.8 s to recalculate in a debug build)
+[profile.dev.package.gridcraft-engine]
+opt-level = 3
+
+[profile.dev.package.gridcraft-calc]
+opt-level = 3
+
+[profile.dev.package.gridcraft-model]
+opt-level = 3
+
+[profile.dev.package.gridcraft-core]
+opt-level = 3
+
+[profile.dev.package.gridcraft-formula]
+opt-level = 3
+
+[profile.dev.package.gridcraft-functions]
+opt-level = 3
+
+[profile.dev.package.gridcraft-numfmt]
+opt-level = 3
+
+[profile.dev.package.gridcraft-xlsx]
+opt-level = 3
+
+[profile.dev.package.wordcraft-docx]
+opt-level = 3
+
+[profile.dev.package.wordcraft-formats]
+opt-level = 3
+
+[profile.dev.package.wordcraft-doc]
+opt-level = 3
+
+[profile.dev.package.quick-xml]
+opt-level = 3
+
+[profile.dev.package.deckcraft-model]
+opt-level = 3
+
+[profile.dev.package.deckcraft-pptx]
+opt-level = 3
+
+[profile.dev.package.deckcraft-render]
+opt-level = 3
+
+[profile.dev.package.deckcraft-text]
+opt-level = 3
+
+[profile.dev.package.deckcraft-fonts]
+opt-level = 3
+
+[profile.dev.package.vello_cpu]
+opt-level = 3
+
+[profile.dev.package.vello_common]
+opt-level = 3
+
+[profile.dev.package.skrifa]
+opt-level = 3
+
+[profile.dev.package.kurbo]
+opt-level = 3
+
+[profile.dev.package.wordcraft-pdf]
+opt-level = 3
+
+[profile.dev.package.wordcraft-layout]
+opt-level = 3
+
+[profile.dev.package.wordcraft-docbin]
+opt-level = 3
+
+# Required by craft-pdf (used by wordcraft-pdf): the PDF backend must be the patched one, which rejects writers that failed while unwinding.
+[patch.crates-io]
+krilla = { git = "https://github.com/storytold/craft-libs", rev = "c3487320b2d1de657b860b3c8abb44e1f2b32bd8" }

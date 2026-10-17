@@ -1,34 +1,58 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 
 import { AlertTriangle, Copy, Download, ExternalLink, Play, RefreshCw, Trash2, X } from "@/components/animate-icons";
 import { ToolbarSearch } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import { ansiPieces, plain } from "@/lib/ansi";
-import { forgetRun, type Run, type RunLine } from "@/lib/projectRuns";
+import { forgetRun, mergeRuns, type Run, type RunLine } from "@/lib/projectRuns";
 import { projectRunLog, projectRuns, projectTaskStop, writeExportText } from "@/lib/tauri";
 import { cn, errorText, formatBytes } from "@/lib/utils";
 import type { RunRecord } from "@/types/projects";
+
+// One line of output. Lines are added at the end and never change, so a memoised row is drawn once, however many follow it.
+const Line = memo(function Line({ text, stderr, label, color }: { text: string; stderr: boolean; label?: string; color?: string }) {
+	return (
+		<div className={cn("break-all whitespace-pre-wrap", stderr && "text-warning")}>
+			{label && <span className={cn("mr-2 select-none font-medium", color)}>{label}</span>}
+			{ansiPieces(text).map((p, j) => (
+				<span key={j} className={p.className}>
+					{p.text}
+				</span>
+			))}
+		</div>
+	);
+});
+
+// Each task of the merged view keeps one colour, so a stream of several is easy to follow
+const COLORS = ["text-sky-500", "text-emerald-500", "text-amber-500", "text-fuchsia-500", "text-cyan-500", "text-rose-500"];
+const colorOf = (task: string) => COLORS[[...task].reduce((n, c) => n + c.charCodeAt(0), 0) % COLORS.length];
+const ALL = "*";
 
 const stateText = (r: Run) => (r.status === "done" ? (r.stopped ? "stopped" : r.error ? "could not start" : r.code === 0 ? "finished" : `ended with code ${r.code ?? "none"}`) : r.status === "ready" ? "running" : "starting");
 
 // The output of a project's runs: one tab per run, the lines with their colours, a filter, copy and save, the ports a run opened
 // (with a note when one is open to the whole network) and the runs kept from earlier
-export default function RunOutput({ workspacePath, project, runs, onRerun, onOpenUrl }: { workspacePath: string; project: string; runs: Run[]; onRerun: (task: string) => void; onOpenUrl: (port: number) => void }) {
+export default function RunOutput({ workspacePath, project, runs, onRerun, onOpenUrl, onShare }: { workspacePath: string; project: string; runs: Run[]; onRerun: (task: string) => void; onOpenUrl: (port: number) => void; onShare?: (run: Run) => Promise<void> }) {
 	const [picked, setPicked] = useState<string | null>(null);
 	const [filter, setFilter] = useState("");
 	const [history, setHistory] = useState<RunRecord[] | null>(null);
 	const [earlier, setEarlier] = useState<{ title: string; lines: string[] } | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
-	const run = runs.find((r) => r.runId === picked) ?? runs[0] ?? null;
+	// With more than one run there is a view of all of them together (the process manager's merged log)
+	const merged = picked === ALL && runs.length > 1 && !earlier;
+	const run = merged ? null : (runs.find((r) => r.runId === picked) ?? runs[0] ?? null);
 	const box = useRef<HTMLDivElement>(null);
 	const stick = useRef(true);
-	const lines: RunLine[] = useMemo(() => (earlier ? earlier.lines.map((text) => ({ stream: "stdout" as const, text })) : (run?.lines ?? [])), [earlier, run?.lines]);
+	const mergedLines = useMemo(() => (merged ? mergeRuns(runs) : []), [merged, runs]);
+	const lines: RunLine[] = useMemo(() => (merged ? mergedLines.map((m) => m.line) : earlier ? earlier.lines.map((text) => ({ stream: "stdout" as const, text })) : (run?.lines ?? [])), [merged, mergedLines, earlier, run?.lines]);
 
 	const shown = useMemo(() => {
 		const q = filter.trim().toLowerCase();
 		return q ? lines.filter((l) => plain(l.text).toLowerCase().includes(q)) : lines;
 	}, [lines, filter]);
+	// The task of each shown line in the merged view (the filter keeps the order, so it is found by identity)
+	const taskOf = useMemo(() => new Map(mergedLines.map((m) => [m.line, m.task])), [mergedLines]);
 
 	// Stay at the bottom while output arrives, unless the person scrolled up to read
 	useEffect(() => {
@@ -45,7 +69,12 @@ export default function RunOutput({ workspacePath, project, runs, onRerun, onOpe
 	return (
 		<div className="flex min-h-0 flex-1 flex-col gap-3">
 			<div className="flex flex-wrap items-center gap-2">
-				{runs.map((r) => (
+					{runs.length > 1 && (
+						<button type="button" onClick={() => { setEarlier(null); setPicked(ALL); }} aria-current={merged} className={cn("flex items-center gap-2 px-3 py-1.5 text-sm outline-none focus-visible:bg-muted", merged ? "bg-muted" : "text-muted-foreground hover:bg-muted")}>
+							All Together
+						</button>
+					)}
+					{runs.map((r) => (
 					<button
 						key={r.runId}
 						type="button"
@@ -53,8 +82,8 @@ export default function RunOutput({ workspacePath, project, runs, onRerun, onOpe
 							setEarlier(null);
 							setPicked(r.runId);
 						}}
-						aria-current={!earlier && r.runId === run?.runId}
-						className={cn("flex items-center gap-2 px-3 py-1.5 text-sm outline-none focus-visible:bg-muted", !earlier && r.runId === run?.runId ? "bg-muted" : "text-muted-foreground hover:bg-muted")}
+						aria-current={!earlier && !merged && r.runId === run?.runId}
+							className={cn("flex items-center gap-2 px-3 py-1.5 text-sm outline-none focus-visible:bg-muted", !earlier && !merged && r.runId === run?.runId ? "bg-muted" : "text-muted-foreground hover:bg-muted")}
 					>
 						<span className={cn("size-2 rounded-full", r.status === "done" ? (r.code === 0 ? "bg-muted-foreground/50" : "bg-destructive") : "bg-success")} aria-hidden />
 						{r.task}
@@ -90,12 +119,12 @@ export default function RunOutput({ workspacePath, project, runs, onRerun, onOpe
 				</ul>
 			)}
 
-			{!run && !earlier ? (
+				{!run && !earlier && !merged ? (
 				<p className="text-sm text-muted-foreground">Nothing has run yet. Start a task from the Overview tab and its output appears here.</p>
 			) : (
 				<>
 					<div className="flex flex-wrap items-center gap-2">
-						<span className="min-w-0 truncate text-sm font-medium">{earlier ? `${earlier.title} (earlier run)` : run?.task}</span>
+						<span className="min-w-0 truncate text-sm font-medium">{merged ? "All running tasks together" : earlier ? `${earlier.title} (earlier run)` : run?.task}</span>
 						{run && !earlier && (
 							<span className="font-mono text-[13px] text-muted-foreground">
 								{stateText(run)}
@@ -151,6 +180,11 @@ export default function RunOutput({ workspacePath, project, runs, onRerun, onOpe
 									<Play className="size-3" />
 									Run Again
 								</Button>
+								{onShare && run.code !== 0 && !run.stopped && !run.error && (
+									<Button variant="outline" size="xs" onPress={() => void onShare(run).then(() => flash("Shared. Teammates see it on the Team tab.")).catch((e) => flash(errorText(e, "Could not share.")))}>
+										Share Failure
+									</Button>
+								)}
 								<Button variant="ghost" size="icon-xs" aria-label="Remove this run" onPress={() => forgetRun(run.runId)}>
 									<Trash2 className="size-3.5" />
 								</Button>
@@ -175,13 +209,7 @@ export default function RunOutput({ workspacePath, project, runs, onRerun, onOpe
 					>
 						{run && !earlier && run.dropped > 0 && <p className="text-muted-foreground">[{run.dropped.toLocaleString()} earlier lines are not shown; the whole output is kept when the run ends]</p>}
 						{shown.map((l, i) => (
-							<div key={i} className={cn("break-all whitespace-pre-wrap", l.stream === "stderr" && "text-warning")}>
-								{ansiPieces(l.text).map((p, j) => (
-									<span key={j} className={p.className}>
-										{p.text}
-									</span>
-								))}
-							</div>
+							<Line key={i} text={l.text} stderr={l.stream === "stderr"} label={merged ? taskOf.get(l) : undefined} color={merged ? colorOf(taskOf.get(l) ?? "") : undefined} />
 						))}
 						{shown.length === 0 && <p className="text-muted-foreground">{filter ? "No line matches." : "No output yet."}</p>}
 					</div>

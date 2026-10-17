@@ -2,7 +2,7 @@
 //! prefixes and `password = "..."` lines. It is a heuristic. It misses secrets that look like anything else and flags some harmless
 //! text, so what it finds is a warning with the line, never a block, and the person can leave a file on their own device or allow it.
 
-use std::sync::LazyLock;
+use std::{collections::{HashMap, HashSet}, fs, path::{Path, PathBuf}, sync::{LazyLock, Mutex}};
 
 use regex::Regex;
 use serde::Serialize;
@@ -42,11 +42,18 @@ fn placeholder(value: &str) -> bool {
         || v.chars().all(|c| c == v.chars().next().unwrap_or('x'))
 }
 
+/// Every word any pattern needs, as one expression the engine searches for all at once: almost all source text has none of them, so
+/// the per-line patterns below run only on the files and lines that could match
+static NEEDS_A_LOOK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)AKIA|ASIA|ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|xox[abprs]-|AIza|_live_|npm_|PRIVATE KEY|passw|secret|api[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key").unwrap());
+
 /// What looks like a secret in `text`, one finding per line at most, in line order
 pub fn scan_text(text: &str) -> Vec<Finding> {
     let mut out = Vec::new();
+    if !NEEDS_A_LOOK.is_match(text) {
+        return out;
+    }
     for (i, line) in text.lines().enumerate() {
-        if line.len() > 2_000 {
+        if line.len() > 2_000 || !NEEDS_A_LOOK.is_match(line) {
             continue;
         }
         for p in PATTERNS.iter() {
@@ -60,6 +67,85 @@ pub fn scan_text(text: &str) -> Vec<Finding> {
         }
     }
     out
+}
+
+/// Files looked into: small ones, and only text (a zero byte early on says it is not)
+pub const MAX_BYTES: u64 = 512 * 1024;
+
+pub fn findings_in_file(path: &Path) -> Vec<Finding> {
+    let Ok(bytes) = fs::read(path) else { return Vec::new() };
+    if bytes.len() as u64 > MAX_BYTES || bytes[..bytes.len().min(1024)].contains(&0) {
+        return Vec::new();
+    }
+    scan_text(&String::from_utf8_lossy(&bytes))
+}
+
+fn allowed_file(root: &Path) -> PathBuf {
+    root.join(".nexsync").join("secret-allowed.json")
+}
+
+/// The files in `projects/` this device's owner said are fine to share although they look like they hold a secret
+pub fn allowed(root: &Path) -> HashSet<String> {
+    fs::read_to_string(allowed_file(root)).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+}
+
+pub fn allow(root: &Path, rel: &str) -> Result<(), String> {
+    if !rel.starts_with("projects/") || rel.contains("..") {
+        return Err("That is not a project file.".to_string());
+    }
+    let mut all = allowed(root);
+    all.insert(rel.to_string());
+    fs::create_dir_all(root.join(".nexsync")).map_err(|e| e.to_string())?;
+    fs::write(allowed_file(root), serde_json::to_string(&all).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+}
+
+/// What the last look at each file found, with the size and time it had then
+/// Size, time and whether it looked like a secret
+type Looked = (u64, u128, bool);
+static LOOKED: LazyLock<Mutex<HashMap<PathBuf, Looked>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Files kept from collaborators until the person decides: a project file that looks like it holds a secret is not listed, sent or
+/// served until they choose Keep on This Device (a rule in `.nexignore`) or It Is Fine
+pub struct Withhold {
+    root: PathBuf,
+    allowed: HashSet<String>,
+}
+
+impl Withhold {
+    pub fn load(root: &Path) -> Self {
+        Self { root: root.to_path_buf(), allowed: allowed(root) }
+    }
+
+    /// For one file with no listing at hand: looks the time up
+    pub fn check(&self, rel: &str, size: u64) -> bool {
+        self.check_at(rel, size, fs::metadata(self.root.join(rel)).ok().and_then(|m| m.modified().ok()))
+    }
+
+    /// The same, for a walk that already has the file's size and time from the directory listing, which costs nothing more
+    pub fn check_at(&self, rel: &str, size: u64, modified: Option<std::time::SystemTime>) -> bool {
+        if !rel.starts_with("projects/") || size > MAX_BYTES || self.allowed.contains(rel) || is_example_file(rel.rsplit('/').next().unwrap_or("")) {
+            return false;
+        }
+        let path = self.root.join(rel);
+        // A file is read again only when it changed since the last look: a listing is made on every connect and for every bundle
+        let stamp = modified.and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_nanos());
+        if let Some(stamp) = stamp {
+            if let Some((len, at, hit)) = LOOKED.lock().unwrap_or_else(|p| p.into_inner()).get(&path) {
+                if *len == size && *at == stamp {
+                    return *hit;
+                }
+            }
+        }
+        let hit = !findings_in_file(&path).is_empty();
+        if let Some(stamp) = stamp {
+            let mut cache = LOOKED.lock().unwrap_or_else(|p| p.into_inner());
+            if cache.len() > 200_000 {
+                cache.clear();
+            }
+            cache.insert(path, (size, stamp, hit));
+        }
+        hit
+    }
 }
 
 /// Files that exist to show the shape of a secret, not to hold one
@@ -90,6 +176,20 @@ mod tests {
         for harmless in ["password = \"changeme\"", "api_key = \"${API_KEY}\"", "password: \"<your password>\"", "secret = \"xxxxxxxxxx\"", "token = process.env.TOKEN", "const password = getPassword()"] {
             assert!(scan_text(harmless).is_empty(), "{harmless}");
         }
+    }
+
+    #[test]
+    fn a_file_that_looks_like_it_holds_a_secret_is_withheld_until_allowed() {
+        let ws = std::env::temp_dir().join(format!("nexsync-withhold-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(ws.join("projects/app")).unwrap();
+        std::fs::write(ws.join("projects/app/config.ts"), format!("export const k = '{}{}';\n", "AKIA", "ABCDEFGHIJKLMNOP")).unwrap();
+        std::fs::write(ws.join("projects/app/ok.ts"), "export const a = 1;\n").unwrap();
+        assert!(Withhold::load(&ws).check("projects/app/config.ts", 60));
+        assert!(!Withhold::load(&ws).check("projects/app/ok.ts", 20));
+        allow(&ws, "projects/app/config.ts").unwrap();
+        assert!(!Withhold::load(&ws).check("projects/app/config.ts", 60));
+        assert!(allow(&ws, "../../etc/passwd").is_err());
+        let _ = std::fs::remove_dir_all(ws);
     }
 
     #[test]

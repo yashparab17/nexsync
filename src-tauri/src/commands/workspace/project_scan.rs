@@ -96,11 +96,14 @@ pub fn path_problems(paths: &[String]) -> Vec<Hazard> {
 
 struct Walk<'a> {
     workspace: &'a Path,
+    /// A folder elsewhere, looked at as if it were at this path of the workspace
+    mount: Option<(String, std::path::PathBuf)>,
     rules: Rules,
     seen: usize,
     scan: Scan,
     paths: Vec<String>,
     looked: usize,
+    allowed: std::collections::HashSet<String>,
 }
 
 impl Walk<'_> {
@@ -108,19 +111,24 @@ impl Walk<'_> {
     fn folder(&mut self, rel: &str, depth: usize) -> (usize, u64) {
         let (mut files, mut bytes) = (0usize, 0u64);
         let heavy_mark = self.scan.heavy.len();
-        let Ok(entries) = fs::read_dir(self.workspace.join(rel)) else { return (0, 0) };
+        let real = match &self.mount {
+            Some((prefix, dir)) if rel == prefix => dir.clone(),
+            Some((prefix, dir)) if rel.starts_with(&format!("{prefix}/")) => dir.join(&rel[prefix.len() + 1..]),
+            _ => self.workspace.join(rel),
+        };
+        let Ok(entries) = fs::read_dir(real) else { return (0, 0) };
         for e in entries.filter_map(Result::ok) {
             if self.seen >= MAX_ENTRIES {
                 self.scan.truncated = true;
                 break;
             }
             let Some(name) = e.file_name().to_str().map(str::to_owned) else { continue };
-            let Ok(meta) = e.path().symlink_metadata() else { continue };
+            let Ok(meta) = e.metadata() else { continue };
             if meta.is_symlink() {
                 continue;
             }
             let child = format!("{rel}/{name}");
-            if self.rules.ignored(&child, meta.is_dir()) {
+            if self.rules.ignored_entry(&child, meta.is_dir()) {
                 continue;
             }
             self.seen += 1;
@@ -136,15 +144,10 @@ impl Walk<'_> {
                 bytes += meta.len();
                 if meta.len() > super::syncignore::MAX_PROJECT_FILE_BYTES {
                     self.scan.held.push(Held { path: child, size: meta.len() });
-                } else if meta.len() <= SECRET_MAX_BYTES && self.looked < SECRET_MAX_FILES && !super::secret_scan::is_example_file(&name) {
+                } else if meta.len() <= SECRET_MAX_BYTES && self.looked < SECRET_MAX_FILES && !super::secret_scan::is_example_file(&name) && !self.allowed.contains(&child) {
                     self.looked += 1;
-                    if let Ok(bytes) = fs::read(e.path()) {
-                        // Binary files are not text; a zero byte early on says so
-                        if !bytes[..bytes.len().min(1024)].contains(&0) {
-                            for f in super::secret_scan::scan_text(&String::from_utf8_lossy(&bytes)) {
-                                self.scan.secrets.push(Secret { path: child.clone(), line: f.line, kind: f.kind.to_string() });
-                            }
-                        }
+                    for f in super::secret_scan::findings_in_file(&e.path()) {
+                        self.scan.secrets.push(Secret { path: child.clone(), line: f.line, kind: f.kind.to_string() });
                     }
                 }
             }
@@ -159,7 +162,7 @@ impl Walk<'_> {
 }
 
 pub fn scan(workspace: &Path) -> Scan {
-    let mut w = Walk { workspace, rules: Rules::load(workspace), seen: 0, scan: Scan::default(), paths: Vec::new(), looked: 0 };
+    let mut w = Walk { workspace, mount: None, rules: Rules::load(workspace), seen: 0, scan: Scan::default(), paths: Vec::new(), looked: 0, allowed: super::secret_scan::allowed(workspace) };
     w.folder(PROJECTS_ROOT, 0);
     let mut scan = w.scan;
     scan.hazards = path_problems(&w.paths);
@@ -167,6 +170,26 @@ pub fn scan(workspace: &Path) -> Scan {
     scan.held.truncate(MAX_REPORTED);
     scan.secrets.truncate(MAX_REPORTED);
     scan
+}
+
+/// The same look at a folder outside the workspace, as if it were at `prefix` (inside `projects/`)
+pub fn scan_mounted(workspace: &Path, prefix: &str, source: &Path) -> Scan {
+    let mut w = Walk { workspace, mount: Some((prefix.to_string(), source.to_path_buf())), rules: Rules::mounted(workspace, prefix, source), seen: 0, scan: Scan::default(), paths: Vec::new(), looked: 0, allowed: Default::default() };
+    // The folder itself is a project (depth 1), so what is inside it can be reported as heavy
+    w.folder(prefix, 1);
+    let mut scan = w.scan;
+    scan.hazards = path_problems(&w.paths);
+    scan.heavy.truncate(MAX_REPORTED);
+    scan.held.truncate(MAX_REPORTED);
+    scan.secrets.truncate(MAX_REPORTED);
+    scan
+}
+
+/// "It is fine": this project file may be shared although it looks like it holds a secret
+#[tauri::command]
+pub fn project_secret_allow(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<(), String> {
+    validate_allowed_root(&app_handle, &path)?;
+    super::secret_scan::allow(Path::new(&path), rel_path.trim_matches('/'))
 }
 
 /// Looks through `projects/` for folders that look generated, files held back for size and paths that will not work everywhere

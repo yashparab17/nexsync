@@ -1,6 +1,12 @@
 mod commands;
 mod database;
 
+/// Development only: the office engines, for `examples/office_dev.rs`, which lets the editors run in a browser
+#[cfg(debug_assertions)]
+pub mod lab {
+    pub use crate::commands::workspace::{deck, office, sheet_tools, sheets};
+}
+
 /// Initializes plugins, registers Tauri command handlers, and runs the application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -8,6 +14,7 @@ pub fn run() {
         .manage(commands::p2p::P2pState::default())
         .manage(commands::editor_run::RunState::default())
         .manage(commands::workspace::project_tasks::TaskState::default())
+        .manage(commands::workspace::project_lsp::LspState::default())
         .manage(commands::terminal::TerminalState::default())
         .setup(|app| {
             // A crash leaves a record in the local error log
@@ -201,6 +208,54 @@ pub fn run() {
             commands::workspace::projects::project_add_ignore,
             commands::workspace::project_doctor::project_doctor,
             commands::workspace::project_scan::project_scan,
+            commands::workspace::project_scan::project_secret_allow,
+            commands::workspace::deck::deck_new,
+            commands::workspace::deck::deck_open,
+            commands::workspace::deck::deck_register,
+            commands::workspace::deck::deck_render,
+            commands::workspace::deck::deck_layouts,
+            commands::workspace::deck::deck_new_slide,
+            commands::workspace::deck::deck_new_shape,
+            commands::workspace::deck::deck_edit_shape,
+            commands::workspace::deck::deck_edit_slide,
+            commands::workspace::deck::deck_add_picture,
+            commands::workspace::deck::deck_text_of,
+            commands::workspace::deck::deck_save,
+            commands::workspace::sheets::sheet_calculate,
+            commands::workspace::sheets::sheet_restructure,
+            commands::workspace::proof::proof_check,
+            commands::workspace::sheet_tools::sheet_sort,
+            commands::workspace::sheet_tools::sheet_chart,
+            commands::workspace::sheets::sheet_open,
+            commands::workspace::sheets::sheet_save,
+            commands::workspace::office::office_import,
+            commands::workspace::office::office_export,
+            commands::workspace::office::office_inspect,
+            commands::workspace::project_lsp::lsp_status,
+            commands::workspace::project_lsp::lsp_enable,
+            commands::workspace::project_lsp::lsp_sync,
+            commands::workspace::project_lsp::lsp_close,
+            commands::workspace::project_lsp::lsp_request,
+            commands::workspace::project_runtime::project_runtime,
+            commands::workspace::project_runtime::project_runtime_set,
+            commands::workspace::project_containers::project_containers,
+            commands::workspace::project_audit::project_audit,
+            commands::workspace::project_search::project_search,
+            commands::workspace::project_search::project_replace,
+            commands::workspace::project_impact::project_test_impact,
+            commands::workspace::project_bisect::project_bisect,
+            commands::workspace::project_bisect::project_bisect_cancel,
+            commands::workspace::project_http::project_http_files,
+            commands::workspace::project_http::project_http_send,
+            commands::workspace::project_generators::project_generators,
+            commands::workspace::project_generators::project_generate,
+            commands::workspace::project_reports::project_reports,
+            commands::workspace::project_reports::project_read_report,
+            commands::workspace::project_templates::project_templates,
+            commands::workspace::project_templates::project_scaffold_preview,
+            commands::workspace::project_templates::project_scaffold,
+            commands::workspace::project_templates::project_import_preview,
+            commands::workspace::project_templates::project_import,
             commands::workspace::project_tasks::project_task_trust,
             commands::workspace::project_tasks::project_task_approve,
             commands::workspace::project_tasks::project_task_start,
@@ -215,6 +270,15 @@ pub fn run() {
             commands::p2p::p2p_hold_incoming,
             commands::p2p::p2p_held_count,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // Language servers are programs of their own: end them with the app
+            if let tauri::RunEvent::Exit = event {
+                use tauri::Manager;
+                if let Some(state) = app.try_state::<commands::workspace::project_lsp::LspState>() {
+                    tauri::async_runtime::block_on(state.stop_all());
+                }
+            }
+        });
 }

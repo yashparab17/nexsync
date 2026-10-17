@@ -25,7 +25,7 @@ import { exportFolders } from "@/lib/export";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
 import { usePanelSize, useSidePanelWidth } from "@/hooks/usePanelSize";
-import { useReportItem } from "@/hooks/usePresence";
+import { useReportItem, useReportLine } from "@/hooks/usePresence";
 import { isBinaryFile, isDocumentFile, isMarkdownFile } from "@/lib/editor/languages";
 import { baseName } from "@/lib/editor/fileKinds";
 import type { VimCommand } from "@/lib/editor/vimSetup";
@@ -99,6 +99,7 @@ export default function WorkspaceEditor() {
 	const [dirty, setDirty] = useState<Set<string>>(new Set());
 	const [statuses, setStatuses] = useState<Record<string, CodeTabStatus>>({});
 	const [cursors, setCursors] = useState<Record<string, CursorInfo>>({});
+	useReportLine(current ? cursors[current]?.line : undefined);
 	const [texts, setTexts] = useState<Record<string, string>>({});
 	const [vimMode, setVimMode] = useState("");
 	const [showBlame, setShowBlame] = useState(false);
@@ -177,7 +178,22 @@ export default function WorkspaceEditor() {
 		[workspacePath, logError, active],
 	);
 
-	useOpenParam((path) => openPath(toRel(path)), !!workspacePath);
+	// Opens a file at a line; the tab needs a moment to exist, so the jump is tried for a second
+	const openAt = (rel: string, line: number) => {
+		openPath(rel);
+		if (!line) return;
+		let tries = 0;
+		const timer = setInterval(() => {
+			const handle = handleOf(rel);
+			if (handle || ++tries > 20) clearInterval(timer);
+			handle?.goToLine(line);
+		}, 50);
+	};
+	// `?open=/path#L12` opens the file at a line
+	useOpenParam((value) => {
+		const [path, line] = value.split("#L");
+		openAt(toRel(path), Number(line) || 0);
+	}, !!workspacePath);
 
 	// window.confirm is unreliable in the desktop webview, so unsaved tabs ask in a dialog
 	const closeTab = (path: string) => {
@@ -667,6 +683,7 @@ export default function WorkspaceEditor() {
 											onText={previewOpen && path === active ? mdTextHandler : undefined}
 											onVimMode={setVimMode}
 											onVimCommand={onVimCommand}
+											onOpenAt={(rel, line) => openAt(rel, line)}
 										/>
 									</div>
 								);

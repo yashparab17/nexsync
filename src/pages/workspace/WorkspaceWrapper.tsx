@@ -18,6 +18,7 @@ import TransferTray from "@/components/layout/workspace/TransferTray";
 import HostGate from "@/components/layout/workspace/HostGate";
 import DueReminders from "@/components/layout/workspace/DueReminders";
 import DependencyWatch from "@/components/layout/workspace/DependencyWatch";
+import TestWatch from "@/components/layout/workspace/TestWatch";
 import FollowWatch from "@/components/layout/workspace/FollowWatch";
 import ShortcutsDialog from "@/components/dialogs/workspace/ShortcutsDialog";
 import { shortcutFor } from "@/lib/shortcuts";
@@ -125,6 +126,7 @@ export default function Workspace() {
 			{/* Warns about work due today or late, whichever page is open */}
 			<DueReminders />
 			<DependencyWatch />
+			<TestWatch />
 			<FollowWatch />
 
 			{/* Guests joining with a short code wait here for the host to allow them */}

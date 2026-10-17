@@ -47,11 +47,16 @@ export default defineConfig(async () => ({
 	},
 
 	// Split the big libraries out of the app code so each is cached on its own and the first screen loads only what it uses. The editors
-	// (CodeMirror, BlockNote) and the terminal are loaded when their pages open.
+	// (CodeMirror, BlockNote) and the terminal are loaded when their pages open. The notes editor's libraries are left out of this list on
+	// purpose: given chunks of their own they were linked to the shared ones in a loop, and the first screen loaded all of them
+	// (1.1 MB it never uses); left alone they stay in the notes page's own chunk.
 	build: {
 		rollupOptions: {
 			output: {
 				manualChunks(id: string) {
+					// The small helper every lazy page load goes through. Left to Rollup it can land in a big library's chunk (here the
+					// notes editor's), and then the first screen loads that library and everything it needs.
+					if (id.includes("vite/preload-helper")) return "preload-helper";
 					if (!id.includes("node_modules")) return undefined;
 					const pkg = (re: RegExp) => re.test(id);
 					if (pkg(/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//)) return "react";
@@ -59,11 +64,6 @@ export default defineConfig(async () => ({
 					if (pkg(/node_modules\/(motion|motion-dom|motion-utils|framer-motion)\//)) return "motion";
 					if (pkg(/node_modules\/(yjs|lib0|y-protocols|y-codemirror\.next)\//)) return "yjs";
 					if (pkg(/node_modules\/@tauri-apps\//)) return "tauri";
-					// The rich-text notes editor, in four pieces so none is huge
-					if (pkg(/node_modules\/(prosemirror-[a-z-]+|@tiptap|orderedmap|rope-sequence|w3c-keyname|y-prosemirror)\//)) return "prosemirror";
-					if (pkg(/node_modules\/@mantine\//)) return "mantine";
-					if (pkg(/node_modules\/(@floating-ui|@emoji-mart|tabbable|react-remove-scroll|react-remove-scroll-bar|react-style-singleton|use-callback-ref|use-sidecar|aria-hidden|get-nonce)\//)) return "popovers";
-					if (pkg(/node_modules\/@blocknote\//)) return "blocknote";
 					return undefined;
 				},
 			},

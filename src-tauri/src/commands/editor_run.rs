@@ -110,18 +110,55 @@ async fn pump(reader: impl AsyncRead + Unpin, stream: &'static str, sink: Sink) 
     }
 }
 
+/// Where a command runs: on this system, or inside a Windows Subsystem for Linux distribution
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) enum Runtime {
+    #[default]
+    Local,
+    /// `cwd` is the folder as the distribution sees it
+    Wsl { distro: String, cwd: String },
+}
+
+/// The arguments of `wsl.exe` that run `command` in a distribution's login shell, in a folder. They are passed as separate
+/// arguments, never through the Windows command interpreter, so nothing in `command` is read by it.
+pub(crate) fn wsl_args(distro: &str, cwd: &str, command: &str) -> Vec<String> {
+    ["-d", distro, "--cd", cwd, "--", "sh", "-lc", command].iter().map(|s| s.to_string()).collect()
+}
+
 /// Runs `command` in `dir`, passing each output line to `sink`. Returns the exit code and whether it was stopped.
-pub(crate) async fn run_streaming(
+pub(crate) async fn run_streaming(dir: &Path, command: &str, env: &[(String, String)], stop_rx: &mut oneshot::Receiver<()>, sink: Sink) -> Result<(Option<i32>, bool), String> {
+    run_streaming_in(&Runtime::Local, dir, command, env, stop_rx, sink).await
+}
+
+/// Like [`run_streaming`], on the given runtime. Variables reach a distribution through `WSLENV`, which names the ones to pass.
+pub(crate) async fn run_streaming_in(
+    runtime: &Runtime,
     dir: &Path,
     command: &str,
     env: &[(String, String)],
     stop_rx: &mut oneshot::Receiver<()>,
     sink: Sink,
 ) -> Result<(Option<i32>, bool), String> {
-    let mut cmd = shell(command);
+    let mut env: Vec<(String, String)> = env.to_vec();
+    let mut cmd = match runtime {
+        Runtime::Local => shell(command),
+        Runtime::Wsl { distro, cwd } => {
+            let mut c = Command::new("wsl.exe");
+            c.args(wsl_args(distro, cwd, command));
+            #[cfg(windows)]
+            c.creation_flags(0x0800_0000);
+            let names: Vec<String> = env.iter().map(|(k, _)| k.clone()).collect();
+            if !names.is_empty() {
+                env.push(("WSLENV".to_string(), names.join(":")));
+            }
+            c
+        }
+    };
     // Its own process group, so stopping it can end everything it started
     #[cfg(unix)]
-    cmd.process_group(0);
+    {
+        cmd.process_group(0);
+    }
     let mut child = cmd
         .current_dir(dir)
         .envs(env.iter().map(|(k, v)| (k, v)))

@@ -41,6 +41,23 @@ pub mod project_scan;
 pub mod project_env;
 pub mod secret_scan;
 pub mod project_tasks;
+pub mod project_templates;
+pub mod project_reports;
+pub mod project_targets;
+pub mod project_audit;
+pub mod project_http;
+pub mod office;
+pub mod proof;
+pub mod sheet_tools;
+pub mod sheets;
+pub mod deck;
+pub mod project_lsp;
+pub mod project_runtime;
+pub mod project_containers;
+pub mod project_bisect;
+pub mod project_impact;
+pub mod project_search;
+pub mod project_generators;
 
 // Re-exports for command invocation surface
 pub use workspace::*;

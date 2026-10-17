@@ -131,6 +131,9 @@ pub enum FileReply {
         version: u64,
         #[serde(default)]
         offset: u64,
+        /// The file has the executable bit on the sender's system (a script, a binary), so it is given it here too (Unix only)
+        #[serde(default)]
+        exec: bool,
     },
     Error { error: String },
 }

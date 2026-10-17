@@ -8,6 +8,9 @@ vi.mock("@/lib/tauri", () => ({
 		{ id: "t1", title: "Write report", description: "", status: "todo", priority: "low", tags: [], created_at: "t", updated_at: "t" },
 	]),
 	getKanban: vi.fn(async () => []),
+	projectsList: vi.fn(async () => [
+		{ id: "web", path: "projects/web", name: "web", scratch: false, recipe: null, recipeError: null, detected: { kinds: [], packageManager: null, tasks: [{ id: "dev", label: "Start the Dev Server", command: "npm run dev" }], tools: [], env: [] } },
+	]),
 }));
 vi.mock("@/store/workspace/WorkspaceContext", () => ({
 	useWorkspace: () => ({ workspace: { id: "ws1", path: "/w", name: "W" } }),
@@ -44,6 +47,15 @@ describe("workspace search and command palette", () => {
 		fireEvent.change(box, { target: { value: "kanban" } });
 		fireEvent.click(screen.getByRole("option", { name: /Kanban board/ }));
 		expect(screen.getByTestId("where").textContent).toBe("/workspace/kanban");
+	});
+
+	it("offers each project's tasks and opens Projects to start the one chosen", async () => {
+		open();
+		const box = screen.getByLabelText("Search workspace");
+		fireEvent.focus(box);
+		fireEvent.change(box, { target: { value: "dev server" } });
+		fireEvent.click(await screen.findByRole("option", { name: /Run Start the Dev Server in web/ }));
+		expect(screen.getByTestId("where").textContent).toBe("/workspace/projects?run=web%3Adev");
 	});
 
 	it("filters results by type", async () => {

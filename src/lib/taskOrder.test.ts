@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { serverIds, startOrder } from "./taskOrder";
 import type { TaskSpec } from "@/types/projects";
 
-const t = (id: string, dependsOn: string[] = [], watch = false): TaskSpec => ({ id, label: id, command: id, cwd: "", env: [], ports: [], dependsOn, watch, readyWhen: "" });
+const t = (id: string, dependsOn: string[] = [], watch = false): TaskSpec => ({ id, label: id, command: id, cwd: "", env: [], ports: [], dependsOn, watch, interactive: false, readyWhen: "" });
 
 describe("taskOrder", () => {
 	it("starts what a task waits on first, each once", () => {

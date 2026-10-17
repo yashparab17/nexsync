@@ -21,7 +21,7 @@ const MAX_EXPORT_BYTES: usize = 50 * 1024 * 1024;
 
 /// A destination is acceptable when it is an absolute path with the wanted extension in an existing folder,
 /// and is not inside the app's own `.nexsync` folder
-fn check_destination(workspace: &str, dest: &str, extensions: &[&str]) -> Result<PathBuf, String> {
+pub(crate) fn check_destination(workspace: &str, dest: &str, extensions: &[&str]) -> Result<PathBuf, String> {
     let dest = Path::new(dest);
     if !dest.is_absolute() {
         return Err("Choose a full file path to save to.".to_string());
@@ -81,7 +81,7 @@ fn add_tree(
             continue;
         }
         let Ok(kind) = entry.file_type() else { continue };
-        if rules.ignored(&rel, kind.is_dir()) {
+        if rules.ignored_entry(&rel, kind.is_dir()) {
             continue;
         }
         if kind.is_dir() {

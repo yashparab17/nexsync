@@ -22,7 +22,7 @@ use super::{
     project_env,
     projects::{project_dir, tasks_of, TaskSpec},
 };
-use crate::commands::{config::validate_allowed_root, editor_run::{run_streaming, Sink}};
+use crate::commands::{config::validate_allowed_root, editor_run::{run_streaming_in, Sink}};
 
 pub const EVENT_OUTPUT: &str = "project://output";
 pub const EVENT_EXIT: &str = "project://exit";
@@ -64,6 +64,15 @@ fn load_trust(workspace: &str) -> TrustFile {
 fn save_trust(workspace: &str, trust: &TrustFile) -> Result<(), String> {
     fs::create_dir_all(Path::new(workspace).join(".nexsync")).map_err(|e| e.to_string())?;
     fs::write(trust_path(workspace), serde_json::to_string(trust).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+}
+
+/// A task this device has approved as it is now, with its project's folder; for programs that run a task themselves
+pub(crate) fn approved_task(workspace: &str, project: &str, task_id: &str) -> Result<(PathBuf, TaskSpec), String> {
+    let (dir, task) = find_task(workspace, project, task_id)?;
+    if !load_trust(workspace).approved.contains(&fingerprint(project, &task)) {
+        return Err("This command has not been approved on this device. Run it once from the Overview tab and choose Always.".to_string());
+    }
+    Ok((dir, task))
 }
 
 fn find_task(workspace: &str, project: &str, task_id: &str) -> Result<(PathBuf, TaskSpec), String> {
@@ -129,6 +138,18 @@ pub struct Problem {
 #[derive(Default)]
 pub struct Problems {
     pending: Option<(String, String)>,
+    /// ESLint prints the file once, then a row for each problem in it
+    file: Option<String>,
+    /// webpack names the place, and the message is the next line
+    place: Option<(String, u32, u32)>,
+    /// What the project's recipe adds
+    custom: Vec<(super::projects::MatcherSpec, Regex)>,
+}
+
+impl Problems {
+    pub fn with(custom: Vec<(super::projects::MatcherSpec, Regex)>) -> Self {
+        Self { custom, ..Self::default() }
+    }
 }
 
 impl Problems {
@@ -144,13 +165,90 @@ impl Problems {
         // Python: `  File "app.py", line 12, in main`
         static PYTHON: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"^\s*File "(?P<file>.+?)", line (?P<line>\d+)(?:, in (?P<name>.+))?$"#).unwrap());
 
+        // Pyright: `/path/app.py:12:5 - error: message`
+        static PYRIGHT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s*(?P<file>.+?\.pyi?):(?P<line>\d+):(?P<col>\d+) - (?P<sev>error|warning): (?P<msg>.+)$").unwrap());
+        // Kotlin: `e: file:///path/A.kt:12:5 message` and the older `e: /path/A.kt: (12, 5): message`
+        static KOTLIN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?P<sev>[ew]): (?P<file>(?:file:///)?.+?\.kts?):(?P<line>\d+):(?P<col>\d+) (?P<msg>.+)$").unwrap());
+        static KOTLIN_OLD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?P<sev>[ew]): (?P<file>.+?\.kts?): \((?P<line>\d+), (?P<col>\d+)\): (?P<msg>.+)$").unwrap());
+        // ESLint's default format: a file name line, then `  12:5  error  message  rule-name`
+        static ESLINT_FILE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?P<file>(?:[A-Za-z]:)?[\w./\\@~-][^\s:()]*\.(?:js|jsx|ts|tsx|mjs|cjs|vue|svelte))$").unwrap());
+        static ESLINT_ROW: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s+(?P<line>\d+):(?P<col>\d+)\s+(?P<sev>error|warning)\s+(?P<msg>.+?)(?:\s{2,}[\w@/.-]+)?$").unwrap());
+
+        // Biome: `src/a.ts:3:5 lint/correctness/noUnusedVariables ━━━━`
+        static BIOME: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?P<file>\S+?):(?P<line>\d+):(?P<col>\d+)\s+(?P<msg>[\w/]+)\s+[━─-]{3,}").unwrap());
+        // esbuild and Vite: `✘ [ERROR] message`, then the place on its own line
+        static ESBUILD_HEAD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[✘Xx▲]\s*\[(?P<sev>ERROR|WARNING)\]\s*(?P<msg>.+)$").unwrap());
+        static ESBUILD_AT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s+(?P<file>\S[^:]*):(?P<line>\d+):(?P<col>\d+):\s*$").unwrap());
+        // webpack: `ERROR in ./src/a.ts 3:5-10`, then the message
+        static WEBPACK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?:ERROR|WARNING) in (?P<file>\S+) (?P<line>\d+):(?P<col>\d+)").unwrap());
+
         let text = strip_ansi(raw);
         let line = text.trim_end();
+        // cargo --message-format=json (Clippy, rustc): one JSON object per message
+        if line.starts_with("{\"reason\":\"compiler-message\"") {
+            let v: serde_json::Value = serde_json::from_str(line).ok()?;
+            let m = v.get("message")?;
+            let level = m.get("level")?.as_str()?;
+            if level != "error" && level != "warning" {
+                return None;
+            }
+            let span = m.get("spans")?.as_array()?.iter().find(|s| s.get("is_primary").and_then(|p| p.as_bool()).unwrap_or(false))?;
+            return Some(Problem {
+                file: span.get("file_name")?.as_str()?.replace('\\', "/"),
+                line: span.get("line_start")?.as_u64()? as u32,
+                column: span.get("column_start").and_then(|c| c.as_u64()).unwrap_or(0) as u32,
+                severity: level.to_string(),
+                message: m.get("message")?.as_str()?.chars().take(300).collect(),
+            });
+        }
+        // The team's own matchers come first, so they can read what Nexsync would not
+        for (spec, re) in &self.custom {
+            if let Some(c) = re.captures(line) {
+                let get = |n: &str| c.name(n).map(|m| m.as_str().to_string());
+                let sev = get("severity").unwrap_or_else(|| spec.severity.clone());
+                return Some(Problem {
+                    file: get("file")?.replace('\\', "/"),
+                    line: get("line")?.parse().unwrap_or(0),
+                    column: get("column").and_then(|v| v.parse().ok()).unwrap_or(0),
+                    severity: if sev.to_lowercase().contains("warn") { "warning" } else { "error" }.to_string(),
+                    message: get("message").unwrap_or_else(|| spec.name.clone()).trim().chars().take(300).collect(),
+                });
+            }
+        }
+        if let Some((file, ln, col)) = self.place.take() {
+            if !line.trim().is_empty() {
+                return Some(Problem { file, line: ln, column: col, severity: "error".to_string(), message: line.trim().chars().take(300).collect() });
+            }
+            self.place = Some((file, ln, col));
+            return None;
+        }
+        if let Some(c) = WEBPACK.captures(line) {
+            self.place = Some((c["file"].trim_start_matches("./").to_string(), c["line"].parse().unwrap_or(0), c["col"].parse().unwrap_or(0)));
+            return None;
+        }
+        if let Some(c) = BIOME.captures(line) {
+            return Some(Problem { file: c["file"].to_string(), line: c["line"].parse().unwrap_or(0), column: c["col"].parse().unwrap_or(0), severity: "error".to_string(), message: c["msg"].to_string() });
+        }
+        if let (Some(c), Some((sev, msg))) = (ESBUILD_AT.captures(line), self.pending.clone()) {
+            self.pending = None;
+            return Some(Problem { file: c["file"].to_string(), line: c["line"].parse().unwrap_or(0), column: c["col"].parse().unwrap_or(0), severity: if sev.eq_ignore_ascii_case("warning") { "warning" } else { "error" }.to_string(), message: msg.chars().take(300).collect() });
+        }
+        if let Some(c) = ESBUILD_HEAD.captures(line) {
+            self.pending = Some((c["sev"].to_string(), c["msg"].to_string()));
+            return None;
+        }
         let make = |c: &regex::Captures, sev: Option<&str>, msg: &str| Problem {
-            file: c["file"].trim().replace('\\', "/"),
+            file: {
+                let f = c["file"].trim().replace('\\', "/");
+                match f.strip_prefix("file:///") {
+                    Some(rest) if rest.as_bytes().get(1) == Some(&b':') => rest.to_string(),
+                    Some(rest) => format!("/{rest}"),
+                    None => f,
+                }
+            },
             line: c["line"].parse().unwrap_or(0),
             column: c.name("col").and_then(|m| m.as_str().parse().ok()).unwrap_or(0),
-            severity: if sev.is_some_and(|s| s.to_lowercase().contains("warn")) { "warning" } else { "error" }.to_string(),
+            severity: if sev.is_some_and(|s| s.eq_ignore_ascii_case("w") || s.to_lowercase().contains("warn")) { "warning" } else { "error" }.to_string(),
             message: msg.trim().chars().take(300).collect(),
         };
         if let Some(c) = RUST_AT.captures(line) {
@@ -164,8 +262,18 @@ impl Problems {
         if let Some(c) = MAVEN.captures(line) {
             return Some(make(&c, Some(&c["sev"]), &c["msg"]));
         }
+        if let Some(c) = PYRIGHT.captures(line).or_else(|| KOTLIN.captures(line)).or_else(|| KOTLIN_OLD.captures(line)) {
+            return Some(make(&c, Some(&c["sev"]), &c["msg"]));
+        }
         if let Some(c) = PAREN.captures(line) {
             return Some(make(&c, Some(&c["sev"]), &c["msg"]));
+        }
+        if let Some(c) = ESLINT_FILE.captures(line) {
+            self.file = Some(c["file"].to_string());
+            return None;
+        }
+        if let (Some(c), Some(file)) = (ESLINT_ROW.captures(line), self.file.clone()) {
+            return Some(Problem { file, line: c["line"].parse().unwrap_or(0), column: c["col"].parse().unwrap_or(0), severity: c["sev"].to_string(), message: c["msg"].trim().chars().take(300).collect() });
         }
         if let Some(c) = PYTHON.captures(line) {
             // A traceback names where each call was; the last one before the message is the useful one, and the page shows every one
@@ -233,6 +341,11 @@ struct Exit<'a> {
 
 fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+/// The first port after `port` that nothing is listening on
+fn next_free(port: u16) -> Option<u16> {
+    (port.saturating_add(1)..port.saturating_add(50)).find(|p| !listening(*p))
 }
 
 /// Whether something is accepting connections on a local port
@@ -333,7 +446,7 @@ impl Watch {
 /// Starts a task and returns the id of the run. It needs the approval described at the top, or `once` (the person chose Run Once
 /// in the dialog a moment ago).
 #[tauri::command]
-pub async fn project_task_start(app: AppHandle, state: State<'_, TaskState>, path: String, project: String, task_id: String, once: bool) -> Result<String, String> {
+pub async fn project_task_start(app: AppHandle, state: State<'_, TaskState>, path: String, project: String, task_id: String, once: bool, args: Option<Vec<String>>) -> Result<String, String> {
     validate_allowed_root(&app, &path)?;
     let (dir, task) = find_task(&path, &project, &task_id)?;
     let mut trust = load_trust(&path);
@@ -345,13 +458,21 @@ pub async fn project_task_start(app: AppHandle, state: State<'_, TaskState>, pat
 
     for port in &task.ports {
         if task.watch && listening(*port) {
-            return Err(format!("Port {port} is already in use by another program. Stop that program first, or change the port in the recipe."));
+            let free = next_free(*port).map(|p| format!(" Port {p} is free: change the port in the recipe or in the project's own settings.")).unwrap_or_default();
+            return Err(format!("Port {port} is already in use by another program. Stop that program first.{free}"));
         }
     }
     let cwd = if task.cwd.is_empty() { dir.clone() } else { dir.join(&task.cwd) };
     if !cwd.is_dir() {
         return Err(format!("The folder \"{}\" does not exist in this project.", task.cwd));
     }
+    let command = with_args(&task.command, &args.unwrap_or_default())?;
+    Ok(launch(&app, &state, path, project, task, command, cwd))
+}
+
+/// Starts `command` for a task in `cwd` and returns the id of the run. Whatever needed approving has been approved by now.
+pub(crate) fn launch(app: &AppHandle, state: &TaskState, path: String, project: String, task: TaskSpec, command: String, cwd: PathBuf) -> String {
+    let task_id = task.id.clone();
     let env = project_env::values_for(&path, &project);
 
     let run_id = uuid::Uuid::new_v4().to_string();
@@ -361,7 +482,7 @@ pub async fn project_task_start(app: AppHandle, state: State<'_, TaskState>, pat
     // A task that keeps running is ready when its text appears, or its port accepts connections, or it has run a moment
     let ready_text = Some(task.ready_when.trim().to_lowercase()).filter(|t| !t.is_empty() && !t.chars().all(|c| c.is_ascii_digit()));
     let ready_ports: Vec<u16> = if task.ready_when.trim().parse::<u16>().is_ok() { vec![task.ready_when.trim().parse().unwrap_or(0)] } else if ready_text.is_none() { task.ports.clone() } else { Vec::new() };
-    let watch = Arc::new(Mutex::new(Watch { app: app.clone(), run_id: run_id.clone(), project: project.clone(), task: task_id.clone(), ready_text, ready: false, ports: HashSet::new(), problems: Problems::default(), log: Vec::new() }));
+    let watch = Arc::new(Mutex::new(Watch { app: app.clone(), run_id: run_id.clone(), project: project.clone(), task: task_id.clone(), ready_text, ready: false, ports: HashSet::new(), problems: Problems::with(project_dir(&path, &project).map(|d| super::projects::matchers_of(&d)).unwrap_or_default()), log: Vec::new() }));
     if task.watch {
         let (app, watch, run_id, project, task_id) = (app.clone(), watch.clone(), run_id.clone(), project.clone(), task_id.clone());
         let needs_poll = !ready_ports.is_empty();
@@ -383,9 +504,11 @@ pub async fn project_task_start(app: AppHandle, state: State<'_, TaskState>, pat
         });
     }
 
-    let (ws, wid, proj, tid, command, restarts_allowed) = (path.clone(), run_id.clone(), project.clone(), task_id.clone(), task.command.clone(), task.watch);
+    let (ws, wid, proj, tid, command, restarts_allowed) = (path.clone(), run_id.clone(), project.clone(), task_id.clone(), command.clone(), task.watch);
     let emitter = app.clone();
     let started_at = now_ms();
+    // Where this device runs the project's tasks: this system, or a WSL distribution it chose
+    let runtime = super::project_runtime::runtime_for(&path, &project, &cwd);
     tokio::spawn(async move {
         let sink: Sink = {
             let watch = watch.clone();
@@ -394,7 +517,7 @@ pub async fn project_task_start(app: AppHandle, state: State<'_, TaskState>, pat
         let begun = Instant::now();
         let mut restarts = 0u32;
         let (code, stopped, error) = loop {
-            let result = run_streaming(&cwd, &command, &env, &mut stop_rx, sink.clone()).await;
+            let result = run_streaming_in(&runtime, &cwd, &command, &env, &mut stop_rx, sink.clone()).await;
             let (code, stopped, error) = match result {
                 Ok((code, stopped)) => (code, stopped, None),
                 Err(e) => (None, false, Some(e)),
@@ -423,8 +546,25 @@ pub async fn project_task_start(app: AppHandle, state: State<'_, TaskState>, pat
             s.runs.lock().unwrap_or_else(|p| p.into_inner()).remove(&wid);
         }
     });
-    Ok(run_id)
+    run_id
 }
+
+/// The base command with the arguments added, each in quotes; they are checked, since they can come from output (a test's name)
+fn with_args(base: &str, args: &[String]) -> Result<String, String> {
+    if args.len() > 45 {
+        return Err("Too many arguments.".to_string());
+    }
+    let mut command = base.to_string();
+    for a in args {
+        if a.is_empty() || a.len() > 200 || !a.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | ':' | '.' | '/' | '-' | ' ' | '#' | '[' | ']' | ',' | '=')) {
+            return Err("An argument may only hold letters, digits, spaces and _ : . / - # [ ] , =".to_string());
+        }
+        command.push_str(&format!(" \"{a}\""));
+    }
+    Ok(command)
+}
+
+
 
 /// Stops a run; does nothing if it already ended
 #[tauri::command]
@@ -440,6 +580,14 @@ mod tests {
 
     fn task(command: &str) -> TaskSpec {
         TaskSpec { id: "dev".into(), label: "Dev".into(), command: command.into(), ..Default::default() }
+    }
+
+    #[test]
+    fn arguments_are_checked_and_quoted() {
+        assert_eq!(with_args("cargo test", &["tests::a_name".into(), "--".into(), "--exact".into()]).unwrap(), "cargo test \"tests::a_name\" \"--\" \"--exact\"");
+        for bad in ["a; rm x", "a$(b)", "a\"b", "a|b", "a&b", "", "`x`"] {
+            assert!(with_args("x", &[bad.to_string()]).is_err(), "{bad:?}");
+        }
     }
 
     #[test]
@@ -475,6 +623,38 @@ mod tests {
     }
 
     #[test]
+    fn eslint_pyright_ruff_and_kotlin_output_is_read_too() {
+        assert_eq!(
+            found(&["/w/app/src/a.ts", "  12:5  error  'x' is defined but never used  @typescript-eslint/no-unused-vars", "  14:1  warning  Unexpected console statement  no-console", "", "✖ 2 problems"]),
+            [at("/w/app/src/a.ts", 12, 5, "error", "'x' is defined but never used"), at("/w/app/src/a.ts", 14, 1, "warning", "Unexpected console statement")]
+        );
+        assert_eq!(found(&["  /w/app/main.py:12:5 - error: \"x\" is not defined"]), [at("/w/app/main.py", 12, 5, "error", "\"x\" is not defined")]);
+        assert_eq!(found(&["app.py:3:1: F401 `os` imported but unused"]), [at("app.py", 3, 1, "error", "F401 `os` imported but unused")]);
+        assert_eq!(found(&["e: file:///C:/w/A.kt:12:5 Unresolved reference: foo"]), [at("C:/w/A.kt", 12, 5, "error", "Unresolved reference: foo")]);
+        assert_eq!(found(&["w: /w/A.kt: (3, 9): Variable 'y' is never used"]), [at("/w/A.kt", 3, 9, "warning", "Variable 'y' is never used")]);
+    }
+
+    #[test]
+    fn biome_esbuild_webpack_and_cargo_json_are_read() {
+        assert_eq!(found(&["src/a.ts:3:5 lint/correctness/noUnusedVariables ━━━━━━━━━"]), [at("src/a.ts", 3, 5, "error", "lint/correctness/noUnusedVariables")]);
+        assert_eq!(found(&["✘ [ERROR] Could not resolve \"x\"", "", "    src/main.ts:4:7:", "      4 │ import x from 'x'"]), [at("src/main.ts", 4, 7, "error", "Could not resolve \"x\"")]);
+        assert_eq!(found(&["ERROR in ./src/a.ts 3:5-10", "Module not found: Error: Can't resolve 'y'", ""]), [at("src/a.ts", 3, 5, "error", "Module not found: Error: Can't resolve 'y'")]);
+        let json = r#"{"reason":"compiler-message","package_id":"a","message":{"level":"warning","message":"unused variable: `x`","spans":[{"file_name":"src\\main.rs","line_start":4,"column_start":9,"is_primary":true},{"file_name":"x.rs","line_start":1,"column_start":1,"is_primary":false}]}}"#;
+        assert_eq!(found(&[json, r#"{"reason":"compiler-artifact"}"#]), [at("src/main.rs", 4, 9, "warning", "unused variable: `x`")]);
+    }
+
+    #[test]
+    fn a_teams_own_matcher_reads_what_nexsync_does_not() {
+        use super::super::projects::{compile_matcher, MatcherSpec};
+        let spec = MatcherSpec { name: "Our linter".into(), pattern: r"^LINT (?P<severity>\w+) (?P<file>\S+) line (?P<line>\d+): (?P<message>.+)$".into(), severity: String::new() };
+        let re = compile_matcher(&spec).unwrap();
+        let mut p = Problems::with(vec![(spec, re)]);
+        assert_eq!(p.feed("LINT warning src/x.rb line 12: trailing space"), Some(at("src/x.rb", 12, 0, "warning", "trailing space")));
+        assert!(compile_matcher(&MatcherSpec { name: "bad".into(), pattern: "(".into(), severity: String::new() }).is_err());
+        assert!(compile_matcher(&MatcherSpec { name: "no groups".into(), pattern: "x".into(), severity: String::new() }).is_err());
+    }
+
+    #[test]
     fn ordinary_output_is_not_a_problem() {
         assert!(found(&["12:30:05: server started", "Compiled successfully in 3.2s", "  --> not a place", "warning: unused", "listening on http://localhost:3000"]).is_empty());
     }
@@ -500,7 +680,7 @@ mod tests {
         let command = "echo %NEXSYNC_TEST_VALUE%";
         #[cfg(not(windows))]
         let command = "echo $NEXSYNC_TEST_VALUE";
-        let (code, _) = run_streaming(&dir, command, &[("NEXSYNC_TEST_VALUE".into(), "from the project".into())], &mut rx, sink).await.unwrap();
+        let (code, _) = crate::commands::editor_run::run_streaming(&dir, command, &[("NEXSYNC_TEST_VALUE".into(), "from the project".into())], &mut rx, sink).await.unwrap();
         assert_eq!(code, Some(0));
         assert!(lines.lock().unwrap().iter().any(|l| l.trim() == "from the project"));
 

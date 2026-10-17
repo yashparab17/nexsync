@@ -40,7 +40,7 @@ function suggestCommand(path: string | null): string {
 	if (!path) return "";
 	const template = RUNNERS[extensionOf(path)];
 	if (!template) return "";
-	const rel = path.startsWith("editor/") ? path.slice("editor/".length) : `../${path}`;
+	const rel = path.startsWith("projects/") ? path.slice("projects/".length) : `../${path}`;
 	return template.replace("{file}", /\s/.test(rel) ? `"${rel}"` : rel);
 }
 
