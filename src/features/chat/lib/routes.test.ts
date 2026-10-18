@@ -6,6 +6,7 @@ describe("routeForChannel", () => {
 		expect(routeForChannel("general")).toBe("/workspace/chat?channel=general");
 		expect(routeForChannel("doc:notes/plan.md")).toBe("/workspace/notes?open=notes%2Fplan.md");
 		expect(routeForChannel("doc:src/app.ts")).toBe("/workspace/editor?open=src%2Fapp.ts");
+		expect(routeForChannel("doc:office/sheets/q3.xlsx")).toBe("/workspace/office/sheets?open=office%2Fsheets%2Fq3.xlsx");
 		expect(routeForChannel("task:t1")).toBe("/workspace/tasks?open=t1");
 		expect(routeForChannel("card:c1")).toBe("/workspace/kanban?open=c1");
 	});

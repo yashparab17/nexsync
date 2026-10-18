@@ -43,8 +43,13 @@ fn call(cmd: &str, a: &Value) -> Result<Value, String> {
             ok(serde_json::to_value(office::lay_out(&s("html"), &s("title"), layout.as_ref(), src)?))
         }
         "office_page" => ok(serde_json::to_value(office::draw_page(n("session") as u64, n("index") as usize, n("scale") as f32)?)),
+        "office_margins" => ok(serde_json::to_value(office::draw_margins(&s("sourceId"), n("pages") as usize, n("index") as usize, n("scale") as f32)?)),
         "office_render" => ok(serde_json::to_value(office::render_pages(&s("html"), &s("title"), None, n("scale") as f32)?)),
         "deck_new" => ok(serde_json::to_value(deck::blank()?)),
+        "deck_open_file" => {
+            let path = s("path");
+            ok(serde_json::to_value(deck::open(&path, &std::fs::read(&path).map_err(|e| e.to_string())?)?))
+        }
         "deck_register" => Ok(json!(deck::register(&s("base"))?)),
         "deck_render" => ok(serde_json::to_value(deck::render(&s("baseId"), &s("slide"), n("scale"))?)),
         "deck_layouts" => ok(serde_json::to_value(deck::layouts(&s("baseId"))?)),

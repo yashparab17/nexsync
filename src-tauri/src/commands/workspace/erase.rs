@@ -201,7 +201,7 @@ pub fn apply_remote_erasures(db: &WorkspaceDb, workspace: &str, remote: &[Erased
 // ────────────────────────────
 
 /// Erases a task or card for good, here; the caller tells the other devices
-#[tauri::command]
+#[tauri::command(async)]
 pub fn erase_record_for_good(app_handle: tauri::AppHandle, path: String, entity: String, id: String) -> Result<Erased, String> {
     validate_allowed_root(&app_handle, &path)?;
     let db = WorkspaceDb::open_existing(&path)?;
@@ -210,7 +210,7 @@ pub fn erase_record_for_good(app_handle: tauri::AppHandle, path: String, entity:
 }
 
 /// Erases a file or folder for good, here; `doc_ids` are any other Yjs documents that belong to it, such as branches
-#[tauri::command]
+#[tauri::command(async)]
 pub fn erase_file_for_good(app_handle: tauri::AppHandle, path: String, rel_path: String, doc_ids: Vec<String>) -> Result<Erased, String> {
     validate_allowed_root(&app_handle, &path)?;
     let db = WorkspaceDb::open_existing(&path)?;

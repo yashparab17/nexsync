@@ -1,4 +1,5 @@
 import { useNewParam } from "@/hooks/useNewParam";
+import { useSyncedIn } from "@/hooks/useSyncedIn";
 import { pushRecent } from "@/lib/recentFiles";
 // Slides: slide decks (.pptx) of the workspace, opened as live shared decks. The slides are drawn by the backend from the deck's pieces;
 // the frames over them select, move and resize shapes, and everyone with the deck open sees the changes as they are made.
@@ -38,7 +39,8 @@ export default function SlidesPage() {
 	const { workspace } = useWorkspace();
 	const logError = useErrorLog();
 	const isViewer = useIsViewer();
-	const { selfName, viewersAt, lastSyncedFile } = useP2P();
+	const { selfName, viewersAt } = useP2P();
+	const synced = useSyncedIn(LAYOUT.slides);
 	const workspacePath = workspace?.path ?? "";
 	const author = selfName ?? "Someone";
 
@@ -60,7 +62,7 @@ export default function SlidesPage() {
 				setDecks([]);
 			});
 	}, [workspacePath, logError]);
-	useEffect(load, [load, lastSyncedFile]);
+	useEffect(load, [load, synced]);
 
 	// `?open=path#L3` opens a deck at slide 3 (someone presenting is followed this way)
 	const [wanted, setWanted] = useState<number | null>(null);

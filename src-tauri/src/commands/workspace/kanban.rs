@@ -11,7 +11,7 @@ use super::models::{json_list, to_json, valid_checklist, valid_comments, valid_t
 // ────────────────────────────
 
 /// Fetches all Kanban columns and their ordered cards
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_kanban(app_handle: tauri::AppHandle, path: String, with_state: Option<bool>) -> Result<Vec<KanbanColumn>, String> {
     validate_allowed_root(&app_handle, &path)?;
     
@@ -84,7 +84,7 @@ pub(super) fn read_columns(conn: &rusqlite::Connection, ws_id: &str) -> Result<V
 }
 
 /// Creates a new Kanban column
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_kanban_column(app_handle: tauri::AppHandle, request: KanbanColumnRequest) -> Result<KanbanColumn, String> {
     validate_allowed_root(&app_handle, &request.path)?;
     
@@ -111,7 +111,7 @@ pub fn create_kanban_column(app_handle: tauri::AppHandle, request: KanbanColumnR
 }
 
 /// Creates a new card inside a Kanban column
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardRequest) -> Result<KanbanCard, String> {
     validate_allowed_root(&app_handle, &request.path)?;
     
@@ -158,7 +158,7 @@ pub fn create_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
 }
 
 /// Updates title, description, or column assignment for a Kanban card
-#[tauri::command]
+#[tauri::command(async)]
 pub fn update_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardRequest) -> Result<(), String> {
     validate_allowed_root(&app_handle, &request.path)?;
     
@@ -195,7 +195,7 @@ pub fn update_kanban_card(app_handle: tauri::AppHandle, request: KanbanCardReque
 }
 
 /// Moves a card to a new column and position
-#[tauri::command]
+#[tauri::command(async)]
 pub fn move_kanban_card(app_handle: tauri::AppHandle, request: MoveCardRequest) -> Result<(), String> {
     validate_allowed_root(&app_handle, &request.path)?;
     
@@ -220,7 +220,7 @@ pub fn move_kanban_card(app_handle: tauri::AppHandle, request: MoveCardRequest) 
 }
 
 /// Deletes a Kanban column and all cards in it
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_kanban_column(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Result<(), String> {
     validate_allowed_root(&app_handle, &request.path)?;
     
@@ -250,7 +250,7 @@ pub fn delete_kanban_column(app_handle: tauri::AppHandle, request: TaskIdRequest
 }
 
 /// Deletes a single Kanban card
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_kanban_card(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Result<(), String> {
     validate_allowed_root(&app_handle, &request.path)?;
     

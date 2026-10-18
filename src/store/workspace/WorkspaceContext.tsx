@@ -5,6 +5,7 @@ import {
 	useState,
 	useCallback,
 	useEffect,
+	useMemo,
 	useRef,
 	type ReactNode,
 } from "react";
@@ -350,32 +351,32 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 			window.removeEventListener("beforeunload", handleBeforeUnload);
 	}, [metadata, saveWorkspace]);
 
-	return (
-		<WorkspaceContext.Provider
-			value={{
-				workspace,
-				metadata,
-				stats,
-				isLoading,
-				error,
-				failedWorkspace,
-				setWorkspace: handleSetWorkspace,
-				loadWorkspace,
-				saveWorkspace,
-				clearWorkspace,
-				refreshStats,
-				refreshMetadata,
-				updateSettings,
-				updateMembers,
-				addActivityEvent,
-				updatePermissions,
-				updateHistory,
-				clearError,
-			}}
-		>
-			{children}
-		</WorkspaceContext.Provider>
+	// One value for as long as nothing in it changes, so the pages using it are not drawn again whenever this provider is
+	const value = useMemo(
+		() => ({
+			workspace,
+			metadata,
+			stats,
+			isLoading,
+			error,
+			failedWorkspace,
+			setWorkspace: handleSetWorkspace,
+			loadWorkspace,
+			saveWorkspace,
+			clearWorkspace,
+			refreshStats,
+			refreshMetadata,
+			updateSettings,
+			updateMembers,
+			addActivityEvent,
+			updatePermissions,
+			updateHistory,
+			clearError,
+		}),
+		[workspace, metadata, stats, isLoading, error, failedWorkspace, handleSetWorkspace, loadWorkspace, saveWorkspace, clearWorkspace, refreshStats, refreshMetadata, updateSettings, updateMembers, addActivityEvent, updatePermissions, updateHistory, clearError],
 	);
+
+	return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }
 
 // Hook to access the workspace context

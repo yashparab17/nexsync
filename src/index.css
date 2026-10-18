@@ -392,7 +392,7 @@ select option:checked { background-color: var(--accent); color: var(--foreground
 .doc-page .bn-container,
 .doc-page .bn-editor {
 	font-family: var(--doc-font);
-	font-size: 11pt;
+	font-size: var(--doc-size, 11pt);
 	color: #000;
 	background: transparent;
 	--bn-colors-editor-background: transparent;
@@ -407,17 +407,77 @@ select option:checked { background-color: var(--accent); color: var(--foreground
 	display: flow-root;
 }
 /* A paragraph whose spacing comes from the file: the spacing is drawn on the block, so the editor's own is taken off */
-.doc-page .nx-sp > .bn-block > .bn-block-content[data-content-type],
-.doc-page .nx-sp > .bn-block > .bn-block-content[data-content-type] :is(h1, h2, h3, h4, h5, h6, p) {
+.doc-page .bn-block-content.nx-sp,
+.doc-page .bn-block-content.nx-sp :is(h1, h2, h3, h4, h5, h6, p) {
 	margin-block: 0;
 }
-/* A line of a table of contents ("Title<tab>12"): the tab stops just short of the right edge, so the page number ends there */
+/* A line of a table of contents ("Title<tab>12"): the page number sits at the right edge, the tab before it hidden */
 .doc-page .nx-toc .bn-inline-content {
-	white-space: pre-wrap;
-	tab-size: calc(var(--doc-w, 600px) - var(--nx-left, 0pt) - 3ch);
+	flex: 1;
 }
+.doc-page .nx-toc .nx-toc-tab {
+	display: none;
+}
+.doc-page .nx-toc .nx-toc-num {
+	float: right;
+	margin-left: 1em;
+}
+/* Lines as tall as Word draws them: each font's own single line height (--nx-lf, measured by the backend from the font) times the
+   paragraph's line spacing (--nx-mult). The paragraph mark's font and size, on the block, give the least a line is. */
+.doc-page .nx-sp > .bn-inline-content,
+.doc-page .nx-sp [data-style-type="fontFamily"] {
+	line-height: calc(var(--nx-lf, 1.2) * var(--nx-mult, 1));
+}
+/* A heading with Word formatting is drawn in its own runs' look; the editor's heading font and size would sit on its lines as a second,
+   differently placed font and make them taller */
+.doc-page .bn-editor .bn-block > .bn-block-content.nx-sp[data-content-type="heading"],
+.doc-page .bn-editor .bn-block > .bn-block-content.nx-sp[data-content-type="heading"] > :is(h1, h2, h3, h4, h5, h6) {
+	font-family: inherit;
+	font-size: inherit;
+	font-weight: inherit;
+	color: inherit;
+}
+/* BlockNote eases a heading's size and weight when they change; in a long document that is thousands of animations when the look arrives
+   (pages are measured half way through them) */
+.bn-editor .bn-block-content {
+	transition: none;
+}
+/* Line spacing of exactly so many points */
+.doc-page .nx-exact > .bn-inline-content,
+.doc-page .nx-exact .bn-inline-content [data-style-type] {
+	line-height: var(--nx-exact) !important;
+}
+/* A Word list item's label hangs in front of its first line, at the first-line indent. It sits on that line (taking no room), so its
+   font's line height counts for the line, as it does in Word. */
+.doc-page .bn-block-content.nx-label > .bn-inline-content::before {
+	content: var(--nx-label);
+	display: inline-block;
+	width: 0;
+	white-space: pre;
+	text-indent: 0;
+	position: relative;
+	left: var(--nx-hang);
+	line-height: calc(var(--nx-label-lf, var(--nx-lf, 1.2)) * var(--nx-mult, 1));
+}
+/* Lists as Word lays them out by default: the bullet or number 0.25in in, the text at 0.5in, each level a further 0.5in */
+.doc-page .bn-block-content:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"]) {
+	padding-left: 18pt;
+}
+.doc-page .bn-block-content:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"])::before {
+	min-width: 18pt;
+	padding-right: 0;
+	justify-content: flex-start;
+}
+.doc-page .bn-block-group .bn-block-group {
+	margin-left: 36pt;
+}
+/* The editor's line beside nested blocks is not part of the page */
+.doc-page .bn-editor .bn-block-group .bn-block-group > .bn-block-outer::before {
+	display: none;
+}
+/* Line spacing is a multiple of single, and single in Word is the font's own line height, about 1.21 times its size */
 .doc-page .bn-block-content {
-	line-height: var(--doc-ls, 1.15);
+	line-height: calc(1.21 * var(--doc-ls, 1.15));
 	padding-block: 0;
 }
 .doc-page [data-content-type="heading"] h1,
@@ -450,8 +510,57 @@ select option:checked { background-color: var(--accent); color: var(--foreground
 .doc-page [data-content-type="checkListItem"] {
 	margin-bottom: 2pt;
 }
+/* Tables as Word draws them: no space around the table, cells 0.075in in from the sides and none above or below. The editor's own room for its row and column handles is kept, but takes no space on the page. */
 .doc-page [data-content-type="table"] {
-	margin-block: 4pt 8pt;
+	margin-block: 0;
+}
+/* Tables take the column widths the backend worked out with Word's AutoFit; the browser's own table layout is told not to change them.
+   (The editor's fixed layout would give every column without a set width the same 120 pixels.) */
+.doc-page .bn-editor [data-content-type="table"] table {
+	table-layout: auto !important;
+	width: auto !important;
+	/* (the editor sets a minimum of 120 pixels a column on the table itself) */
+	min-width: 0 !important;
+}
+.doc-page .ProseMirror.bn-editor [data-content-type="table"] :is(td, th) {
+	min-width: 0 !important;
+}
+/* The bars beside a table that add rows or columns by dragging are too easily caught; rows and columns are added from its handles */
+.doc-page .bn-extend-button {
+	display: none;
+}
+.doc-page .bn-editor [data-content-type="table"] .tableWrapper {
+	margin: -9px -22px -22px -9px;
+	/* (its width then reaches into the margins too, so the room for its handles is not taken from the table) */
+	width: auto;
+}
+.doc-page .bn-editor [data-content-type="table"] :is(td, th) {
+	/* The space after a paragraph of the file's ordinary text, which Word keeps in a cell over what the table style says */
+	/* (Word's 5.4 pt cell margins hold half of each border; here the border is drawn inside the cell, so the margin gives it room) */
+	padding: 0 calc(5.4pt - 0.5px) 4pt;
+	border-color: #bfbfbf;
+	/* A header cell is bold only where its text is, as in Word (bold text in a bold cell would otherwise go to the heaviest weight) */
+	font-weight: inherit;
+	text-align: left;
+}
+.doc-page .bn-editor [data-content-type="table"] :is(td, th)[data-text-alignment="center"] {
+	text-align: center;
+}
+.doc-page .bn-editor [data-content-type="table"] :is(td, th)[data-text-alignment="right"] {
+	text-align: right;
+}
+.doc-page .bn-editor [data-content-type="table"] :is(td, th)[data-text-alignment="justify"] {
+	text-align: justify;
+}
+/* ponytail: every table drawn with the look of Word's own table styles (Table Grid and the like: single spacing, no space after);
+   a file whose table style says otherwise is drawn so too, as the editor keeps no style per table */
+/* The first row of a table on its second page draws the top edge the table has there */
+.doc-page .bn-editor [data-content-type="table"] tr.nx-row-break > :is(td, th) {
+	border-top-width: 1px;
+}
+.doc-page .bn-editor [data-content-type="table"] :is(td, th) > p {
+	min-height: 0;
+	line-height: 1.21;
 }
 .doc-page .bn-block-group .bn-block-outer {
 	margin-block: 0;

@@ -275,7 +275,7 @@ pub fn list(workspace: &str, rel: &str) -> Result<Vec<FileVersion>, String> {
 // ────────────────────────────
 
 /// Lists the saved versions of a file, newest first
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_file_versions(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<Vec<FileVersion>, String> {
     validate_allowed_root(&app_handle, &path)?;
     list(&path, &rel_path)
@@ -283,7 +283,7 @@ pub fn list_file_versions(app_handle: tauri::AppHandle, path: String, rel_path: 
 
 /// Keeps the text an editor holds right now as a version: `auto` for the periodic snapshot, `named` for one
 /// the person labelled
-#[tauri::command]
+#[tauri::command(async)]
 pub fn record_file_version(
     app_handle: tauri::AppHandle,
     path: String,
@@ -309,7 +309,7 @@ pub fn record_file_version(
 }
 
 /// A version a collaborator named, delivered by the sync layer. Returns whether it was added.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn receive_named_version(
     app_handle: tauri::AppHandle,
     path: String,
@@ -323,7 +323,7 @@ pub fn receive_named_version(
 }
 
 /// Reads a version as text, for the preview and the diff
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_file_version(app_handle: tauri::AppHandle, path: String, id: i64) -> Result<String, String> {
     validate_allowed_root(&app_handle, &path)?;
     let db = WorkspaceDb::open_existing(&path)?;
@@ -338,7 +338,7 @@ pub fn read_file_version(app_handle: tauri::AppHandle, path: String, id: i64) ->
 
 /// Puts a version back on disk. What was there is kept as a version first, so a restore can be undone.
 /// Text files that are open in an editor are restored from the editor instead, so collaborators see it.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn restore_file_version(app_handle: tauri::AppHandle, path: String, id: i64) -> Result<String, String> {
     validate_allowed_root(&app_handle, &path)?;
     let db = WorkspaceDb::open_existing(&path)?;

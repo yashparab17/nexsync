@@ -14,7 +14,7 @@ const MAX_DETAIL_LEN: usize = 8192;
 // ────────────────────────────
 
 /// Appends a new error record to the application error log
-#[tauri::command]
+#[tauri::command(async)]
 pub fn log_error(app_handle: tauri::AppHandle, mut entry: ErrorRecord) -> Result<(), String> {
     // Truncate fields to max lengths
     if entry.message.len() > MAX_MESSAGE_LEN {
@@ -65,7 +65,7 @@ pub fn log_error(app_handle: tauri::AppHandle, mut entry: ErrorRecord) -> Result
 }
 
 /// Returns the most recent error records, newest first
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_error_log(app_handle: tauri::AppHandle, limit: Option<usize>) -> Result<Vec<ErrorRecord>, String> {
     let path = error_log_path(&app_handle)?;
     let content = fs::read_to_string(&path).unwrap_or_default();
@@ -78,7 +78,7 @@ pub fn get_error_log(app_handle: tauri::AppHandle, limit: Option<usize>) -> Resu
 }
 
 /// Deletes the application error log
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_error_log(app_handle: tauri::AppHandle) -> Result<(), String> {
     match fs::remove_file(error_log_path(&app_handle)?) {
         Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),

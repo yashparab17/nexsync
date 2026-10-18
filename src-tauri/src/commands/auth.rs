@@ -81,14 +81,14 @@ pub static SESSION_REGISTRY: std::sync::LazyLock<SessionRegistry> =
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Creates a new workspace session token
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_workspace_session(workspace_path: String) -> Result<String, String> {
     let session_id = create_session(&workspace_path, UserRole::Owner);
     Ok(session_id)
 }
 
 /// Closes an active workspace session token
-#[tauri::command]
+#[tauri::command(async)]
 pub fn close_workspace_session(session_id: String) -> Result<(), String> {
     if !remove_session(&session_id) {
         return Err(format!("Session '{}' not found", session_id));
@@ -97,7 +97,7 @@ pub fn close_workspace_session(session_id: String) -> Result<(), String> {
 }
 
 /// Retrieves active session details for frontend authorization
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_current_session_info(_app_handle: tauri::AppHandle, session_id: String) -> Result<Option<SessionInfo>, String> {
     let session = get_session(&session_id)
         .ok_or_else(|| "Invalid or expired session token".to_string())?;

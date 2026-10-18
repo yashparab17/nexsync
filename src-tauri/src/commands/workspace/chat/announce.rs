@@ -179,7 +179,7 @@ pub fn is_expired_target(conn: &Connection, e: &Entry, now: u64) -> bool {
     !target.is_empty() && matches!(e.kind.as_str(), KIND | END | ACK) && expired_announcements(conn, now).contains(target)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn expiry_sweep(app: tauri::AppHandle, path: String) -> Result<usize, String> {
     validate_allowed_root(&app, &path)?;
     let db = WorkspaceDb::open_existing(&path)?;

@@ -39,7 +39,7 @@ fn session(state: &TerminalState, id: &str) -> Result<Arc<PtySession>, String> {
 }
 
 /// Opens a shell in a folder of the workspace's projects folder and returns its id
-#[tauri::command]
+#[tauri::command(async)]
 pub fn terminal_open(
     app: AppHandle,
     state: State<'_, TerminalState>,
@@ -85,24 +85,24 @@ pub fn terminal_open(
 }
 
 /// The shells installed here, the default first
-#[tauri::command]
+#[tauri::command(async)]
 pub fn terminal_shells() -> Vec<Shell> {
     terminal_pty::shells()
 }
 
 /// Keys typed into the terminal, as the text the panel's emulator produced
-#[tauri::command]
+#[tauri::command(async)]
 pub fn terminal_write(state: State<'_, TerminalState>, id: String, data: String) -> Result<(), String> {
     session(&state, &id)?.write(data.as_bytes())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn terminal_resize(state: State<'_, TerminalState>, id: String, cols: u16, rows: u16) -> Result<(), String> {
     session(&state, &id)?.resize(cols, rows)
 }
 
 /// Ends the shell and forgets the terminal; does nothing if it already ended
-#[tauri::command]
+#[tauri::command(async)]
 pub fn terminal_close(state: State<'_, TerminalState>, id: String) {
     // Dropping the last handle kills the shell
     state.sessions.lock().unwrap_or_else(|p| p.into_inner()).remove(&id);

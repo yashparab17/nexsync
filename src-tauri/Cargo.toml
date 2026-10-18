@@ -26,7 +26,6 @@ serde_json = "1"
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
-tauri-plugin-decorum = "1.1.1"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
@@ -59,6 +58,7 @@ wordcraft-pdf = { git = "https://github.com/storytold/wordcraft", rev = "eae2421
 wordcraft-proof = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
 wordcraft-layout = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
 wordcraft-render = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
+wordcraft-fonts = { git = "https://github.com/storytold/wordcraft", rev = "eae242176108d328c5dd81fbc10370c51ab90706" }
 # Spreadsheet engine and .xlsx files (Phase 21): GridCraft, by commit. MIT OR Apache-2.0; see THIRD_PARTY_NOTICES.md.
 gridcraft-engine = { git = "https://github.com/storytold/gridcraft", rev = "f1894c6da64d4326022ae644c767581816a23c2c" }
 gridcraft-xlsx = { git = "https://github.com/storytold/gridcraft", rev = "f1894c6da64d4326022ae644c767581816a23c2c" }
@@ -73,110 +73,16 @@ deckcraft-render = { git = "https://github.com/storytold/deckcraft", rev = "1dc6
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
-# Signatures on every synced write are checked by these; unoptimised they take milliseconds each, which makes
-# `tauri dev` and the tests slow when many records sync at once
-[profile.dev.package.curve25519-dalek]
-opt-level = 3
-[profile.dev.package.ed25519-dalek]
-opt-level = 3
-[profile.dev.package.sha2]
-opt-level = 3
-
 # The device key goes in the OS credential store on these systems
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 keyring = { version = "3", default-features = false, features = ["windows-native", "apple-native"] }
-
-# Pattern matching runs over every file of a big project (ignore rules, secret scan); unoptimised it is slow enough to
-# make a debug build misleading about how the release one behaves
-[profile.dev.package.regex-automata]
-opt-level = 3
-[profile.dev.package.regex-syntax]
-opt-level = 3
-[profile.dev.package.aho-corasick]
-opt-level = 3
-[profile.dev.package.memchr]
-opt-level = 3
-[profile.dev.package.globset]
-opt-level = 3
-[profile.dev.package.ignore]
-opt-level = 3
-
-# The office engines are slow unoptimised (a 10,000-cell sheet took 1.8 s to recalculate in a debug build)
-[profile.dev.package.gridcraft-engine]
-opt-level = 3
-
-[profile.dev.package.gridcraft-calc]
-opt-level = 3
-
-[profile.dev.package.gridcraft-model]
-opt-level = 3
-
-[profile.dev.package.gridcraft-core]
-opt-level = 3
-
-[profile.dev.package.gridcraft-formula]
-opt-level = 3
-
-[profile.dev.package.gridcraft-functions]
-opt-level = 3
-
-[profile.dev.package.gridcraft-numfmt]
-opt-level = 3
-
-[profile.dev.package.gridcraft-xlsx]
-opt-level = 3
-
-[profile.dev.package.wordcraft-docx]
-opt-level = 3
-
-[profile.dev.package.wordcraft-formats]
-opt-level = 3
-
-[profile.dev.package.wordcraft-doc]
-opt-level = 3
-
-[profile.dev.package.quick-xml]
-opt-level = 3
-
-[profile.dev.package.deckcraft-model]
-opt-level = 3
-
-[profile.dev.package.deckcraft-pptx]
-opt-level = 3
-
-[profile.dev.package.deckcraft-render]
-opt-level = 3
-
-[profile.dev.package.deckcraft-text]
-opt-level = 3
-
-[profile.dev.package.deckcraft-fonts]
-opt-level = 3
-
-[profile.dev.package.vello_cpu]
-opt-level = 3
-
-[profile.dev.package.vello_common]
-opt-level = 3
-
-[profile.dev.package.skrifa]
-opt-level = 3
-
-[profile.dev.package.kurbo]
-opt-level = 3
-
-[profile.dev.package.wordcraft-pdf]
-opt-level = 3
-
-[profile.dev.package.wordcraft-layout]
-opt-level = 3
-
-[profile.dev.package.wordcraft-docbin]
-opt-level = 3
 
 # Required by craft-pdf (used by wordcraft-pdf): the PDF backend must be the patched one, which rejects writers that failed while unwinding.
 [patch.crates-io]
 krilla = { git = "https://github.com/storytold/craft-libs", rev = "c3487320b2d1de657b860b3c8abb44e1f2b32bd8" }
 
-[profile.dev.package.wordcraft-render]
+# Every dependency is optimised in debug builds too (built once, then cached): unoptimised, the office engines, the picture decoders
+# behind slides (a photo slide took 1.6 s to draw), signature checks and pattern matching make `tauri dev` far slower than a release.
+# Only this crate stays unoptimised, so it rebuilds quickly.
+[profile.dev.package."*"]
 opt-level = 3

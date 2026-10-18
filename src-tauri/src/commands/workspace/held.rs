@@ -283,7 +283,7 @@ pub fn accept_entry(conn: &Connection, id: &str, now: u64) -> Result<Option<chat
     Ok(merged.added.into_iter().next())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn held_entries_list(app: tauri::AppHandle, path: String) -> Result<Vec<chatlog::Entry>, String> {
     validate_allowed_root(&app, &path)?;
     list_entries(&WorkspaceDb::open_existing(&path)?.conn)
@@ -298,7 +298,7 @@ fn entry_reviewer(conn: &Connection) -> Result<(), String> {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn held_entry_accept(app: tauri::AppHandle, path: String, id: String) -> Result<(), String> {
     use tauri::Emitter;
     validate_allowed_root(&app, &path)?;
@@ -309,7 +309,7 @@ pub fn held_entry_accept(app: tauri::AppHandle, path: String, id: String) -> Res
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn held_entry_discard(app: tauri::AppHandle, path: String, id: String) -> Result<(), String> {
     validate_allowed_root(&app, &path)?;
     let db = WorkspaceDb::open_existing(&path)?;
@@ -381,7 +381,7 @@ fn adopt_card(conn: &Connection, ws_id: &str, id: &str, path: &str, sibling: Sib
 // Commands
 // ────────────────────────────
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn held_list(app: tauri::AppHandle, path: String) -> Result<Vec<Held>, String> {
     validate_allowed_root(&app, &path)?;
     list(&WorkspaceDb::open_existing(&path)?.conn)
@@ -402,19 +402,19 @@ fn reviewer(conn: &Connection, id: i64) -> Result<(), String> {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn held_review_get(app: tauri::AppHandle, path: String) -> Result<bool, String> {
     validate_allowed_root(&app, &path)?;
     Ok(review_on(&WorkspaceDb::open_existing(&path)?.conn))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn held_review_set(app: tauri::AppHandle, path: String, on: bool) -> Result<(), String> {
     validate_allowed_root(&app, &path)?;
     set_review(&WorkspaceDb::open_existing(&path)?.conn, on)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn held_accept(app: tauri::AppHandle, path: String, id: i64) -> Result<(), String> {
     validate_allowed_root(&app, &path)?;
     let db = WorkspaceDb::open_existing(&path)?;
@@ -423,7 +423,7 @@ pub fn held_accept(app: tauri::AppHandle, path: String, id: i64) -> Result<(), S
     accept(&db.conn, &ws_id, id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn held_discard(app: tauri::AppHandle, path: String, id: i64) -> Result<(), String> {
     validate_allowed_root(&app, &path)?;
     let db = WorkspaceDb::open_existing(&path)?;

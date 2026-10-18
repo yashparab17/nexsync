@@ -2,12 +2,12 @@
 // editors, notes and the code editor.
 
 import { ChevronDown, FilePlus } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 import { editorRouteFor } from "@/lib/editor/languages";
 import { routeOf } from "@/lib/p2p/presence";
-import { readRecent } from "@/lib/recentFiles";
+import { useRecent } from "@/lib/recentFiles";
 import { cn } from "@/lib/utils";
 import { useIsViewer } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -25,12 +25,8 @@ export default function SidebarQuick({ onNavigate }: { onNavigate?: () => void }
 	const { workspace } = useWorkspace();
 	const isViewer = useIsViewer();
 	const navigate = useNavigate();
-	const { pathname } = useLocation();
 	const [open, setOpen] = useState(false);
-	const [recent, setRecent] = useState<string[]>([]);
-	// Read again after each move between pages, which is when something new has been opened
-	const root = workspace?.path;
-	useEffect(() => setRecent(root ? readRecent(root).slice(0, 5) : []), [root, pathname]);
+	const recent = useRecent(workspace?.path).slice(0, 5);
 
 	return (
 		<div className="flex flex-col gap-0.5">

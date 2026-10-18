@@ -12,7 +12,7 @@ import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
 import Art from "@/components/elements/Art";
 import { DEFAULT_LAYOUT, loadLayout, moveTile, saveLayout, type DashboardLayout, type TileId, type TileSize } from "@/lib/dashboardLayout";
 import { formatAction } from "@/lib/insights";
-import { readRecent } from "@/lib/recentFiles";
+import { useRecent } from "@/lib/recentFiles";
 import { useRuns } from "@/features/projects/lib/projectRuns";
 import { getTasks, loadConfig, projectRuns, projectsList } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
@@ -100,7 +100,7 @@ export default function DashboardPage() {
 
 	const activity = metadata?.activity.events ?? [];
 	// Files opened in the Editor or Notes on this device, newest first
-	const recent = useMemo(() => (workspace ? readRecent(workspace.path) : []), [workspace]);
+	const recent = useRecent(workspace?.path);
 	const members = metadata?.members.members ?? [];
 	const online = useMemo(() => new Set([me, ...peers.filter((p) => p.status === "connected").map((p) => nameOf(p.id))]), [me, peers, nameOf]);
 	const due = useMemo(

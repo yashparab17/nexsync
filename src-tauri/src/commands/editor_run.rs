@@ -236,7 +236,7 @@ pub async fn run_command(
 }
 
 /// Stops a run started by [`run_command`]; does nothing if it already ended
-#[tauri::command]
+#[tauri::command(async)]
 pub fn kill_run(state: State<'_, RunState>, run_id: String) {
     if let Some(stop_tx) = state.runs.lock().unwrap_or_else(|p| p.into_inner()).remove(&run_id) {
         let _ = stop_tx.send(());

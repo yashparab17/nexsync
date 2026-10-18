@@ -16,6 +16,9 @@ export interface OfficeLayout {
 	pageNumbers: boolean;
 	// Where the text sits between the top and bottom margins: top, center, bottom or justify
 	valign: string;
+	// The font and size (points) of the file's ordinary text; empty and 0 when unknown
+	font?: string;
+	size?: number;
 }
 
 export interface OfficeInspect {
@@ -37,7 +40,12 @@ export interface OfficeInspect {
 }
 
 export interface Imported {
-	html: string;
+	// The document body as the editor's blocks, every paragraph and run carrying its Word formatting
+	blocks: unknown[];
+	// Each font's single line height as a multiple of its size, as Word measures it
+	fonts: Record<string, number>;
+	// The definitions of the document's lists (`num:level`), for numbering them as they change
+	lists: Record<string, { abs: number; format: string; text: string; start: number; restart: boolean }>;
 	title: string;
 	inspect: OfficeInspect;
 	// The page set-up the file has

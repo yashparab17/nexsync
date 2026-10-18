@@ -224,7 +224,7 @@ pub fn member_changes(conn: &Connection, key: &str, name: &str) -> Result<Vec<Me
     Ok(out)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_member_changes(app_handle: tauri::AppHandle, path: String, key: String, name: String) -> Result<Vec<MemberChange>, String> {
     member_changes(&open(&app_handle, &path)?.conn, &key, &name)
 }
@@ -248,7 +248,7 @@ fn open(app_handle: &tauri::AppHandle, path: &str) -> Result<crate::database::Wo
     crate::database::WorkspaceDb::open_existing(path)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_catchup(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Entry>, String> {
     let db = open(&app_handle, &path)?;
     // Housekeeping must not stop the review from loading
@@ -256,12 +256,12 @@ pub fn get_catchup(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Ent
     list(&db.conn)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mark_catchup(app_handle: tauri::AppHandle, path: String, ids: Vec<i64>, state: String) -> Result<(), String> {
     set_state(&open(&app_handle, &path)?.conn, &ids, &state)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[allow(clippy::too_many_arguments)] // the arguments are the fields the frontend sends
 pub fn add_text_catchup(app_handle: tauri::AppHandle, path: String, doc_id: String, label: String, who: Option<String>, before: String, after: String, live: Option<bool>) -> Result<(), String> {
     if doc_id.is_empty() || doc_id.len() > 512 || label.len() > 512 || who.as_ref().is_some_and(|w| w.len() > 128) {

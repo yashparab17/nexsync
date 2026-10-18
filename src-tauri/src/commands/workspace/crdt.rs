@@ -670,7 +670,7 @@ pub fn write_history(conn: &Connection, entity: &str, id: &str) -> Result<Vec<Lo
     rows.collect::<Result<_, _>>().map_err(db_err)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn record_history(app: tauri::AppHandle, path: String, entity: String, id: String) -> Result<Vec<LoggedWrite>, String> {
     crate::commands::config::validate_allowed_root(&app, &path)?;
     write_history(&crate::database::WorkspaceDb::open_existing(&path)?.conn, &entity, &id)

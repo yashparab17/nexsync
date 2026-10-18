@@ -301,7 +301,7 @@ pub fn find(dir: &Path) -> Vec<HttpFile> {
     out
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_http_files(app_handle: tauri::AppHandle, path: String, project: String) -> Result<Vec<HttpFile>, String> {
     validate_allowed_root(&app_handle, &path)?;
     Ok(find(&project_dir(&path, &project)?))

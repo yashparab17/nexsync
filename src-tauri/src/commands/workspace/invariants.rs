@@ -138,13 +138,13 @@ fn open(app_handle: &tauri::AppHandle, path: &str) -> Result<crate::database::Wo
     crate::database::WorkspaceDb::open_existing(path)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_rules(app_handle: tauri::AppHandle, path: String) -> Result<Vec<RuleInfo>, String> {
     let on = enabled(&open(&app_handle, &path)?.conn)?;
     Ok(RULES.iter().map(|r| RuleInfo { id: r.id, text: r.text, applies_to: r.applies_to, enabled: on.iter().any(|id| id == r.id) }).collect())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_rule(app_handle: tauri::AppHandle, path: String, id: String, enabled: bool) -> Result<(), String> {
     set_enabled(&open(&app_handle, &path)?.conn, &id, enabled)
 }

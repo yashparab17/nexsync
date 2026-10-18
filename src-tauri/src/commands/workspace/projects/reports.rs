@@ -71,14 +71,14 @@ pub fn find_reports(dir: &Path) -> Vec<ReportFile> {
 }
 
 /// The test and coverage reports lying in a project, newest first
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_reports(app_handle: tauri::AppHandle, path: String, project: String) -> Result<Vec<ReportFile>, String> {
     validate_allowed_root(&app_handle, &path)?;
     Ok(find_reports(&project_dir(&path, &project)?))
 }
 
 /// The text of one of them; the path is inside the project and names a report
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_read_report(app_handle: tauri::AppHandle, path: String, project: String, file: String) -> Result<String, String> {
     validate_allowed_root(&app_handle, &path)?;
     let file = file.trim_matches('/');

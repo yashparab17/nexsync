@@ -13,6 +13,7 @@ import { ArrowLeft, ChartColumn as BarChart3, SquareKanban as KanbanSquare, Layo
 import { Button } from "@/components/ui/button";
 import { t, type MessageKey } from "@/i18n";
 import Splitter from "@/components/elements/Splitter";
+import { setCollapsed, useCollapsed } from "@/hooks/useCollapsed";
 import { usePanelSize } from "@/hooks/usePanelSize";
 import { cn } from "@/lib/utils";
 import Avatar from "@/components/elements/Avatar";
@@ -248,10 +249,18 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 	const { workspace, clearWorkspace } = useWorkspace();
 	const navigate = useNavigate();
 	// How wide the sidebar is when open, remembered on this device; groups with a label can be folded away
-	const [width, setWidth] = usePanelSize("sidebar", DEFAULT_WIDTH, RAIL, 380);
-	// The drag decides it: a narrow sidebar is the icon rail, a wider one is at least MIN_OPEN
-	const collapsed = !expanded && width < COLLAPSE_BELOW;
-	const shownWidth = collapsed ? RAIL : Math.max(width, MIN_OPEN);
+	const [width, setWidth] = usePanelSize("sidebar", DEFAULT_WIDTH, MIN_OPEN, 380);
+	// The drag decides it: dragged narrow, the sidebar folds to the icon rail; dragged out of the rail, it opens at the usual width
+	const [railed] = useCollapsed("sidebar");
+	const collapsed = !expanded && railed;
+	const shownWidth = collapsed ? RAIL : width;
+	const resize = (next: number) => {
+		if (next === 0 || (collapsed && next >= COLLAPSE_BELOW)) {
+			setWidth(DEFAULT_WIDTH);
+			setCollapsed("sidebar", false);
+		} else if (!collapsed && next < COLLAPSE_BELOW) setCollapsed("sidebar", true);
+		else if (!collapsed) setWidth(next);
+	};
 	const [folded, setFolded] = useState(readFolded);
 	const toggleGroup = useCallback((id: string) => {
 		setFolded((prev) => {
@@ -327,7 +336,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 			</nav>
 
 			{/* Bottom Navigation */}
-			<nav className="flex flex-col gap-1 p-3">
+			<nav className="flex flex-col gap-1 border-t border-foreground/15 p-3">
 				{bottomNavigation.map((item) => (
 					<NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />
 				))}
@@ -338,7 +347,8 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 		</aside>
 
 			{/* The sidebar edge: drag it to change the width, narrow enough and it folds to icons; double-click to reset */}
-			{!expanded && <Splitter orientation="vertical" grows="right" size={shownWidth} onResize={(next) => setWidth(next === 0 ? DEFAULT_WIDTH : next)} label="Resize the sidebar" className="bg-transparent" quiet />}
+			{/* (a new edge each time it folds or opens, which ends the drag there) */}
+			{!expanded && <Splitter key={String(collapsed)} orientation="vertical" grows="right" size={shownWidth} onResize={resize} label="Resize the sidebar" className="bg-transparent" quiet />}
 		</div>
 	);
 }

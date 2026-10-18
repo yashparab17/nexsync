@@ -19,13 +19,15 @@ import QuickOpen, { type EditorCommand } from "@/features/editor/components/Quic
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
 import MarkdownPreview from "@/components/elements/MarkdownPreview";
 import Splitter from "@/components/elements/Splitter";
+import CollapsiblePane from "@/components/layout/CollapsiblePane";
+import { useCollapsed } from "@/hooks/useCollapsed";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { exportFolders } from "@/lib/export";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
-import { usePanelSize, useSidePanelWidth } from "@/hooks/usePanelSize";
+import { usePanelSize } from "@/hooks/usePanelSize";
 import { useReportItem, useReportLine } from "@/hooks/usePresence";
 import { isBinaryFile, isDocumentFile, isMarkdownFile } from "@/lib/editor/languages";
 import { baseName } from "@/lib/editor/fileKinds";
@@ -105,10 +107,9 @@ export default function EditorPage() {
 	const [vimMode, setVimMode] = useState("");
 	const [showBlame, setShowBlame] = useState(false);
 	const [preview, setPreview] = useState(false);
-	const [explorerOpen, setExplorerOpen] = useState(() => read("nexsync.editor.explorer", true));
+	const [, toggleExplorer] = useCollapsed("editor.explorer");
 	const [showPanel, setShowPanel] = useState(() => read("nexsync.editor.panel", true));
 	const [panelTab, setPanelTab] = useState<PanelTab>("terminal");
-	const [explorerWidth, setExplorerWidth] = useSidePanelWidth();
 	const [panelHeight, setPanelHeight] = usePanelSize("editor.panel", 208, 96, 640);
 	const [splitWidth, setSplitWidth] = usePanelSize("editor.split", 640, 240, 2400);
 	const [recent, setRecent] = useState<string[]>(() => readRecent(workspacePath));
@@ -132,11 +133,17 @@ export default function EditorPage() {
 		[workspacePath],
 	);
 
-	// Load the roots and every open folder, and again when a collaborator's changes arrive
+	// Load the roots and every open folder
 	useEffect(() => {
 		for (const dir of new Set([...ROOTS, ...expanded])) void loadDir(dir);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [loadDir, expanded, lastSyncedFile]);
+	}, [loadDir, expanded]);
+	// A collaborator's file: only the open folders it is in are read again (all of them after a whole-workspace sync)
+	useEffect(() => {
+		if (!lastSyncedFile) return;
+		const path = lastSyncedFile.relPath.replace(/^\/+/, "");
+		for (const dir of new Set([...ROOTS, ...expanded])) if (!path || path.startsWith(`${dir}/`)) void loadDir(dir);
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- only when a file arrives
+	}, [lastSyncedFile]);
 
 	// Load every folder under the roots, so the explorer filter can search files that are not expanded
 	const loadTree = useCallback(async () => {
@@ -329,7 +336,6 @@ export default function EditorPage() {
 	const canPreview = !!active && isMarkdownFile(active);
 	const previewOpen = preview && canPreview && !sideOpen;
 
-	const toggleExplorer = () => setExplorerOpen((v) => (remember("nexsync.editor.explorer", !v), !v));
 	const terminalRef = useRef<TerminalPanelHandle>(null);
 	const newTerminal = () => {
 		togglePanel("terminal");
@@ -558,9 +564,8 @@ export default function EditorPage() {
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-background">
 			<div className="flex min-h-0 flex-1">
-				{explorerOpen && (
-					<>
-						<div style={{ width: explorerWidth }} className="min-w-0 shrink-0">
+				<CollapsiblePane id="editor.explorer" defaultWidth={300} label="the explorer">
+						<div className="min-w-0 shrink-0">
 							<FileExplorer
 								roots={ROOTS}
 								entries={entries}
@@ -609,9 +614,7 @@ export default function EditorPage() {
 								}}
 							/>
 						</div>
-						<Splitter orientation="vertical" grows="right" size={explorerWidth} onResize={setExplorerWidth} label="Resize the explorer" quiet />
-					</>
-				)}
+				</CollapsiblePane>
 
 				<div className="flex min-w-0 flex-1 flex-col">
 					<Toolbar variant="tabs">
@@ -634,8 +637,6 @@ export default function EditorPage() {
 						path={current}
 						status={currentStatus}
 						handle={handleOf(current)}
-						explorerOpen={explorerOpen}
-						onToggleExplorer={toggleExplorer}
 						showBlame={showBlame}
 						onToggleBlame={() => setShowBlame((v) => !v)}
 						split={sideOpen}

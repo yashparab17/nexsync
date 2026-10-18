@@ -1,6 +1,7 @@
 // Where an inbox item or a comment count leads: the chat channel, or the file, task or card the comment thread is on.
 
 import { isThread } from "@/features/chat/lib/entries";
+import { isIn, LAYOUT } from "@/lib/workspaceLayout";
 
 const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
 
@@ -10,7 +11,11 @@ export function routeForChannel(channel: string): string {
 	const at = channel.indexOf(":");
 	const kind = channel.slice(0, at);
 	const target = channel.slice(at + 1);
-	if (kind === "doc") return `${isMarkdown(target) ? "/workspace/notes" : "/workspace/editor"}?open=${encodeURIComponent(target)}`;
+	if (kind === "doc") {
+		// An office file opens in its own editor, whose page is at its folder's path
+		const office = [LAYOUT.documents, LAYOUT.sheets, LAYOUT.slides].find((f) => isIn(target, f));
+		return `${office ? `/workspace/${office}` : isMarkdown(target) ? "/workspace/notes" : "/workspace/editor"}?open=${encodeURIComponent(target)}`;
+	}
 	if (kind === "task") return `/workspace/tasks?open=${encodeURIComponent(target)}`;
 	if (kind === "card") return `/workspace/kanban?open=${encodeURIComponent(target)}`;
 	// A change in the catch-up review, a branch or a draft has no page of its own: the dashboard is where they are reached

@@ -12,9 +12,10 @@ export const LAYOUT = {
 	others: "others",
 } as const;
 
-// The folders whose contents are shared with collaborators, and the ones the Editor offers to open files from
+// The folders whose contents are shared with collaborators, and the ones the Editor offers to open files from (notes and office
+// files have editors of their own)
 export const SHARED_FOLDERS = [LAYOUT.notes, LAYOUT.office, LAYOUT.others, LAYOUT.assets, LAYOUT.projects] as const;
-export const EDITOR_FOLDERS = [LAYOUT.projects, LAYOUT.office, LAYOUT.others, LAYOUT.notes] as const;
+export const EDITOR_FOLDERS = [LAYOUT.projects, LAYOUT.others] as const;
 
 const bare = (path: string) => path.replace(/^\/+/, "");
 

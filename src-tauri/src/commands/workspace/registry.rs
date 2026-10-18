@@ -36,7 +36,7 @@ pub(crate) fn is_same_path(p1: &str, p2: &str) -> bool {
 // ────────────────────────────
 
 /// Retrieves the list of recent workspaces, filtering invalid paths, refreshing metadata, and deduplicating
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_recent_workspaces(app_handle: tauri::AppHandle) -> Result<Vec<WorkspaceInfo>, String> {
     let registry = ensure_registry(&app_handle)?;
     if !registry.exists() {
@@ -81,7 +81,7 @@ pub fn get_recent_workspaces(app_handle: tauri::AppHandle) -> Result<Vec<Workspa
 }
 
 /// Retrieves the last opened workspace for startup session restoration
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_last_workspace(app_handle: tauri::AppHandle) -> Result<Option<WorkspaceInfo>, String> {
     let path = last_workspace_path(&app_handle)?;
     if !path.exists() {
@@ -101,7 +101,7 @@ pub fn get_last_workspace(app_handle: tauri::AppHandle) -> Result<Option<Workspa
 }
 
 /// Persists the last active workspace record
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_last_workspace(
     app_handle: tauri::AppHandle,
     workspace: WorkspaceInfo,
@@ -122,7 +122,7 @@ pub fn set_last_workspace(
 }
 
 /// Clears the last active workspace record
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_last_workspace(app_handle: tauri::AppHandle) -> Result<(), String> {
     let path = last_workspace_path(&app_handle)?;
     if path.exists() {
@@ -132,7 +132,7 @@ pub fn clear_last_workspace(app_handle: tauri::AppHandle) -> Result<(), String> 
 }
 
 /// Adds or moves a workspace to the top of the recent workspaces registry, deduplicating by ID and path
-#[tauri::command]
+#[tauri::command(async)]
 pub fn add_recent_workspace(
     app_handle: tauri::AppHandle,
     workspace: WorkspaceInfo,
@@ -162,7 +162,7 @@ pub fn add_recent_workspace(
 }
 
 /// Removes a workspace by ID or path from the recent workspaces registry
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remove_recent_workspace(
     app_handle: tauri::AppHandle,
     id: String,

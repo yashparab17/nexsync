@@ -32,11 +32,11 @@ export function PeopleStack({ people, max = 4 }: { people: Person[]; max?: numbe
 	return (
 		<span className="flex items-center -space-x-1.5" role="group" aria-label={`Also here: ${people.map((p) => p.name).join(", ")}`}>
 			{people.slice(0, max).map((p) => (
-				<span key={p.name} title={p.name} className="flex size-6 items-center justify-center rounded-full text-[11px] font-semibold text-white ring-2 ring-white/80" style={{ background: p.color }}>
+				<span key={p.name} title={p.name} className="flex size-6 items-center justify-center rounded-full text-[11px] font-semibold text-white ring-2 ring-background" style={{ background: p.color }}>
 					{p.name.trim().charAt(0).toUpperCase()}
 				</span>
 			))}
-			{people.length > max && <span className="flex size-6 items-center justify-center rounded-full bg-white/30 text-[11px] font-semibold text-white ring-2 ring-white/80">+{people.length - max}</span>}
+			{people.length > max && <span className="flex size-6 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-foreground ring-2 ring-background">+{people.length - max}</span>}
 		</span>
 	);
 }

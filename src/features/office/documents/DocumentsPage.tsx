@@ -1,4 +1,5 @@
 import { useNewParam } from "@/hooks/useNewParam";
+import { useSyncedIn } from "@/hooks/useSyncedIn";
 import { pushRecent } from "@/lib/recentFiles";
 // Documents: word-processor files (.docx, .odt, .rtf) of the workspace, opened as live shared documents. The file is where a document
 // starts and where a copy can go; while it is open, the shared copy is the document, and everyone with it open edits it together.
@@ -30,6 +31,7 @@ import { safeUploadName, validateFileName } from "@/lib/validation";
 import { useIsViewer, useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { Imported } from "@/features/office/types";
+import { setFontFactors } from "@/features/office/documents/lib/fontMetrics";
 
 interface Doc {
 	name: string;
@@ -43,7 +45,8 @@ export default function DocumentsPage() {
 	const { workspace, addActivityEvent } = useWorkspace();
 	const logError = useErrorLog();
 	const isViewer = useIsViewer();
-	const { selfName, viewersAt, lastSyncedFile } = useP2P();
+	const { selfName, viewersAt } = useP2P();
+	const synced = useSyncedIn(LAYOUT.documents);
 	const workspacePath = workspace?.path ?? "";
 	const author = selfName ?? "Someone";
 
@@ -53,6 +56,8 @@ export default function DocumentsPage() {
 	const [opened, setState] = useState<{ rel: string; imported?: Imported; error?: string; password?: boolean } | null>(null);
 	// What was opened, only while it is the file chosen: a file still opening when another is chosen never stands for that one
 	const state = opened && opened.rel === selected ? opened : null;
+	// The line heights of the file's fonts, before its text is drawn
+	if (state?.imported) setFontFactors(state.imported.fonts);
 	const [password, setPassword] = useState("");
 	const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 	const [creating, setCreating] = useState(false);
@@ -72,7 +77,7 @@ export default function DocumentsPage() {
 				setDocs([]);
 			});
 	}, [workspacePath, logError]);
-	useEffect(load, [load, lastSyncedFile]);
+	useEffect(load, [load, synced]);
 
 	useOpenParam((p) => setSelected(strip(p)), !!workspacePath);
 	useReportItem(selected);
@@ -128,6 +133,37 @@ export default function DocumentsPage() {
 			flash(false, errorText(err, "The file could not be updated."));
 		}
 	};
+
+	// The file read again, for putting it back in place of the shared copy
+	const reloadFile = async () => {
+		if (!selected) return null;
+		const rel = selected;
+		try {
+			const a = await officeImport(workspacePath, rel, password || null);
+			if (!a.imported) {
+				flash(false, a.error ?? "The file could not be read.");
+				return null;
+			}
+			setState({ rel, imported: a.imported });
+			flash(true, "The document now holds the file as it is.");
+			return a.imported;
+		} catch (err) {
+			flash(false, errorText(err, "The file could not be read."));
+			return null;
+		}
+	};
+
+	// The editor is given handlers that stay the same, so it is not drawn again each time this page is (they call the latest of these)
+	const latest = useRef({ saveCopy, updateFile, reloadFile });
+	latest.current = { saveCopy, updateFile, reloadFile };
+	const handlers = useMemo(
+		() => ({
+			saveCopy: (...a: Parameters<typeof saveCopy>) => latest.current.saveCopy(...a),
+			updateFile: (...a: Parameters<typeof updateFile>) => latest.current.updateFile(...a),
+			reloadFile: () => latest.current.reloadFile(),
+		}),
+		[],
+	);
 
 	const create = async () => {
 		const name = newName.trim();
@@ -299,7 +335,8 @@ export default function DocumentsPage() {
 						<DocumentWorkspace
 							key={selected}
 							collab={collab}
-							initialHtml={state.imported!.html}
+							initialBlocks={state.imported!.blocks}
+							lists={state.imported!.lists}
 							name={selected.split("/").pop() ?? ""}
 							title={title}
 							author={author}
@@ -308,8 +345,9 @@ export default function DocumentsPage() {
 							fileLayout={state.imported!.layout}
 							sourceId={state.imported!.sourceId}
 							canUpdateFile={["docx", "odt", "rtf"].includes(ext)}
-							onSaveCopy={saveCopy}
-							onUpdateFile={updateFile}
+							onSaveCopy={handlers.saveCopy}
+							onUpdateFile={handlers.updateFile}
+							onReload={handlers.reloadFile}
 							notice={notice}
 						/>
 					) : (

@@ -1596,74 +1596,75 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		: isJoining ? "connecting"
 		: "offline";
 
-	return (
-		<P2PContext.Provider
-			value={{
-				peers,
-				presence,
-				setMyPresence,
-				nameOf,
-				viewersAt: (page, item) => whoIsAt(presence, page, item).map(nameOf),
-				requestName: (name) => {
-					for (const host of peersRef.current.filter((p) => p.isHost)) send({ kind: "NAME_REQUEST", timestamp: Date.now(), payload: JSON.stringify({ name }) }, host.id);
-				},
-				connectionStatus,
-				placeholders,
-				syncProgress,
-				lastSyncedFile,
-				dataVersion,
-				selfName,
-				selfId,
-				requestRoleChange,
-				transfers,
-				cancelTransfers,
-				handoffOffer,
-				acceptHandoff,
-				declineHandoff,
-				transferHost,
-				publishDataChange,
-				refreshData,
-				shareRules: () => void sendRules(),
-				revertTextHunk,
-				shareNamedVersion,
-				createInvite,
-				createShortCode,
-				joinRequests,
-				resolveJoinRequest,
-				workspaceDeleted,
-				dismissWorkspaceDeleted,
-				announceWorkspaceDeleted,
-				revokeInvite,
-				joinWithTicket,
-				joinWithCode,
-				createSyncProvider,
-				requestWorkspaceSnapshot,
-				downloadFileOnDemand,
-				disconnectPeer,
-				blockDevice,
-				disconnectAll,
-				retryConnection,
-				link: linkOf(peers),
-				hostGate,
-				requireHost,
-				setRequireHost: async (on) => {
-					// The host applies it itself; an Admin guest asks, and the change comes back like any other
-					if (selfNameRef.current === null) {
-						await applyPolicy(on);
-						sendPolicy();
-						return;
-					}
-					for (const host of peersRef.current.filter((p) => p.isHost)) send({ kind: "POLICY_REQUEST", timestamp: Date.now(), payload: JSON.stringify({ requireHost: on }) }, host.id);
-				},
-				hostUnreachable,
-				hostName: selfName === null ? null : (metadata?.members.members.find((m) => m.role === "Owner")?.name ?? "the host"),
-				reconnectToHost,
-				network,
-			}}
-		>
-			{children}
-		</P2PContext.Provider>
+	// One value for as long as nothing in it changes, so the pages using it are not drawn again whenever this provider is
+	const value = useMemo<P2PContextType>(
+		() => ({
+			peers,
+			presence,
+			setMyPresence,
+			nameOf,
+			viewersAt: (page, item) => whoIsAt(presence, page, item).map(nameOf),
+			requestName: (name) => {
+				for (const host of peersRef.current.filter((p) => p.isHost)) send({ kind: "NAME_REQUEST", timestamp: Date.now(), payload: JSON.stringify({ name }) }, host.id);
+			},
+			connectionStatus,
+			placeholders,
+			syncProgress,
+			lastSyncedFile,
+			dataVersion,
+			selfName,
+			selfId,
+			requestRoleChange,
+			transfers,
+			cancelTransfers,
+			handoffOffer,
+			acceptHandoff,
+			declineHandoff,
+			transferHost,
+			publishDataChange,
+			refreshData,
+			shareRules: () => void sendRules(),
+			revertTextHunk,
+			shareNamedVersion,
+			createInvite,
+			createShortCode,
+			joinRequests,
+			resolveJoinRequest,
+			workspaceDeleted,
+			dismissWorkspaceDeleted,
+			announceWorkspaceDeleted,
+			revokeInvite,
+			joinWithTicket,
+			joinWithCode,
+			createSyncProvider,
+			requestWorkspaceSnapshot,
+			downloadFileOnDemand,
+			disconnectPeer,
+			blockDevice,
+			disconnectAll,
+			retryConnection,
+			link: linkOf(peers),
+			hostGate,
+			requireHost,
+			setRequireHost: async (on) => {
+				// The host applies it itself; an Admin guest asks, and the change comes back like any other
+				if (selfNameRef.current === null) {
+					await applyPolicy(on);
+					sendPolicy();
+					return;
+				}
+				for (const host of peersRef.current.filter((p) => p.isHost)) send({ kind: "POLICY_REQUEST", timestamp: Date.now(), payload: JSON.stringify({ requireHost: on }) }, host.id);
+			},
+			hostUnreachable,
+			hostName: selfName === null ? null : (metadata?.members.members.find((m) => m.role === "Owner")?.name ?? "the host"),
+			reconnectToHost,
+			network,
+		}),
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- the refs are read when called
+		[peers, presence, setMyPresence, nameOf, send, connectionStatus, placeholders, syncProgress, lastSyncedFile, dataVersion, selfName, selfId, requestRoleChange, transfers, cancelTransfers, handoffOffer, acceptHandoff, declineHandoff, transferHost, publishDataChange, refreshData, sendRules, revertTextHunk, shareNamedVersion, createInvite, createShortCode, joinRequests, resolveJoinRequest, workspaceDeleted, dismissWorkspaceDeleted, announceWorkspaceDeleted, revokeInvite, joinWithTicket, joinWithCode, createSyncProvider, requestWorkspaceSnapshot, downloadFileOnDemand, disconnectPeer, blockDevice, disconnectAll, retryConnection, hostGate, requireHost, applyPolicy, sendPolicy, hostUnreachable, metadata, reconnectToHost, network],
 	);
+
+	return <P2PContext.Provider value={value}>{children}</P2PContext.Provider>;
 }
 
 export function useP2P() {

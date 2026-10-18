@@ -31,6 +31,7 @@ impl WorkspaceDb {
 
 		let conn =
 			Connection::open_with_flags(&db_file, flags).map_err(|e| e.to_string())?;
+		conn.busy_timeout(std::time::Duration::from_secs(10)).map_err(|e| e.to_string())?;
 
 		// Configure SQLite pragmas
 		conn.execute_batch(
@@ -62,6 +63,8 @@ impl WorkspaceDb {
 
 		let flags = OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_FULL_MUTEX;
 		let conn = Connection::open_with_flags(&db_file, flags).map_err(|e| e.to_string())?;
+		// Commands run side by side on worker threads: a write that meets another waits its turn instead of failing
+		conn.busy_timeout(std::time::Duration::from_secs(10)).map_err(|e| e.to_string())?;
 
 		// Configure SQLite pragmas
 		conn.execute_batch(
@@ -76,9 +79,20 @@ impl WorkspaceDb {
 
 		let db = Self { conn };
 
-		// Ensure schema is up to date
-		crate::database::schema::init_schema(&db.conn).map_err(|e| e.to_string())?;
+		// Ensure schema is up to date, once per database a run: every command opens a connection, and setting up the schema each
+		// time (dozens of statements) was most of the cost of the small ones, such as saving a shared document as it is typed in
+		if schema_checked(&db_file) {
+			crate::database::schema::init_schema(&db.conn).map_err(|e| e.to_string())?;
+		}
 
 		Ok(db)
 	}
+}
+
+/// True the first time it is asked about a database file in this run (its schema then wants checking), false after
+fn schema_checked(db_file: &std::path::Path) -> bool {
+	use std::collections::HashSet;
+	use std::sync::{Mutex, OnceLock};
+	static SEEN: OnceLock<Mutex<HashSet<std::path::PathBuf>>> = OnceLock::new();
+	SEEN.get_or_init(|| Mutex::new(HashSet::new())).lock().unwrap_or_else(|p| p.into_inner()).insert(db_file.to_path_buf())
 }

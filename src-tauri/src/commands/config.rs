@@ -361,13 +361,13 @@ pub fn validate_allowed_root(
 }
 
 /// Tauri command to retrieve current application config
-#[tauri::command]
+#[tauri::command(async)]
 pub fn load_config_cmd(app_handle: tauri::AppHandle) -> Result<NexsyncConfig, String> {
     load_config(&app_handle)
 }
 
 /// Tauri command to persist application config
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_config_cmd(
     app_handle: tauri::AppHandle,
     config: NexsyncConfig,
@@ -376,7 +376,7 @@ pub fn save_config_cmd(
 }
 
 /// Tauri command to check if a workspace path is allowed
-#[tauri::command]
+#[tauri::command(async)]
 pub fn validate_allowed_root_cmd(
     app_handle: tauri::AppHandle,
     workspace_path: String,

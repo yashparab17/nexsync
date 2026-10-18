@@ -266,7 +266,7 @@ pub fn import(path: &str, bundle: &Bundle) -> Result<Report, String> {
     Ok(report)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn bundle_export(app: tauri::AppHandle, path: String, dest: String) -> Result<usize, String> {
     validate_allowed_root(&app, &path)?;
     let bundle = make(&path)?;
@@ -284,13 +284,13 @@ fn read_bundle(source: &str) -> Result<Bundle, String> {
     serde_json::from_str(&text).map_err(|_| "That file is not a Nexsync bundle.".to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn bundle_inspect(app: tauri::AppHandle, path: String, source: String) -> Result<Summary, String> {
     validate_allowed_root(&app, &path)?;
     inspect(&path, &read_bundle(&source)?)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn bundle_import(app: tauri::AppHandle, path: String, source: String) -> Result<Report, String> {
     use tauri::Emitter;
     validate_allowed_root(&app, &path)?;

@@ -35,7 +35,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         // Only its show_snap_overlay command is used, by the title bar's maximize button (Windows 11 snap layouts)
-        .plugin(tauri_plugin_decorum::init())
         .invoke_handler(tauri::generate_handler![
             // Updates
             commands::updates::check_for_update,
@@ -138,6 +137,8 @@ pub fn run() {
             // Yjs CRDT binary document persistence
             commands::workspace::get_yjs_doc,
             commands::workspace::save_yjs_doc,
+            commands::workspace::get_yjs_doc_raw,
+            commands::workspace::save_yjs_doc_raw,
             commands::workspace::rename_yjs_doc,
             commands::workspace::delete_yjs_doc,
 
@@ -232,6 +233,7 @@ pub fn run() {
             commands::workspace::office::documents::office_render,
             commands::workspace::office::documents::office_layout,
             commands::workspace::office::documents::office_page,
+            commands::workspace::office::documents::office_margins,
             commands::workspace::office::documents::office_export,
             commands::workspace::office::documents::office_inspect,
             commands::workspace::projects::lsp::lsp_status,

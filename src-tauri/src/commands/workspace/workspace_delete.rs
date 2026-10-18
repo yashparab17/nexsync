@@ -53,7 +53,7 @@ fn check_deletable(dir: &Path, protected: &[PathBuf]) -> Result<(), String> {
 }
 
 /// Moves the workspace at `path` to the recycle bin
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_workspace(app_handle: tauri::AppHandle, path: String) -> Result<DeleteOutcome, String> {
     validate_allowed_root(&app_handle, &path)?;
     let dir = Path::new(&path).canonicalize().map_err(|_| "The workspace folder no longer exists.".to_string())?;

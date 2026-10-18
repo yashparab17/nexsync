@@ -1,5 +1,6 @@
 // A side panel with a draggable edge, like the main sidebar: drag it to change the width, drag it narrow enough and the panel folds
-// away; double-click the edge for the usual width. Folded, it leaves a thin edge that opens it again when dragged, and a small button.
+// away; double-click the edge for the usual width. Folded, it leaves a thin edge that opens it again, at the usual width, when dragged,
+// and a small button.
 // The width and the fold are kept per panel on this device. The panel's own width class is overridden by the width kept here.
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -19,16 +20,20 @@ export default function CollapsiblePane({ id, label, side = "left", defaultWidth
 	const [width, setWidth] = usePanelSize(`pane.${id}`, defaultWidth, MIN_OPEN, MAX);
 	const grows = side === "left" ? "right" : "left";
 	const Arrow = side === "left" ? ChevronRight : ChevronLeft;
+	const open = () => {
+		setWidth(defaultWidth);
+		setCollapsed(id, false);
+	};
 
 	if (collapsed)
 		return (
 			<div data-pane={id} className={cn("relative flex min-h-0 shrink-0 flex-row", side === "right" && "flex-row-reverse", className)}>
-				<Splitter orientation="vertical" grows={grows} size={0} onResize={(n) => n > 60 && setCollapsed(id, false)} label={`Drag to show ${label}`} quiet />
+				<Splitter orientation="vertical" grows={grows} size={0} onResize={(n) => n > 60 && open()} label={`Drag to show ${label}`} quiet />
 				<button
 					type="button"
 					aria-label={`Show ${label}`}
 					title={`Show ${label}`}
-					onClick={() => setCollapsed(id, false)}
+					onClick={open}
 					className={cn("absolute top-1/2 z-20 flex h-10 w-4 -translate-y-1/2 items-center justify-center border bg-background text-muted-foreground opacity-60 shadow-sm outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring", side === "left" ? "left-0 rounded-r-sm border-l-0" : "right-0 rounded-l-sm border-r-0")}
 				>
 					<Arrow className="size-3" />

@@ -188,7 +188,7 @@ pub struct Generators {
     pub error: Option<String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_generators(app_handle: tauri::AppHandle, path: String, project: String) -> Result<Generators, String> {
     validate_allowed_root(&app_handle, &path)?;
     Ok(match load(&project_dir(&path, &project)?) {
@@ -198,7 +198,7 @@ pub fn project_generators(app_handle: tauri::AppHandle, path: String, project: S
 }
 
 /// Lists the files a generator would write (`dry_run`), or writes them. If any file already exists nothing is written.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_generate(app_handle: tauri::AppHandle, path: String, project: String, generator: String, values: HashMap<String, String>, dry_run: bool) -> Result<Vec<Planned>, String> {
     validate_allowed_root(&app_handle, &path)?;
     let dir = project_dir(&path, &project)?;

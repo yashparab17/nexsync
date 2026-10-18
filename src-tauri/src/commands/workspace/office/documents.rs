@@ -3,10 +3,10 @@
 //!
 //! The reading and writing is done by the format crates of WordCraft (MIT OR Apache-2.0, pinned by commit, see
 //! THIRD_PARTY_NOTICES.md). A document lives in the workspace as a shared rich-text document; the file is a copy that goes in
-//! and out. Coming in, the file becomes HTML for the editor; going out, the editor's HTML becomes the file. So what is kept is
-//! what the editor can hold: text, headings, lists, tables, links, images and character styles. Page layout (margins, columns,
-//! headers, footers), styles by name, footnotes, fields and comments are not carried into the editor yet, and `import` lists what it
-//! saw and left out so a person is told, not surprised.
+//! and out. Coming in, the file becomes the editor's blocks directly (`blocks`), every paragraph and run carrying its Word formatting:
+//! spacing, indents, line spacing, keeps, page breaks, list numbering, fonts, colours. Going out, the editor's HTML is merged into
+//! the file it came from (`merge`), so what the editor does not hold (style names, sections, headers and footers) stays. Footnotes,
+//! fields and comments are not carried into the editor yet, and `import` lists what it saw and left out so a person is told.
 //!
 //! A file from another person is hostile input. It is size-limited, a zip package is checked for a zip bomb before any part is
 //! unpacked, nothing it points at is fetched, a macro is reported and never run, the work runs on its own thread so a panic in a
@@ -58,8 +58,12 @@ pub struct Inspect {
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Imported {
-    /// The document body as HTML for the editor
-    pub html: String,
+    /// The document body as the editor's blocks, every paragraph and run carrying its Word formatting (see `blocks`)
+    pub blocks: Vec<serde_json::Value>,
+    /// The line height of each font the blocks use, as Word measures single spacing (a multiple of the font's size)
+    pub fonts: std::collections::BTreeMap<String, f32>,
+    /// The definitions of the lists the blocks belong to, for numbering them as they change (`num:level`)
+    pub lists: std::collections::BTreeMap<String, super::blocks::ListLevel>,
     pub title: String,
     pub inspect: Inspect,
     /// The page set-up the file has, for the editor's page and header settings to start from
@@ -90,6 +94,9 @@ pub struct Layout {
     pub page_numbers: bool,
     /// Where the text sits between the top and bottom margins of each page: `top`, `center`, `bottom` or `justify`
     pub valign: String,
+    /// The font and size of the file's ordinary text (its Normal style), which the editor's page starts from; empty and 0 when unknown
+    pub font: String,
+    pub size: f32,
 }
 
 fn line_block(text: &str, page_number: bool, align: wordcraft_doc::Align) -> std::sync::Arc<wordcraft_doc::Block> {
@@ -236,41 +243,6 @@ fn inspect_of(doc: &wordcraft_doc::Document) -> Inspect {
     }
 }
 
-/// The inside of `<body>` of the HTML a document exports
-/// Joins neighbouring spans that carry the same style (`<span style="a">x</span><span style="a">y</span>`): flattening the styles puts one on
-/// every run, and a long file would otherwise hand the editor tens of thousands of elements for the same look
-fn merge_spans(html: &str) -> String {
-    const JOIN: &str = "</span><span style=\"";
-    let mut out = String::with_capacity(html.len());
-    let mut rest = html;
-    // The style of the span that is open, when what is inside it so far is plain text
-    while let Some(at) = rest.find(JOIN) {
-        let (before, after) = rest.split_at(at);
-        let tail = &after[JOIN.len()..];
-        let Some(end) = tail.find("\">") else { break };
-        let style = &tail[..end];
-        let opener = format!("<span style=\"{style}\">");
-        let same = out.len() + before.len() >= opener.len()
-            && before.rfind("<span style=\"").is_some_and(|i| before[i..].starts_with(&opener) && !before[i + opener.len()..].contains('<'))
-            || (before.rfind("<span style=\"").is_none() && out.rfind("<span style=\"").is_some_and(|i| out[i..].starts_with(&opener) && !out[i + opener.len()..].contains('<') && before.find('<').is_none()));
-        out.push_str(before);
-        if same {
-            rest = &tail[end + 2..];
-        } else {
-            out.push_str(JOIN);
-            rest = tail;
-        }
-    }
-    out.push_str(rest);
-    out
-}
-
-fn body_of(html: &str) -> String {
-    let start = html.find("<body").and_then(|i| html[i..].find('>').map(|j| i + j + 1)).unwrap_or(0);
-    let end = html.rfind("</body>").unwrap_or(html.len());
-    html[start..end.max(start)].trim().to_string()
-}
-
 fn ext_of(name: &str) -> String {
     name.rsplit('.').next().unwrap_or("").to_ascii_lowercase()
 }
@@ -312,23 +284,17 @@ pub fn import(name: &str, bytes: &[u8], password: Option<&str>) -> Result<Import
         return Err(Refusal::text(format!("Nexsync cannot open .{ext} files as documents yet. It opens {}.", IMPORTABLE.join(", "))));
     }
     let package = matches!(ext.as_str(), "docx" | "docm" | "dotx" | "dotm" | "odt");
-    let flatten = package || matches!(ext.as_str(), "rtf" | "doc" | "dot");
     let names = if package && !bytes.starts_with(&[0xD0, 0xCF, 0x11, 0xE0]) { check_package(bytes).map_err(Refusal::text)? } else { Vec::new() };
     let doc = read_document(&ext, bytes, password)?;
     let layout = super::merge::layout_of(&doc);
     let source_id = Some(super::merge::keep(bytes, &ext, &doc));
-    // The editor shows what is written on each run, so what the styles say (the font of a heading, the size of the body, a colour from a
-    // character style) is written there first
-    let mut doc = doc;
-    if flatten {
-        let _ = catch_unwind(AssertUnwindSafe(|| flatten_styles(&mut doc)));
+    // Headers and footers with shapes WordCraft draws as boxes are drawn from a copy with those shapes written out
+    if let (true, Some(id)) = (matches!(ext.as_str(), "docx" | "docm" | "dotx" | "dotm"), &source_id) {
+        if let Some(Ok(drawn)) = super::presets::drawn_copy(bytes).map(|copy| read_document(&ext, &copy, password)) {
+            super::merge::keep_drawn(id, drawn);
+        }
     }
-    let html = catch_unwind(AssertUnwindSafe(|| wordcraft_formats::export("html", &doc)))
-        .ok()
-        .flatten()
-        .and_then(Result::ok)
-        .map(|b| String::from_utf8_lossy(&b).into_owned())
-        .ok_or_else(|| Refusal::text("This document could not be shown."))?;
+    let converted = catch_unwind(AssertUnwindSafe(|| super::blocks::convert(&doc))).map_err(|_| Refusal::text("This document could not be shown."))?;
     let mut inspect = inspect_of(&doc);
     if package {
         inspect.macros = names.iter().any(|n| n.ends_with("vbaProject.bin"));
@@ -351,148 +317,10 @@ pub fn import(name: &str, bytes: &[u8], password: Option<&str>) -> Result<Import
         inspect.left_out.push(format!("{} tracked change{}: the text is shown as it reads with them accepted.", inspect.revisions, if inspect.revisions == 1 { "" } else { "s" }));
     }
     if package || ext == "rtf" {
-        inspect.left_out.push("Page layout (margins, columns, headers, footers), named styles, footnotes and fields.".into());
+        inspect.left_out.push("Style names (the formatting they give is kept), footnotes, comments and fields other than page numbers.".into());
     }
     let title = if doc.core.title.trim().is_empty() { name.rsplit(['/', '\\']).next().unwrap_or(name).rsplit_once('.').map(|(s, _)| s.to_string()).unwrap_or_else(|| name.to_string()) } else { doc.core.title.clone() };
-    Ok(Imported { html: merge_spans(&lift_notes(&body_of(&html))), title, inspect, layout, source_id })
-}
-
-/// The font and size the editor's page starts from; a run is given a font or size only where the file asks for another
-const EDITOR_FONT: &str = "Calibri";
-const EDITOR_SIZE: f32 = 11.0;
-
-/// Opens and closes the note a paragraph carries its spacing in (private-use characters, so it cannot be mistaken for text)
-const NOTE_OPEN: char = '\u{E000}';
-const NOTE_CLOSE: char = '\u{E001}';
-
-/// HTML has nowhere to put a paragraph's spacing, indent or table-of-contents look, so they are written at the start of its text, as a note
-/// `lift_notes` turns into an attribute of the paragraph's element (the editor reads it from there)
-fn mark_spacing(p: &mut wordcraft_doc::Paragraph, styles: &wordcraft_doc::StyleSheet, section: Option<(bool, char)>) {
-    if p.text.is_empty() {
-        return;
-    }
-    let r = styles.resolve_para(&p.props);
-    let listed = r.numbering.is_some();
-    // A line of a table of contents ("Title<tab>12"): the page number goes to the right edge
-    let is_toc = |s: &str| s.len() > 3 && s.is_char_boundary(3) && s[..3].eq_ignore_ascii_case("toc") && matches!(s.as_bytes()[3], b'0'..=b'9' | b' ');
-    let named = p.props.style.as_deref().and_then(|id| styles.styles.iter().find(|s| s.id == id)).is_some_and(|s| is_toc(&s.name));
-    let toc = (named || p.props.style.as_deref().is_some_and(is_toc)) && p.text.matches('\t').count() == 1;
-    let (left, first) = if listed { (0.0, 0.0) } else { (r.indent_left, r.indent_first) };
-    let (brk, valign) = section.unwrap_or((false, '-'));
-    let note = format!("{NOTE_OPEN}{:.1},{:.1},{:.1},{:.1},{},{},{valign},{}{NOTE_CLOSE}", r.space_before, r.space_after, left, first, u8::from(toc), u8::from(brk), u8::from(r.keep_next));
-    p.text.insert_str(0, &note);
-    p.runs.insert(0, wordcraft_doc::Run { len: note.len(), props: Default::default() });
-}
-
-/// Moves each note `mark_spacing` wrote from the text into a `data-nx-sp` attribute on the element before it
-fn lift_notes(html: &str) -> String {
-    let mut out = String::with_capacity(html.len());
-    let mut rest = html;
-    while let Some(at) = rest.find(NOTE_OPEN) {
-        let after = &rest[at + NOTE_OPEN.len_utf8()..];
-        let Some(end) = after.find(NOTE_CLOSE) else { break };
-        let note = &after[..end];
-        let head = &rest[..at];
-        match head.strip_suffix('>') {
-            Some(tag) => {
-                out.push_str(tag);
-                out.push_str(&format!(" data-nx-sp=\"{note}\">"));
-            }
-            None => out.push_str(head),
-        }
-        rest = &after[end + NOTE_CLOSE.len_utf8()..];
-    }
-    out.push_str(rest);
-    out
-}
-
-/// Writes what the styles say into each run (font, size, bold, italic, underline, colour), so the HTML the editor is filled from carries
-/// it: Word files keep most of their look in named styles, and HTML has nowhere to put those.
-fn flatten_styles(doc: &mut wordcraft_doc::Document) {
-    use std::sync::Arc;
-    use wordcraft_doc::{props::TextColor, Block, Blocks};
-
-    fn blocks(list: &mut Blocks, styles: &wordcraft_doc::StyleSheet, starts: &std::collections::HashMap<usize, (bool, char)>) {
-        for (i, b) in list.iter_mut().enumerate() {
-            match Arc::make_mut(b) {
-                Block::Para(p) => para(p, styles, starts.get(&i).copied()),
-                Block::Table(t) => {
-                    for row in &mut t.rows {
-                        for cell in &mut row.cells {
-                            blocks(&mut cell.blocks, styles, &std::collections::HashMap::new());
-                        }
-                    }
-                }
-            }
-        }
-    }
-    fn para(p: &mut wordcraft_doc::Paragraph, styles: &wordcraft_doc::StyleSheet, section: Option<(bool, char)>) {
-        let style = p.props.style.clone();
-        // Centring and the like that comes from the paragraph's style, not from the paragraph itself
-        let resolved = styles.resolve_para(&p.props);
-        let aligned = resolved.align;
-        // A title or heading whose style names no colour is black in Word; the editor would otherwise paint its own heading colour
-        let heading = resolved.outline_level.is_some() || style.as_deref().is_some_and(|s| matches!(s, "Title" | "Subtitle"));
-        if p.props.align.is_none() && aligned != wordcraft_doc::props::Align::Left {
-            p.props.align = Some(aligned);
-        }
-        for run in &mut p.runs {
-            let r = styles.resolve_char(style.as_deref(), &run.props);
-            if !r.font.is_empty() && !r.font.eq_ignore_ascii_case(EDITOR_FONT) {
-                run.props.font = Some(r.font.clone());
-            }
-            if r.size > 0.0 && (r.size - EDITOR_SIZE).abs() > 0.05 {
-                run.props.size = Some(r.size);
-            }
-            if r.bold {
-                run.props.bold = Some(true);
-            }
-            if r.italic {
-                run.props.italic = Some(true);
-            }
-            if r.underline != wordcraft_doc::props::Underline::None {
-                run.props.underline = Some(r.underline);
-            }
-            if let TextColor::Rgb(c) = r.color {
-                run.props.color = Some(TextColor::Rgb(c));
-            } else if heading {
-                run.props.color = Some(TextColor::Rgb(wordcraft_doc::Rgb(0, 0, 0)));
-            }
-        }
-        mark_spacing(p, styles, section);
-    }
-    let styles = doc.styles.clone();
-    let starts = section_starts(doc);
-    blocks(&mut doc.body, &styles, &starts);
-}
-
-/// For the first paragraph of each section of a file with several: whether the section starts a new page, and how its text sits on the
-/// page (`c`entre, `b`ottom, `j`ustify, `-` top). The editor has one page set-up, so these ride on the paragraph like its spacing.
-fn section_starts(doc: &wordcraft_doc::Document) -> std::collections::HashMap<usize, (bool, char)> {
-    use wordcraft_doc::{section::{PageVAlign, SectionStart}, Block};
-    let mut ends: Vec<(usize, &wordcraft_doc::SectionProps)> = doc.body.iter().enumerate().filter_map(|(i, b)| if let Block::Para(p) = &**b { p.section.as_deref().map(|s| (i, s)) } else { None }).collect();
-    let mut out = std::collections::HashMap::new();
-    if ends.is_empty() {
-        return out;
-    }
-    ends.push((doc.body.len().saturating_sub(1), &doc.last_section));
-    let mut start = 0;
-    for (k, (end, s)) in ends.iter().enumerate() {
-        let valign = match s.valign {
-            PageVAlign::Center => 'c',
-            PageVAlign::Bottom => 'b',
-            PageVAlign::Justify => 'j',
-            _ => '-',
-        };
-        let brk = k > 0 && s.start != SectionStart::Continuous;
-        if (brk || valign != '-') && start <= *end {
-            if let Some(i) = (start..=*end).find(|&i| matches!(&*doc.body[i], Block::Para(p) if !p.text.is_empty())) {
-                out.insert(i, (brk, valign));
-            }
-        }
-        start = end + 1;
-    }
-    out
+    Ok(Imported { blocks: converted.blocks, fonts: converted.fonts, lists: converted.lists, title, inspect, layout, source_id })
 }
 
 /// The document the editor's HTML stands for. With the file it came from (`source`), that file is brought up to date with the text, so
@@ -593,7 +421,7 @@ pub fn draw_page(session: u64, index: usize, scale: f32) -> Result<PageImage, St
     let laid = LAID.lock().unwrap_or_else(|p| p.into_inner()).iter().find(|(k, _)| *k == session).map(|(_, l)| l.clone()).ok_or("These pages are no longer kept. Open the view again.")?;
     let page = laid.pages.get(index).ok_or("There is no such page.")?;
     let scale = scale.clamp(0.5, 2.0);
-    catch_unwind(AssertUnwindSafe(|| PageImage { png: BASE64_STANDARD.encode(wordcraft_render::render_page(&laid.doc, page, scale, &wordcraft_render::RenderOptions::default()).to_png()), width_pt: page.w, height_pt: page.h }))
+    catch_unwind(AssertUnwindSafe(|| PageImage { png: BASE64_STANDARD.encode(wordcraft_render::render_page(&laid.doc, page, scale, &wordcraft_render::RenderOptions::default()).to_png()), width_pt: page.w, height_pt: page.h, body_top_pt: page.body.y, body_height_pt: page.body.h }))
         .map_err(|_| "That page could not be drawn safely.".to_string())
 }
 
@@ -604,6 +432,9 @@ pub struct PageImage {
     pub png: String,
     pub width_pt: f32,
     pub height_pt: f32,
+    /// Where the text goes on the page (points from its top): between the margins, less what a header or footer reaches into them
+    pub body_top_pt: f32,
+    pub body_height_pt: f32,
 }
 
 const MAX_PAGES: usize = 200;
@@ -629,7 +460,7 @@ pub fn render_pages_with(html: &str, title: &str, layout: Option<&Layout>, scale
             .pages
             .iter()
             .take(MAX_PAGES)
-            .map(|p| PageImage { png: BASE64_STANDARD.encode(wordcraft_render::render_page(&doc, p, scale, &opts).to_png()), width_pt: p.w, height_pt: p.h })
+            .map(|p| PageImage { png: BASE64_STANDARD.encode(wordcraft_render::render_page(&doc, p, scale, &opts).to_png()), width_pt: p.w, height_pt: p.h, body_top_pt: p.body.y, body_height_pt: p.body.h })
             .collect())
     }))
     .map_err(|_| "The pages could not be drawn safely.".to_string())?
@@ -656,6 +487,86 @@ pub struct ImportAnswer {
 #[tauri::command]
 pub async fn office_layout(html: String, title: String, layout: Option<Layout>, source_id: Option<String>) -> Result<PageList, String> {
     tokio::task::spawn_blocking(move || lay_out(&html, &title, layout.as_ref(), source_id.as_deref())).await.map_err(|e| e.to_string())?
+}
+
+/// The file's headers and footers (shapes, lines and page numbers as Word draws them) for each page of the editor, which shows the text
+/// itself: a stand-in for the file with its sections and one empty page for each of the editor's, laid out by WordCraft so that page
+/// fields, first-page and section rules work as in Word. Each stand-in is kept for its file and page count.
+struct Margins {
+    source: String,
+    pages: usize,
+    doc: wordcraft_doc::Document,
+    laid: Vec<wordcraft_layout::Page>,
+}
+static MARGINS: std::sync::Mutex<Vec<std::sync::Arc<Margins>>> = std::sync::Mutex::new(Vec::new());
+// Which section each page of a file is in, from laying the file out once
+static SECTIONS_OF: std::sync::Mutex<Vec<(String, std::sync::Arc<Vec<usize>>)>> = std::sync::Mutex::new(Vec::new());
+
+fn margins_for(source: &str, pages: usize) -> Result<std::sync::Arc<Margins>, String> {
+    use std::sync::Arc;
+    use wordcraft_doc::{Block, Paragraph};
+    let mut kept = MARGINS.lock().unwrap_or_else(|p| p.into_inner());
+    if let Some(m) = kept.iter().find(|m| m.source == source && m.pages == pages) {
+        return Ok(m.clone());
+    }
+    let src = super::merge::drawn(source).ok_or("The file is no longer kept. Open it again.")?;
+    let opts = wordcraft_layout::LayoutOptions::default();
+    let known = SECTIONS_OF.lock().unwrap_or_else(|p| p.into_inner()).iter().find(|(k, _)| k == source).map(|(_, v)| v.clone());
+    let of_page = match known {
+        Some(v) => v,
+        None => {
+            let v: Arc<Vec<usize>> = Arc::new(wordcraft_layout::layout(&src, &mut wordcraft_layout::LayoutCache::new(), &opts).pages.iter().map(|p| p.section).collect());
+            let mut all = SECTIONS_OF.lock().unwrap_or_else(|p| p.into_inner());
+            all.push((source.to_string(), v.clone()));
+            if all.len() > KEEP_LAID {
+                all.remove(0);
+            }
+            v
+        }
+    };
+    let sections: Vec<wordcraft_doc::SectionProps> = src.sections().into_iter().map(|(_, s)| s.clone()).collect();
+    // Past the file's own pages, the editor's go on in the file's last section
+    let sec = |i: usize| of_page.get(i).or(of_page.last()).copied().unwrap_or(0).min(sections.len().saturating_sub(1));
+    let pages = pages.clamp(1, MAX_PAGES);
+    let mut doc = (*src).clone();
+    doc.body = (0..pages)
+        .map(|i| {
+            let mut p = Paragraph::default();
+            if i > 0 && sec(i) == sec(i - 1) {
+                p.props.page_break_before = Some(true);
+            }
+            if i + 1 < pages && sec(i + 1) != sec(i) {
+                p.section = Some(Box::new(sections[sec(i)].clone()));
+            }
+            Arc::new(Block::Para(p))
+        })
+        .collect();
+    doc.last_section = sections[sec(pages - 1)].clone();
+    let laid = wordcraft_layout::layout(&doc, &mut wordcraft_layout::LayoutCache::new(), &opts).pages;
+    let m = Arc::new(Margins { source: source.to_string(), pages, doc, laid });
+    kept.push(m.clone());
+    if kept.len() > KEEP_LAID {
+        kept.remove(0);
+    }
+    Ok(m)
+}
+
+/// Page `index` of the editor's `pages` with only the file's header and footer on it, drawn
+pub fn draw_margins(source: &str, pages: usize, index: usize, scale: f32) -> Result<PageImage, String> {
+    use base64::prelude::{Engine, BASE64_STANDARD};
+    catch_unwind(AssertUnwindSafe(|| -> Result<PageImage, String> {
+        let m = margins_for(source, pages)?;
+        let page = m.laid.get(index).ok_or("There is no such page.")?;
+        let png = wordcraft_render::render_page(&m.doc, page, scale.clamp(0.5, 3.0), &wordcraft_render::RenderOptions::default()).to_png();
+        Ok(PageImage { png: BASE64_STANDARD.encode(png), width_pt: page.w, height_pt: page.h, body_top_pt: page.body.y, body_height_pt: page.body.h })
+    }))
+    .map_err(|_| "The header and footer could not be drawn safely.".to_string())?
+}
+
+/// The file's header and footer on one page of the editor, drawn
+#[tauri::command]
+pub async fn office_margins(source_id: String, pages: usize, index: usize, scale: f32) -> Result<PageImage, String> {
+    tokio::task::spawn_blocking(move || draw_margins(&source_id, pages, index, scale)).await.map_err(|e| e.to_string())?
 }
 
 /// One page of a laid-out document, drawn
@@ -720,29 +631,22 @@ mod tests {
 
     const HTML: &str = "<h1>Report</h1><p>Hello <strong>bold</strong> and <em>italic</em> with a <a href=\"https://example.com/x\">link</a>.</p><ul><li>one</li><li>two</li></ul><table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>";
 
+    /// The blocks a file opens as, written out, for looking through
+    fn json(i: &Imported) -> String {
+        serde_json::to_string(&i.blocks).unwrap()
+    }
+
     #[test]
     fn what_the_styles_say_comes_into_the_editor_with_each_run() {
         let html = "<h1>Title</h1><p>Plain text</p><p style=\"font-family:Georgia\">Georgia text</p>";
-        let back = import("f.docx", &export("docx", html, "T", "", None).unwrap(), None).unwrap().html;
-        let heading = back.split("</h1>").next().unwrap();
-        assert!(heading.contains("font-size:20pt"), "the heading's size from its style: {heading}");
-        assert!(heading.contains("color:#"), "the heading's colour from its style: {heading}");
-        assert!(back.contains("font-family:'Georgia'"));
-        // This file's own body font and size (Aptos 12) are written on the runs, since the editor starts from Calibri 11
-        assert!(back.contains("font-size:12pt"));
-    }
-
-    /// The HTML without its `<span style="...">` openers, to read the structure
-    fn regex_free_strip_spans(h: &str) -> String {
-        let mut out = String::new();
-        let mut rest = h;
-        while let Some(i) = rest.find("<span") {
-            out.push_str(&rest[..i]);
-            rest = &rest[i..];
-            rest = rest.find('>').map_or("", |e| &rest[e + 1..]);
-        }
-        out.push_str(rest);
-        out
+        let back = import("f.docx", &export("docx", html, "T", "", None).unwrap(), None).unwrap();
+        let heading = serde_json::to_string(&back.blocks[0]).unwrap();
+        assert!(back.blocks[0]["type"] == "heading" && heading.contains("\"fontSize\":\"20pt\""), "the heading's size from its style: {heading}");
+        assert!(heading.contains("\"textColor\":\"#"), "the heading's colour from its style: {heading}");
+        let all = json(&back);
+        assert!(all.contains("\"fontFamily\":\"Georgia\"") && all.contains("\"fontSize\":\"12pt\""), "{all}");
+        // Each font comes with its line height, as Word measures it
+        assert!(back.fonts.get("Georgia").is_some_and(|k| *k > 1.0 && *k < 1.5), "{:?}", back.fonts);
     }
 
     #[test]
@@ -770,9 +674,8 @@ mod tests {
         }
         let bytes = wordcraft_docx::write(&doc).unwrap();
         let opened = import("toc.docx", &bytes, None).unwrap();
-        assert!(opened.html.contains("data-nx-sp=\"") && !opened.html.contains('\u{E000}') && !opened.html.contains('\u{E001}'), "{}", opened.html);
-        assert!(opened.html.contains(",30.0,"), "the paragraph's own spacing is carried: {}", opened.html);
-        assert!(opened.html.contains(",1,0,-,") && opened.html.contains("Chapter one"), "a contents line is marked: {}", opened.html);
+        assert_eq!(opened.blocks[1]["props"]["spaceAfter"], 30.0, "the paragraph's own spacing is carried: {}", json(&opened));
+        assert!(json(&opened).contains("Chapter one"));
     }
 
     #[test]
@@ -789,25 +692,18 @@ mod tests {
         assert_eq!(opened.layout.valign, "center");
         let id = opened.source_id.clone().unwrap();
         // The editor hands back its text (one word changed) and the page set-up as it was given
-        let html = opened.html.replace("Body text.", "Body text, edited.");
-        let kept = export_with("docx", &html, "Cover", "", Some(&opened.layout), Some(&id)).unwrap();
+        let html = "<h1>Cover</h1><p>Intro text.</p><p>Body text, edited.</p>";
+        let kept = export_with("docx", html, "Cover", "", Some(&opened.layout), Some(&id)).unwrap();
         let back = wordcraft_docx::read_with_password(&kept, None).unwrap();
         assert_eq!(back.last_section.valign, wordcraft_doc::section::PageVAlign::Center, "the centred page stays centred");
         assert!(matches!(&*back.body[2], wordcraft_doc::Block::Para(p) if p.props.space_after == Some(41.0) && p.plain_text().contains("edited")), "the edited paragraph keeps its spacing");
         // Without the file there is nothing to bring back
-        let plain = wordcraft_docx::read_with_password(&export_with("docx", &html, "Cover", "", Some(&opened.layout), None).unwrap(), None).unwrap();
+        let plain = wordcraft_docx::read_with_password(&export_with("docx", html, "Cover", "", Some(&opened.layout), None).unwrap(), None).unwrap();
         assert_ne!(plain.body[2].as_para().and_then(|p| p.props.space_after), Some(41.0));
         // And the page set-up the person changes wins
         let moved = Layout { valign: "bottom".into(), ..opened.layout.clone() };
-        let changed = wordcraft_docx::read_with_password(&export_with("docx", &html, "Cover", "", Some(&moved), Some(&id)).unwrap(), None).unwrap();
+        let changed = wordcraft_docx::read_with_password(&export_with("docx", html, "Cover", "", Some(&moved), Some(&id)).unwrap(), None).unwrap();
         assert_eq!(changed.last_section.valign, wordcraft_doc::section::PageVAlign::Bottom);
-    }
-
-    #[test]
-    fn neighbouring_spans_with_the_same_style_are_joined_and_different_ones_are_not() {
-        let html = "<p><span style=\"a:1\">one </span><span style=\"a:1\">two </span><span style=\"b:2\">three</span><strong><span style=\"b:2\">x</span></strong><span style=\"b:2\">y</span></p>";
-        assert_eq!(merge_spans(html), "<p><span style=\"a:1\">one two </span><span style=\"b:2\">three</span><strong><span style=\"b:2\">x</span></strong><span style=\"b:2\">y</span></p>");
-        assert_eq!(merge_spans("<p>plain</p>"), "<p>plain</p>");
     }
 
     #[test]
@@ -834,10 +730,10 @@ mod tests {
         for ext in ["docx", "odt", "rtf", "md", "html"] {
             let bytes = export(ext, HTML, "Report", "Ana", None).unwrap_or_else(|e| panic!("{ext}: {e}"));
             let back = import(&format!("report.{ext}"), &bytes, None).unwrap_or_else(|e| panic!("{ext}: {}", e.message));
-            let h = back.html.to_lowercase();
+            let h = json(&back).to_lowercase();
             assert!(h.contains("report") && h.contains("hello") && h.contains("bold") && h.contains("one") && h.contains("two"), "{ext}: {h}");
             if ext != "md" && ext != "rtf" {
-                assert!(h.contains("<table") || h.contains("<td"), "{ext} lost its table: {h}");
+                assert!(h.contains("\"type\":\"table\""), "{ext} lost its table: {h}");
             }
         }
     }
@@ -850,15 +746,15 @@ mod tests {
             "<h2 style=\"text-align: right;\">Head</h2>",
             "<p><span style=\"background-color: rgb(255, 255, 0);\">marked</span> and <s>struck</s></p>",
         );
-        let back = import("f.docx", &export("docx", html, "T", "", None).unwrap(), None).unwrap().html.to_lowercase();
-        assert!(back.contains("24pt"), "size: {back}");
+        let back = json(&import("f.docx", &export("docx", html, "T", "", None).unwrap(), None).unwrap()).to_lowercase();
+        assert!(back.contains("\"24pt\""), "size: {back}");
         assert!(back.contains("georgia"), "font: {back}");
-        assert!(back.contains("center"), "alignment: {back}");
-        assert!(back.contains("right"), "alignment: {back}");
-        assert!(back.contains("<u>") || back.contains("underline"), "underline: {back}");
-        assert!(back.contains("<s>") || back.contains("line-through") || back.contains("<del>") || back.contains("<strike>"), "strike: {back}");
-        assert!(back.contains("e03e3e") || back.contains("224, 62, 62") || back.contains("rgb"), "colour: {back}");
-        assert!(back.contains("<h2"), "heading: {back}");
+        assert!(back.contains("\"textalignment\":\"center\""), "alignment: {back}");
+        assert!(back.contains("\"textalignment\":\"right\""), "alignment: {back}");
+        assert!(back.contains("\"underline\":true"), "underline: {back}");
+        assert!(back.contains("\"strike\":true"), "strike: {back}");
+        assert!(back.contains("e03e3e"), "colour: {back}");
+        assert!(back.contains("\"type\":\"heading\""), "heading: {back}");
     }
 
     #[test]
@@ -887,9 +783,11 @@ mod tests {
     fn a_docx_keeps_headings_bold_links_and_names_its_author_unless_asked_not_to() {
         let bytes = export("docx", HTML, "Report", "Ana", None).unwrap();
         let back = import("r.docx", &bytes, None).unwrap();
-        let h = back.html.to_lowercase().replace("</span>", "");
-        let h = regex_free_strip_spans(&h);
-        assert!(h.contains("<h1") && h.contains("<strong>bold</strong>") && h.contains("href=\"https://example.com/x\""), "{h}");
+        let h = json(&back);
+        assert!(back.blocks[0]["type"] == "heading" && back.blocks[0]["props"]["level"] == 1, "{h}");
+        let bold = back.blocks[1]["content"].as_array().unwrap().iter().find(|t| t["text"] == "bold").unwrap();
+        assert_eq!(bold["styles"]["bold"], true, "{h}");
+        assert!(back.blocks[1]["content"].as_array().unwrap().iter().any(|t| t["type"] == "link" && t["href"] == "https://example.com/x"), "{h}");
         assert_eq!(back.inspect.people, ["Ana"]);
         assert_eq!(back.title, "Report");
         let anon = import("r.docx", &export("docx", HTML, "Report", "", None).unwrap(), None).unwrap();
@@ -920,14 +818,9 @@ mod tests {
     #[test]
     fn plain_formats_open_and_markdown_headings_become_headings() {
         let md = import("n.md", b"# Title\n\nSome *text*\n\n- a\n- b\n", None).unwrap();
-        let h = md.html.to_lowercase();
-        assert!(h.contains("<h1") && h.contains("<em>text</em>") && h.contains("<li>a"), "{h}");
+        let h = json(&md);
+        assert!(md.blocks[0]["type"] == "heading" && h.contains("\"text\":\"text\"") && h.contains("\"italic\":true") && h.contains("\"listLabel\""), "{h}");
         assert_eq!(import("n.txt", b"line one\n\nline two", None).unwrap().inspect.words, 4);
     }
 
-    #[test]
-    fn the_body_is_cut_out_of_a_whole_page_of_html() {
-        assert_eq!(body_of("<html><head><title>x</title></head><body class=\"a\">\n<p>hi</p>\n</body></html>"), "<p>hi</p>");
-        assert_eq!(body_of("<p>no body</p>"), "<p>no body</p>");
-    }
 }

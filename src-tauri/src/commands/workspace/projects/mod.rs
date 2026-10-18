@@ -830,14 +830,14 @@ pub(crate) fn project_dir(workspace: &str, project: &str) -> Result<PathBuf, Str
 // Tauri commands
 // ────────────────────────────
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn projects_list(app_handle: tauri::AppHandle, path: String) -> Result<Vec<ProjectInfo>, String> {
     validate_allowed_root(&app_handle, &path)?;
     Ok(list(Path::new(&path)))
 }
 
 /// Saves the recipe in the project's folder, where the sync shares it with the team
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_save_recipe(app_handle: tauri::AppHandle, path: String, project: String, recipe: Recipe) -> Result<Recipe, String> {
     validate_allowed_root(&app_handle, &path)?;
     let dir = project_dir(&path, &project)?;
@@ -850,7 +850,7 @@ pub fn project_save_recipe(app_handle: tauri::AppHandle, path: String, project: 
 }
 
 /// A new, empty project folder
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_create(app_handle: tauri::AppHandle, path: String, name: String) -> Result<String, String> {
     validate_allowed_root(&app_handle, &path)?;
     let name = name.trim();
@@ -867,7 +867,7 @@ pub fn project_create(app_handle: tauri::AppHandle, path: String, name: String) 
 }
 
 /// Adds a line to the project's `.nexignore`, so the project's team stops syncing it
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_add_ignore(app_handle: tauri::AppHandle, path: String, project: String, line: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
     let dir = project_dir(&path, &project)?;

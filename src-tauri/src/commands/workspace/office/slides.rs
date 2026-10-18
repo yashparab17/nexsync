@@ -533,27 +533,27 @@ pub async fn deck_render(base_id: String, slide: String, scale: f64) -> Result<R
     tokio::task::spawn_blocking(move || render(&base_id, &slide, scale)).await.map_err(|e| e.to_string())?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn deck_layouts(base_id: String) -> Result<Vec<Layout>, String> {
     layouts(&base_id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn deck_new_slide(base_id: String, layout: u32) -> Result<String, String> {
     new_slide(&base_id, layout)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn deck_new_shape(kind: String, id: u32, x: f64, y: f64, w: f64, h: f64) -> Result<String, String> {
     new_shape(&kind, id, x, y, w, h)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn deck_edit_shape(shape: String, edit: ShapeEdit) -> Result<String, String> {
     edit_shape(&shape, &edit)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn deck_edit_slide(slide: String, edit: SlideEdit) -> Result<String, String> {
     edit_slide(&slide, &edit)
 }
@@ -565,7 +565,7 @@ pub async fn deck_add_picture(base: String, name: String, data: String, id: u32,
     tokio::task::spawn_blocking(move || add_picture(&base, &name, &data, id, x, y, w, h)).await.map_err(|e| e.to_string())?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn deck_text_of(shape: String) -> Result<String, String> {
     text_of(&shape)
 }

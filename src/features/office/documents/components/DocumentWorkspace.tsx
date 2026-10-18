@@ -1,8 +1,8 @@
 import { BlockNoteView } from "@blocknote/mantine";
 import { withCollaboration } from "@blocknote/core/yjs";
 import { useCreateBlockNote } from "@blocknote/react";
-import { Download, FilePenLine, Info, Printer, Redo2, Save, Undo2, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Download, FilePenLine, Info, Printer, Redo2, RotateCcw, Save, Undo2, X } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type * as Y from "yjs";
 
 import "@blocknote/mantine/style.css";
@@ -21,14 +21,14 @@ import Loading from "@/components/Loading";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
 import { useSeedOnce } from "@/hooks/useSeedOnce";
 import { colorOf } from "@/lib/collabColor";
+import { officeMargins } from "@/lib/tauri";
 import { setupFromLayout } from "@/features/office/documents/lib/documentFormat";
-import { chunkHtml } from "@/features/office/documents/lib/chunkHtml";
 import { paginate } from "@/features/office/documents/lib/pagination";
-import { pagePushPlugin, pushesOf, setPushes } from "@/features/office/documents/lib/pagePush";
-import { matchSpacing, paragraphSpacingPlugin, setParagraphSpacing, spacingsOfHtml, type ParaSpacing } from "@/features/office/documents/lib/paragraphSpacing";
+import { pagePushPlugin, pushesOf, setPushes, splitsOf } from "@/features/office/documents/lib/pagePush";
+import { fillDone, setLegacySpacing, setListDefinitions, wordLayoutPlugin, type ListLevel, type ParaSpacing } from "@/features/office/documents/lib/wordLayout";
 import { countText, DEFAULT_PAGE, fontStack, NO_HEADER, pageBox, pageCount, PX_PER_PT, readHeaderFooter, readPage, type HeaderFooter, type PageSetup } from "@/features/office/documents/lib/documentFormat";
 import { headingsOf, replaceInBlocks, textOfBlocks, type BlockLike } from "@/features/office/documents/lib/documentFind";
-import { documentSchema, type DocumentEditorType } from "@/features/office/documents/lib/documentSchema";
+import { documentSchema } from "@/features/office/documents/lib/documentSchema";
 import { cn } from "@/lib/utils";
 import type { OfficeInspect, OfficeLayout } from "@/features/office/types";
 
@@ -77,7 +77,10 @@ export function layoutOf(setup: PageSetup, hf: HeaderFooter): Layout {
 
 interface Props {
 	collab: CollabDoc;
-	initialHtml: string;
+	// The file's text: the blocks the backend made of it (every paragraph carrying its Word formatting), or HTML (a sample, a paste)
+	initialBlocks: unknown[] | string;
+	// The definitions of the file's lists, for numbering them as they change
+	lists?: Record<string, ListLevel>;
 	name: string;
 	title: string;
 	author: string;
@@ -92,29 +95,16 @@ interface Props {
 	// The page set-up the file has (the settings start from it) and the file as the backend read it
 	fileLayout?: OfficeLayout | null;
 	sourceId?: string | null;
+	// Reads the file again, for putting it back in place of the shared copy; null when it could not be read (the page says why)
+	onReload?: () => Promise<{ blocks: unknown[]; layout?: OfficeLayout | null; lists?: Record<string, ListLevel> } | null>;
 }
 
 // A header or footer written as left, middle and right parts (Word separates them with tabs) is drawn so
 const zones = (text: string) => (text.includes("	") ? text.split("	").slice(0, 3) : [text]);
 
-type Inline = { text?: string; content?: Inline[] };
-const textOf = (c: unknown): string | null => (Array.isArray(c) ? (c as Inline[]).map((i) => i.text ?? textOf(i.content) ?? "").join("") : c ? null : "");
-
-// The spacing, indent, page breaks and contents-line look the file gives each paragraph of a piece of HTML (`had` blocks come before the
-// ones it became), matched to the blocks by their text and kept in the shared document, so they are there for everyone and on every open
-function carrySpacing(editor: DocumentEditorType, html: string, had: number, store: Y.Map<string>) {
-	const specs = spacingsOfHtml(html);
-	if (!specs.some((s) => s.sp)) return;
-	const blocks: { id: string; text: string | null }[] = [];
-	const walk = (list: { id: string; content?: unknown; children?: unknown[] }[]) => list.forEach((b) => (blocks.push({ id: b.id, text: textOf(b.content) }), walk((b.children ?? []) as never)));
-	walk(editor.document.slice(had) as never);
-	const added = matchSpacing(specs, blocks);
-	if (added.size) store.doc!.transact(() => added.forEach((s, id) => store.set(id, JSON.stringify(s))));
-}
-
 // A document, laid out like a word processor: a ribbon of the things people do to text, a page on a desk with a ruler, a navigation
 // pane of headings, and a status bar. The text is shared live; so are the page set-up and the header and footer.
-export default function DocumentWorkspace({ collab, initialHtml, name, title, author, readOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId }: Props) {
+function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload }: Props) {
 	const doc = collab.doc;
 	const options = useMemo(
 		() =>
@@ -123,7 +113,7 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 				// Given at creation, so they are in the view the editor makes once the shared copy has loaded (one registered later is lost)
 				extensions: [
 					() => ({ key: "pagePush", prosemirrorPlugins: [pagePushPlugin] }),
-					() => ({ key: "paragraphSpacing", prosemirrorPlugins: [paragraphSpacingPlugin] }),
+					() => ({ key: "wordLayout", prosemirrorPlugins: [wordLayoutPlugin] }),
 				],
 				collaboration: { fragment: doc.getXmlFragment("blocknote"), user: { name: author, color: colorOf(author) }, provider: { awareness: collab.awareness } },
 			}),
@@ -151,7 +141,7 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 		};
 	}, [editor]);
 
-	// Block id → the file's spacing for it (see carrySpacing), drawn by the paragraphSpacing plugin
+	// Documents put in before blocks carried their Word formatting keep their spacing here, by block id (see `wordLayout`)
 	const spacing = doc.getMap<string>("paraSpacing");
 	const [seeding, setSeeding] = useState<{ done: number; total: number } | null>(null);
 	useEffect(() => {
@@ -159,6 +149,7 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 		const apply = (keys: Iterable<string>) => {
 			const m = new Map<string, ParaSpacing>();
 			for (const k of keys) {
+				if (k === "version") continue;
 				try {
 					const v = spacing.get(k);
 					if (v) m.set(k, JSON.parse(v));
@@ -167,7 +158,7 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 				}
 			}
 			try {
-				if (editor.prosemirrorView) setParagraphSpacing(editor.prosemirrorView, m);
+				if (editor.prosemirrorView) setLegacySpacing(editor.prosemirrorView, m);
 			} catch {
 				// Not mounted
 			}
@@ -177,11 +168,31 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 		spacing.observe(changed);
 		return () => spacing.unobserve(changed);
 	}, [editor, mounted, spacing]);
-	// A document put in before its spacing was kept with it gets it from the file once, matched to the text it has now
-	useEffect(() => {
-		if (!collab.synced || !mounted || seeding || spacing.size > 0 || !initialHtml.trim() || doc.getXmlFragment("blocknote").length === 0) return;
-		carrySpacing(editor, initialHtml, 0, spacing);
-	}, [collab.synced, mounted, seeding, spacing, initialHtml, doc, editor]);
+	// Puts a file's text in place of everything in the document, a piece at a time so the window keeps answering while it fills
+	const fill = useCallback(
+		async (source: unknown[] | string) => {
+			const blocks = (typeof source === "string" ? editor.tryParseHTMLToBlocks(source) : source) as never[];
+			const step = 120;
+			const total = Math.max(1, Math.ceil(blocks.length / step));
+			setSeeding({ done: 0, total });
+			try {
+				for (let i = 0; i < total; i++) {
+					const piece = blocks.slice(i * step, (i + 1) * step);
+					editor.transact((tr) => {
+						tr.setMeta("wordLayoutFill", true);
+						if (i === 0) editor.replaceBlocks(editor.document, piece);
+						else editor.insertBlocks(piece, editor.document[editor.document.length - 1] as never, "after");
+					});
+					setSeeding({ done: i + 1, total });
+					await new Promise((r) => setTimeout(r, 0));
+				}
+			} finally {
+				if (editor.prosemirrorView) fillDone(editor.prosemirrorView);
+				setSeeding(null);
+			}
+		},
+		[editor],
+	);
 	// The file is the first text of a document nobody has opened before
 	useSeedOnce(
 		collab.synced && mounted,
@@ -189,27 +200,11 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 			// A document nobody has written in holds nothing, or the one empty paragraph the editor starts with
 			const first = editor.document[0] as unknown as { type: string; content?: unknown[] } | undefined;
 			const blank = doc.getXmlFragment("blocknote").length === 0 || (editor.document.length === 1 && first?.type === "paragraph" && (first.content?.length ?? 0) === 0);
-			if (!blank || !initialHtml.trim()) return;
-			// A long file is put in a piece at a time, so the window keeps answering while it fills
-			const pieces = chunkHtml(initialHtml);
-			setSeeding({ done: 0, total: pieces.length });
-			void (async () => {
-				try {
-					for (let i = 0; i < pieces.length; i++) {
-						const blocks = editor.tryParseHTMLToBlocks(pieces[i]) as never[];
-						const had = i === 0 ? 0 : editor.document.length;
-						if (i === 0) editor.replaceBlocks(editor.document, blocks);
-						else editor.insertBlocks(blocks, editor.document[editor.document.length - 1] as never, "after");
-						carrySpacing(editor, pieces[i], had, spacing);
-						setSeeding({ done: i + 1, total: pieces.length });
-						await new Promise((r) => setTimeout(r, 0));
-					}
-				} finally {
-					setSeeding(null);
-				}
-			})();
+			if (!blank || !initialBlocks.length) return;
+			if (lists) meta.set("lists", JSON.stringify(lists));
+			void fill(initialBlocks);
 		},
-		[collab, editor, initialHtml, mounted],
+		[collab, editor, initialBlocks, mounted],
 	);
 
 	// Page set-up and the header and footer are shared, so everyone sees the same page
@@ -229,6 +224,30 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 		meta.observe(read);
 		return () => meta.unobserve(read);
 	}, [meta]);
+	useEffect(() => {
+		if (!mounted) return;
+		const read = () => {
+			try {
+				const view = editor.prosemirrorView;
+				if (view) setListDefinitions(view, JSON.parse(meta.get("lists") ?? "{}"));
+			} catch {
+				// Not mounted, or a damaged value: the labels the file gave are shown
+			}
+		};
+		// A task of its own: numbering a long document's lists draws every block again, and the window should get a turn between
+		// that and drawing the document when it arrives
+		let timer: number | undefined;
+		const later = () => {
+			clearTimeout(timer);
+			timer = window.setTimeout(read);
+		};
+		later();
+		meta.observe(later);
+		return () => {
+			meta.unobserve(later);
+			clearTimeout(timer);
+		};
+	}, [editor, meta, mounted]);
 	// Choosing a paper size, margins or orientation replaces the page a file came with
 	// A file's own page set-up is where the settings start, the first time anyone opens it
 	useEffect(() => {
@@ -248,7 +267,41 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 	const [view, setViewState] = useState({ ruler: true, navigation: false, mode: "edit" as "print" | "edit" | "web" | "read", spelling: true });
 	const setView = (v: Partial<typeof view>) => setViewState((c) => ({ ...c, ...v }));
 	const [find, setFind] = useState<{ replace: boolean; query: string; with: string; cs: boolean; note: string } | null>(null);
-	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | null>(null);
+	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | null>(null);
+	// Puts the file back in place of the shared copy, for everyone: the text as the file has it now, with its spacing, page set-up and
+	// header and footer
+	const reload = async () => {
+		setDialog(null);
+		const fresh = onReload ? await onReload() : { blocks: typeof initialBlocks === "string" ? editor.tryParseHTMLToBlocks(initialBlocks) : initialBlocks, layout: fileLayout, lists };
+		if (!fresh || !fresh.blocks.length) return;
+		// (The spacing kept for the blocks being replaced stays, so that undoing the reload brings them back as they were)
+		doc.transact(() => {
+			if (fresh.lists) meta.set("lists", JSON.stringify(fresh.lists));
+			if (fresh.layout) {
+				const { page: p, hf: h } = setupFromLayout(fresh.layout);
+				meta.set("page", JSON.stringify(p));
+				meta.set("headerFooter", JSON.stringify(h));
+			}
+		});
+		// The file goes in a piece at a time; the shared undo is told to keep the pieces together, so one undo takes the reload back
+		type Undo = { captureTimeout: number; stopCapturing: () => void };
+		let undo: Undo | undefined;
+		try {
+			const state = editor.prosemirrorView!.state;
+			undo = (state.plugins.find((p) => (p as unknown as { key: string }).key === "y-undo$")?.getState(state) as { undoManager?: Undo } | undefined)?.undoManager;
+		} catch {
+			// No shared undo: the reload is simply not one step
+		}
+		const timeout = undo?.captureTimeout ?? 500;
+		undo?.stopCapturing();
+		if (undo) undo.captureTimeout = Number.POSITIVE_INFINITY;
+		try {
+			await fill(fresh.blocks);
+		} finally {
+			undo?.stopCapturing();
+			if (undo) undo.captureTimeout = timeout;
+		}
+	};
 	const scroller = useRef<HTMLDivElement>(null);
 	const body = useRef<HTMLDivElement>(null);
 	const picker = useRef<HTMLInputElement>(null);
@@ -263,16 +316,23 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 	const [bodyHeight, setBodyHeight] = useState(0);
 	const paged = mode === "edit" && page.columns <= 1;
 	const [flowPages, setFlowPages] = useState(1);
-	const roomPx = (box.height - box.top - box.bottom) * PX_PER_PT;
-	const gapPx = (box.top + box.bottom) * PX_PER_PT + PAGE_GAP;
+	// The text goes between the margins; a header or footer of the file's that reaches into them takes that much more off, as in Word
+	// (set once the backend has laid one out, see `margins` below)
+	const [textArea, setTextArea] = useState<{ top: number; height: number } | null>(null);
+	const area = textArea && sourceId ? textArea : { top: box.top, height: box.height - box.top - box.bottom };
+	const roomPx = area.height * PX_PER_PT;
+	const gapPx = (box.height - area.height) * PX_PER_PT + PAGE_GAP;
 	useEffect(() => {
 		const el = body.current;
 		// While the file is being put in, the pages are not worked out; they are, once, when it is all there
 		if (!el || seeding) return;
 		let timer: number | undefined;
-		const outers = () => Array.from(el.querySelectorAll<HTMLElement>(".bn-editor > .bn-block-group > .bn-block-outer"));
+		// Every block, nested ones too, in document order
+		const outers = () => Array.from(el.querySelectorAll<HTMLElement>(".bn-editor .bn-block-outer"));
 		const run = () => {
 			timer = undefined;
+			// A minimized window has no size to lay pages out in; the resize that brings it back works them out
+			if (document.hidden || el.offsetWidth === 0) return;
 			setBodyHeight(el.offsetHeight);
 			let view;
 			try {
@@ -287,15 +347,53 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 			}
 			const list = outers();
 			const applied = pushesOf(view);
+			const cuts = splitsOf(view);
 			const rect = el.getBoundingClientRect();
 			const scale = el.offsetHeight > 0 ? rect.height / el.offsetHeight : 1;
-			// Where each block would be with no spacing: where it is now, less the spacing above it (its own is inside its box)
+			// Where each block would be with no spacing: where it is now, less the spacing above it (its own is inside its box). This runs
+			// over every block of the document, so it reads only what it needs: positions, and the block's own inline style.
 			let above = 0;
+			let prevKeep = false;
 			const measured = list.map((o, i) => {
 				const r = o.getBoundingClientRect();
 				const own = applied[i] ?? 0;
-				const m = { top: (r.top - rect.top) / scale - above, height: r.height / scale - own, keepNext: o.classList.contains("nx-sp") ? o.dataset.nxKeep === "1" : !!o.querySelector(':scope > .bn-block > .bn-block-content[data-content-type="heading"]'), breakBefore: o.dataset.nxBrk === "1", valign: o.dataset.nxValign };
-				above += own;
+				const cut = cuts[i];
+				const block = o.firstElementChild;
+				const content = block?.firstElementChild as HTMLElement | null | undefined;
+				const nested = block?.children[1]?.classList.contains("bn-block-group");
+				const kind = content?.dataset.contentType;
+				const table = kind === "table";
+				// A block with blocks nested in it is measured to the end of its own text; the nested ones are measured on their own.
+				// (A table broken over two pages is measured without the empty row that does it.)
+				const height = (nested && content ? content.getBoundingClientRect().bottom - r.top : r.height) / scale - own - (cut?.px ?? 0);
+				// The space after it, from the file's spacing (points, on the block's content; see `wordLayout`)
+				const after = nested ? 0 : (parseFloat(content?.dataset.nxAfter ?? "") || 0) * PX_PER_PT;
+				// How much of it has to share a page with a heading before it that keeps with it (only wanted then): a table's first row, a
+				// paragraph's first line, or with widow and orphan control (Word's default) the lines it cannot be split before: all of a
+				// paragraph of three lines or fewer, else its first two
+				let first: number | undefined;
+				if (prevKeep && content) {
+					const line = table ? content.querySelector("tr") : (content.firstElementChild as HTMLElement | null);
+					const lr = line?.getBoundingClientRect();
+					const lh = line && !table ? parseFloat(getComputedStyle(line).lineHeight) * scale : NaN;
+					if (lr && Number.isFinite(lh) && lh > 0) {
+						const lines = Math.max(1, Math.round(lr.height / lh));
+						const keep = content.dataset.widowControl === "false" ? 1 : lines <= 3 ? lines : 2;
+						first = (Math.min(lr.bottom, lr.top + lr.height * (keep / lines)) - r.top) / scale - own;
+					} else if (lr) first = (lr.bottom - r.top) / scale - own;
+				}
+				// A table's rows, from its top, as they would be without a break applied to it
+				const rows = table
+					? Array.from(o.querySelectorAll("tr:not(.nx-row-gap)")).map((tr, k): [number, number] => {
+							const tb = tr.getBoundingClientRect();
+							const back = cut && k >= cut.at ? cut.px * scale : 0;
+							return [(tb.top - back - r.top) / scale - own, (tb.bottom - back - r.top) / scale - own];
+						})
+					: undefined;
+				const keepNext = content?.classList.contains("nx-sp") ? content.dataset.nxKeep === "1" : kind === "heading";
+				prevKeep = keepNext;
+				const m = { rows, first, after, top: (r.top - rect.top) / scale - above, height, keepNext, breakBefore: content?.dataset.nxBrk === "1", valign: content?.dataset.nxValign };
+				above += own + (cut?.px ?? 0);
 				return m;
 			});
 			const result = paginate(measured, roomPx, gapPx);
@@ -305,11 +403,14 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 				const free = roomPx - (last.top + last.height);
 				if (free > 0) result.push[0] += page.valign === "center" ? free / 2 : free;
 			}
-			setPushes(view, result.push);
+			setPushes(view, result.push, result.split);
 			setFlowPages(result.pages);
 		};
+		// Worked out once things have been still for a moment: a pass over a long document takes a while, and typing should not
+		// wait for one after every key
 		const soon = () => {
-			if (timer === undefined) timer = window.setTimeout(run, 30);
+			if (timer !== undefined) clearTimeout(timer);
+			timer = window.setTimeout(run, 150);
 		};
 		// Fonts arriving change the height of lines without touching the text, and the window changes how it wraps
 		const fonts = document.fonts;
@@ -322,7 +423,8 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 		ro.observe(el);
 		const mo = new MutationObserver(soon);
 		mo.observe(el, { childList: true, characterData: true, subtree: true });
-		run();
+		// (in a task of its own, so the window gets a turn after the document is drawn)
+		timer = window.setTimeout(run);
 		return () => {
 			ro.disconnect();
 			mo.disconnect();
@@ -339,6 +441,34 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 		const el = scroller.current;
 		if (el) setPageAt(Math.min(pages, Math.max(1, Math.floor((el.scrollTop / ((zoom / 100) * (heightPx + PAGE_GAP))) + 0.5) + 1)));
 	};
+
+	// While the header and footer are still the file's own, they are drawn as the file has them (shapes, lines, page numbers) by the
+	// backend, a picture per page behind the text, for the pages around the one in view
+	const fileMargins = !!sourceId && paged && !!fileLayout && JSON.stringify(setupFromLayout(fileLayout).hf) === JSON.stringify(hf);
+	const [margins, setMargins] = useState<Map<number, string>>(new Map());
+	const asked = useRef({ pages: 0, set: new Set<number>() });
+	useEffect(() => {
+		if (!fileMargins || !sourceId) return;
+		// A new page count lays the pages out again, so what was drawn for the old one is let go
+		if (asked.current.pages !== pages) {
+			asked.current = { pages, set: new Set() };
+			setMargins(new Map());
+		}
+		const mine = asked.current;
+		for (let p = Math.max(1, pageAt - 2); p <= Math.min(pages, pageAt + 2); p++) {
+			if (mine.set.has(p)) continue;
+			mine.set.add(p);
+			officeMargins(sourceId, pages, p - 1, 2)
+				.then((img) => {
+					if (asked.current !== mine) return;
+					setMargins((m) => new Map(m).set(p, `data:image/png;base64,${img.png}`));
+					// The text area of an ordinary page (the first may have a header and footer of its own)
+					if ((p > 1 || pages === 1) && img.bodyHeightPt > 0)
+						setTextArea((a) => (a && Math.abs(a.top - img.bodyTopPt) < 0.01 && Math.abs(a.height - img.bodyHeightPt) < 0.01 ? a : { top: img.bodyTopPt, height: img.bodyHeightPt }));
+				})
+				.catch(() => mine.set.delete(p));
+		}
+	}, [fileMargins, sourceId, pages, pageAt]);
 
 	const setZoom = (z: number) => {
 		if (z === -1) {
@@ -365,6 +495,26 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 		const el = body.current?.querySelector<HTMLElement>(".bn-editor");
 		el?.setAttribute("spellcheck", view.spelling ? "true" : "false");
 	}, [view.spelling, collab.synced, editor]);
+
+	// Ctrl+Z and Ctrl+Y undo and redo in the document wherever on its page the focus is, as in Word: a click on a table's handles or
+	// on the page around the text takes the focus out of the text, and the keys would otherwise do nothing
+	const actions = useRef(a);
+	actions.current = a;
+	useEffect(() => {
+		if (readOnly) return;
+		const onKey = (e: KeyboardEvent) => {
+			const k = e.key.toLowerCase();
+			if (!(e.ctrlKey || e.metaKey) || e.altKey || (k !== "z" && k !== "y")) return;
+			const t = e.target as HTMLElement;
+			if (t.closest?.(".ProseMirror, input, textarea, select, [contenteditable='true']")) return;
+			if (t !== document.body && !scroller.current?.contains(t)) return;
+			e.preventDefault();
+			if (k === "y" || e.shiftKey) actions.current.redo();
+			else actions.current.undo();
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [readOnly]);
 
 	const doFind = (backwards: boolean) => {
 		if (!find?.query) return;
@@ -465,6 +615,23 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 					),
 				},
 				{
+					id: "reload",
+					label: "Reload from File",
+					icon: RotateCcw,
+					panel: (
+						<div className="max-w-md space-y-3 text-sm">
+							<h2 className="text-2xl font-light">Reload from File</h2>
+							<p>
+								Puts <b>{name}</b> back as the file has it now, in place of what the document holds, for everyone who has it open. Use it to see the file as it is, or to start again from it.
+							</p>
+							<p className="text-muted-foreground">Changes made in the document since it was opened from the file are replaced. Undo brings them back.</p>
+							<Button isDisabled={readOnly || !!seeding} onPress={() => setDialog("reload")}>
+								Reload from File…
+							</Button>
+						</div>
+					),
+				},
+				{
 					id: "print",
 					label: "Print",
 					icon: Printer,
@@ -491,13 +658,13 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 			onTab={setTab}
 			quick={
 				<>
-					<button type="button" aria-label="Save a copy" title="Save a copy" onClick={() => setTab("file")} className="flex size-7 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-white">
+					<button type="button" aria-label="Save a copy" title="Save a copy" onClick={() => setTab("file")} className="flex size-7 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
 						<Save className="size-4" />
 					</button>
-					<button type="button" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={readOnly} onClick={a.undo} className="flex size-7 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-white">
+					<button type="button" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={readOnly} onClick={a.undo} className="flex size-7 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
 						<Undo2 className="size-4" />
 					</button>
-					<button type="button" aria-label="Redo" title="Redo (Ctrl+Y)" disabled={readOnly} onClick={a.redo} className="flex size-7 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-white">
+					<button type="button" aria-label="Redo" title="Redo (Ctrl+Y)" disabled={readOnly} onClick={a.redo} className="flex size-7 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
 						<Redo2 className="size-4" />
 					</button>
 				</>
@@ -530,7 +697,7 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 					<span>
 						Page {pageAt} of {pages}
 					</span>
-					<button type="button" onClick={() => setDialog("counts")} className="outline-none hover:underline focus-visible:ring-1 focus-visible:ring-white">
+					<button type="button" onClick={() => setDialog("counts")} className="outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring">
 						{words.words.toLocaleString()} {words.words === 1 ? "word" : "words"}
 					</button>
 					<span>English</span>
@@ -616,15 +783,16 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 							{mode === "print" && (
 								<PrintView getHtml={html} subscribe={(cb) => editor.onChange(cb)} title={title} layout={layoutOf(page, hf)} sourceId={sourceId} zoom={zoom} onPages={setPrintPages} />
 							)}
-							<div className={cn("flex justify-center py-6", mode === "print" && "hidden")} style={{ zoom: zoom / 100 }}>
+							<div className={cn("flex justify-center-safe py-6", mode === "print" && "hidden")} style={{ zoom: zoom / 100 }}>
 								<div
-									className="doc-page relative text-black"
+									className="doc-page relative shrink-0 text-black"
 									style={
 										{
 											width: mode === "edit" ? widthPx : Math.min(widthPx, 920),
 											minHeight: paged ? pages * heightPx + (pages - 1) * PAGE_GAP : mode === "edit" ? pages * heightPx : undefined,
-											padding: mode === "edit" ? `${box.top * PX_PER_PT}px ${box.right * PX_PER_PT}px ${box.bottom * PX_PER_PT}px ${box.left * PX_PER_PT}px` : "48px 56px",
-											"--doc-font": fontStack("Calibri"),
+											padding: mode === "edit" ? `${(paged ? area.top : box.top) * PX_PER_PT}px ${box.right * PX_PER_PT}px ${box.bottom * PX_PER_PT}px ${box.left * PX_PER_PT}px` : "48px 56px",
+											"--doc-font": fontStack(fileLayout?.font || "Calibri"),
+											"--doc-size": fileLayout?.size ? `${fileLayout.size}pt` : undefined,
 											"--doc-ls": String(page.spacing),
 										} as React.CSSProperties
 									}
@@ -632,12 +800,13 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 									{/* The sheets, behind the text */}
 									{paged ? (
 										Array.from({ length: pages }, (_, i) => (
-											<div key={i} aria-hidden data-sheet={i + 1} className="pointer-events-none absolute right-0 left-0 bg-white shadow-md ring-1 ring-black/10" style={{ top: i * (heightPx + PAGE_GAP), height: heightPx }} />
+											<div key={i} aria-hidden data-sheet={i + 1} className="pointer-events-none absolute right-0 left-0 bg-white bg-[length:100%_100%] shadow-md ring-1 ring-black/10" style={{ top: i * (heightPx + PAGE_GAP), height: heightPx, backgroundImage: fileMargins && margins.get(i + 1) ? `url(${margins.get(i + 1)})` : undefined }} />
 										))
 									) : (
 										<div aria-hidden className="pointer-events-none absolute inset-0 bg-white shadow-md ring-1 ring-black/10" />
 									)}
 									{mode === "edit" &&
+										!fileMargins &&
 										Array.from({ length: pages }, (_, i) => {
 											const top = i * (heightPx + PAGE_GAP);
 											return (
@@ -702,6 +871,20 @@ export default function DocumentWorkspace({ collab, initialHtml, name, title, au
 						</dl>
 						<DialogFooter>
 							<Button onPress={() => setDialog(null)}>Close</Button>
+						</DialogFooter>
+					</div>
+				</Dialog>
+			)}
+			{dialog === "reload" && (
+				<Dialog isOpen onOpenChange={(o) => !o && setDialog(null)} className="max-w-md">
+					<div className="space-y-4 text-sm">
+						<DialogHeading icon={<RotateCcw className="size-6" />} title="Reload from File" />
+						<p>This replaces what the document holds with {name} as the file has it now, for everyone who has it open.</p>
+						<DialogFooter>
+							<Button variant="outline" onPress={() => setDialog(null)}>
+								Cancel
+							</Button>
+							<Button onPress={() => void reload()}>Reload</Button>
 						</DialogFooter>
 					</div>
 				</Dialog>
@@ -789,3 +972,6 @@ function Ruler({ widthPx, box, zoom }: { widthPx: number; box: ReturnType<typeof
 		</div>
 	);
 }
+
+// Drawn again only when what it is given changes, not with every redraw of the page around it
+export default memo(DocumentWorkspace);

@@ -27,7 +27,7 @@ fn folder_is_free(path: &Path) -> bool {
 }
 
 /// Creates a new workspace on disk and initializes its SQLite database
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRequest) -> Result<WorkspaceInfo, String> {
     // Validate workspace name and root paths
     validate_workspace_item_name(&request.name)?;
@@ -166,7 +166,7 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
 }
 
 /// Imports an existing workspace from disk
-#[tauri::command]
+#[tauri::command(async)]
 pub fn import_workspace(app_handle: tauri::AppHandle, path: String) -> Result<WorkspaceInfo, String> {
     validate_allowed_root(&app_handle, &path)?;
     
@@ -210,7 +210,7 @@ pub fn import_workspace(app_handle: tauri::AppHandle, path: String) -> Result<Wo
 // ────────────────────────────
 
 /// Loads complete workspace metadata from SQLite database
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_workspace_metadata(app_handle: tauri::AppHandle, path: String) -> Result<WorkspaceMetadata, String> {
     validate_allowed_root(&app_handle, &path)?;
     
@@ -291,7 +291,7 @@ pub fn read_workspace_metadata(app_handle: tauri::AppHandle, path: String) -> Re
 }
 
 /// Persists workspace metadata updates to SQLite database
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_workspace_metadata(app_handle: tauri::AppHandle, request: UpdateMetadataRequest) -> Result<(), String> {
     validate_allowed_root(&app_handle, &request.path)?;
     
@@ -518,7 +518,7 @@ fn count_files(dir: &Path, depth: usize, rel: &str, rules: &mut super::syncignor
 }
 
 /// Retrieves aggregate metrics for files, tasks, and members in the workspace
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_workspace_stats(app_handle: tauri::AppHandle, path: String) -> Result<super::models::WorkspaceStats, String> {
     validate_allowed_root(&app_handle, &path)?;
     

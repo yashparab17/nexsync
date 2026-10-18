@@ -186,7 +186,7 @@ pub fn scan_mounted(workspace: &Path, prefix: &str, source: &Path) -> Scan {
 }
 
 /// "It is fine": this project file may be shared although it looks like it holds a secret
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_secret_allow(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
     crate::commands::workspace::secret_scan::allow(Path::new(&path), rel_path.trim_matches('/'))

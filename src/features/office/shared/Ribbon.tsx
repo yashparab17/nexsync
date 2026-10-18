@@ -1,11 +1,12 @@
-// The chrome the three office editors share: a coloured title bar, a strip of tabs with a File tab, a ribbon of labelled groups with
-// big and small buttons, menus, colour pickers and galleries, and a coloured status bar. It is laid out the way the desktop office
-// programs are, because people already know where things are in them.
+// The chrome the three office editors share: a header like every other page's, a strip of tabs with a File tab, a ribbon of labelled
+// groups with big and small buttons, menus, colour pickers and galleries, and a status bar. The ribbon is laid out the way the desktop
+// office programs are, because people already know where things are in them; the header and bars look like the rest of the app.
 
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ElementType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { ToolbarTitle } from "@/components/layout/Toolbar";
 import { cn } from "@/lib/utils";
 
 export type Accent = "word" | "excel" | "powerpoint";
@@ -63,32 +64,17 @@ export function OfficeFrame({
 	return (
 		<AccentContext.Provider value={accent}>
 			<div className="flex h-full min-h-0 flex-col bg-background" style={{ "--office": a.color, "--office-dark": a.dark } as CSSProperties}>
-				<div className="flex h-9 shrink-0 items-center gap-2 px-2 text-white" style={{ background: a.color }}>
-					<span aria-hidden className="flex size-6 items-center justify-center rounded-sm bg-white/95 text-sm font-bold" style={{ color: a.color }}>
-						{a.letter}
-					</span>
-					<div role="toolbar" aria-label="Quick access" className="flex items-center gap-0.5 [&_button]:text-white [&_button:hover]:bg-white/20 [&_button:disabled]:opacity-40">
+				<div className="flex h-12 shrink-0 items-center gap-2 border-b bg-card/40 px-3 [&_button]:text-muted-foreground [&_button:hover]:bg-muted [&_button:hover]:text-foreground [&_button:disabled]:opacity-40">
+					<ToolbarTitle as="h2" name={name} meta={state} />
+					<div role="toolbar" aria-label="Quick access" className="ml-1 flex items-center gap-0.5 border-l pl-2">
 						{quick}
 					</div>
-					<div className="flex min-w-0 flex-1 items-center justify-center gap-2 text-[13px]">
-						<span className="truncate font-medium">{name}</span>
-						{state && <span className="shrink-0 text-white/70">· {state}</span>}
-					</div>
-					<div className="flex shrink-0 items-center gap-2 [&_button]:text-white [&_button:hover]:bg-white/20">{people}</div>
-					<div className="flex shrink-0 items-center gap-1 [&_button]:text-white [&_button:hover]:bg-white/20">{actions}</div>
+					<span className="flex-1" />
+					<div className="flex shrink-0 items-center gap-2">{people}</div>
+					<div className="flex shrink-0 items-center gap-1">{actions}</div>
 				</div>
-				<div role="tablist" aria-label="Ribbon tabs" className="flex h-8 shrink-0 items-end gap-0.5 border-b bg-background px-1">
-					<button
-						type="button"
-						role="tab"
-						aria-selected={tab === "file"}
-						onClick={() => onTab("file")}
-						className={cn("mb-0.5 h-7 px-4 text-[13px] font-medium text-white outline-none focus-visible:ring-2 focus-visible:ring-ring", tab === "file" ? "brightness-90" : "hover:brightness-110")}
-						style={{ background: a.color }}
-					>
-						File
-					</button>
-					{tabs.map((t) => (
+				<div role="tablist" aria-label="Ribbon tabs" className="flex h-10 shrink-0 items-center gap-1 border-b px-3">
+					{[{ id: "file", label: "File" }, ...tabs].map((t) => (
 						<button
 							key={t.id}
 							type="button"
@@ -96,10 +82,9 @@ export function OfficeFrame({
 							aria-selected={tab === t.id}
 							onClick={() => {
 								onTab(t.id);
-								if (collapsed) setPeek(true);
+								if (collapsed && t.id !== "file") setPeek(true);
 							}}
-							className={cn("h-8 px-3.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring", tab === t.id ? "-mb-px border-x border-t bg-[#f3f2f1] font-medium dark:bg-neutral-800" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground")}
-							style={tab === t.id ? { color: a.color, boxShadow: `inset 0 2px 0 ${a.color}` } : undefined}
+							className={cn("flex h-8 items-center px-3 text-sm whitespace-nowrap outline-none transition-colors focus-visible:bg-muted", tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
 						>
 							{t.label}
 						</button>
@@ -113,13 +98,13 @@ export function OfficeFrame({
 							setCollapsed((c) => !c);
 							setPeek(false);
 						}}
-						className="mb-1 flex size-6 items-center justify-center text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+						className="flex size-7 items-center justify-center text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
 					>
 						{collapsed ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}
 					</button>
 				</div>
 				{showBody && (
-					<div role="tabpanel" className="relative z-30 flex h-[96px] shrink-0 items-stretch overflow-x-auto border-b bg-[#f3f2f1] px-1 py-1 dark:bg-neutral-800" onMouseDown={(e) => { if (!(e.target as HTMLElement).closest("input,select,textarea")) e.preventDefault(); }} onMouseLeave={() => collapsed && setPeek(false)}>
+					<div role="tabpanel" className="relative z-30 flex h-[96px] shrink-0 items-stretch overflow-x-auto border-b bg-panel px-1 py-1" onMouseDown={(e) => { if (!(e.target as HTMLElement).closest("input,select,textarea")) e.preventDefault(); }} onMouseLeave={() => collapsed && setPeek(false)}>
 						{ribbon}
 					</div>
 				)}
@@ -127,7 +112,7 @@ export function OfficeFrame({
 					{children}
 					{tab === "file" && <div className="absolute inset-0 z-40 overflow-auto bg-background">{file}</div>}
 				</div>
-				<div className="flex h-6 shrink-0 items-center gap-4 px-3 text-xs text-white" style={{ background: a.color }}>
+				<div className="flex h-7 shrink-0 items-center gap-4 border-t bg-card/40 px-3 font-mono text-xs text-muted-foreground">
 					{status}
 				</div>
 			</div>
@@ -397,14 +382,14 @@ export function GridPicker({ rows = 8, cols = 10, onPick }: { rows?: number; col
 export function ZoomBar({ value, onChange, min = 50, max = 200 }: { value: number; onChange: (v: number) => void; min?: number; max?: number }) {
 	return (
 		<span className="ml-auto flex items-center gap-2">
-			<button type="button" aria-label="Zoom out" onClick={() => onChange(Math.max(min, value - 10))} className="px-1 text-base leading-none outline-none hover:bg-white/20 focus-visible:ring-1 focus-visible:ring-white">
+			<button type="button" aria-label="Zoom out" onClick={() => onChange(Math.max(min, value - 10))} className="px-1 text-base leading-none outline-none hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring">
 				−
 			</button>
-			<input type="range" aria-label="Zoom" min={min} max={max} step={5} value={value} onChange={(e) => onChange(Number(e.target.value))} className="h-1 w-28 accent-white" />
-			<button type="button" aria-label="Zoom in" onClick={() => onChange(Math.min(max, value + 10))} className="px-1 text-base leading-none outline-none hover:bg-white/20 focus-visible:ring-1 focus-visible:ring-white">
+			<input type="range" aria-label="Zoom" min={min} max={max} step={5} value={value} onChange={(e) => onChange(Number(e.target.value))} className="h-1 w-28 accent-primary" />
+			<button type="button" aria-label="Zoom in" onClick={() => onChange(Math.min(max, value + 10))} className="px-1 text-base leading-none outline-none hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring">
 				+
 			</button>
-			<button type="button" onClick={() => onChange(100)} className="w-10 text-right outline-none hover:underline focus-visible:ring-1 focus-visible:ring-white" title="Back to 100%">
+			<button type="button" onClick={() => onChange(100)} className="w-10 text-right outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring" title="Back to 100%">
 				{value}%
 			</button>
 		</span>

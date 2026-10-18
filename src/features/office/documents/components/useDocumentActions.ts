@@ -46,7 +46,7 @@ export function useDocumentActions(editor: Editor | null) {
 			const s = editor.getActiveStyles() as Record<string, string | boolean | undefined>;
 			const block = editor.getTextCursorPosition().block as unknown as AnyBlock;
 			const type = block.type;
-			setFmt({
+			const next: Fmt = {
 				bold: !!s.bold,
 				italic: !!s.italic,
 				underline: !!s.underline,
@@ -61,7 +61,9 @@ export function useDocumentActions(editor: Editor | null) {
 				canNest: editor.canNestBlock(),
 				canUnnest: editor.canUnnestBlock(),
 				hasSelection: editor.getSelectedText().length > 0,
-			});
+			};
+			// Unchanged (most keystrokes): the same object, so the page around the text is not drawn again for nothing
+			setFmt((cur) => ((Object.keys(next) as (keyof Fmt)[]).every((k) => cur[k] === next[k]) ? cur : next));
 		} catch {
 			// The editor is between states (being mounted or rebuilt)
 		}

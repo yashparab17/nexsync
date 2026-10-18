@@ -16,7 +16,7 @@ const MAX_BINARY_FILE_SIZE: u64 = 50 * 1024 * 1024;
 // ────────────────────────────
 
 /// Lists files and directories in a workspace content subdirectory
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_workspace_files(
     app_handle: tauri::AppHandle,
     path: String,
@@ -86,7 +86,7 @@ pub fn list_workspace_files(
 }
 
 /// Creates a new empty file or folder in a workspace directory
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_workspace_item(
     app_handle: tauri::AppHandle,
     path: String,
@@ -119,7 +119,7 @@ pub fn create_workspace_item(
 }
 
 /// Reads text contents from a workspace file
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<String, String> {
     validate_allowed_root(&app_handle, &path)?;
 
@@ -141,7 +141,7 @@ pub fn read_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path:
 }
 
 /// Writes text contents to a workspace file
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path: String, content: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
 
@@ -162,7 +162,7 @@ pub fn write_workspace_file(app_handle: tauri::AppHandle, path: String, rel_path
 }
 
 /// Renames a workspace file or directory
-#[tauri::command]
+#[tauri::command(async)]
 pub fn rename_workspace_item(
     app_handle: tauri::AppHandle,
     path: String,
@@ -199,7 +199,7 @@ pub fn rename_workspace_item(
 }
 
 /// Moves a file or directory into the workspace trash
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_workspace_item(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
 
@@ -211,7 +211,7 @@ pub fn delete_workspace_item(app_handle: tauri::AppHandle, path: String, rel_pat
 }
 
 /// Reads a workspace binary file and returns its base64-encoded string
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_workspace_binary_file(
     app_handle: tauri::AppHandle,
     path: String,
@@ -237,7 +237,7 @@ pub fn read_workspace_binary_file(
 }
 
 /// Writes binary base64 data to a workspace file
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_workspace_binary_file(
     app_handle: tauri::AppHandle,
     path: String,
@@ -268,7 +268,7 @@ pub fn write_workspace_binary_file(
 }
 
 /// Imports an external file from disk into the workspace assets/ folder
-#[tauri::command]
+#[tauri::command(async)]
 pub fn import_asset_from_path(
     app_handle: tauri::AppHandle,
     workspace_path: String,
@@ -399,7 +399,7 @@ fn search_walk(dir: &std::path::Path, rel: &str, depth: usize, out: &mut Vec<Sea
 }
 
 /// Every file in the workspace with the text of the small text ones, in one call
-#[tauri::command]
+#[tauri::command(async)]
 pub fn search_workspace_files(app_handle: tauri::AppHandle, path: String) -> Result<Vec<SearchFile>, String> {
     validate_allowed_root(&app_handle, &path)?;
     let root = crate::commands::path_utils::resolve_workspace_path(&path, ".")?;

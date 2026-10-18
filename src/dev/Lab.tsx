@@ -7,6 +7,7 @@ import { Awareness } from "y-protocols/awareness";
 import * as Y from "yjs";
 
 import DocumentWorkspace from "@/features/office/documents/components/DocumentWorkspace";
+import { setFontFactors } from "@/features/office/documents/lib/fontMetrics";
 import SheetWorkspace from "@/features/office/sheets/components/SheetWorkspace";
 import SlideWorkspace from "@/features/office/slides/components/SlideWorkspace";
 import type { SheetIn } from "@/features/office/sheets/lib/sheet";
@@ -48,6 +49,12 @@ const SHEETS: SheetIn[] = [
 	{ name: "Notes", cells: { A1: "Second sheet" } },
 ];
 
+// ?perf: every stretch of more than 50 ms the page could not answer in, from the start, in window.__long
+if (new URLSearchParams(location.search).has("perf")) {
+	const long: { at: number; ms: number }[] = ((window as unknown as { __long: unknown }).__long = []) as never;
+	new PerformanceObserver((l) => l.getEntries().forEach((e) => long.push({ at: Math.round(e.startTime), ms: Math.round(e.duration) }))).observe({ type: "longtask" });
+}
+
 async function viaLab(cmd: string, args: unknown) {
 	const r = await fetch("http://127.0.0.1:7878/", { method: "POST", body: JSON.stringify({ cmd, args }) });
 	const j = (await r.json()) as { ok?: unknown; err?: string };
@@ -81,10 +88,11 @@ export default function Lab({ which }: { which: string }) {
 	const collab = useMemo<CollabDoc>(() => ({ ...base, synced }), [base, synced]);
 	const [readOnly] = useState(false);
 	(window as unknown as { __lab: unknown }).__lab = collab;
+	const fileParam = new URLSearchParams(location.search).get("file");
 	const [deck, setDeck] = useState<{ base: string; slides: string[]; notes: string[] } | null>(null);
 	useEffect(() => {
-		if (which === "slides") void viaLab("deck_new", {}).then((o) => setDeck({ base: (o as { parts: { base: string } }).parts.base, slides: (o as { parts: { slides: string[] } }).parts.slides, notes: [] }));
-	}, [which]);
+		if (which === "slides") void (fileParam ? viaLab("deck_open_file", { path: fileParam }) : viaLab("deck_new", {})).then((o) => setDeck({ base: (o as { parts: { base: string } }).parts.base, slides: (o as { parts: { slides: string[] } }).parts.slides, notes: [] }));
+	}, [which, fileParam]);
 	if (which === "slides")
 		return (
 			<div style={{ height: new URLSearchParams(location.search).get("h") ?? "100vh" }}>
@@ -97,10 +105,13 @@ export default function Lab({ which }: { which: string }) {
 				<SheetWorkspace collab={collab} opened={{ sheets: SHEETS, notes: [] }} name="Sales.xlsx" rel="office/sheets/Sales.xlsx" workspacePath="/lab" author="Ana" readOnly={readOnly} />
 			</div>
 		);
-	const fileParam = new URLSearchParams(location.search).get("file");
 	const [opened, setOpened] = useState<{ html: string; layout: never; sourceId: string } | null>(null);
 	useEffect(() => {
-		if (fileParam) void viaLab("office_import_file", { path: fileParam }).then((o) => setOpened(o as never));
+		if (fileParam)
+			void viaLab("office_import_file", { path: fileParam }).then((o) => {
+				setFontFactors((o as { fonts?: Record<string, number> }).fonts);
+				setOpened(o as never);
+			});
 	}, [fileParam]);
 	if (fileParam && !opened) return <p className="p-6">Opening…</p>;
 	if (which !== "documents") return <p className="p-6">The lab has no “{which}” yet.</p>;
@@ -110,7 +121,8 @@ export default function Lab({ which }: { which: string }) {
 				collab={collab}
 				fileLayout={(opened as unknown as { layout?: never } | null)?.layout}
 				sourceId={(opened as unknown as { sourceId?: string } | null)?.sourceId}
-				initialHtml={opened ? (opened as unknown as { html: string }).html : new URLSearchParams(location.search).has("long") ? SAMPLE + Array.from({ length: 40 }, (_, i) => `<h2>Section ${i + 1}</h2><p>${"Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(5)}</p>`).join("") : SAMPLE}
+				lists={(opened as unknown as { lists?: never } | null)?.lists}
+				initialBlocks={opened ? (opened as unknown as { blocks: unknown[] }).blocks : new URLSearchParams(location.search).has("long") ? SAMPLE + Array.from({ length: 40 }, (_, i) => `<h2>Section ${i + 1}</h2><p>${"Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(5)}</p>`).join("") : SAMPLE}
 				name="Quarterly Review.docx"
 				title="Quarterly Review"
 				author="Ana"

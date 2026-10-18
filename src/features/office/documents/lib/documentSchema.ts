@@ -1,9 +1,11 @@
-// The document editor's schema: BlockNote's blocks and character styles, plus the two a word processor needs that it lacks: a font
-// size and a font. Both are read back from the `font-size` and `font-family` of a span, so files that come in as HTML keep them.
+// The document editor's schema: BlockNote's blocks and character styles, plus what a word processor needs that they lack. Characters
+// get a font size and a font (read back from the `font-size` and `font-family` of a span, so text pasted as HTML keeps them). Text
+// blocks get a Word paragraph's properties (see `WORD_PROPS`), stored with the text, so they are shared, undone and copied with it.
 
-import { BlockNoteSchema, createStyleSpec, defaultStyleSpecs } from "@blocknote/core";
+import { BlockNoteSchema, createStyleSpec, defaultBlockSpecs, defaultStyleSpecs } from "@blocknote/core";
 
 import { pointsOf } from "@/features/office/documents/lib/documentFormat";
+import { lineFactor } from "@/features/office/documents/lib/fontMetrics";
 
 const fontSize = createStyleSpec(
 	{ type: "fontSize", propSchema: "string" },
@@ -33,6 +35,8 @@ const fontFamily = createStyleSpec(
 		render: (value) => {
 			const dom = document.createElement("span");
 			dom.style.fontFamily = value;
+			// The font's own line height, which the page draws its lines from (see `fontMetrics`)
+			dom.style.setProperty("--nx-lf", String(lineFactor(value)));
 			return { dom, contentDOM: dom };
 		},
 		toExternalHTML: (value) => {
@@ -71,5 +75,49 @@ function colourSpec(type: "textColor" | "backgroundColor", prop: "color" | "back
 	);
 }
 
-export const documentSchema = BlockNoteSchema.create({ styleSpecs: { ...defaultStyleSpecs, fontSize, fontFamily, textColor: colourSpec("textColor", "color"), backgroundColor: colourSpec("backgroundColor", "backgroundColor") } });
+// A Word paragraph's properties, in points. -1 (spacing) and 0 (line spacing) mean "not set": the editor's own spacing then.
+export const WORD_PROPS = {
+	spaceBefore: { default: -1 },
+	spaceAfter: { default: -1 },
+	// A multiple of single spacing, or (negative) exactly that many points
+	lineSpacing: { default: 0 },
+	indentLeft: { default: 0 },
+	indentRight: { default: 0 },
+	// Negative: a hanging indent
+	indentFirst: { default: 0 },
+	keepNext: { default: false },
+	keepLines: { default: false },
+	widowControl: { default: true },
+	pageBreakBefore: { default: false },
+	// How the text of the section this paragraph starts sits on its page: c(entre), b(ottom), j(ustify)
+	sectionVAlign: { default: "" },
+	// What follows the paragraph's one tab sits at the right edge (a right tab stop: a contents line)
+	tabRight: { default: false },
+	// The paragraph mark's font and size: an empty paragraph's line, and the least any of its lines is
+	markFont: { default: "" },
+	markSize: { default: 0 },
+	// A Word list: its id, level and label (numbered again as the list changes, see `wordLayout`)
+	numId: { default: 0 },
+	ilvl: { default: 0 },
+	listLabel: { default: "" },
+	// A picture's line goes on below it by its font's descent (points), as an inline picture's line does in Word
+	descent: { default: 0 },
+	styleId: { default: "" },
+} as const;
+
+type Spec = { config: { propSchema: Record<string, unknown> } };
+const withWordProps = <T extends Spec>(spec: T): T => ({ ...spec, config: { ...spec.config, propSchema: { ...spec.config.propSchema, ...WORD_PROPS } } }) as T;
+
+const blockSpecs = {
+	...defaultBlockSpecs,
+	paragraph: withWordProps(defaultBlockSpecs.paragraph),
+	heading: withWordProps(defaultBlockSpecs.heading),
+	bulletListItem: withWordProps(defaultBlockSpecs.bulletListItem),
+	numberedListItem: withWordProps(defaultBlockSpecs.numberedListItem),
+	checkListItem: withWordProps(defaultBlockSpecs.checkListItem),
+	image: withWordProps(defaultBlockSpecs.image),
+};
+
+// The font goes before the size, so a run's size is drawn inside its font: its line is then as tall as that font at that size, as in Word
+export const documentSchema = BlockNoteSchema.create({ blockSpecs, styleSpecs: { ...defaultStyleSpecs, fontFamily, fontSize, textColor: colourSpec("textColor", "color"), backgroundColor: colourSpec("backgroundColor", "backgroundColor") } });
 export type DocumentEditorType = typeof documentSchema.BlockNoteEditor;

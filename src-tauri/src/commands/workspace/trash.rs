@@ -154,7 +154,7 @@ fn restore_into(src: &Path, dst: &Path) -> Result<(), String> {
 // ────────────────────────────
 
 /// Lists trashed items, newest first
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_trash(app_handle: tauri::AppHandle, path: String) -> Result<Vec<TrashItem>, String> {
     validate_allowed_root(&app_handle, &path)?;
     purge_expired(&path, SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0));
@@ -176,7 +176,7 @@ pub fn list_trash(app_handle: tauri::AppHandle, path: String) -> Result<Vec<Tras
 }
 
 /// Moves a trashed item back to its original location
-#[tauri::command]
+#[tauri::command(async)]
 pub fn restore_trash_item(app_handle: tauri::AppHandle, path: String, id: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
     let entry = entry_dir(&path, &id)?;
@@ -193,14 +193,14 @@ pub fn restore_trash_item(app_handle: tauri::AppHandle, path: String, id: String
 }
 
 /// Permanently deletes one trashed item
-#[tauri::command]
+#[tauri::command(async)]
 pub fn purge_trash_item(app_handle: tauri::AppHandle, path: String, id: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
     fs::remove_dir_all(entry_dir(&path, &id)?).map_err(|e| e.to_string())
 }
 
 /// Permanently deletes everything in the trash
-#[tauri::command]
+#[tauri::command(async)]
 pub fn empty_trash(app_handle: tauri::AppHandle, path: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
     match fs::remove_dir_all(trash_root(&path)) {

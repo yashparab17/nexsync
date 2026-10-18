@@ -138,7 +138,7 @@ pub fn write_zip(workspace: &str, roots: &[String], dest: &Path) -> Result<usize
 // ────────────────────────────
 
 /// Exports workspace folders as a zip, for a workspace backup or a snapshot of the code in `projects`
-#[tauri::command]
+#[tauri::command(async)]
 pub fn export_zip(app_handle: tauri::AppHandle, path: String, roots: Vec<String>, dest: String) -> Result<usize, String> {
     validate_allowed_root(&app_handle, &path)?;
     if roots.is_empty() || roots.len() > 32 {
@@ -149,7 +149,7 @@ pub fn export_zip(app_handle: tauri::AppHandle, path: String, roots: Vec<String>
 }
 
 /// Saves a finished export, such as a note as Markdown or PDF, to the place the person chose
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_export_file(app_handle: tauri::AppHandle, path: String, dest: String, content_base64: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
     let dest = check_destination(&path, &dest, &["md", "pdf", "txt"])?;

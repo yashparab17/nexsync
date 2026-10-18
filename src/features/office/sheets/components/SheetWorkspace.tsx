@@ -329,7 +329,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 	}, [selection, shown]);
 
 	const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
-	const quickBtn = "flex size-7 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-white";
+	const quickBtn = "flex size-7 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 	if (!sheet) return <Loading className="h-48" />;
 

@@ -320,7 +320,7 @@ struct Progress {
     text: String,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_bisect_cancel() {
     CANCEL.store(true, Ordering::SeqCst);
 }

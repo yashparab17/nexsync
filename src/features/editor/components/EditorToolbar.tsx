@@ -1,7 +1,7 @@
 // The strip above the editor: the path of the file as a breadcrumb on the left, and what can be done with it on the right.
 
 import Toolbar from "@/components/layout/Toolbar";
-import { ChevronRight, Columns3, Eye, FolderClose, GitBranch, History, MessageSquareDiff, Save, Search, Sparkles, Terminal, UsersRound, Check } from "@/components/animate-icons";
+import { ChevronRight, Columns3, Eye, GitBranch, History, MessageSquareDiff, Save, Search, Sparkles, Terminal, UsersRound, Check } from "@/components/animate-icons";
 
 import type { CodeTabHandle, CodeTabStatus } from "@/features/editor/components/codeTabTypes";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,6 @@ interface EditorToolbarProps {
 	path: string | null;
 	status?: CodeTabStatus;
 	handle?: CodeTabHandle;
-	explorerOpen: boolean;
-	onToggleExplorer: () => void;
 	showBlame: boolean;
 	onToggleBlame: () => void;
 	split: boolean;
@@ -34,14 +32,10 @@ function Tool({ label, shortcut, pressed, onPress, disabled, children }: { label
 	);
 }
 
-export default function EditorToolbar({ path, status, handle, explorerOpen, onToggleExplorer, showBlame, onToggleBlame, split, onToggleSplit, canPreview, preview, onTogglePreview, panelOpen, onTogglePanel }: EditorToolbarProps) {
+export default function EditorToolbar({ path, status, handle, showBlame, onToggleBlame, split, onToggleSplit, canPreview, preview, onTogglePreview, panelOpen, onTogglePanel }: EditorToolbarProps) {
 	const segments = path ? path.split("/") : [];
 	return (
 		<Toolbar variant="sub">
-			<Tool label={explorerOpen ? "Hide explorer" : "Show explorer"} shortcut="Ctrl+B" pressed={explorerOpen} onPress={onToggleExplorer}>
-				<FolderClose className="size-4" />
-			</Tool>
-
 			<nav aria-label="Path" className="flex min-w-0 flex-1 items-center gap-1 px-1 font-mono text-xs text-muted-foreground">
 				{segments.map((segment, i) => (
 					<span key={i} className="flex min-w-0 items-center gap-1">

@@ -35,6 +35,24 @@ pub fn keep(bytes: &[u8], ext: &str, doc: &Document) -> String {
     id
 }
 
+/// The same files read for drawing their headers and footers (see `presets`), where that copy differs from the file
+static DRAWN: Mutex<Vec<(String, Arc<Document>)>> = Mutex::new(Vec::new());
+
+pub fn keep_drawn(id: &str, doc: Document) {
+    let mut all = DRAWN.lock().unwrap_or_else(|p| p.into_inner());
+    if !all.iter().any(|(k, _)| k == id) {
+        all.push((id.to_string(), Arc::new(doc)));
+        if all.len() > KEEP {
+            all.remove(0);
+        }
+    }
+}
+
+/// The file to draw headers and footers from: its drawing copy when it has one
+pub fn drawn(id: &str) -> Option<Arc<Document>> {
+    DRAWN.lock().unwrap_or_else(|p| p.into_inner()).iter().find(|(k, _)| k == id).map(|(_, d)| d.clone()).or_else(|| get(id))
+}
+
 pub fn get(id: &str) -> Option<Arc<Document>> {
     SOURCES.lock().unwrap_or_else(|p| p.into_inner()).iter().find(|(k, _)| k == id).map(|(_, d)| d.clone())
 }
@@ -52,6 +70,7 @@ pub fn layout_of(doc: &Document) -> Layout {
         .default
         .and_then(|i| doc.parts.get(&i))
         .is_some_and(|p| p.blocks.iter().any(|b| matches!(&**b, Block::Para(para) if para.objects.iter().any(|o| matches!(o, InlineObject::Field { instr, .. } if instr.trim_start().to_ascii_uppercase().starts_with("PAGE"))))));
+    let normal = doc.styles.resolve_char(Some("Normal"), &Default::default());
     Layout {
         width: s.page_w,
         height: s.page_h,
@@ -72,6 +91,8 @@ pub fn layout_of(doc: &Document) -> Layout {
             wordcraft_doc::section::PageVAlign::Justify => "justify",
         }
         .to_string(),
+        font: normal.font,
+        size: normal.size,
     }
 }
 

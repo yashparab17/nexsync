@@ -163,7 +163,7 @@ pub struct EnvState {
     pub state: &'static str,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_env_status(app_handle: tauri::AppHandle, path: String, project: String) -> Result<Vec<EnvState>, String> {
     validate_allowed_root(&app_handle, &path)?;
     let dir = project_dir(&path, &project)?;
@@ -184,7 +184,7 @@ pub fn project_env_status(app_handle: tauri::AppHandle, path: String, project: S
 }
 
 /// Sets one variable on this device, in `.env` (`store` is `file`) or the credential store (`credential`); it leaves the other
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_env_set(app_handle: tauri::AppHandle, path: String, project: String, name: String, value: String, store: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
     let dir = project_dir(&path, &project)?;
@@ -214,7 +214,7 @@ pub fn project_env_set(app_handle: tauri::AppHandle, path: String, project: Stri
 }
 
 /// Removes one variable from this device, from both places
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_env_clear(app_handle: tauri::AppHandle, path: String, project: String, name: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
     let dir = project_dir(&path, &project)?;
@@ -300,7 +300,7 @@ pub fn deps_state(workspace: &str, project: &str, dir: &Path) -> DepsStatus {
     DepsStatus { state, files }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_deps_status(app_handle: tauri::AppHandle, path: String, project: String) -> Result<DepsStatus, String> {
     validate_allowed_root(&app_handle, &path)?;
     let dir = project_dir(&path, &project)?;
@@ -308,7 +308,7 @@ pub fn project_deps_status(app_handle: tauri::AppHandle, path: String, project: 
 }
 
 /// "I have installed them already": records the current files as what this device's install matches
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_deps_mark(app_handle: tauri::AppHandle, path: String, project: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
     project_dir(&path, &project)?;

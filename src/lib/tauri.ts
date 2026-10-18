@@ -1,4 +1,5 @@
 import { forgetWorkspace } from "@/lib/forgetWorkspace";
+import { forgetRecent, renameRecent } from "@/lib/recentFiles";
 // Typed wrapper around Tauri IPC commands
 // All backend invocations go through these functions to keep IPC calls type-safe
 // P2P commands live in src/lib/p2p/transport.ts
@@ -627,6 +628,7 @@ export async function deleteWorkspaceItem(
 	relPath: string,
 ): Promise<void> {
 	await invoke("delete_workspace_item", { path, relPath });
+	forgetRecent(path, relPath);
 	// The live editing state goes with the file, or a new file of the same name would open with the old text
 	await forgetYjsDocs(path, relPath.replace(/^\/+|\/+$/g, ""));
 }
@@ -642,12 +644,13 @@ async function forgetYjsDocs(workspacePath: string, rel: string): Promise<void> 
 }
 
 // Rename a workspace file or directory
-export function renameWorkspaceItem(
+export async function renameWorkspaceItem(
 	path: string,
 	relPath: string,
 	newName: string,
 ): Promise<void> {
-	return invoke("rename_workspace_item", { path, relPath, newName });
+	await invoke("rename_workspace_item", { path, relPath, newName });
+	renameRecent(path, relPath, newName);
 }
 
 // Get aggregate stats for workspace dashboard
@@ -744,12 +747,11 @@ export async function getYjsDoc(
 	workspacePath: string,
 	docId: string,
 ): Promise<Uint8Array | null> {
-	const base64Str = await invoke<string | null>("get_yjs_doc", {
-		workspacePath,
-		docId,
-	});
-	if (!base64Str) return null;
-	return base64ToUint8Array(base64Str);
+	// The bytes come back as they are (no base64, no JSON): a document's state runs to megabytes
+	const raw = await invoke<ArrayBuffer | Uint8Array | number[] | null>("get_yjs_doc_raw", { workspacePath, docId });
+	if (!raw) return null;
+	const bytes = raw instanceof Uint8Array ? raw : raw instanceof ArrayBuffer ? new Uint8Array(raw) : Uint8Array.from(raw);
+	return bytes.byteLength > 0 ? bytes : null;
 }
 
 // Ids of every document that has stored CRDT state
@@ -763,12 +765,8 @@ export async function saveYjsDoc(
 	docId: string,
 	state: Uint8Array,
 ): Promise<void> {
-	const base64Str = uint8ArrayToBase64(state);
-	await invoke("save_yjs_doc", {
-		workspacePath,
-		docId,
-		state: base64Str,
-	});
+	// Sent as the request's body, the bytes as they are; which document it is goes in headers
+	await invoke("save_yjs_doc_raw", state, { headers: { "x-workspace": encodeURIComponent(workspacePath), "x-doc": encodeURIComponent(docId) } });
 }
 
 // Move a Yjs document's binary CRDT state to a new doc id, e.g. after a file rename
@@ -1218,6 +1216,9 @@ export interface PageImage {
 	png: string;
 	widthPt: number;
 	heightPt: number;
+	// Where the text goes on the page: between the margins, less what a header or footer reaches into them
+	bodyTopPt: number;
+	bodyHeightPt: number;
 }
 export function officeRender(html: string, title: string, layout: OfficeLayout | null, scale: number, sourceId?: string | null): Promise<PageImage[]> {
 	return invoke("office_render", { html, title, layout, scale, sourceId: sourceId ?? null });
@@ -1233,4 +1234,8 @@ export function officeLayout(html: string, title: string, layout: OfficeLayout |
 }
 export function officePage(session: number, index: number, scale: number): Promise<PageImage> {
 	return invoke("office_page", { session, index, scale });
+}
+// Page `index` of a document the editor shows on `pages` pages, with only the header and footer of the file it came from drawn on it
+export function officeMargins(sourceId: string, pages: number, index: number, scale: number): Promise<PageImage> {
+	return invoke("office_margins", { sourceId, pages, index, scale });
 }

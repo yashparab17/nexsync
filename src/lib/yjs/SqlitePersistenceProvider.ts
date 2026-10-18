@@ -21,6 +21,8 @@ export class SqlitePersistenceProvider {
 
 	private readonly debounceMs: number;
 	private saveTimeout: ReturnType<typeof setTimeout> | null = null;
+	// A save waiting for the browser to be idle (see scheduleSave)
+	private idleSave: number | null = null;
 	private syncedListeners: Set<SyncedListener> = new Set();
 	private pendingSavePromise: Promise<void> | null = null;
 	public readonly whenSynced: Promise<void>;
@@ -90,9 +92,20 @@ export class SqlitePersistenceProvider {
 
 		this.saveTimeout = setTimeout(() => {
 			this.saveTimeout = null;
-			this.saveNow().catch((err) => {
-				console.error(`[SqlitePersistenceProvider] Save error for "${this.docId}":`, err);
-			});
+			// Writing out a long document's whole state takes a moment, so it waits for a gap in the typing, not just the debounce
+			const run = () =>
+				this.saveNow().catch((err) => {
+					console.error(`[SqlitePersistenceProvider] Save error for "${this.docId}":`, err);
+				});
+			if (typeof requestIdleCallback === "function")
+				this.idleSave = requestIdleCallback(
+					() => {
+						this.idleSave = null;
+						void run();
+					},
+					{ timeout: 3000 },
+				);
+			else void run();
 		}, this.debounceMs);
 	}
 
@@ -131,9 +144,13 @@ export class SqlitePersistenceProvider {
 
 		this.doc.off("update", this.handleDocUpdate);
 
-		if (this.saveTimeout !== null) {
-			clearTimeout(this.saveTimeout);
-			this.saveTimeout = null;
+		// A save still waiting (on its debounce, or for an idle moment) is made now
+		const pending = this.saveTimeout !== null || this.idleSave !== null;
+		if (this.saveTimeout !== null) clearTimeout(this.saveTimeout);
+		if (this.idleSave !== null) cancelIdleCallback(this.idleSave);
+		this.saveTimeout = null;
+		this.idleSave = null;
+		if (pending) {
 			// Attempt a final synchronous-like save before destroying
 			try {
 				const state = Y.encodeStateAsUpdate(this.doc);

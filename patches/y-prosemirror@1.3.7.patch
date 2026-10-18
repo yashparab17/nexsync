@@ -1,0 +1,120 @@
+diff --git a/dist/y-prosemirror.cjs b/dist/y-prosemirror.cjs
+index de4d1e6609bba2ffbc2a57048023cdf5bad44b18..280eb29f3eae86fb12e770597f056d46e6530685 100644
+--- a/dist/y-prosemirror.cjs
++++ b/dist/y-prosemirror.cjs
+@@ -1047,7 +1047,9 @@ const equalYTextPText = (ytext, ptexts) => {
+  * @param {Y.XmlElement|Y.XmlText|Y.XmlHook} ytype
+  * @param {any|Array<any>} pnode
+  */
+-const equalYTypePNode = (ytype, pnode) => {
++const equalYTypePNode = (ytype, pnode, mapping) => {
++  // patched (nexsync): a child already mapped to this very node is equal, without comparing its content again
++  if (mapping && mappedIdentity(mapping.get(ytype), pnode)) return true
+   if (
+     ytype instanceof Y__namespace.XmlElement && !(pnode instanceof Array) &&
+     matchNodeName(ytype, pnode)
+@@ -1056,7 +1058,7 @@ const equalYTypePNode = (ytype, pnode) => {
+     return ytype._length === normalizedContent.length &&
+       equalAttrs(ytype.getAttributes(), pnode.attrs) &&
+       ytype.toArray().every((ychild, i) =>
+-        equalYTypePNode(ychild, normalizedContent[i])
++        equalYTypePNode(ychild, normalizedContent[i], mapping)
+       )
+   }
+   return ytype instanceof Y__namespace.XmlText && pnode instanceof Array &&
+@@ -1094,7 +1096,7 @@ const computeChildEqualityFactor = (ytype, pnode, meta) => {
+     const leftP = pChildren[left];
+     if (mappedIdentity(meta.mapping.get(leftY), leftP)) {
+       foundMappedChild = true; // definite (good) match!
+-    } else if (!equalYTypePNode(leftY, leftP)) {
++    } else if (!equalYTypePNode(leftY, leftP, meta.mapping)) {
+       break
+     }
+   }
+@@ -1103,7 +1105,7 @@ const computeChildEqualityFactor = (ytype, pnode, meta) => {
+     const rightP = pChildren[pChildCnt - right - 1];
+     if (mappedIdentity(meta.mapping.get(rightY), rightP)) {
+       foundMappedChild = true;
+-    } else if (!equalYTypePNode(rightY, rightP)) {
++    } else if (!equalYTypePNode(rightY, rightP, meta.mapping)) {
+       break
+     }
+   }
+@@ -1257,7 +1259,7 @@ const updateYFragment = (y, yDomFragment, pNode, meta) => {
+     const leftY = yChildren[left];
+     const leftP = pChildren[left];
+     if (!mappedIdentity(meta.mapping.get(leftY), leftP)) {
+-      if (equalYTypePNode(leftY, leftP)) {
++      if (equalYTypePNode(leftY, leftP, meta.mapping)) {
+         // update mapping
+         meta.mapping.set(leftY, leftP);
+       } else {
+@@ -1270,7 +1272,7 @@ const updateYFragment = (y, yDomFragment, pNode, meta) => {
+     const rightY = yChildren[yChildCnt - right - 1];
+     const rightP = pChildren[pChildCnt - right - 1];
+     if (!mappedIdentity(meta.mapping.get(rightY), rightP)) {
+-      if (equalYTypePNode(rightY, rightP)) {
++      if (equalYTypePNode(rightY, rightP, meta.mapping)) {
+         // update mapping
+         meta.mapping.set(rightY, rightP);
+       } else {
+diff --git a/src/plugins/sync-plugin.js b/src/plugins/sync-plugin.js
+index dccfb76918c8c70fe5a5b12372cdabcc9d8c58dd..c5e89c0b71fa0e4504807fafd9981a64f3c06324 100644
+--- a/src/plugins/sync-plugin.js
++++ b/src/plugins/sync-plugin.js
+@@ -973,7 +973,9 @@ const equalYTextPText = (ytext, ptexts) => {
+  * @param {Y.XmlElement|Y.XmlText|Y.XmlHook} ytype
+  * @param {any|Array<any>} pnode
+  */
+-const equalYTypePNode = (ytype, pnode) => {
++const equalYTypePNode = (ytype, pnode, mapping) => {
++  // patched (nexsync): a child already mapped to this very node is equal, without comparing its content again
++  if (mapping && mappedIdentity(mapping.get(ytype), pnode)) return true
+   if (
+     ytype instanceof Y.XmlElement && !(pnode instanceof Array) &&
+     matchNodeName(ytype, pnode)
+@@ -982,7 +984,7 @@ const equalYTypePNode = (ytype, pnode) => {
+     return ytype._length === normalizedContent.length &&
+       equalAttrs(ytype.getAttributes(), pnode.attrs) &&
+       ytype.toArray().every((ychild, i) =>
+-        equalYTypePNode(ychild, normalizedContent[i])
++        equalYTypePNode(ychild, normalizedContent[i], mapping)
+       )
+   }
+   return ytype instanceof Y.XmlText && pnode instanceof Array &&
+@@ -1020,7 +1022,7 @@ const computeChildEqualityFactor = (ytype, pnode, meta) => {
+     const leftP = pChildren[left]
+     if (mappedIdentity(meta.mapping.get(leftY), leftP)) {
+       foundMappedChild = true // definite (good) match!
+-    } else if (!equalYTypePNode(leftY, leftP)) {
++    } else if (!equalYTypePNode(leftY, leftP, meta.mapping)) {
+       break
+     }
+   }
+@@ -1029,7 +1031,7 @@ const computeChildEqualityFactor = (ytype, pnode, meta) => {
+     const rightP = pChildren[pChildCnt - right - 1]
+     if (mappedIdentity(meta.mapping.get(rightY), rightP)) {
+       foundMappedChild = true
+-    } else if (!equalYTypePNode(rightY, rightP)) {
++    } else if (!equalYTypePNode(rightY, rightP, meta.mapping)) {
+       break
+     }
+   }
+@@ -1183,7 +1185,7 @@ export const updateYFragment = (y, yDomFragment, pNode, meta) => {
+     const leftY = yChildren[left]
+     const leftP = pChildren[left]
+     if (!mappedIdentity(meta.mapping.get(leftY), leftP)) {
+-      if (equalYTypePNode(leftY, leftP)) {
++      if (equalYTypePNode(leftY, leftP, meta.mapping)) {
+         // update mapping
+         meta.mapping.set(leftY, leftP)
+       } else {
+@@ -1196,7 +1198,7 @@ export const updateYFragment = (y, yDomFragment, pNode, meta) => {
+     const rightY = yChildren[yChildCnt - right - 1]
+     const rightP = pChildren[pChildCnt - right - 1]
+     if (!mappedIdentity(meta.mapping.get(rightY), rightP)) {
+-      if (equalYTypePNode(rightY, rightP)) {
++      if (equalYTypePNode(rightY, rightP, meta.mapping)) {
+         // update mapping
+         meta.mapping.set(rightY, rightP)
+       } else {

@@ -102,13 +102,13 @@ pub fn build_command(template: &str, name: &str, options: &[(String, String)]) -
     Ok(command)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_templates() -> Vec<Template> {
     TEMPLATES.to_vec()
 }
 
 /// What a template would run, for the dialog to show before anything starts
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_scaffold_preview(template: String, name: String, options: Vec<(String, String)>) -> Result<String, String> {
     build_command(&template, &name, &options)
 }

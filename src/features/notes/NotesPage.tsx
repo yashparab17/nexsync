@@ -5,7 +5,7 @@ import { dropSummary, importDropped } from "@/lib/dropImport";
 import Welcome from "@/components/elements/Welcome";
 import Toolbar, { ToolbarSearch, ToolbarTitle } from "@/components/layout/Toolbar";
 import { useNavigate } from "react-router-dom";
-import { CalendarPlus, FilePlus, FileText, LayoutGrid, Network, PanelLeftClose, PanelLeftOpen, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "@/components/animate-icons";
+import { CalendarPlus, FilePlus, FileText, LayoutGrid, Network, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "@/components/animate-icons";
 
 import NoteEditor from "@/features/editor/components/NoteEditor";
 import NoteBoard from "@/components/elements/notes/NoteBoard";
@@ -14,7 +14,7 @@ import { useContextMenu } from "@/components/elements/ContextMenu";
 import EditorTabs from "@/features/editor/components/EditorTabs";
 import Finder from "@/components/elements/Finder";
 import PresenceDots from "@/components/elements/PresenceDots";
-import Splitter from "@/components/elements/Splitter";
+import CollapsiblePane from "@/components/layout/CollapsiblePane";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -23,8 +23,9 @@ import { useCollabDoc } from "@/hooks/useCollabDoc";
 import { useListKeys } from "@/hooks/useListKeys";
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { useOpenParam } from "@/hooks/useOpenParam";
-import { useSidePanelWidth } from "@/hooks/usePanelSize";
+import { useCollapsed } from "@/hooks/useCollapsed";
 import { useReportItem } from "@/hooks/usePresence";
+import { useSyncedIn } from "@/hooks/useSyncedIn";
 import { isNoteFile } from "@/lib/editor/languages";
 import { positionsFor, summarize } from "@/features/notes/lib/board";
 import { noteTitle } from "@/features/notes/lib/links";
@@ -76,7 +77,8 @@ export default function NotesPage() {
 	const logError = useErrorLog();
 	const navigate = useNavigate();
 	const isViewer = useIsViewer();
-	const { lastSyncedFile, viewersAt, selfName } = useP2P();
+	const { viewersAt, selfName } = useP2P();
+	const synced = useSyncedIn(LAYOUT.notes, LAYOUT.others);
 	const workspacePath = workspace?.path;
 
 	const [notes, setNotes] = useState<WorkspaceFile[]>([]);
@@ -84,8 +86,7 @@ export default function NotesPage() {
 	const [loading, setLoading] = useState(true);
 	const [view, setView] = useState<View>("note");
 	const [query, setQuery] = useState("");
-	const [listOpen, setListOpen] = useState(true);
-	const [listWidth, setListWidth] = useSidePanelWidth();
+	const [, toggleList] = useCollapsed("notes.list");
 	const [pins, setPins] = useState<string[]>([]);
 	useEffect(() => {
 		if (workspacePath) setPins(readPins(workspacePath));
@@ -152,9 +153,9 @@ export default function NotesPage() {
 
 	// A collaborator's changes arrive as files
 	useEffect(() => {
-		if (lastSyncedFile && workspacePath) void loadNotes();
+		if (synced && workspacePath) void loadNotes();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [lastSyncedFile]);
+	}, [synced]);
 
 	// What each row and card shows, and the links for the graph, come from the saved text of every note
 	useEffect(() => {
@@ -166,7 +167,7 @@ export default function NotesPage() {
 		return () => {
 			live = false;
 		};
-	}, [workspacePath, notes, lastSyncedFile]);
+	}, [workspacePath, notes, synced]);
 
 	// The text of the note in front
 	useEffect(() => {
@@ -398,12 +399,12 @@ export default function NotesPage() {
 				setIsNewOpen(true);
 			} else if (e.key === "\\") {
 				e.preventDefault();
-				setListOpen((o) => !o);
+				toggleList();
 			}
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [isViewer]);
+	}, [isViewer, toggleList]);
 
 	const switcherItems = useMemo(
 		() => [...infos].sort((a, b) => (modified.get(b.path) ?? "").localeCompare(modified.get(a.path) ?? "")).map((n) => ({ id: n.path, label: noteTitle(n.name), detail: ago(modified.get(n.path) ?? ""), group: "Recent", icon: <FileText className="size-4" /> })),
@@ -456,9 +457,8 @@ export default function NotesPage() {
 			<DropOverlay show={dragging} title="Drop to add to notes" />
 			{dropNotice.node}
 			{/* Notes list */}
-			{listOpen && (
-				<>
-					<aside aria-label="Notes list" style={{ width: listWidth }} className="flex shrink-0 flex-col bg-panel">
+			<CollapsiblePane id="notes.list" defaultWidth={300} label="the notes list">
+					<aside aria-label="Notes list" className="flex shrink-0 flex-col bg-panel">
 						<Toolbar variant="header">
 							<div className="flex-1"><ToolbarTitle as="h2" name="Notes" meta={notes.length} /></div>
 							{!isViewer && (
@@ -479,9 +479,6 @@ export default function NotesPage() {
 									</Button>
 								</>
 							)}
-							<Button variant="ghost" size="icon-xs" aria-label="Hide notes list" onPress={() => setListOpen(false)}>
-								<PanelLeftClose className="size-4" />
-							</Button>
 						</Toolbar>
 						<Toolbar variant="sub" className="gap-2">
 							<ToolbarSearch label="Search notes" placeholder="Search notes" value={query} onChange={setQuery} className="w-full" />
@@ -507,18 +504,11 @@ export default function NotesPage() {
 							)}
 						</div>
 					</aside>
-					<Splitter orientation="vertical" size={listWidth} onResize={setListWidth} grows="right" label="Resize notes list" quiet />
-				</>
-			)}
+			</CollapsiblePane>
 
 			{/* Tabs and the open note */}
 			<section className="flex min-w-0 flex-1 flex-col" aria-label="Note">
 				<Toolbar variant="tabs">
-					{!listOpen && (
-						<Button variant="ghost" size="icon-xs" aria-label="Show notes list" onPress={() => setListOpen(true)} className="m-2">
-							<PanelLeftOpen className="size-4" />
-						</Button>
-					)}
 					{view === "note" ? <EditorTabs tabs={tabs} active={selectedPath} side={null} dirty={NO_DIRTY} onSelect={setSelectedPath} onClose={closeTab} onReorder={(from, to) => setTabs((prev) => { const next = [...prev]; next.splice(to, 0, next.splice(from, 1)[0]); return next; })} onContextMenu={noteMenu} label={(path) => noteTitle(path.split("/").pop() ?? path)} /> : <div className="flex-1" />}
 					<div className="flex shrink-0 items-center gap-1 border-l px-2" role="group" aria-label="View">
 						{segment("note", "Note", <FileText className="size-3.5" />)}

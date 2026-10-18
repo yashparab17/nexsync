@@ -1,4 +1,5 @@
 import { useNewParam } from "@/hooks/useNewParam";
+import { useSyncedIn } from "@/hooks/useSyncedIn";
 import { pushRecent } from "@/lib/recentFiles";
 // Sheets: spreadsheet files of the workspace (.xlsx and the formats it reads) opened as live shared workbooks. What people type and how
 // cells look is kept in a shared document; the cells' answers are worked out by the spreadsheet engine from that text, on every device alike.
@@ -39,7 +40,8 @@ export default function SheetsPage() {
 	const { workspace } = useWorkspace();
 	const logError = useErrorLog();
 	const isViewer = useIsViewer();
-	const { selfName, viewersAt, lastSyncedFile } = useP2P();
+	const { selfName, viewersAt } = useP2P();
+	const synced = useSyncedIn(LAYOUT.sheets);
 	const workspacePath = workspace?.path ?? "";
 	const author = selfName ?? "Someone";
 
@@ -61,7 +63,7 @@ export default function SheetsPage() {
 				setBooks([]);
 			});
 	}, [workspacePath, logError]);
-	useEffect(load, [load, lastSyncedFile]);
+	useEffect(load, [load, synced]);
 
 	useOpenParam((p) => setSelected(strip(p)), !!workspacePath);
 	useReportItem(selected);

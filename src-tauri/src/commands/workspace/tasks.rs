@@ -11,7 +11,7 @@ use crate::commands::validation::{validate_task_priority, validate_task_status};
 // ────────────────────────────
 
 /// Fetches all tasks for the workspace
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_tasks(app_handle: tauri::AppHandle, path: String, with_state: Option<bool>) -> Result<Vec<Task>, String> {
     validate_allowed_root(&app_handle, &path)?;
     
@@ -56,7 +56,7 @@ pub fn get_tasks(app_handle: tauri::AppHandle, path: String, with_state: Option<
 }
 
 /// Creates a new task in the workspace database
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result<Task, String> {
     validate_allowed_root(&app_handle, &request.path)?;
     
@@ -103,7 +103,7 @@ pub fn create_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
 }
 
 /// Updates an existing task in the workspace database
-#[tauri::command]
+#[tauri::command(async)]
 pub fn update_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result<(), String> {
     validate_allowed_root(&app_handle, &request.path)?;
     
@@ -142,7 +142,7 @@ pub fn update_task(app_handle: tauri::AppHandle, request: TaskRequest) -> Result
 }
 
 /// Deletes a task by ID from the workspace database
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_task(app_handle: tauri::AppHandle, request: TaskIdRequest) -> Result<(), String> {
     validate_allowed_root(&app_handle, &request.path)?;
     

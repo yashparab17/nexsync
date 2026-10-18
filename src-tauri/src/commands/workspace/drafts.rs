@@ -440,12 +440,12 @@ fn to_value<T: Serialize>(row: &T) -> Result<Value, String> {
     serde_json::to_value(row).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_drafts(app_handle: tauri::AppHandle, path: String, entity: String, target: String) -> Result<Vec<Draft>, String> {
     list(&open(&app_handle, &path)?.conn, &entity, &target)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn start_draft(app_handle: tauri::AppHandle, path: String, entity: String, target: String, name: String, author: Option<String>) -> Result<Draft, String> {
     let db = open(&app_handle, &path)?;
     match entity.as_str() {
@@ -456,7 +456,7 @@ pub fn start_draft(app_handle: tauri::AppHandle, path: String, entity: String, t
 }
 
 /// The draft as a task or card
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_draft(app_handle: tauri::AppHandle, path: String, draft_id: String) -> Result<Value, String> {
     let db = open(&app_handle, &path)?;
     match entity_of(&db.conn, &draft_id)?.as_str() {
@@ -465,7 +465,7 @@ pub fn get_draft(app_handle: tauri::AppHandle, path: String, draft_id: String) -
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_draft(app_handle: tauri::AppHandle, path: String, draft_id: String, record: Value, author: Option<String>) -> Result<Value, String> {
     let db = open(&app_handle, &path)?;
     match entity_of(&db.conn, &draft_id)?.as_str() {
@@ -480,7 +480,7 @@ pub fn save_draft(app_handle: tauri::AppHandle, path: String, draft_id: String, 
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn preview_draft(app_handle: tauri::AppHandle, path: String, draft_id: String) -> Result<Preview, String> {
     let db = open(&app_handle, &path)?;
     match entity_of(&db.conn, &draft_id)?.as_str() {
@@ -490,7 +490,7 @@ pub fn preview_draft(app_handle: tauri::AppHandle, path: String, draft_id: Strin
 }
 
 /// Merges the draft; returns the record with the state other devices need to merge it
-#[tauri::command]
+#[tauri::command(async)]
 pub fn merge_draft(app_handle: tauri::AppHandle, path: String, draft_id: String) -> Result<Value, String> {
     let db = open(&app_handle, &path)?;
     let workspace = super::helpers::get_workspace_id(&db)?;
@@ -506,48 +506,48 @@ pub fn merge_draft(app_handle: tauri::AppHandle, path: String, draft_id: String)
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn discard_draft(app_handle: tauri::AppHandle, path: String, draft_id: String) -> Result<(), String> {
     discard(&open(&app_handle, &path)?.conn, &draft_id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_board_drafts(app_handle: tauri::AppHandle, path: String) -> Result<Vec<BoardDraft>, String> {
     list_boards(&open(&app_handle, &path)?.conn)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn start_board_draft(app_handle: tauri::AppHandle, path: String, name: String, author: Option<String>) -> Result<BoardDraft, String> {
     start_board(&open(&app_handle, &path)?.conn, &name, author.as_deref())
 }
 
 /// The board as the draft would leave it
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_board_draft(app_handle: tauri::AppHandle, path: String, board_id: String) -> Result<Vec<KanbanColumn>, String> {
     let db = open(&app_handle, &path)?;
     let workspace = super::helpers::get_workspace_id(&db)?;
     board_view(&db.conn, &workspace, &board_id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn move_in_board_draft(app_handle: tauri::AppHandle, path: String, board_id: String, card_id: String, column_id: String, position: f64, author: Option<String>) -> Result<(), String> {
     move_card(&open(&app_handle, &path)?.conn, &board_id, &card_id, &column_id, position, author.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn preview_board_draft(app_handle: tauri::AppHandle, path: String, board_id: String) -> Result<BoardPreview, String> {
     preview_board(&open(&app_handle, &path)?.conn, &board_id)
 }
 
 /// Merges the board draft; returns the ids of the cards that changed, so the caller can send each to collaborators
-#[tauri::command]
+#[tauri::command(async)]
 pub fn merge_board_draft(app_handle: tauri::AppHandle, path: String, board_id: String) -> Result<Vec<String>, String> {
     let db = open(&app_handle, &path)?;
     let workspace = super::helpers::get_workspace_id(&db)?;
     merge_board(&db.conn, &workspace, &board_id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn discard_board_draft(app_handle: tauri::AppHandle, path: String, board_id: String) -> Result<(), String> {
     discard_board(&open(&app_handle, &path)?.conn, &board_id)
 }

@@ -286,7 +286,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 		return () => window.removeEventListener("keydown", onKey);
 	}, [typing, presenting, undo, index, keys]);
 
-	const quickBtn = "flex size-7 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-white";
+	const quickBtn = "flex size-7 items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 	if (!slide || !key) return <Loading className="h-48" />;
 
 	return (
@@ -408,7 +408,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 					<span>
 						Slide {index + 1} of {keys.length}
 					</span>
-					<button type="button" onClick={() => setViewState((v) => ({ ...v, notes: !v.notes }))} className="outline-none hover:underline focus-visible:ring-1 focus-visible:ring-white">
+					<button type="button" onClick={() => setViewState((v) => ({ ...v, notes: !v.notes }))} className="outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring">
 						Notes
 					</button>
 					<ZoomBar value={zoom} onChange={setZoom} min={30} max={200} />

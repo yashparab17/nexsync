@@ -517,39 +517,39 @@ pub(super) fn checked(app_handle: &tauri::AppHandle, path: &str) -> Result<(), S
 }
 
 /// A task with the state other devices need to merge it, to send to collaborators after a local change
-#[tauri::command]
+#[tauri::command(async)]
 pub fn export_task_record(app_handle: tauri::AppHandle, path: String, id: String) -> Result<Option<Task>, String> {
     checked(&app_handle, &path)?;
     export_task(&path, &id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn export_card_record(app_handle: tauri::AppHandle, path: String, id: String) -> Result<Option<KanbanCard>, String> {
     checked(&app_handle, &path)?;
     export_card(&path, &id)
 }
 
 /// Merges a task a collaborator sent; returns whether anything here changed
-#[tauri::command]
+#[tauri::command(async)]
 pub fn merge_task_record(app_handle: tauri::AppHandle, path: String, task: Task) -> Result<bool, String> {
     checked(&app_handle, &path)?;
     merge_task_into(&path, &task)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn merge_card_record(app_handle: tauri::AppHandle, path: String, card: KanbanCard) -> Result<bool, String> {
     checked(&app_handle, &path)?;
     merge_card_into(&path, &card)
 }
 
 /// Settles a conflict on a task by choosing one of its values
-#[tauri::command]
+#[tauri::command(async)]
 pub fn resolve_task_conflict(app_handle: tauri::AppHandle, path: String, id: String, field: String, value: serde_json::Value, author: Option<String>) -> Result<Option<Task>, String> {
     checked(&app_handle, &path)?;
     resolve_task_field(&path, &id, &field, value, author.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn resolve_card_conflict(app_handle: tauri::AppHandle, path: String, id: String, field: String, value: serde_json::Value, author: Option<String>) -> Result<Option<KanbanCard>, String> {
     checked(&app_handle, &path)?;
     resolve_card_field(&path, &id, &field, value, author.as_deref())

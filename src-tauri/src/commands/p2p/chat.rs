@@ -262,7 +262,7 @@ pub struct ModerationView {
     pub held: i64,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn moderation_state(app: AppHandle, path: String) -> Result<ModerationView, String> {
     validate_allowed_root(&app, &path)?;
     let db = WorkspaceDb::open_existing(&path)?;
@@ -281,7 +281,7 @@ pub struct ChatState {
 }
 
 /// Everything the chat and comment views need: the entries, the read markers, and this device's key
-#[tauri::command]
+#[tauri::command(async)]
 pub fn chat_state(app: AppHandle, path: String) -> Result<ChatState, String> {
     validate_allowed_root(&app, &path)?;
     let db = WorkspaceDb::open_existing(&path)?;
@@ -290,56 +290,56 @@ pub fn chat_state(app: AppHandle, path: String) -> Result<ChatState, String> {
 
 /// The body of a direct message to `to`, sealed so only that device and this one can read it; post it with kind "dm" on the
 /// channel `dm_channel` returns
-#[tauri::command]
+#[tauri::command(async)]
 pub fn dm_seal(to: String, text: String) -> Result<String, String> {
     let key = signing::device_secret().ok_or("This device has no key yet.")?;
     crate::commands::workspace::chat::dm::body_for(key, &to, &text).ok_or_else(|| "That member's device key is not valid.".to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn dm_channel(with: String) -> Result<String, String> {
     let me = signing::device_key().ok_or("This device has no key yet.")?;
     Ok(crate::commands::workspace::chat::dm::channel_of(&me, &with))
 }
 
 /// Opens the direct messages among the given entries that this device wrote or was sent: entry id to text
-#[tauri::command]
+#[tauri::command(async)]
 pub fn dm_open(entries: Vec<(String, String, String)>) -> std::collections::HashMap<String, String> {
     let Some(key) = signing::device_secret() else { return Default::default() };
     entries.into_iter().filter_map(|(id, author, body)| crate::commands::workspace::chat::dm::read_entry(key, &author, &body).map(|t| (id, t))).collect()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn chat_get_history_limit(app: AppHandle, path: String) -> Result<usize, String> {
     validate_allowed_root(&app, &path)?;
     chatlog::history_limit(&WorkspaceDb::open_existing(&path)?.conn)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn chat_set_history_limit(app: AppHandle, path: String, limit: usize) -> Result<(), String> {
     validate_allowed_root(&app, &path)?;
     chatlog::set_history_limit(&WorkspaceDb::open_existing(&path)?.conn, limit)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn chat_mark_read(app: AppHandle, path: String, channel: String, ts: u64) -> Result<(), String> {
     validate_allowed_root(&app, &path)?;
     chatlog::mark_read(&WorkspaceDb::open_existing(&path)?.conn, &channel, ts)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn chat_set_muted(app: AppHandle, path: String, channel: String, muted: bool) -> Result<(), String> {
     validate_allowed_root(&app, &path)?;
     chatlog::set_muted(&WorkspaceDb::open_existing(&path)?.conn, &channel, muted)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn inbox_list(app: AppHandle, path: String) -> Result<Vec<chatlog::InboxItem>, String> {
     validate_allowed_root(&app, &path)?;
     chatlog::inbox_list(&WorkspaceDb::open_existing(&path)?.conn)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn inbox_add(app: AppHandle, path: String, kind: String, reference: String, snippet: String, channel: Option<String>, author: Option<String>) -> Result<(), String> {
     validate_allowed_root(&app, &path)?;
     let snippet: String = snippet.chars().take(200).collect();
@@ -347,13 +347,13 @@ pub fn inbox_add(app: AppHandle, path: String, kind: String, reference: String, 
 }
 
 /// Marks the given items read, or every item when none are given
-#[tauri::command]
+#[tauri::command(async)]
 pub fn inbox_mark_read(app: AppHandle, path: String, ids: Vec<i64>) -> Result<(), String> {
     validate_allowed_root(&app, &path)?;
     chatlog::inbox_mark_read(&WorkspaceDb::open_existing(&path)?.conn, &ids)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn inbox_clear(app: AppHandle, path: String) -> Result<(), String> {
     validate_allowed_root(&app, &path)?;
     chatlog::inbox_clear(&WorkspaceDb::open_existing(&path)?.conn)

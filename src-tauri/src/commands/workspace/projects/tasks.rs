@@ -90,7 +90,7 @@ pub struct Trust {
 }
 
 /// Whether this device has approved the task as it is now, and what to show if not
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_task_trust(app_handle: AppHandle, path: String, project: String, task_id: String) -> Result<Trust, String> {
     validate_allowed_root(&app_handle, &path)?;
     let (_, task) = find_task(&path, &project, &task_id)?;
@@ -100,7 +100,7 @@ pub fn project_task_trust(app_handle: AppHandle, path: String, project: String, 
 }
 
 /// "Always for this command"
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_task_approve(app_handle: AppHandle, path: String, project: String, task_id: String) -> Result<(), String> {
     validate_allowed_root(&app_handle, &path)?;
     let (_, task) = find_task(&path, &project, &task_id)?;
@@ -389,14 +389,14 @@ fn record_run(workspace: &str, record: RunRecord, log: &[String]) {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_runs(app_handle: AppHandle, path: String, project: String) -> Result<Vec<RunRecord>, String> {
     validate_allowed_root(&app_handle, &path)?;
     Ok(load_runs(&path).into_iter().filter(|r| r.project == project).collect())
 }
 
 /// The saved output of one finished run
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_run_log(app_handle: AppHandle, path: String, run_id: String) -> Result<String, String> {
     validate_allowed_root(&app_handle, &path)?;
     if run_id.is_empty() || !run_id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
@@ -564,7 +564,7 @@ fn with_args(base: &str, args: &[String]) -> Result<String, String> {
 
 
 /// Stops a run; does nothing if it already ended
-#[tauri::command]
+#[tauri::command(async)]
 pub fn project_task_stop(state: State<'_, TaskState>, run_id: String) {
     if let Some(tx) = state.runs.lock().unwrap_or_else(|p| p.into_inner()).remove(&run_id) {
         let _ = tx.send(());
