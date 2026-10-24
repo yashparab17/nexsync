@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { headingsOf, replaceInBlocks, textOfBlocks, type BlockLike } from "@/features/office/documents/lib/documentFind";
+import { firstMatch, headingsOf, replaceInBlocks, textOfBlocks, type BlockLike } from "@/features/office/documents/lib/documentFind";
 
 const text = (t: string, styles = {}) => ({ type: "text" as const, text: t, styles });
 const doc: BlockLike[] = [
@@ -50,5 +50,22 @@ describe("whole-word replacement", () => {
 		expect(r.count).toBe(3);
 		expect((r.changed[0].content as { text: string }[])[0].text).toBe("the tether, the. the café");
 		expect(replaceInBlocks(blocks, "caf", "x", false, true).count).toBe(0);
+	});
+});
+
+describe("regular-expression replacement", () => {
+	const blocks: BlockLike[] = [{ id: "a", type: "paragraph", content: [{ type: "text", text: "Smith, John and Doe, Jane", styles: { bold: true } }] }];
+	it("matches a pattern and expands groups in the replacement", () => {
+		const r = replaceInBlocks(blocks, "(\\w+), (\\w+)", "$2 $1", false, false, true);
+		expect(r.count).toBe(2);
+		const out = r.changed[0].content as { text: string; styles: unknown }[];
+		expect(out[0].text).toBe("John Smith and Jane Doe");
+		expect(out[0].styles).toEqual({ bold: true });
+	});
+	it("treats an unfinished pattern as no match, and keeps text literal when regex is off", () => {
+		expect(replaceInBlocks(blocks, "(", "x", false, false, true).count).toBe(0);
+		expect(replaceInBlocks(blocks, "\\w+", null, false, false, false).count).toBe(0);
+		expect(firstMatch(blocks, "J\\w+", true)).toBe("John");
+		expect(firstMatch(blocks, "(", true)).toBeNull();
 	});
 });

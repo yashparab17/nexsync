@@ -16,45 +16,74 @@ use wordcraft_doc::{Block, Document, InlineObject, Paragraph};
 
 use super::documents::Layout;
 
-/// Parsed originals, newest last
-static SOURCES: Mutex<Vec<(String, Arc<Document>)>> = Mutex::new(Vec::new());
-const KEEP: usize = 4;
+/// Parsed originals with the size of the file each came from, least recently used first
+pub(super) static SOURCES: Mutex<Vec<(String, Arc<Document>, usize)>> = Mutex::new(Vec::new());
+/// How many originals are kept, and how many bytes of files they came from (a parsed file is a few times its size); the one
+/// just kept always stays
+const KEEP: usize = 32;
+const KEEP_BYTES: usize = 200 * 1024 * 1024;
 /// The table of the longest-common-subsequence search is `n * m` cells of two bytes
 const MAX_CELLS: usize = 16_000_000;
+
+fn trim(all: &mut Vec<(String, Arc<Document>, usize)>) {
+    while all.len() > 1 && (all.len() > KEEP || all.iter().map(|e| e.2).sum::<usize>() > KEEP_BYTES) {
+        all.remove(0);
+    }
+}
 
 /// Keeps a parsed original; returns the id to hand back with the editor's text
 pub fn keep(bytes: &[u8], ext: &str, doc: &Document) -> String {
     let id = format!("{}.{ext}", blake3::hash(bytes).to_hex());
     let mut all = SOURCES.lock().unwrap_or_else(|p| p.into_inner());
-    if !all.iter().any(|(k, _)| *k == id) {
-        all.push((id.clone(), Arc::new(doc.clone())));
-        if all.len() > KEEP {
-            all.remove(0);
-        }
-    }
+    // Opened again: it becomes the most recent
+    all.retain(|(k, _, _)| *k != id);
+    all.push((id.clone(), Arc::new(doc.clone()), bytes.len()));
+    trim(&mut all);
     id
 }
 
 /// The same files read for drawing their headers and footers (see `presets`), where that copy differs from the file
-static DRAWN: Mutex<Vec<(String, Arc<Document>)>> = Mutex::new(Vec::new());
+static DRAWN: Mutex<Vec<(String, Arc<Document>, usize)>> = Mutex::new(Vec::new());
 
 pub fn keep_drawn(id: &str, doc: Document) {
     let mut all = DRAWN.lock().unwrap_or_else(|p| p.into_inner());
-    if !all.iter().any(|(k, _)| k == id) {
-        all.push((id.to_string(), Arc::new(doc)));
-        if all.len() > KEEP {
-            all.remove(0);
-        }
+    if !all.iter().any(|(k, _, _)| k == id) {
+        // Sized like the original it was drawn from, which is kept beside it
+        let size = SOURCES.lock().unwrap_or_else(|p| p.into_inner()).iter().find(|(k, _, _)| k == id).map_or(0, |e| e.2);
+        all.push((id.to_string(), Arc::new(doc), size));
+        trim(&mut all);
     }
 }
 
 /// The file to draw headers and footers from: its drawing copy when it has one
 pub fn drawn(id: &str) -> Option<Arc<Document>> {
-    DRAWN.lock().unwrap_or_else(|p| p.into_inner()).iter().find(|(k, _)| k == id).map(|(_, d)| d.clone()).or_else(|| get(id))
+    DRAWN.lock().unwrap_or_else(|p| p.into_inner()).iter().find(|(k, _, _)| k == id).map(|(_, d, _)| d.clone()).or_else(|| get(id))
 }
 
+/// An original, which then counts as the most recently used
 pub fn get(id: &str) -> Option<Arc<Document>> {
-    SOURCES.lock().unwrap_or_else(|p| p.into_inner()).iter().find(|(k, _)| k == id).map(|(_, d)| d.clone())
+    let mut all = SOURCES.lock().unwrap_or_else(|p| p.into_inner());
+    let at = all.iter().position(|(k, _, _)| k == id)?;
+    let entry = all.remove(at);
+    let doc = entry.1.clone();
+    all.push(entry);
+    Some(doc)
+}
+
+#[cfg(test)]
+mod keep_tests {
+    use super::*;
+
+    #[test]
+    fn a_file_used_again_outlasts_newer_ones() {
+        let doc = Document::default();
+        let first = keep(b"first file", "docx", &doc);
+        for i in 0..KEEP + 4 {
+            keep(format!("other {i}").as_bytes(), "docx", &doc);
+            // The person keeps coming back to the first one
+            assert!(get(&first).is_some(), "still there after {i} others");
+        }
+    }
 }
 
 /// The page set-up of the file's last section as the editor's page and header settings show it

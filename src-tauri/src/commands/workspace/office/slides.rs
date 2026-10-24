@@ -576,7 +576,9 @@ pub async fn deck_save(app_handle: tauri::AppHandle, path: String, dest: String,
     validate_allowed_root(&app_handle, &path)?;
     let dest = crate::commands::workspace::export::check_destination(&path, &dest, &["pptx"])?;
     let bytes = tokio::task::spawn_blocking(move || export(&base, &slides)).await.map_err(|e| e.to_string())??;
+    super::keep_versions(&path, &dest, true, &[]);
     std::fs::write(&dest, &bytes).map_err(|e| format!("Could not save the file: {e}"))?;
+    super::keep_versions(&path, &dest, false, &bytes);
     Ok(bytes.len())
 }
 

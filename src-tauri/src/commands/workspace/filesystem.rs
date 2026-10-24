@@ -361,11 +361,87 @@ const SEARCH_MAX_DEPTH: usize = 5;
 const SEARCH_MAX_FILES: usize = 20_000;
 const SEARCH_MAX_TEXT_FILES: usize = 300;
 const SEARCH_MAX_TEXT_BYTES: u64 = 256 * 1024;
+/// Office files whose text the search reads (unzipped once, then kept until the file changes)
+const SEARCH_MAX_OFFICE_FILES: usize = 500;
+const SEARCH_MAX_OFFICE_BYTES: u64 = 50 * 1024 * 1024;
+const SEARCH_MAX_PART_BYTES: u64 = 8 * 1024 * 1024;
+const SEARCH_OFFICE_EXTENSIONS: &[&str] = &["docx", "xlsx", "pptx"];
+
+type OfficeKey = (u64, Option<std::time::SystemTime>);
+static OFFICE_TEXT: std::sync::Mutex<Option<std::collections::HashMap<std::path::PathBuf, (OfficeKey, String)>>> = std::sync::Mutex::new(None);
+
+/// The words of the XML of one part: tags are dropped, and the ends of paragraphs, cells and strings become spaces
+fn xml_text(xml: &str, out: &mut String) {
+    let mut rest = xml;
+    while let Some(open) = rest.find('<') {
+        push_unescaped(&rest[..open], out);
+        let Some(close) = rest[open..].find('>') else { return };
+        let tag = &rest[open + 1..open + close];
+        if matches!(tag, "/w:p" | "/a:p" | "/si" | "/w:tc" | "/a:tc") || tag.starts_with("w:br") || tag.starts_with("w:tab") {
+            out.push(' ');
+        }
+        rest = &rest[open + close + 1..];
+    }
+    push_unescaped(rest, out);
+}
+
+fn push_unescaped(text: &str, out: &mut String) {
+    out.push_str(&text.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&"));
+}
+
+/// The lower-case text of a .docx, .xlsx or .pptx: the body, the shared strings, or the slides; empty when it cannot be read
+fn office_text(path: &std::path::Path, ext: &str) -> String {
+    let Ok(file) = fs::File::open(path) else { return String::new() };
+    let Ok(mut zip) = zip::ZipArchive::new(file) else { return String::new() };
+    let wanted = |name: &str| match ext {
+        "docx" => name == "word/document.xml",
+        "xlsx" => name == "xl/sharedStrings.xml",
+        _ => name.starts_with("ppt/slides/slide") && name.ends_with(".xml"),
+    };
+    let mut text = String::new();
+    for i in 0..zip.len().min(2_000) {
+        let Ok(part) = zip.by_index(i) else { continue };
+        if !wanted(part.name()) || part.size() > SEARCH_MAX_PART_BYTES {
+            continue;
+        }
+        let mut xml = String::new();
+        // Read no more than the limit, whatever the part says it holds
+        if std::io::Read::read_to_string(&mut std::io::Read::take(part, SEARCH_MAX_PART_BYTES), &mut xml).is_ok() {
+            xml_text(&xml, &mut text);
+        }
+        if text.len() >= SEARCH_MAX_TEXT_BYTES as usize {
+            break;
+        }
+    }
+    let mut text = text.to_lowercase();
+    let mut cut = (SEARCH_MAX_TEXT_BYTES as usize).min(text.len());
+    while !text.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    text.truncate(cut);
+    text
+}
+
+/// `office_text`, from the cache while the file's size and time are the same
+fn cached_office_text(path: &std::path::Path, ext: &str, meta: &fs::Metadata) -> String {
+    let key: OfficeKey = (meta.len(), meta.modified().ok());
+    let mut guard = OFFICE_TEXT.lock().unwrap_or_else(|e| e.into_inner());
+    let cache = guard.get_or_insert_with(Default::default);
+    if let Some((k, text)) = cache.get(path) {
+        if *k == key {
+            return text.clone();
+        }
+    }
+    let text = office_text(path, ext);
+    cache.insert(path.to_path_buf(), (key, text.clone()));
+    text
+}
+
 const SEARCH_TEXT_EXTENSIONS: &[&str] = &[
     "md", "markdown", "txt", "json", "csv", "toml", "yml", "yaml", "html", "htm", "css", "js", "ts", "tsx", "jsx", "rs",
 ];
 
-fn search_walk(dir: &std::path::Path, rel: &str, depth: usize, out: &mut Vec<SearchFile>, text_files: &mut usize, rules: &mut super::syncignore::Rules) {
+fn search_walk(dir: &std::path::Path, rel: &str, depth: usize, out: &mut Vec<SearchFile>, text_files: &mut usize, office_files: &mut usize, rules: &mut super::syncignore::Rules) {
     let Ok(entries) = fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         if out.len() >= SEARCH_MAX_FILES {
@@ -380,7 +456,7 @@ fn search_walk(dir: &std::path::Path, rel: &str, depth: usize, out: &mut Vec<Sea
         }
         if meta.is_dir() {
             if depth < SEARCH_MAX_DEPTH {
-                search_walk(&entry.path(), &path, depth + 1, out, text_files, rules);
+                search_walk(&entry.path(), &path, depth + 1, out, text_files, office_files, rules);
             }
             continue;
         }
@@ -388,7 +464,11 @@ fn search_walk(dir: &std::path::Path, rel: &str, depth: usize, out: &mut Vec<Sea
             .extension()
             .and_then(|e| e.to_str())
             .is_some_and(|e| SEARCH_TEXT_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()));
-        let body = if is_text && meta.len() <= SEARCH_MAX_TEXT_BYTES && *text_files < SEARCH_MAX_TEXT_FILES {
+        let ext = std::path::Path::new(&name).extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).unwrap_or_default();
+        let body = if SEARCH_OFFICE_EXTENSIONS.contains(&ext.as_str()) && meta.len() <= SEARCH_MAX_OFFICE_BYTES && *office_files < SEARCH_MAX_OFFICE_FILES {
+            *office_files += 1;
+            cached_office_text(&entry.path(), &ext, &meta)
+        } else if is_text && meta.len() <= SEARCH_MAX_TEXT_BYTES && *text_files < SEARCH_MAX_TEXT_FILES {
             *text_files += 1;
             fs::read_to_string(entry.path()).map(|t| t.to_lowercase()).unwrap_or_default()
         } else {
@@ -398,13 +478,43 @@ fn search_walk(dir: &std::path::Path, rel: &str, depth: usize, out: &mut Vec<Sea
     }
 }
 
-/// Every file in the workspace with the text of the small text ones, in one call
+/// Every file in the workspace with the text of the small text ones (and, with `with_office`, of .docx, .xlsx and .pptx files), in one call
 #[tauri::command(async)]
-pub fn search_workspace_files(app_handle: tauri::AppHandle, path: String) -> Result<Vec<SearchFile>, String> {
+pub fn search_workspace_files(app_handle: tauri::AppHandle, path: String, with_office: Option<bool>) -> Result<Vec<SearchFile>, String> {
     validate_allowed_root(&app_handle, &path)?;
     let root = crate::commands::path_utils::resolve_workspace_path(&path, ".")?;
     let mut files = Vec::new();
     let mut rules = super::syncignore::Rules::load(&root);
-    search_walk(&root, "", 0, &mut files, &mut 0, &mut rules);
+    // The pages that only list files do not pay for unzipping the Office ones
+    let mut office_files = if with_office == Some(true) { 0 } else { SEARCH_MAX_OFFICE_FILES };
+    search_walk(&root, "", 0, &mut files, &mut 0, &mut office_files, &mut rules);
     Ok(files)
+}
+
+#[cfg(test)]
+mod office_search_tests {
+    use super::*;
+    use std::io::Write;
+
+    fn docx(dir: &std::path::Path, body: &str) -> std::path::PathBuf {
+        let path = dir.join("a.docx");
+        let mut z = zip::ZipWriter::new(fs::File::create(&path).unwrap());
+        z.start_file("word/document.xml", zip::write::SimpleFileOptions::default()).unwrap();
+        z.write_all(body.as_bytes()).unwrap();
+        z.finish().unwrap();
+        path
+    }
+
+    #[test]
+    fn the_words_of_a_docx_are_found_and_kept_until_the_file_changes() {
+        let dir = std::env::temp_dir().join(format!("nx-search-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = docx(&dir, "<w:p><w:r><w:t>Hel</w:t></w:r><w:r><w:t>lo &amp; Wor</w:t></w:r></w:p><w:p><w:t>ld</w:t></w:p>");
+        let meta = fs::metadata(&path).unwrap();
+        assert_eq!(cached_office_text(&path, "docx", &meta), "hello & wor ld ");
+        // Not a zip: nothing, and no panic
+        fs::write(&path, b"nope").unwrap();
+        assert_eq!(office_text(&path, "docx"), "");
+        fs::remove_dir_all(&dir).ok();
+    }
 }

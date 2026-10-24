@@ -1,7 +1,7 @@
 import * as Y from "yjs";
 import { describe, expect, it } from "vitest";
 
-import { a1Of, addSheet, colLetters, deleteSheet, extent, freezeOf, lettersCol, listSheets, lookOf, normalise, parseA1, parseTsv, rangeText, readWorkbook, renameSheet, replaceWorkbook, seed, setCell, setFreeze, setWidth, stepDecimals, styleRange, toTsv, typedText, widthsFor } from "@/features/office/sheets/lib/sheet";
+import { a1Of, addSheet, duplicateAddresses, jsonToRows, transpose, colLetters, deleteSheet, extent, freezeOf, lettersCol, listSheets, lookOf, normalise, parseA1, parseTsv, rangeText, readWorkbook, renameSheet, replaceWorkbook, seed, setCell, setFreeze, setWidth, stepDecimals, styleRange, toTsv, typedText, widthsFor } from "@/features/office/sheets/lib/sheet";
 
 describe("sheet addresses", () => {
 	it("count columns the way spreadsheets do", () => {
@@ -119,5 +119,23 @@ describe("how cells look", () => {
 		expect(stepDecimals("0", -1)).toBe("0");
 		expect(stepDecimals('"$"#,##0.00', -1)).toBe('"$"#,##0.0');
 		expect(stepDecimals("0.0%", 1)).toBe("0.00%");
+	});
+});
+
+describe("paste special, duplicates and JSON", () => {
+	it("turns rows into columns", () => {
+		expect(transpose([["a", "b", "c"], ["d", "e"]])).toEqual([["a", "d"], ["b", "e"], ["c", ""]]);
+		expect(transpose([])).toEqual([]);
+	});
+	it("finds cells whose text appears twice, ignoring case and blanks", () => {
+		const t: Record<string, string> = { A1: "x", A2: "X", A3: "", A4: "", A5: "y" };
+		expect(duplicateAddresses({ r0: 0, c0: 0, r1: 4, c1: 0 }, (a) => t[a] ?? "")).toEqual(["A1", "A2"]);
+	});
+	it("reads a JSON array of objects or of arrays, and refuses anything else", () => {
+		expect(jsonToRows('[{"a":1,"b":"x"},{"b":null,"c":{"d":2}}]')).toEqual([["a", "b", "c"], ["1", "x", ""], ["", "", '{"d":2}']]);
+		expect(jsonToRows("[[1,2],[3]]")).toEqual([["1", "2"], ["3"]]);
+		expect(jsonToRows('{"a":1}')).toBeNull();
+		expect(jsonToRows("[1,2]")).toBeNull();
+		expect(jsonToRows("nope")).toBeNull();
 	});
 });

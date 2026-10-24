@@ -399,3 +399,37 @@ export function stepDecimals(code: string | undefined, by: 1 | -1): string {
 	const head = c.slice(0, m.index + 1);
 	return head + (want > 0 ? "." + "0".repeat(want) : "") + c.slice(at);
 }
+
+// ── paste special, duplicates and JSON ──
+
+// Rows turned into columns
+export const transpose = (rows: string[][]): string[][] => Array.from({ length: Math.max(0, ...rows.map((r) => r.length)) }, (_, c) => rows.map((r) => r[c] ?? ""));
+
+// The addresses in a range whose text also appears in another cell of it (empty cells and case are ignored)
+export function duplicateAddresses(r: Range, textAt: (a1: string) => string): string[] {
+	const seen = new Map<string, string[]>();
+	for (let row = r.r0; row <= r.r1; row++)
+		for (let col = r.c0; col <= r.c1; col++) {
+			const a1 = a1Of(row, col);
+			const t = textAt(a1).trim().toLowerCase();
+			if (t) seen.set(t, [...(seen.get(t) ?? []), a1]);
+		}
+	return [...seen.values()].filter((l) => l.length > 1).flat();
+}
+
+// A JSON array as rows: objects become a heading row of their keys (in the order first seen) and one row each; arrays of arrays
+// are taken as they are. Nested values are written as JSON text. null when it is not an array of rows.
+export function jsonToRows(text: string): string[][] | null {
+	let data: unknown;
+	try {
+		data = JSON.parse(text);
+	} catch {
+		return null;
+	}
+	if (!Array.isArray(data) || data.length === 0) return null;
+	const show = (v: unknown) => (v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v));
+	if (data.every(Array.isArray)) return (data as unknown[][]).map((r) => r.map(show));
+	if (!data.every((d) => d && typeof d === "object" && !Array.isArray(d))) return null;
+	const keys = [...new Set(data.flatMap((d) => Object.keys(d as object)))];
+	return [keys, ...data.map((d) => keys.map((k) => show((d as Record<string, unknown>)[k])))];
+}

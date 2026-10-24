@@ -1,7 +1,7 @@
 import { BlockNoteView } from "@blocknote/mantine";
 import { withCollaboration } from "@blocknote/core/yjs";
 import { useCreateBlockNote } from "@blocknote/react";
-import { Download, FilePenLine, Info, Printer, Redo2, RotateCcw, Save, Undo2, X } from "lucide-react";
+import { Download, FilePenLine, History, Info, Printer, Redo2, RotateCcw, Save, Undo2, X } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type * as Y from "yjs";
 
@@ -13,6 +13,7 @@ import PrintView from "@/features/office/documents/components/PrintView";
 import ProofingDialog from "@/features/office/documents/components/ProofingDialog";
 import { useDocumentActions } from "@/features/office/documents/components/useDocumentActions";
 import Backstage from "@/features/office/shared/Backstage";
+import HistoryPanel from "@/features/office/shared/HistoryPanel";
 import { OfficeFrame, ZoomBar, ACCENTS, type RibbonTab } from "@/features/office/shared/Ribbon";
 import { PeopleStack, usePeople } from "@/features/office/shared/People";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,8 @@ import { paginate } from "@/features/office/documents/lib/pagination";
 import { pagePushPlugin, pushesOf, setPushes, splitsOf } from "@/features/office/documents/lib/pagePush";
 import { fillDone, setLegacySpacing, setListDefinitions, wordLayoutPlugin, type ListLevel, type ParaSpacing } from "@/features/office/documents/lib/wordLayout";
 import { countText, DEFAULT_PAGE, fontStack, NO_HEADER, pageBox, pageCount, PX_PER_PT, readHeaderFooter, readPage, type HeaderFooter, type PageSetup } from "@/features/office/documents/lib/documentFormat";
-import { headingsOf, replaceInBlocks, textOfBlocks, type BlockLike } from "@/features/office/documents/lib/documentFind";
+import { lineMarks, type LineMark } from "@/features/office/documents/lib/lineNumbers";
+import { firstMatch, headingsOf, replaceInBlocks, textOfBlocks, type BlockLike } from "@/features/office/documents/lib/documentFind";
 import { documentSchema } from "@/features/office/documents/lib/documentSchema";
 import { cn } from "@/lib/utils";
 import type { OfficeInspect, OfficeLayout } from "@/features/office/types";
@@ -96,6 +98,8 @@ interface Props {
 	fileLayout?: OfficeLayout | null;
 	sourceId?: string | null;
 	// Reads the file again, for putting it back in place of the shared copy; null when it could not be read (the page says why)
+	// Where the file is, for its version history
+	history?: { workspacePath: string; rel: string };
 	onReload?: () => Promise<{ blocks: unknown[]; layout?: OfficeLayout | null; lists?: Record<string, ListLevel> } | null>;
 }
 
@@ -104,7 +108,7 @@ const zones = (text: string) => (text.includes("	") ? text.split("	").slice(0, 3
 
 // A document, laid out like a word processor: a ribbon of the things people do to text, a page on a desk with a ruler, a navigation
 // pane of headings, and a status bar. The text is shared live; so are the page set-up and the header and footer.
-function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload }: Props) {
+function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload, history }: Props) {
 	const doc = collab.doc;
 	const options = useMemo(
 		() =>
@@ -264,9 +268,11 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 	const [tab, setTab] = useState("home");
 	const [anonymous, setAnonymous] = useState(false);
 	const [zoom, setZoomState] = useState(100);
-	const [view, setViewState] = useState({ ruler: true, navigation: false, mode: "edit" as "print" | "edit" | "web" | "read", spelling: true });
+	const [view, setViewState] = useState({ ruler: true, navigation: false, mode: "edit" as "print" | "edit" | "web" | "read", spelling: true, focus: false, marks: false, dark: false });
 	const setView = (v: Partial<typeof view>) => setViewState((c) => ({ ...c, ...v }));
-	const [find, setFind] = useState<{ replace: boolean; query: string; with: string; cs: boolean; note: string } | null>(null);
+	const pageEl = useRef<HTMLDivElement>(null);
+	const [marks, setMarks] = useState<LineMark[]>([]);
+	const [find, setFind] = useState<{ replace: boolean; query: string; with: string; cs: boolean; rx: boolean; note: string } | null>(null);
 	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | null>(null);
 	// Puts the file back in place of the shared copy, for everyone: the text as the file has it now, with its spacing, page set-up and
 	// header and footer
@@ -307,6 +313,21 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 	const picker = useRef<HTMLInputElement>(null);
 
 	const mode = view.mode;
+	// Line numbers are counted again after the text, the page or the zoom changes (once per frame at most)
+	useEffect(() => {
+		if (!page.lineNumbers || mode !== "edit") return setMarks([]);
+		let frame = 0;
+		const count = () => {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(() => pageEl.current && setMarks(lineMarks(pageEl.current, zoom / 100)));
+		};
+		count();
+		const off = editor.onChange(count);
+		return () => {
+			cancelAnimationFrame(frame);
+			off?.();
+		};
+	}, [editor, page, mode, zoom, collab.synced]);
 	const box = pageBox(page);
 	const widthPx = box.width * PX_PER_PT;
 	const heightPx = box.height * PX_PER_PT;
@@ -518,18 +539,26 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 
 	const doFind = (backwards: boolean) => {
 		if (!find?.query) return;
-		const found = (window as unknown as { find: (q: string, cs: boolean, back: boolean, wrap: boolean) => boolean }).find(find.query, find.cs, backwards, true);
+		// The browser's search is literal, so a pattern is looked for as the first text it matches
+		const q = find.rx ? firstMatch(editor.document as unknown as BlockLike[], find.query, find.cs) : find.query;
+		const found = !!q && (window as unknown as { find: (q: string, cs: boolean, back: boolean, wrap: boolean) => boolean }).find(q, find.cs, backwards, true);
 		setFind({ ...find, note: found ? "" : "No match" });
 	};
 	const doReplace = (all: boolean) => {
 		if (!find?.query) return;
 		const blocks = editor.document as unknown as BlockLike[];
 		if (!all) {
-			if (editor.getSelectedText().toLowerCase() === find.query.toLowerCase()) editor.insertInlineContent([find.with]);
+			const sel = editor.getSelectedText();
+			const flags = find.cs ? "u" : "iu";
+			try {
+				if (find.rx ? new RegExp(`^(?:${find.query})$`, flags).test(sel) : sel.toLowerCase() === find.query.toLowerCase()) editor.insertInlineContent([find.rx ? sel.replace(new RegExp(find.query, flags), find.with) : find.with]);
+			} catch {
+				// An unfinished pattern replaces nothing
+			}
 			doFind(false);
 			return;
 		}
-		const r = replaceInBlocks(blocks, find.query, find.with, find.cs);
+		const r = replaceInBlocks(blocks, find.query, find.with, find.cs, false, find.rx);
 		editor.transact(() => r.changed.forEach((c) => editor.updateBlock(c.id, { content: c.content } as never)));
 		setFind({ ...find, note: r.count ? `Replaced ${r.count}` : "No match" });
 	};
@@ -644,7 +673,8 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					),
 				},
 				{ id: "close", label: "Close", icon: X, panel: <p className="text-sm text-muted-foreground">Choose the document tab to go back to the text. Closing is done from the list of documents.</p> },
-			]}
+						{ id: "history", label: "Version History", icon: History, panel: history ? <HistoryPanel workspacePath={history.workspacePath} rel={history.rel} readOnly={readOnly} /> : null },
+					]}
 		/>
 	);
 
@@ -682,7 +712,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					setView={setView}
 					zoom={zoom}
 					setZoom={setZoom}
-					openFind={(replace) => setFind({ replace, query: find?.query ?? "", with: find?.with ?? "", cs: false, note: "" })}
+					openFind={(replace) => setFind({ replace, query: find?.query ?? "", with: find?.with ?? "", cs: false, rx: find?.rx ?? false, note: "" })}
 					openHeaderFooter={() => setDialog("headerFooter")}
 					openCounts={() => setDialog("counts")}
 					openProofing={() => setDialog("proofing")}
@@ -736,6 +766,10 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 							<input type="checkbox" checked={find.cs} onChange={(e) => setFind({ ...find, cs: e.target.checked })} />
 							Match case
 						</label>
+						<label className="flex items-center gap-1">
+							<input type="checkbox" checked={find.rx} onChange={(e) => setFind({ ...find, rx: e.target.checked, note: "" })} />
+							Regular expression
+						</label>
 						<span className="text-muted-foreground">{find.note}</span>
 						<span className="flex-1" />
 						<Button variant="ghost" size="icon-xs" aria-label="Close find" onPress={() => setFind(null)}>
@@ -744,7 +778,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					</div>
 				)}
 				<div className="flex min-h-0 flex-1">
-					{view.navigation && (
+					{view.navigation && !view.focus && (
 						<nav aria-label="Navigation" className="w-60 shrink-0 overflow-y-auto border-r bg-background p-3 text-[13px]">
 							<h2 className="mb-2 text-sm font-semibold">Navigation</h2>
 							{headings.length === 0 ? (
@@ -770,7 +804,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 						</nav>
 					)}
 					<div ref={scroller} onScroll={onScroll} className="min-w-0 flex-1 overflow-auto bg-[#e1dfdd] dark:bg-neutral-900">
-						{view.ruler && mode === "edit" && <Ruler widthPx={widthPx} box={box} zoom={zoom} />}
+						{view.ruler && !view.focus && mode === "edit" && <Ruler widthPx={widthPx} box={box} zoom={zoom} />}
 						{seeding && (
 							<p role="status" className="sticky top-0 z-20 bg-[var(--office)] px-3 py-1 text-center text-xs text-white">
 								Opening the document… {Math.round((seeding.done / Math.max(1, seeding.total)) * 100)}%
@@ -785,7 +819,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 							)}
 							<div className={cn("flex justify-center-safe py-6", mode === "print" && "hidden")} style={{ zoom: zoom / 100 }}>
 								<div
-									className="doc-page relative shrink-0 text-black"
+									ref={pageEl} className={cn("doc-page relative shrink-0 text-black", view.marks && "doc-marks", view.dark && "doc-dark")}
 									style={
 										{
 											width: mode === "edit" ? widthPx : Math.min(widthPx, 920),
@@ -797,6 +831,16 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 										} as React.CSSProperties
 									}
 								>
+									{marks.map((m) => (
+										<span key={m.n} aria-hidden className="pointer-events-none absolute z-10 w-8 text-right text-[9pt] leading-none text-neutral-500 select-none" style={{ left: -40, top: m.top }}>
+											{m.n}
+										</span>
+									))}
+									{page.watermark && mode !== "print" && (
+										<div aria-hidden className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden">
+											<span className="-rotate-45 text-[96px] font-bold tracking-widest whitespace-nowrap text-neutral-400/25 select-none">{page.watermark}</span>
+										</div>
+									)}
 									{/* The sheets, behind the text */}
 									{paged ? (
 										Array.from({ length: pages }, (_, i) => (

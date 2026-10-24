@@ -603,6 +603,23 @@ pub async fn office_import(app_handle: tauri::AppHandle, path: String, rel: Stri
     })
 }
 
+/// Brings a pushed-out original back by reading it again from `file`, when that file is exactly the one the id was made from (the id is
+/// the hash of its bytes). A different file, or none, is left alone: merging with the wrong original would be worse than none.
+pub fn recover_original(file: &std::path::Path, id: &str) {
+    if super::merge::get(id).is_some() {
+        return;
+    }
+    let Ok(meta) = fs::metadata(file) else { return };
+    if !meta.is_file() || meta.len() > MAX_FILE_BYTES {
+        return;
+    }
+    let Ok(bytes) = fs::read(file) else { return };
+    let Some((hash, _)) = id.rsplit_once('.') else { return };
+    if blake3::hash(&bytes).to_hex().as_str() == hash {
+        let _ = import(&file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), &bytes, None);
+    }
+}
+
 /// Saves the editor's document as a file in the format its name ends in, at a place the person chose
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
@@ -610,8 +627,18 @@ pub async fn office_export(app_handle: tauri::AppHandle, path: String, dest: Str
     validate_allowed_root(&app_handle, &path)?;
     let dest = crate::commands::workspace::export::check_destination(&path, &dest, EXPORTABLE)?;
     let ext = ext_of(&dest.to_string_lossy());
-    let bytes = tokio::task::spawn_blocking(move || export_with(&ext, &html, &title, &author, layout.as_ref(), source_id.as_deref())).await.map_err(|e| e.to_string())??;
+    let from = dest.clone();
+    let bytes = tokio::task::spawn_blocking(move || {
+        // Updating the file it was opened from: its original comes back from the file if the cache let it go
+        if let Some(id) = source_id.as_deref() {
+            recover_original(&from, id);
+        }
+        export_with(&ext, &html, &title, &author, layout.as_ref(), source_id.as_deref())
+    })
+    .await.map_err(|e| e.to_string())??;
+    super::keep_versions(&path, &dest, true, &[]);
     fs::write(&dest, &bytes).map_err(|e| format!("Could not save the file: {e}"))?;
+    super::keep_versions(&path, &dest, false, &bytes);
     Ok(bytes.len())
 }
 
@@ -634,6 +661,30 @@ mod tests {
     /// The blocks a file opens as, written out, for looking through
     fn json(i: &Imported) -> String {
         serde_json::to_string(&i.blocks).unwrap()
+    }
+
+    #[test]
+    fn a_pushed_out_original_comes_back_from_the_file_it_was_read_from_and_not_from_another() {
+        let mut doc = wordcraft_formats::import("html", b"<p>Alpha</p><p>Beta</p>").unwrap().unwrap();
+        doc.last_section.valign = wordcraft_doc::section::PageVAlign::Center;
+        let bytes = wordcraft_docx::write(&doc).unwrap();
+        let id = import("a.docx", &bytes, None).unwrap().source_id.unwrap();
+        let dir = std::env::temp_dir().join(format!("nx-recover-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let (same, other) = (dir.join("same.docx"), dir.join("other.docx"));
+        fs::write(&same, &bytes).unwrap();
+        fs::write(&other, wordcraft_docx::write(&wordcraft_formats::import("html", b"<p>Different</p>").unwrap().unwrap()).unwrap()).unwrap();
+        // Pushed out by newer files, then looked for
+        {
+            let mut all = super::super::merge::SOURCES.lock().unwrap_or_else(|p| p.into_inner());
+            all.retain(|(k, _, _)| *k != id);
+        }
+        assert!(super::super::merge::get(&id).is_none());
+        recover_original(&other, &id);
+        assert!(super::super::merge::get(&id).is_none(), "another file is not the original");
+        recover_original(&same, &id);
+        assert!(super::super::merge::get(&id).is_some(), "the file it came from is");
+        fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

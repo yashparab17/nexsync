@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countText, DEFAULT_PAGE, fontStack, pageBox, pageCount, pointsOf, readHeaderFooter, readPage, stepSize, styleOf } from "@/features/office/documents/lib/documentFormat";
+import { changeCase, countText, DEFAULT_PAGE, fontStack, pageBox, pageCount, pointsOf, readHeaderFooter, readPage, stepSize, styleOf } from "@/features/office/documents/lib/documentFormat";
 
 describe("documentFormat", () => {
 	it("steps a size up and down the list the way Grow and Shrink do", () => {
@@ -60,5 +60,29 @@ describe("documentFormat", () => {
 	it("falls back to a generic stack for a font it does not know", () => {
 		expect(fontStack("Georgia")).toContain("serif");
 		expect(fontStack("Zapfino")).toBe("'Zapfino', sans-serif");
+	});
+});
+
+describe("changeCase", () => {
+	it("changes the case of a selection", () => {
+		expect(changeCase("hello wORLD. it's me! ok", "upper")).toBe("HELLO WORLD. IT'S ME! OK");
+		expect(changeCase("Hello WORLD", "lower")).toBe("hello world");
+		expect(changeCase("hello wORLD it's me", "title")).toBe("Hello World It's Me");
+		expect(changeCase("hello wORLD. it's me! ok", "sentence")).toBe("Hello world. It's me! Ok");
+	});
+});
+
+describe("watermark", () => {
+	it("is kept when valid and trimmed to forty characters", () => {
+		expect(readPage({ watermark: "  DRAFT " }).watermark).toBe("DRAFT");
+		expect(readPage({ watermark: "x".repeat(60) }).watermark).toHaveLength(40);
+		expect(readPage({ watermark: " " }).watermark).toBeUndefined();
+	});
+});
+
+describe("line numbers", () => {
+	it("are a stored page setting that is off unless set", () => {
+		expect(readPage({ lineNumbers: true }).lineNumbers).toBe(true);
+		expect(readPage({ lineNumbers: "yes" }).lineNumbers).toBeUndefined();
 	});
 });

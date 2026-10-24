@@ -546,8 +546,8 @@ export function listWorkspaceFiles(
 }
 
 // Every file in the workspace with the lower-cased text of small text files, in one call
-export function searchWorkspaceFiles(path: string): Promise<{ name: string; path: string; size: number; body: string }[]> {
-	return invoke("search_workspace_files", { path });
+export function searchWorkspaceFiles(path: string, withOffice = false): Promise<{ name: string; path: string; size: number; body: string }[]> {
+	return invoke("search_workspace_files", { path, withOffice });
 }
 
 // Create a new empty file in workspace

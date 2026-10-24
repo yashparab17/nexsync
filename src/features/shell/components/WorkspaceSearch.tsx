@@ -111,7 +111,7 @@ export default function WorkspaceSearch() {
 		if (builtAt.current.path === workspace.path && Date.now() - builtAt.current.at < 20_000) return;
 		builtAt.current = { path: workspace.path, at: Date.now() };
 		const [files, tasks, columns, projects] = await Promise.all([
-			searchWorkspaceFiles(workspace.path).catch(() => []),
+			searchWorkspaceFiles(workspace.path, true).catch(() => []),
 			getTasks(workspace.path).catch(() => []),
 			getKanban(workspace.path).catch(() => []),
 			projectsList(workspace.path).catch(() => []),

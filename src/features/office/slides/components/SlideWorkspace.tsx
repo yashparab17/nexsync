@@ -4,11 +4,12 @@ import CollapsiblePane from "@/components/layout/CollapsiblePane";
 // the deck open sees changes as they are made.
 
 import { save } from "@tauri-apps/plugin-dialog";
-import { Download, FilePenLine, Info, Redo2, Save, Undo2, X } from "lucide-react";
+import { Download, FilePenLine, History, Info, Redo2, Save, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 
 import Backstage from "@/features/office/shared/Backstage";
+import HistoryPanel from "@/features/office/shared/HistoryPanel";
 import { PeopleStack, usePeople } from "@/features/office/shared/People";
 import { OfficeFrame, ZoomBar, type RibbonTab } from "@/features/office/shared/Ribbon";
 import SlideCanvas, { type OtherSelection } from "@/features/office/slides/components/SlideCanvas";
@@ -400,6 +401,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 							),
 						},
 						{ id: "close", label: "Close", icon: X, panel: <p className="text-sm text-muted-foreground">Choose a tab to go back to the slides. Closing is done from the list of decks.</p> },
+						{ id: "history", label: "Version History", icon: History, panel: <HistoryPanel workspacePath={workspacePath} rel={rel} readOnly={readOnly} /> },
 					]}
 				/>
 			}

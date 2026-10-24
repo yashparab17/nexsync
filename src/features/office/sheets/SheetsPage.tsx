@@ -1,3 +1,4 @@
+import { SHEET_TEMPLATES } from "@/features/office/shared/templates";
 import { useNewParam } from "@/hooks/useNewParam";
 import { useSyncedIn } from "@/hooks/useSyncedIn";
 import { pushRecent } from "@/lib/recentFiles";
@@ -52,6 +53,7 @@ export default function SheetsPage() {
 	const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 	const [creating, setCreating] = useState(false);
 	const [newName, setNewName] = useState("");
+	const [template, setTemplate] = useState("blank");
 	const fileInput = useRef<HTMLInputElement>(null);
 
 	const load = useCallback(() => {
@@ -95,7 +97,7 @@ export default function SheetsPage() {
 		const rel = placeIn(LAYOUT.sheets, `${name}.xlsx`);
 		if (books?.some((b) => b.rel.toLowerCase() === rel.toLowerCase())) return flash(false, "A workbook with that name exists.");
 		try {
-			await sheetSave(workspacePath, `${workspacePath.replace(/[\\/]+$/, "")}/${rel}`, [{ name: "Sheet1", cells: {} }], "Sheet1");
+			await sheetSave(workspacePath, `${workspacePath.replace(/[\\/]+$/, "")}/${rel}`, [{ name: "Sheet1", cells: (SHEET_TEMPLATES.find((t) => t.id === template) ?? SHEET_TEMPLATES[0]).cells }], "Sheet1");
 			setCreating(false);
 			setNewName("");
 			load();
@@ -202,7 +204,14 @@ export default function SheetsPage() {
 					>
 						<DialogHeading icon={<FilePlus className="size-6" />} title="New Workbook" />
 						<Input aria-label="Workbook name" autoFocus required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Budget" aria-invalid={!!(newName && validateFileName(newName))} />
-						{newName && validateFileName(newName) && <p role="alert" className="text-xs text-destructive">{validateFileName(newName)}</p>}
+						<select aria-label="Template" value={template} onChange={(e) => setTemplate(e.target.value)} className="h-9 w-full border bg-background px-2 text-sm">
+						{SHEET_TEMPLATES.map((t) => (
+							<option key={t.id} value={t.id}>
+								{t.label}
+							</option>
+						))}
+					</select>
+					{newName && validateFileName(newName) && <p role="alert" className="text-xs text-destructive">{validateFileName(newName)}</p>}
 						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setCreating(false)}>
 								Cancel

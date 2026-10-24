@@ -44,11 +44,17 @@ import {
 	Space,
 	PenLine,
 	AlignVerticalSpaceAround,
+	CaseSensitive,
+	Paintbrush,
+	Pilcrow,
+	Moon,
+	Focus,
+	Stamp,
 } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { Big, Choice, ColorButton, Gallery, GridPicker, Group, MenuItem, MenuTitle, Row, Rows, Sep, Small } from "@/features/office/shared/Ribbon";
-import { FONTS, HIGHLIGHTS, MARGINS, PALETTE, PAPER, SIZES, STYLES, type MarginName, type PageSetup, type PaperName, type StyleId } from "@/features/office/documents/lib/documentFormat";
+import { type CaseKind, FONTS, HIGHLIGHTS, MARGINS, PALETTE, PAPER, SIZES, STYLES, type MarginName, type PageSetup, type PaperName, type StyleId } from "@/features/office/documents/lib/documentFormat";
 import type { Fmt, useDocumentActions } from "@/features/office/documents/components/useDocumentActions";
 
 type Actions = ReturnType<typeof useDocumentActions>;
@@ -73,7 +79,7 @@ export interface RibbonProps {
 	readOnly: boolean;
 	page: PageSetup;
 	setPage: (p: Partial<PageSetup>) => void;
-	view: { ruler: boolean; navigation: boolean; mode: "print" | "edit" | "web" | "read"; spelling: boolean };
+	view: { ruler: boolean; navigation: boolean; mode: "print" | "edit" | "web" | "read"; spelling: boolean; focus: boolean; marks: boolean; dark: boolean };
 	setView: (v: Partial<RibbonProps["view"]>) => void;
 	zoom: number;
 	setZoom: (z: number) => void;
@@ -99,6 +105,7 @@ export default function DocumentRibbon(p: RibbonProps) {
 					<Rows>
 						<Small icon={Scissors} label="Cut" disabled={ro} onPress={() => document.execCommand("cut")} />
 						<Small icon={Copy} label="Copy" onPress={() => document.execCommand("copy")} />
+						<Small icon={Paintbrush} label="Format Painter" title={a.painter ? "Select text, then press again to paint the look onto it" : "Pick up the look at the caret"} active={!!a.painter} disabled={ro} onPress={a.formatPainter} />
 					</Rows>
 				</Group>
 				<Group label="Font">
@@ -109,6 +116,21 @@ export default function DocumentRibbon(p: RibbonProps) {
 							<Small icon={ALargeSmall} title="Grow font" disabled={ro} onPress={() => a.stepSize(1)} />
 							<Small icon={Type} title="Shrink font" disabled={ro} onPress={() => a.stepSize(-1)} />
 							<Small icon={Eraser} title="Clear all formatting" disabled={ro} onPress={a.clearFormatting} />
+							<Small
+								icon={CaseSensitive}
+								title="Change case of the selected text"
+								disabled={ro || !fmt.hasSelection}
+								menu={(
+									[
+										["sentence", "Sentence case."],
+										["lower", "lowercase"],
+										["upper", "UPPERCASE"],
+										["title", "Capitalize Each Word"],
+									] as [CaseKind, string][]
+								).map(([k, l]) => (
+									<MenuItem key={k} label={l} onPress={() => a.changeCase(k)} />
+								))}
+							/>
 						</Row>
 						<Row>
 							<Small icon={Bold} title="Bold (Ctrl+B)" active={fmt.bold} disabled={ro} onPress={() => a.toggle("bold")} />
@@ -270,6 +292,14 @@ export default function DocumentRibbon(p: RibbonProps) {
 						}
 					/>
 					<Big
+							icon={ListOrdered}
+							label="Line Numbers"
+							title="A number beside each line, shown in the editor and not written to the file"
+							disabled={ro}
+							active={!!p.page.lineNumbers}
+							onPress={() => p.setPage({ lineNumbers: !p.page.lineNumbers })}
+						/>
+						<Big
 						icon={Columns2}
 						label="Columns"
 						disabled={ro}
@@ -282,7 +312,24 @@ export default function DocumentRibbon(p: RibbonProps) {
 						}
 					/>
 				</Group>
-				<Group label="Paragraph">
+				<Group label="Page Background">
+						<Big
+							icon={Stamp}
+							label="Watermark"
+							title="Text across each page, shown in the editor and not written to the file"
+							disabled={ro}
+							menu={
+								<>
+									<MenuTitle>Watermark</MenuTitle>
+									{["DRAFT", "CONFIDENTIAL", "DO NOT COPY"].map((w) => (
+										<MenuItem key={w} label={w} checked={p.page.watermark === w} onPress={() => p.setPage({ watermark: w })} />
+									))}
+									<MenuItem label="No watermark" checked={!p.page.watermark} onPress={() => p.setPage({ watermark: "" })} />
+								</>
+							}
+						/>
+					</Group>
+					<Group label="Paragraph">
 					<Big
 						icon={StretchHorizontal}
 						label="Line Spacing"
@@ -322,6 +369,9 @@ export default function DocumentRibbon(p: RibbonProps) {
 				<Rows>
 					<Small icon={Ruler} label="Ruler" active={p.view.ruler} onPress={() => p.setView({ ruler: !p.view.ruler })} />
 					<Small icon={PanelLeft} label="Navigation Pane" active={p.view.navigation} onPress={() => p.setView({ navigation: !p.view.navigation })} />
+					<Small icon={Pilcrow} label="Formatting Marks" active={p.view.marks} onPress={() => p.setView({ marks: !p.view.marks })} />
+					<Small icon={Focus} label="Focus" title="Hide the ruler and the navigation pane" active={p.view.focus} onPress={() => p.setView({ focus: !p.view.focus })} />
+					<Small icon={Moon} label="Dark Page" title="Light text on a dark page" active={p.view.dark} onPress={() => p.setView({ dark: !p.view.dark })} />
 				</Rows>
 			</Group>
 			<Group label="Zoom">

@@ -1,3 +1,4 @@
+import { DOC_TEMPLATES } from "@/features/office/shared/templates";
 import { useNewParam } from "@/hooks/useNewParam";
 import { useSyncedIn } from "@/hooks/useSyncedIn";
 import { pushRecent } from "@/lib/recentFiles";
@@ -62,6 +63,7 @@ export default function DocumentsPage() {
 	const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 	const [creating, setCreating] = useState(false);
 	const [newName, setNewName] = useState("");
+	const [template, setTemplate] = useState("blank");
 	const fileInput = useRef<HTMLInputElement>(null);
 	const [renaming, setRenaming] = useState<{ doc: Doc; value: string; error: string } | null>(null);
 	const [deleting, setDeleting] = useState<Doc | null>(null);
@@ -171,7 +173,7 @@ export default function DocumentsPage() {
 		const rel = placeIn(LAYOUT.documents, `${name}.docx`);
 		if (docs?.some((d) => d.rel.toLowerCase() === rel.toLowerCase())) return flash(false, "A document with that name exists.");
 		try {
-			await officeExport(workspacePath, `${workspacePath.replace(/[\\/]+$/, "")}/${rel}`, "<p></p>", name, author);
+			await officeExport(workspacePath, `${workspacePath.replace(/[\\/]+$/, "")}/${rel}`, (DOC_TEMPLATES.find((t) => t.id === template) ?? DOC_TEMPLATES[0]).html, name, author);
 			setCreating(false);
 			setNewName("");
 			load();
@@ -334,6 +336,7 @@ export default function DocumentsPage() {
 					) : collab ? (
 						<DocumentWorkspace
 							key={selected}
+							history={{ workspacePath, rel: selected }}
 							collab={collab}
 							initialBlocks={state.imported!.blocks}
 							lists={state.imported!.lists}
@@ -406,7 +409,14 @@ export default function DocumentsPage() {
 					>
 						<DialogHeading icon={<FilePlus className="size-6" />} title="New Document" />
 						<Input aria-label="Document name" autoFocus required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Project brief" aria-invalid={!!(newName && validateFileName(newName))} />
-						{newName && validateFileName(newName) && <p role="alert" className="text-xs text-destructive">{validateFileName(newName)}</p>}
+						<select aria-label="Template" value={template} onChange={(e) => setTemplate(e.target.value)} className="h-9 w-full border bg-background px-2 text-sm">
+						{DOC_TEMPLATES.map((t) => (
+							<option key={t.id} value={t.id}>
+								{t.label}
+							</option>
+						))}
+					</select>
+					{newName && validateFileName(newName) && <p role="alert" className="text-xs text-destructive">{validateFileName(newName)}</p>}
 						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setCreating(false)}>
 								Cancel

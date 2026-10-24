@@ -12,6 +12,7 @@ import {
 	ChartPie,
 	ChartScatter,
 	ClipboardPaste,
+	FileJson,
 	Copy,
 	DollarSign,
 	Eraser,
@@ -77,6 +78,10 @@ export interface SheetRibbonProps {
 	// Changes how the selected cells look
 	style: (change: (cur: CellStyle) => CellStyle) => void;
 	paste: () => void;
+	pasteTransposed: () => void;
+	copyValues: () => void;
+	highlightDuplicates: () => void;
+	importJson: () => void;
 	restructure: (op: "insertRows" | "deleteRows" | "insertCols" | "deleteCols") => void;
 	autoSum: (fn: "SUM" | "AVERAGE" | "COUNT" | "MAX" | "MIN") => void;
 	insertFunction: (name: string) => void;
@@ -100,10 +105,26 @@ export default function SheetRibbon(p: SheetRibbonProps) {
 		return (
 			<>
 				<Group label="Clipboard">
-					<Big icon={ClipboardPaste} label="Paste" disabled={ro} onPress={p.paste} />
+					<Big
+							icon={ClipboardPaste}
+							label="Paste"
+							disabled={ro}
+							onPress={p.paste}
+						/>
+						<Big
+							icon={ClipboardPaste}
+							label="Paste Special"
+							disabled={ro}
+							menu={
+								<div role="menu" className="w-48">
+									<MenuItem label="Paste Transposed" onPress={p.pasteTransposed} />
+								</div>
+							}
+						/>
 					<Rows>
 						<Small icon={Scissors} label="Cut" disabled={ro} onPress={() => document.execCommand("cut")} />
 						<Small icon={Copy} label="Copy" onPress={() => document.execCommand("copy")} />
+							<Small icon={Copy} label="Copy Values" title="Copy the answers the cells show, not their formulas" onPress={p.copyValues} />
 					</Rows>
 				</Group>
 				<Group label="Font">
@@ -284,7 +305,13 @@ export default function SheetRibbon(p: SheetRibbonProps) {
 					<Big icon={ArrowDownAZ} label="Sort A to Z" disabled={ro || !p.canSort} onPress={() => p.sort(false)} />
 					<Big icon={ArrowUpZA} label="Sort Z to A" disabled={ro || !p.canSort} onPress={() => p.sort(true)} />
 				</Group>
-				<Group label="Open">
+				<Group label="Tools">
+						<Big icon={Copy} label="Find Duplicates" title="Fill the cells of the selection whose text appears more than once" disabled={ro} onPress={p.highlightDuplicates} />
+					</Group>
+					<Group label="Get Data">
+						<Big icon={FileJson} label="From JSON" title="Put a JSON file (a list of objects or of rows) into the sheet at the selected cell" disabled={ro} onPress={p.importJson} />
+					</Group>
+					<Group label="Open">
 					<Big icon={Printer} label="Save a Copy" onPress={p.openFile} />
 				</Group>
 			</>

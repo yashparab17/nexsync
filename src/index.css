@@ -576,3 +576,18 @@ select option:checked { background-color: var(--accent); color: var(--foreground
 [data-hide-toolbars] [data-page-toolbar] {
 	display: none;
 }
+
+/* Formatting marks: a pilcrow at the end of each paragraph */
+.doc-marks .bn-block-content[data-content-type="paragraph"] > p::after,
+.doc-marks .bn-block-content[data-content-type="heading"] > :is(h1, h2, h3)::after {
+	content: "¶";
+	color: #4f81bd;
+	margin-left: 2px;
+}
+/* A dark page: the page is turned over, and pictures turned back so they keep their colours */
+.doc-dark {
+	filter: invert(1) hue-rotate(180deg);
+}
+.doc-dark img {
+	filter: invert(1) hue-rotate(180deg);
+}

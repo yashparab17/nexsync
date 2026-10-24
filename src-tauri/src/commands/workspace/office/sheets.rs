@@ -566,7 +566,9 @@ pub async fn sheet_save(app_handle: tauri::AppHandle, path: String, dest: String
     })
     .await
     .map_err(|e| e.to_string())??;
+    super::keep_versions(&path, &dest, true, &[]);
     fs::write(&dest, &bytes).map_err(|e| format!("Could not save the file: {e}"))?;
+    super::keep_versions(&path, &dest, false, &bytes);
     Ok(bytes.len())
 }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { DEFAULT_FONT, DEFAULT_SIZE, pointsOf, stepSize, STYLES, styleOf, type StyleId } from "@/features/office/documents/lib/documentFormat";
+import { changeCase, type CaseKind, DEFAULT_FONT, DEFAULT_SIZE, pointsOf, stepSize, STYLES, styleOf, type StyleId } from "@/features/office/documents/lib/documentFormat";
 import { documentSchema } from "@/features/office/documents/lib/documentSchema";
 
 type Editor = typeof documentSchema.BlockNoteEditor;
@@ -39,6 +39,8 @@ const LISTS = { bullet: "bulletListItem", number: "numberedListItem", check: "ch
 // ribbon does to it
 export function useDocumentActions(editor: Editor | null) {
 	const [fmt, setFmt] = useState<Fmt>(NONE);
+	// The look picked up by Format Painter, waiting for a selection to paint
+	const [painter, setPainter] = useState<Record<string, unknown> | null>(null);
 
 	const refresh = useCallback(() => {
 		if (!editor) return;
@@ -132,6 +134,23 @@ export function useDocumentActions(editor: Editor | null) {
 			}),
 		insertLink: (url: string) => act((e) => e.createLink(url)),
 		insertText: (text: string) => act((e) => e.insertInlineContent([text])),
+		changeCase: (kind: CaseKind) =>
+			act((e) => {
+				const text = e.getSelectedText();
+				if (text) e.insertInlineContent([changeCase(text, kind)]);
+			}),
+		// First press picks up the look at the caret, the next press paints it onto the selection
+		painter,
+		formatPainter: () =>
+			act((e) => {
+				if (!painter) return setPainter(Object.fromEntries(Object.entries(e.getActiveStyles() as Record<string, unknown>).filter(([, v]) => v)));
+				if (e.getSelectedText()) {
+					const old = Object.fromEntries(Object.entries(e.getActiveStyles() as Record<string, unknown>).filter(([, v]) => v));
+					if (Object.keys(old).length > 0) e.removeStyles(old as never);
+					if (Object.keys(painter).length > 0) e.addStyles(painter as never);
+				}
+				setPainter(null);
+			}),
 		undoable: () => !!editor,
 	};
 }

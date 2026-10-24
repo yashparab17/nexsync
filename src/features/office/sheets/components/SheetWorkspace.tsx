@@ -2,11 +2,12 @@
 // live in the shared document; the answers come from the engine, from that same text, on every device.
 
 import { save } from "@tauri-apps/plugin-dialog";
-import { Download, FilePenLine, Info, Redo2, Save, Undo2, X } from "lucide-react";
+import { Download, FilePenLine, History, Info, Redo2, Save, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 
 import Backstage from "@/features/office/shared/Backstage";
+import HistoryPanel from "@/features/office/shared/HistoryPanel";
 import { PeopleStack, usePeople } from "@/features/office/shared/People";
 import { OfficeFrame, type RibbonTab } from "@/features/office/shared/Ribbon";
 import ChartView from "@/features/office/sheets/components/ChartView";
@@ -22,6 +23,12 @@ import {
 	cellsOf,
 	chartsOf,
 	colLetters,
+	duplicateAddresses,
+	jsonToRows,
+	parseA1,
+	parseTsv,
+	toTsv,
+	transpose,
 	deleteSheet,
 	extent,
 	freezeOf,
@@ -176,7 +183,45 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 		edit(() => {
 			rows.forEach((line, i) => line.forEach((text, j) => setCell(doc, sheet.id, a1Of(at.row + i, at.col + j), text)));
 		});
-	const style = (change: (cur: CellStyle) => CellStyle) => sheet && styleRange(doc, sheet.id, selection, change);
+	const pasteRows = async (transposed: boolean) => {
+			try {
+				const rows = parseTsv(await navigator.clipboard.readText());
+				if (rows.length > 0) onPaste({ row: selection.r0, col: selection.c0 }, transposed ? transpose(rows) : rows);
+			} catch {
+				flash(false, "The clipboard could not be read here.");
+			}
+		};
+		const copyValues = async () => {
+			const lines: string[][] = [];
+			for (let r = selection.r0; r <= selection.r1; r++) lines.push(Array.from({ length: selection.c1 - selection.c0 + 1 }, (_, i) => shown[a1Of(r, selection.c0 + i)]?.text ?? ""));
+			try {
+				await navigator.clipboard.writeText(toTsv(lines));
+				flash(true, "Copied the answers. Paste puts values, not formulas.");
+			} catch {
+				flash(false, "The clipboard could not be written here.");
+			}
+		};
+		const highlightDuplicates = () => {
+			if (!sheet) return;
+			const dup = new Set(duplicateAddresses(selection, (a1) => shown[a1]?.text ?? ""));
+			if (dup.size === 0) return flash(true, "No duplicates in the selection.");
+			for (const a1 of dup) {
+				const p = parseA1(a1);
+				if (p) styleRange(doc, sheet.id, { r0: p.row, c0: p.col, r1: p.row, c1: p.col }, (cur) => ({ ...cur, fill: "#FFC7CE" }));
+			}
+			flash(true, `${dup.size} cells share their text with another.`);
+		};
+		const jsonPicker = useRef<HTMLInputElement>(null);
+		const importJson = async (file: File | undefined) => {
+			if (!file) return;
+			if (file.size > 20 * 1024 * 1024) return flash(false, "That file is too large (20 MB at most).");
+			const rows = jsonToRows(await file.text());
+			if (!rows) return flash(false, "That file is not a JSON list of objects or of rows.");
+			if (rows.reduce((n, r) => n + r.length, 0) > 300_000) return flash(false, "That is more than 300,000 cells.");
+			onPaste({ row: selection.r0, col: selection.c0 }, rows);
+			flash(true, `${rows.length.toLocaleString()} rows placed at ${a1Of(selection.r0, selection.c0)}.`);
+		};
+		const style = (change: (cur: CellStyle) => CellStyle) => sheet && styleRange(doc, sheet.id, selection, change);
 
 	const restructure = async (op: "insertRows" | "deleteRows" | "insertCols" | "deleteCols") => {
 		if (!sheet) return;
@@ -358,12 +403,18 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 			}
 			people={<PeopleStack people={people} />}
 			ribbon={
-				<SheetRibbon
+				<>
+<input ref={jsonPicker} type="file" accept=".json,application/json" hidden aria-label="JSON file" onChange={(e) => { void importJson(e.target.files?.[0]); e.target.value = ""; }} />
+<SheetRibbon
 					tab={tab}
 					look={activeLook}
 					readOnly={readOnly}
 					style={style}
 					paste={() => void paste()}
+						pasteTransposed={() => void pasteRows(true)}
+						copyValues={() => void copyValues()}
+						highlightDuplicates={highlightDuplicates}
+						importJson={() => jsonPicker.current?.click()}
 					restructure={(op) => void restructure(op)}
 					autoSum={autoSum}
 					insertFunction={insertFunction}
@@ -381,6 +432,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 					openFile={() => setTab("file")}
 					canSort={used.rows > 1}
 				/>
+</>
 			}
 			file={
 				<Backstage
@@ -441,6 +493,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 							),
 						},
 						{ id: "close", label: "Close", icon: X, panel: <p className="text-sm text-muted-foreground">Choose the workbook tab to go back to the cells. Closing is done from the list of workbooks.</p> },
+						{ id: "history", label: "Version History", icon: History, panel: <HistoryPanel workspacePath={workspacePath} rel={rel} readOnly={readOnly} /> },
 					]}
 				/>
 			}

@@ -30,19 +30,20 @@ export interface BlockLike {
 }
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const pattern = (find: string, cs: boolean, whole = false) => (whole ? new RegExp(String.raw`(?<![\p{L}\p{N}'])${escape(find)}(?![\p{L}\p{N}'])`, cs ? "gu" : "giu") : new RegExp(escape(find), cs ? "g" : "gi"));
+// `regex` takes the text as a regular expression (null when it is not a valid one); otherwise it is matched literally
+const pattern = (find: string, cs: boolean, whole = false, regex = false) => (regex ? new RegExp(whole ? String.raw`(?<![\p{L}\p{N}'])(?:${find})(?![\p{L}\p{N}'])` : find, cs ? "gu" : "giu") : whole ? new RegExp(String.raw`(?<![\p{L}\p{N}'])${escape(find)}(?![\p{L}\p{N}'])`, cs ? "gu" : "giu") : new RegExp(escape(find), cs ? "g" : "gi"));
 
-function runsOf(content: Inline[], re: RegExp, repl: string | null): { content: Inline[]; count: number } {
+function runsOf(content: Inline[], re: RegExp, repl: string | null, expand = false): { content: Inline[]; count: number } {
 	let count = 0;
 	const out = content.map((c): Inline => {
 		if (c.type === "link") {
-			const inner = runsOf(c.content, re, repl);
+			const inner = runsOf(c.content, re, repl, expand);
 			count += inner.count;
 			return repl === null ? c : { ...c, content: inner.content as Run[] };
 		}
 		const hits = c.text.match(re)?.length ?? 0;
 		count += hits;
-		return repl !== null && hits > 0 ? { ...c, text: c.text.replace(re, () => repl) } : c;
+		return repl !== null && hits > 0 ? { ...c, text: (expand ? c.text.replace(re, repl) : c.text.replace(re, () => repl)) } : c;
 	});
 	return { content: out, count };
 }
@@ -52,23 +53,29 @@ function cellContent(c: Inline[] | Cell): Inline[] {
 }
 
 // The blocks with every match replaced (when `repl` is a string) and how many there were; blocks without a match are left out of
-// `changed`, so only those are written back to the editor
-export function replaceInBlocks(blocks: BlockLike[], find: string, repl: string | null, caseSensitive: boolean, wholeWord = false): { changed: { id: string; content: Inline[] | TableContent }[]; count: number } {
+// `changed`, so only those are written back to the editor. With `regex`, `$1` and `$&` in the replacement stand for what matched
+export function replaceInBlocks(blocks: BlockLike[], find: string, repl: string | null, caseSensitive: boolean, wholeWord = false, regex = false): { changed: { id: string; content: Inline[] | TableContent }[]; count: number } {
 	if (!find) return { changed: [], count: 0 };
+	// An unfinished pattern such as "(" matches nothing instead of throwing while the person is still typing it
+	try {
+		pattern(find, caseSensitive, wholeWord, regex);
+	} catch {
+		return { changed: [], count: 0 };
+	}
 	const changed: { id: string; content: Inline[] | TableContent }[] = [];
 	let count = 0;
 	const walk = (list: BlockLike[]) => {
 		for (const b of list) {
-			const re = pattern(find, caseSensitive, wholeWord);
+			const re = pattern(find, caseSensitive, wholeWord, regex);
 			if (Array.isArray(b.content)) {
-				const r = runsOf(b.content, re, repl);
+				const r = runsOf(b.content, re, repl, regex);
 				count += r.count;
 				if (r.count > 0 && repl !== null) changed.push({ id: b.id, content: r.content });
 			} else if (b.content && b.content.type === "tableContent") {
 				let here = 0;
 				const rows = b.content.rows.map((row) => ({
 					cells: row.cells.map((cell) => {
-						const r = runsOf(cellContent(cell), re, repl);
+						const r = runsOf(cellContent(cell), re, repl, regex);
 						here += r.count;
 						return Array.isArray(cell) ? r.content : { ...cell, content: r.content };
 					}),
@@ -109,4 +116,13 @@ export function headingsOf(blocks: BlockLike[]): { id: string; level: number; te
 	};
 	walk(blocks);
 	return out;
+}
+
+// The first text a regular expression matches in the document, for the Next button to look for (null: no match or not a valid pattern)
+export function firstMatch(blocks: BlockLike[], find: string, caseSensitive: boolean): string | null {
+	try {
+		return new RegExp(find, caseSensitive ? "u" : "iu").exec(textOfBlocks(blocks))?.[0] || null;
+	} catch {
+		return null;
+	}
 }

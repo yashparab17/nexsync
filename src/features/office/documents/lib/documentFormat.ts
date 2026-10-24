@@ -59,6 +59,10 @@ export interface PageSetup {
 	valign: "top" | "center" | "bottom" | "justify";
 	// The page as a file has it, when that is not one of the paper sizes and margins above (points); the paper and margins win once chosen
 	custom?: PageBox;
+	// Text drawn across each page in the editor (not written to the file)
+	watermark?: string;
+	// A number beside each line of text in the editor (not written to the file)
+	lineNumbers?: boolean;
 }
 
 export const DEFAULT_PAGE: PageSetup = { paper: "letter", landscape: false, margins: "normal", columns: 1, spacing: 1.15, valign: "top" };
@@ -103,6 +107,8 @@ export function readPage(raw: unknown): PageSetup {
 		spacing: typeof r.spacing === "number" && r.spacing >= 1 && r.spacing <= 3 ? r.spacing : DEFAULT_PAGE.spacing,
 		valign: r.valign === "center" || r.valign === "bottom" || r.valign === "justify" ? r.valign : "top",
 		...(validBox(r.custom) ? { custom: r.custom } : {}),
+		...(r.lineNumbers === true ? { lineNumbers: true } : {}),
+		...(typeof r.watermark === "string" && r.watermark.trim() ? { watermark: r.watermark.trim().slice(0, 40) } : {}),
 	};
 }
 
@@ -165,3 +171,14 @@ export function styleOf(block: { type: string; props?: { level?: number } } | un
 export const PALETTE = ["000000", "404040", "7F7F7F", "C00000", "FF0000", "FFC000", "FFFF00", "92D050", "00B050", "00B0F0", "0070C0", "002060", "7030A0", "FFFFFF"];
 
 export const HIGHLIGHTS = ["FFFF00", "92D050", "00FFFF", "FF00FF", "FFC000", "D9D9D9"];
+
+export type CaseKind = "upper" | "lower" | "title" | "sentence";
+
+// Text in another case: Title Case capitalises each word, Sentence case the first letter after a full stop, question or exclamation mark
+export function changeCase(text: string, kind: CaseKind): string {
+	if (kind === "upper") return text.toUpperCase();
+	const lower = text.toLowerCase();
+	if (kind === "lower") return lower;
+	if (kind === "title") return lower.replace(/(^|[^\p{L}\p{N}'])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
+	return lower.replace(/(^|[.!?]\s+)(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
+}
