@@ -25,6 +25,10 @@ pub fn run() {
             if let Some(key) = commands::p2p::identity(app.handle()) {
                 commands::workspace::signing::init(key);
             }
+            // Font discovery is the first-open cost of a document: pay it now, off the main thread
+            std::thread::spawn(|| {
+                let _ = wordcraft_fonts::word::resolve("Calibri", false, false);
+            });
             // The updater checks GitHub Releases for a signed newer build; desktop-only, like
             // upstream's own scaffold, since there's nothing to update on mobile app stores.
             #[cfg(desktop)]

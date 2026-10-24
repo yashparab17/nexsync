@@ -168,6 +168,32 @@ fn check(sheets: &[SheetIn]) -> Result<(), String> {
     Ok(())
 }
 
+/// The typed cells of a sheet as rectangles of rows that sit under one another with the same first column and width, each with its top
+/// left cell. A full grid is one block; a ragged one is a block per row run.
+fn blocks_of(sheet: &SheetIn) -> Vec<(CellRef, Vec<Vec<&str>>)> {
+    let sorted: std::collections::BTreeMap<(u32, u32), &str> = sheet.cells.iter().filter_map(|(a1, v)| CellRef::parse(a1).map(|c| ((c.row, c.col), v.as_str()))).collect();
+    let mut blocks: Vec<(CellRef, Vec<Vec<&str>>)> = Vec::new();
+    let mut run: Option<(u32, u32, Vec<&str>)> = None;
+    fn flush<'a>(blocks: &mut Vec<(CellRef, Vec<Vec<&'a str>>)>, run: &mut Option<(u32, u32, Vec<&'a str>)>) {
+        let Some((row, col, vals)) = run.take() else { return };
+        match blocks.last_mut() {
+            Some((top, rows)) if top.col == col && top.row + rows.len() as u32 == row && rows[0].len() == vals.len() => rows.push(vals),
+            _ => blocks.push((CellRef::new(row, col), vec![vals])),
+        }
+    }
+    for ((row, col), v) in sorted {
+        match &mut run {
+            Some((r, c, vals)) if *r == row && *c + vals.len() as u32 == col => vals.push(v),
+            _ => {
+                flush(&mut blocks, &mut run);
+                run = Some((row, col, vec![v]));
+            }
+        }
+    }
+    flush(&mut blocks, &mut run);
+    blocks
+}
+
 /// A session holding the sheets, and the cells it refused
 pub(super) fn build(sheets: &[SheetIn]) -> Result<(Session, Vec<Refused>), String> {
     check(sheets)?;
@@ -182,12 +208,18 @@ pub(super) fn build(sheets: &[SheetIn]) -> Result<(Session, Vec<Refused>), Strin
     }
     let mut refused = Vec::new();
     for sheet in sheets {
-        for (a1, input) in &sheet.cells {
-            if CellRef::parse(a1).is_none() {
+        for (at, rows) in blocks_of(sheet) {
+            // A block the engine takes whole is one edit (each edit copies the sheet); one it refuses is entered cell by cell, so the refused cell is named
+            if s.execute("range.setValues", json!({"sheet": sheet.name, "range": at.a1(), "values": rows})).is_ok() {
                 continue;
             }
-            if let Err(e) = s.execute("cell.set", json!({"sheet": sheet.name, "cell": a1, "input": input})) {
-                refused.push((sheet.name.clone(), a1.clone(), e.to_string()));
+            for (i, row) in rows.iter().enumerate() {
+                for (j, input) in row.iter().enumerate() {
+                    let a1 = CellRef::new(at.row + i as u32, at.col + j as u32).a1();
+                    if let Err(e) = s.execute("cell.set", json!({"sheet": sheet.name, "cell": a1, "input": input})) {
+                        refused.push((sheet.name.clone(), a1, e.to_string()));
+                    }
+                }
             }
         }
     }
@@ -571,6 +603,15 @@ mod tests {
         assert_eq!((text(&c, "S", "A2"), text(&c, "S", "A3")), ("#ERROR!", "10"));
         assert!(calculate(&[]).is_err());
         assert!(calculate(&[sheet("a", &[]), sheet("A", &[])]).is_err());
+    }
+
+    #[test]
+    fn ragged_cells_are_entered_whole_in_blocks() {
+        let s = sheet("S", &[("A1", "1"), ("B1", "2"), ("A2", "3"), ("B2", "=A1+B1"), ("D2", "9"), ("A3", "4"), ("B3", "5"), ("Z100", "7")]);
+        let blocks = blocks_of(&s);
+        assert_eq!(blocks.iter().map(|(at, r)| (at.a1(), r.len())).collect::<Vec<_>>(), [("A1".to_string(), 2), ("D2".to_string(), 1), ("A3".to_string(), 1), ("Z100".to_string(), 1)]);
+        let c = calculate(&[s]).unwrap();
+        assert_eq!((text(&c, "S", "B2"), text(&c, "S", "D2"), text(&c, "S", "B3"), text(&c, "S", "Z100")), ("3", "9", "5", "7"));
     }
 
     #[test]

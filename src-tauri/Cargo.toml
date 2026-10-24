@@ -86,3 +86,9 @@ krilla = { git = "https://github.com/storytold/craft-libs", rev = "c3487320b2d1d
 # Only this crate stays unoptimised, so it rebuilds quickly.
 [profile.dev.package."*"]
 opt-level = 3
+
+# Not panic = "abort": the office engines guard their parsers with catch_unwind, which needs unwinding.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
