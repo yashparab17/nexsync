@@ -1,6 +1,12 @@
+import { TableHandlesExtension } from "@blocknote/core";
 import { useCallback, useEffect, useState } from "react";
+import type * as Y from "yjs";
 
-import { changeCase, type CaseKind, DEFAULT_FONT, DEFAULT_SIZE, pointsOf, stepSize, STYLES, styleOf, type StyleId } from "@/features/office/documents/lib/documentFormat";
+import { changeCase, type CaseKind, DEFAULT_FONT, DEFAULT_SIZE, HIGHLIGHTS, pointsOf, stepSize, STYLES, styleOf, type StyleId } from "@/features/office/documents/lib/documentFormat";
+import { headingsOf, textOfBlocks, type BlockLike } from "@/features/office/documents/lib/documentFind";
+import { equationText, indexEntries, withFormula, type Formula } from "@/features/office/documents/lib/documentReferences";
+import { cropImage, drawShape, type CropMode, type ShapeKind } from "@/features/office/documents/lib/documentObjects";
+import { nextCaption, TOC, TOC_TITLE, sortTable, tocBlocks, type TableContent } from "@/features/office/documents/lib/documentTools";
 import { documentSchema } from "@/features/office/documents/lib/documentSchema";
 
 type Editor = typeof documentSchema.BlockNoteEditor;
@@ -20,9 +26,12 @@ export interface Fmt {
 	canNest: boolean;
 	canUnnest: boolean;
 	hasSelection: boolean;
+	inTable: boolean;
+	headerRow: boolean;
+	inPicture: boolean;
 }
 
-const NONE: Fmt = { bold: false, italic: false, underline: false, strike: false, font: DEFAULT_FONT, size: DEFAULT_SIZE, color: "", highlight: "", align: "left", style: "normal", list: null, canNest: false, canUnnest: false, hasSelection: false };
+const NONE: Fmt = { bold: false, italic: false, underline: false, strike: false, font: DEFAULT_FONT, size: DEFAULT_SIZE, color: "", highlight: "", align: "left", style: "normal", list: null, canNest: false, canUnnest: false, hasSelection: false, inTable: false, headerRow: false, inPicture: false };
 
 type AnyBlock = { id: string; type: string; props?: Record<string, unknown>; content?: unknown; children?: AnyBlock[] };
 
@@ -33,11 +42,19 @@ function targets(editor: Editor): AnyBlock[] {
 	return [editor.getTextCursorPosition().block as unknown as AnyBlock];
 }
 
+// A style's definition (font, size, colour, bold, italic) put on the text of a block
+function paint(e: Editor, b: AnyBlock, def: Record<string, unknown>) {
+	if (!Array.isArray(b.content) || Object.keys(def).length === 0) return;
+	e.updateBlock(b.id, { content: (b.content as { type?: string; styles?: object }[]).map((r) => (r.type === "text" ? { ...r, styles: { ...r.styles, ...def } } : r)) } as never);
+}
+
+const sup = (n: number) => [...String(n)].map((c) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[Number(c)]).join("");
+
 const LISTS = { bullet: "bulletListItem", number: "numberedListItem", check: "checkListItem" } as const;
 
 // What the ribbon shows about the text the caret is in, kept up to date as the selection and the text change, and the things the
 // ribbon does to it
-export function useDocumentActions(editor: Editor | null) {
+export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<string, unknown>>) {
 	const [fmt, setFmt] = useState<Fmt>(NONE);
 	// The look picked up by Format Painter, waiting for a selection to paint
 	const [painter, setPainter] = useState<Record<string, unknown> | null>(null);
@@ -63,6 +80,9 @@ export function useDocumentActions(editor: Editor | null) {
 				canNest: editor.canNestBlock(),
 				canUnnest: editor.canUnnestBlock(),
 				hasSelection: editor.getSelectedText().length > 0,
+				inTable: type === "table",
+				inPicture: type === "image",
+				headerRow: type === "table" && ((block.content as { headerRows?: number } | undefined)?.headerRows ?? 0) > 0,
 			};
 			// Unchanged (most keystrokes): the same object, so the page around the text is not drawn again for nothing
 			setFmt((cur) => ((Object.keys(next) as (keyof Fmt)[]).every((k) => cur[k] === next[k]) ? cur : next));
@@ -118,7 +138,12 @@ export function useDocumentActions(editor: Editor | null) {
 		indent: (dir: 1 | -1) => act((e) => (dir === 1 ? e.nestBlock() : e.unnestBlock())),
 		style: (id: StyleId) => {
 			const spec = STYLES.find((s) => s.id === id)?.block;
-			if (spec) act((e) => targets(e).forEach((b) => e.updateBlock(b.id, spec as never)));
+			if (spec)
+				act((e) => {
+					targets(e).forEach((b) => e.updateBlock(b.id, spec as never));
+					const def = defs?.get(id);
+					if (def) targets(e).forEach((b) => paint(e, e.getBlock(b.id) as unknown as AnyBlock, def));
+				});
 		},
 		undo: () => act((e) => e.undo()),
 		redo: () => act((e) => e.redo()),
@@ -127,6 +152,150 @@ export function useDocumentActions(editor: Editor | null) {
 				const at = e.getTextCursorPosition().block;
 				e.insertBlocks([{ type: "table", content: { type: "tableContent", rows: Array.from({ length: rows }, () => ({ cells: Array.from({ length: cols }, () => "") })) } } as never], at, "after");
 			}),
+		// The first row of the table the caret is in becomes a header row, or stops being one
+		toggleHeaderRow: () =>
+			act((e) => {
+				const b = e.getTextCursorPosition().block as unknown as AnyBlock;
+				const c = b.content as { type: "tableContent"; headerRows?: number } | undefined;
+				if (b.type === "table" && c) e.updateBlock(b.id, { content: { ...c, headerRows: c.headerRows ? undefined : 1 } } as never);
+			}),
+		// Merge the selected cells (drag across them), split a merged cell, add or remove the row or column the caret is in
+		table: (op: "merge" | "split" | "rowAbove" | "rowBelow" | "colLeft" | "colRight" | "delRow" | "delCol") =>
+			act((e) => {
+				const t = e.getExtension(TableHandlesExtension);
+				const at = t?.getCellSelection()?.from;
+				if (!t || !at) return;
+				if (op === "merge") t.mergeCells();
+				else if (op === "split") t.splitCell();
+				else if (op === "delRow") t.removeRowOrColumn(at.row, "row");
+				else if (op === "delCol") t.removeRowOrColumn(at.col, "column");
+				else if (op === "rowAbove" || op === "rowBelow") t.addRowOrColumn(at.row, { orientation: "row", side: op === "rowAbove" ? "above" : "below" });
+				else t.addRowOrColumn(at.col, { orientation: "column", side: op === "colLeft" ? "left" : "right" });
+			}),
+		// Sort the table the caret is in by the column the caret is in, below its header rows
+		sortTable: (asc: boolean) =>
+			act((e) => {
+				const b = e.getTextCursorPosition().block as unknown as AnyBlock;
+				const col = e.getExtension(TableHandlesExtension)?.getCellSelection()?.from.col;
+				if (b.type === "table" && col !== undefined) e.updateBlock(b.id, { content: sortTable(b.content as TableContent, col, asc) } as never);
+			}),
+		// A table of contents from the headings as they are now (a copy; insert it again after the headings change)
+		insertToc: () =>
+			act((e) => {
+				const top = e.document as unknown as AnyBlock[];
+				const made = tocBlocks(headingsOf(top as unknown as BlockLike[])) as never[];
+				const old = top.filter((b) => b.props?.styleId === TOC_TITLE || b.props?.styleId === TOC);
+				// Pressed again, it replaces the contents already there
+				if (old.length > 0) {
+					e.insertBlocks(made, old[0].id, "before");
+					e.removeBlocks(old.map((b) => b.id));
+				} else e.insertBlocks(made, e.getTextCursorPosition().block, "after");
+			}),
+		insertCaption: (label: string) =>
+			act((e) => {
+				const texts = (e.document as unknown as BlockLike[]).map((b) => textOfBlocks([{ ...b, children: [] }]).trim());
+				const at = e.getTextCursorPosition().block;
+				e.insertBlocks([{ type: "paragraph", props: { textAlignment: "center" }, content: [{ type: "text", text: nextCaption(texts, label), styles: { italic: true } }] } as never], at, "after");
+			}),
+		// A formula in the cell the caret is in: the sum or average of the numbers above it or to its left
+		tableFormula: (kind: Formula) =>
+			act((e) => {
+				const b = e.getTextCursorPosition().block as unknown as AnyBlock;
+				const at = e.getExtension(TableHandlesExtension)?.getCellSelection()?.from;
+				const next = b.type === "table" && at ? withFormula(b.content as TableContent, at.row, at.col, kind) : null;
+				if (next) e.updateBlock(b.id, { content: next } as never);
+			}),
+		// A new page starts here: an empty paragraph that begins one
+		pageBreak: () =>
+			act((e) => {
+				const at = e.getTextCursorPosition().block;
+				e.insertBlocks([{ type: "paragraph", props: { pageBreakBefore: true }, content: [] } as never], at, "after");
+			}),
+		// A box for text: a table of one cell
+		textBox: () =>
+			act((e) => {
+				const at = e.getTextCursorPosition().block;
+				e.insertBlocks([{ type: "table", content: { type: "tableContent", rows: [{ cells: ["Text box"] }] } } as never], at, "after");
+			}),
+		insertEquation: (src: string) => act((e) => e.insertInlineContent([{ type: "text", text: equationText(src), styles: { italic: true } }] as never)),
+		// Text in a grey box that a teammate replaces
+		formField: () => act((e) => e.insertInlineContent([{ type: "text", text: "[Click here to enter text]", styles: { backgroundColor: "#d9d9d9" } }] as never)),
+		// The picture the caret is in: its width, alignment and the description for people who cannot see it
+		picture: (change: { width?: number; align?: "left" | "center" | "right"; alt?: string; wrap?: "none" | "left" | "right" }) =>
+			act((e) => {
+				const b = e.getTextCursorPosition().block as unknown as AnyBlock;
+				if (b.type !== "image") return;
+				e.updateBlock(b.id, { props: { ...(change.width ? { previewWidth: change.width } : {}), ...(change.align ? { textAlignment: change.align } : {}), ...(change.alt !== undefined ? { name: change.alt } : {}), ...(change.wrap ? { wrap: change.wrap } : {}) } } as never);
+			}),
+		// A note at the end of the document: its number goes in the text, its words under a Notes heading
+		footnote: (words: string, heading = "Notes") =>
+			act((e) => {
+				const top = e.document as unknown as AnyBlock[];
+				const at = top.findIndex((b) => b.type === "heading" && textOfBlocks([{ ...b, children: [] } as BlockLike]).trim() === heading);
+				const n = at < 0 ? 1 : top.length - at;
+				const mark = sup(n);
+				e.insertInlineContent([{ type: "text", text: mark, styles: {} }] as never);
+				const end = e.document[e.document.length - 1];
+				e.insertBlocks([...(at < 0 ? [{ type: "heading", props: { level: 2 }, content: heading }] : []), { type: "paragraph", content: `${mark} ${words}` }] as never, end, "after");
+			}),
+		// Marks the words as an index entry (a highlight, which the index then collects)
+		markEntry: () => act((e) => e.addStyles({ backgroundColor: `#${HIGHLIGHTS[5]}` } as never)),
+		insertIndex: () =>
+			act((e) => {
+				const words = indexEntries(e.document as never);
+				const at = e.getTextCursorPosition().block;
+				e.insertBlocks([{ type: "heading", props: { level: 1 }, content: "Index" }, ...(words.length ? words.map((w) => ({ type: "paragraph", content: w })) : [{ type: "paragraph", content: "No entries yet. Select words and choose Mark Entry." }])] as never, at, "after");
+			}),
+		// A mark for the words other parts of the document refer to
+		crossRef: (text: string) => act((e) => e.insertInlineContent([text])),
+		// Takes the look at the caret as the definition of the style the caret is in, and gives it to every block of that style
+		updateStyle: () =>
+			act((e) => {
+				if (!defs) return;
+				const s = e.getActiveStyles() as Record<string, unknown>;
+				const def = Object.fromEntries(["fontFamily", "fontSize", "textColor", "bold", "italic"].filter((k) => s[k]).map((k) => [k, s[k]]));
+				defs.set(fmt.style, def);
+				const walk = (list: AnyBlock[]) => {
+					for (const b of list) {
+						if (styleOf(b as { type: string; props?: { level?: number } }) === fmt.style) paint(e, b, def);
+						if (b.children?.length) walk(b.children);
+					}
+				};
+				walk(e.document as unknown as AnyBlock[]);
+			}),
+		// Text that stands for a value and can be brought up to date with Update Fields
+		insertField: (kind: string, value: string) => act((e) => e.insertInlineContent([{ type: "text", text: value, styles: { field: kind } }] as never)),
+		updateFields: (values: Record<string, string>) =>
+			act((e) => {
+				let n = 0;
+				const walk = (list: AnyBlock[]) => {
+					for (const b of list) {
+						if (Array.isArray(b.content) && (b.content as { styles?: { field?: string } }[]).some((r) => r.styles?.field)) {
+							const next = (b.content as { type?: string; text?: string; styles?: { field?: string } }[]).map((r) => (r.styles?.field && values[r.styles.field] !== undefined && r.text !== values[r.styles.field] ? (n++, { ...r, text: values[r.styles.field] }) : r));
+							e.updateBlock(b.id, { content: next } as never);
+						}
+						if (b.children?.length) walk(b.children);
+					}
+				};
+				walk(e.document as unknown as AnyBlock[]);
+				return n;
+			}),
+		// A shape drawn as a picture, after the block the caret is in
+		insertShape: (kind: ShapeKind, color: string) =>
+			act((e) => {
+				const url = drawShape(kind, color);
+				if (url) e.insertBlocks([{ type: "image", props: { url, name: kind, caption: "", previewWidth: kind === "line" ? 240 : 200 } } as never], e.getTextCursorPosition().block, "after");
+			}),
+		// The picture the caret is in, cropped
+		cropPicture: async (mode: CropMode) => {
+			if (!editor) return;
+			const b = editor.getTextCursorPosition().block as unknown as AnyBlock;
+			const url = (b.props as { url?: string } | undefined)?.url;
+			if (b.type !== "image" || !url) return;
+			const next = await cropImage(url, mode);
+			if (next) editor.updateBlock(b.id, { props: { url: next } } as never);
+			done();
+		},
 		insertImage: (url: string, name: string) =>
 			act((e) => {
 				const at = e.getTextCursorPosition().block;

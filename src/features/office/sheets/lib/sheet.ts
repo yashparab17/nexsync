@@ -3,6 +3,8 @@
 
 import * as Y from "yjs";
 
+import type { CfRule, DvRule } from "@/features/office/sheets/lib/sheetTools";
+
 // How one cell looks: colours are #RRGGBB, `borders` holds the sides drawn from "ltrb", `nf` is a number format code
 export interface CellStyle {
 	bold?: boolean;
@@ -17,6 +19,12 @@ export interface CellStyle {
 	size?: number;
 	font?: string;
 	borders?: string;
+	// Stays editable on a protected sheet
+	unlocked?: boolean;
+	// Added when a cell is drawn (never kept): an icon from an icon-set rule, and a sparkline from a range
+	icon?: string;
+	iconColor?: string;
+	spark?: { values: number[]; kind: "line" | "column" | "winloss"; color: string };
 }
 
 export interface SheetIn {
@@ -30,16 +38,33 @@ export interface SheetIn {
 	// Rows and columns frozen at the top and left
 	freeze?: [number, number] | null;
 	// Charts, for a file or a PDF that is being written
-	charts?: { range: string; kind: string; title: string; at: string; w: number; h: number }[];
+	charts?: { range: string; kind: string; title: string; at: string; w: number; h: number; opts?: ChartOptions }[];
+	// Written into a file: what is hidden, what may be typed, how cells are coloured by their values, and whether cells are locked
+	hiddenRows?: number[];
+	hiddenCols?: number[];
+	validations?: { range: string; kind: string; list: string[]; min: string; max: string }[];
+	rules?: { range: string; kind: string; a: string; b: string; color: string }[];
+	protect?: boolean;
+	sparklines?: { cell: string; source: string; kind: string; color: string }[];
 }
 
 // A chart drawn over the grid: what it plots, what kind, and where it sits (a cell and a size in pixels)
+// What a chart shows beyond its data: value labels, no gridlines, titles for the axes, a trendline over each series
+export interface ChartOptions {
+	labels?: boolean;
+	noGrid?: boolean;
+	xTitle?: string;
+	yTitle?: string;
+	trend?: "" | "linear" | "exponential" | "logarithmic" | "poly2";
+}
+
 export interface ChartSpec {
 	id: string;
 	sheet: string;
 	range: string;
 	kind: "column" | "bar" | "line" | "pie" | "doughnut" | "area" | "scatter";
 	title: string;
+	opts?: ChartOptions;
 	// Where its top-left corner is, in pixels from the top-left of the cells
 	x: number;
 	y: number;
@@ -118,6 +143,51 @@ export const looksOf = (doc: Y.Doc) => doc.getMap<string>("looks");
 export const widthsOf = (doc: Y.Doc) => doc.getMap<number>("widths");
 export const frozenOf = (doc: Y.Doc) => doc.getMap<[number, number]>("frozen");
 export const chartsOf = (doc: Y.Doc) => doc.getArray<ChartSpec>("charts");
+// Rules that colour cells by what they show, and rules that say what may be typed
+export const cfOf = (doc: Y.Doc) => doc.getArray<CfRule>("cf");
+export const dvOf = (doc: Y.Doc) => doc.getArray<DvRule>("dv");
+// Rows and columns that are not drawn, by `<sheet>!r<row>` or `<sheet>!c<col>`: "h" hidden by the person, "f" by a filter
+export const hiddenOf = (doc: Y.Doc) => doc.getMap<string>("hidden");
+// Sheets whose cells cannot be changed except those marked unlocked
+export const protectedOf = (doc: Y.Doc) => doc.getMap<boolean>("protected");
+
+// Rows and columns grouped so they can be folded away, and named sets of values for a few cells
+export interface GroupSpec {
+	id: string;
+	sheet: string;
+	kind: "rows" | "cols";
+	from: number;
+	to: number;
+}
+export interface ScenarioSpec {
+	id: string;
+	sheet: string;
+	name: string;
+	cells: Record<string, string>;
+}
+// A small chart that sits in one cell, drawn from the numbers of a range
+export interface SparkSpec {
+	id: string;
+	sheet: string;
+	cell: string;
+	source: string;
+	kind: "line" | "column" | "winloss";
+	color: string;
+}
+export const sparksOf = (doc: Y.Doc) => doc.getArray<SparkSpec>("sparks");
+export const groupsOf = (doc: Y.Doc) => doc.getArray<GroupSpec>("groups");
+export const scenariosOf = (doc: Y.Doc) => doc.getArray<ScenarioSpec>("scenarios");
+
+export function hiddenIn(doc: Y.Doc, id: string): { rows: Set<number>; cols: Set<number> } {
+	const rows = new Set<number>();
+	const cols = new Set<number>();
+	for (const key of hiddenOf(doc).keys()) {
+		if (!key.startsWith(`${id}!`)) continue;
+		const rest = key.slice(id.length + 1);
+		(rest[0] === "r" ? rows : cols).add(Number(rest.slice(1)));
+	}
+	return { rows, cols };
+}
 
 export const MAX_STYLED_AT_ONCE = 50_000;
 
@@ -292,6 +362,9 @@ export function deleteSheet(doc: Y.Doc, id: string): string | null {
 		for (const key of [...cells.keys()]) if (key.startsWith(`${id}!`)) cells.delete(key);
 		for (const m of [looksOf(doc), widthsOf(doc)] as Y.Map<unknown>[]) for (const key of [...m.keys()]) if (key.startsWith(`${id}!`)) m.delete(key);
 		frozenOf(doc).delete(id);
+		protectedOf(doc).delete(id);
+		for (const key of [...hiddenOf(doc).keys()]) if (key.startsWith(`${id}!`)) hiddenOf(doc).delete(key);
+		for (const list of [cfOf(doc), dvOf(doc), groupsOf(doc), scenariosOf(doc), sparksOf(doc)] as unknown as Y.Array<{ sheet: string }>[]) for (let j = list.length - 1; j >= 0; j--) if (list.get(j).sheet === id) list.delete(j, 1);
 		const charts = chartsOf(doc);
 		for (let j = charts.length - 1; j >= 0; j--) if (charts.get(j).sheet === id) charts.delete(j, 1);
 	});
@@ -302,9 +375,21 @@ export function deleteSheet(doc: Y.Doc, id: string): string | null {
 export function readWorkbookForFile(doc: Y.Doc, colWidth = 96, rowHeight = 24): SheetIn[] {
 	const book = readWorkbook(doc);
 	const metas = listSheets(doc);
+	metas.forEach((m, i) => {
+		const h = hiddenIn(doc, m.id);
+		if (h.rows.size) book[i].hiddenRows = [...h.rows];
+		if (h.cols.size) book[i].hiddenCols = [...h.cols];
+		const dv = dvOf(doc).toArray().filter((r) => r.sheet === m.id);
+		if (dv.length) book[i].validations = dv.map(({ range, kind, list, min, max }) => ({ range, kind, list, min, max }));
+		const cf = cfOf(doc).toArray().filter((r) => r.sheet === m.id);
+		if (cf.length) book[i].rules = cf.map(({ range, kind, a, b, color }) => ({ range, kind, a, b, color }));
+		if (protectedOf(doc).get(m.id)) book[i].protect = true;
+		const sp = sparksOf(doc).toArray().filter((r) => r.sheet === m.id);
+		if (sp.length) book[i].sparklines = sp.map(({ cell, source, kind, color }) => ({ cell, source, kind, color }));
+	});
 	for (const c of chartsOf(doc).toArray()) {
 		const i = metas.findIndex((m) => m.id === c.sheet);
-		if (i >= 0) (book[i].charts ??= []).push({ range: c.range, kind: c.kind, title: c.title, at: a1Of(Math.max(0, Math.floor(c.y / rowHeight)), Math.max(0, Math.floor(c.x / colWidth))), w: c.w, h: c.h });
+		if (i >= 0) (book[i].charts ??= []).push({ range: c.range, kind: c.kind, title: c.title, opts: c.opts, at: a1Of(Math.max(0, Math.floor(c.y / rowHeight)), Math.max(0, Math.floor(c.x / colWidth))), w: c.w, h: c.h });
 	}
 	return book;
 }

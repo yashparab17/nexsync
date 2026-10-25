@@ -29,7 +29,7 @@ import { isOfficeDocument } from "@/lib/editor/languages";
 import { deleteWorkspaceItem, officeExport, officeImport, renameWorkspaceItem, renameYjsDoc, searchWorkspaceFiles, writeWorkspaceBinaryFile } from "@/lib/tauri";
 import { cn, errorText } from "@/lib/utils";
 import { safeUploadName, validateFileName } from "@/lib/validation";
-import { useIsViewer, useP2P } from "@/store/p2p/P2PContext";
+import { useCanComment, useIsViewer, useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { Imported } from "@/features/office/types";
 import { setFontFactors } from "@/features/office/documents/lib/fontMetrics";
@@ -46,6 +46,7 @@ export default function DocumentsPage() {
 	const { workspace, addActivityEvent } = useWorkspace();
 	const logError = useErrorLog();
 	const isViewer = useIsViewer();
+	const canComment = useCanComment();
 	const { selfName, viewersAt } = useP2P();
 	const synced = useSyncedIn(LAYOUT.documents);
 	const workspacePath = workspace?.path ?? "";
@@ -335,6 +336,7 @@ export default function DocumentsPage() {
 						</div>
 					) : collab ? (
 						<DocumentWorkspace
+							canComment={canComment}
 							key={selected}
 							history={{ workspacePath, rel: selected }}
 							collab={collab}

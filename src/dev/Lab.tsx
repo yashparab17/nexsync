@@ -1,6 +1,8 @@
 // Development only (`npm run dev`, then /?lab=documents, ?lab=sheets or ?lab=slides): the office editors on their own, with a shared
 // document that lives in this page and, for sheets and slides, the engines served by `cargo run --example office_dev` in src-tauri.
 
+import { ChatContext, NONE } from "@/store/chat/ChatContext";
+import type { LogEntry } from "@/features/chat/lib/entries";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { useEffect, useMemo, useState } from "react";
 import { Awareness } from "y-protocols/awareness";
@@ -10,7 +12,7 @@ import DocumentWorkspace from "@/features/office/documents/components/DocumentWo
 import { setFontFactors } from "@/features/office/documents/lib/fontMetrics";
 import SheetWorkspace from "@/features/office/sheets/components/SheetWorkspace";
 import SlideWorkspace from "@/features/office/slides/components/SlideWorkspace";
-import type { SheetIn } from "@/features/office/sheets/lib/sheet";
+import { readWorkbookForFile, type SheetIn } from "@/features/office/sheets/lib/sheet";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
 
 const SAMPLE = `<h1 style="text-align:center">Centered Title</h1><p style="text-align:center">Centered paragraph</p><p style="text-align:right">Right paragraph</p>
@@ -22,7 +24,8 @@ const SAMPLE = `<h1 style="text-align:center">Centered Title</h1><p style="text-
 <h2>Plan</h2>
 <ol><li>Hire two engineers</li><li>Move the data to the new region</li><li>Review pricing</li></ol>
 <table><tr><th>Team</th><th>Goal</th><th>Status</th></tr><tr><td>Platform</td><td>99.9% uptime</td><td>On track</td></tr><tr><td>Growth</td><td>+10% signups</td><td>Ahead</td></tr></table>
-<p>Thanks to everyone who contributed to this quarter.</p>`;
+<p>Thanks to everyone who contributed to this quarter.</p>
+<p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAABkCAIAAACO1KzYAAABDklEQVR42u3TMQ1AIQxFUeQw/7lKEIGmP6MEJehABXnLSe7epKdtuyrSWT1S/SPSN3ekBhgwYMCAAQMGDBgwYMCAAQMGDBgwYMCAAQMGDBgwYMCAAQMGDBgwYMCAAQMGDBgwYMCAAQMGDBgwYMCAAQMGDBgwYMCAAQMGDBgwYMCAAQMGDBgwYMCAAQMGDBgwYMCAAQMGDBgw4IfAqcGpRacOK/VIgAEDBgwYMGDAgAEDBgwYMGDAgAEDBgwYMGDAgAEDBgwYMGDAgAEDBgwYMGDAgAEDBgwYMGDAgAEDBgwYMGDAgAEDBgwYMGDAgAEDBgwYMGDAgAEDBgwYMGDAgAEDBgwYMGDAgAEDfgh8AQV3TNoATTfMAAAAAElFTkSuQmCC" alt="Sample gradient" width="160" height="100"></p>`;
 
 const SHEETS: SheetIn[] = [
 	{
@@ -62,6 +65,29 @@ async function viaLab(cmd: string, args: unknown) {
 	return j.ok;
 }
 
+// A chat that lives in this page, so comments can be tried without a workspace
+function LabChat({ children }: { children: React.ReactNode }) {
+	const [entries, setEntries] = useState<LogEntry[]>([]);
+	const value = useMemo(
+		() => ({
+			...NONE,
+			entries,
+			me: "ana",
+			myName: "Ana",
+			role: "Owner" as const,
+			canPost: true,
+			people: [{ key: "ana", name: "Ana" }] as never,
+			post: async (a: { kind: LogEntry["kind"]; channel: string; parent?: string; body: string }) => {
+				const e: LogEntry = { id: `e${Date.now()}${Math.random().toString(36).slice(2, 6)}`, kind: a.kind, channel: a.channel, parent: a.parent ?? "", author: "ana", name: "Ana", ts: Date.now(), body: a.body, sig: "" };
+				setEntries((x) => [...x, e]);
+				return e;
+			},
+		}),
+		[entries],
+	);
+	return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
+}
+
 export default function Lab({ which }: { which: string }) {
 	useEffect(() => {
 		mockIPC((cmd, args) => viaLab(cmd, args));
@@ -88,6 +114,8 @@ export default function Lab({ which }: { which: string }) {
 	const collab = useMemo<CollabDoc>(() => ({ ...base, synced }), [base, synced]);
 	const [readOnly] = useState(false);
 	(window as unknown as { __lab: unknown }).__lab = collab;
+	// For checking what a workbook writes: __labXlsx(path) saves the shared workbook through the lab backend
+	(window as unknown as { __labXlsx: (path: string) => Promise<unknown> }).__labXlsx = (path) => viaLab("sheet_write_file", { sheets: readWorkbookForFile(collab.doc), path });
 	const fileParam = new URLSearchParams(location.search).get("file");
 	const [deck, setDeck] = useState<{ base: string; slides: string[]; notes: string[] } | null>(null);
 	useEffect(() => {
@@ -116,8 +144,8 @@ export default function Lab({ which }: { which: string }) {
 	if (fileParam && !opened) return <p className="p-6">Opening…</p>;
 	if (which !== "documents") return <p className="p-6">The lab has no “{which}” yet.</p>;
 	return (
-		<div style={{ height: new URLSearchParams(location.search).get("h") ?? "100vh" }}>
-			<DocumentWorkspace
+		<LabChat><div style={{ height: new URLSearchParams(location.search).get("h") ?? "100vh" }}>
+			<DocumentWorkspace canComment
 				collab={collab}
 				fileLayout={(opened as unknown as { layout?: never } | null)?.layout}
 				sourceId={(opened as unknown as { sourceId?: string } | null)?.sourceId}
@@ -129,9 +157,16 @@ export default function Lab({ which }: { which: string }) {
 				readOnly={readOnly}
 				inspect={{ words: 120, images: 0, comments: 0, revisions: 0, people: ["Ana"], title: "", created: "", modified: "", macros: false, embedded: [], external: [], leftOut: ["Page layout (margins, columns, headers, footers), named styles, footnotes and fields."] }}
 				canUpdateFile
-				onSaveCopy={async () => {}}
+				onSaveCopy={async (format, html, layout) => {
+						// ?out=<folder>: write the copy there through the lab backend, so it can be opened again (window.__labCopy says where)
+						const out = new URLSearchParams(location.search).get("out");
+						if (!out) return;
+						const path = `${out}/lab-copy.${format}`;
+						await viaLab("office_export_html", { ext: format, html, title: "Quarterly Review", author: "Ana", path, layout });
+						(window as unknown as { __labCopy: string }).__labCopy = path;
+					}}
 				onUpdateFile={async () => {}}
 			/>
-		</div>
+		</div></LabChat>
 	);
 }

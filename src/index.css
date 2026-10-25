@@ -591,3 +591,17 @@ select option:checked { background-color: var(--accent); color: var(--foreground
 .doc-dark img {
 	filter: invert(1) hue-rotate(180deg);
 }
+
+.doc-comment { background-color: color-mix(in oklch, var(--warning) 25%, transparent); cursor: pointer; }
+.doc-comment-active { background-color: color-mix(in oklch, var(--warning) 50%, transparent); }
+
+.doc-hyphen .doc-body { hyphens: auto; }
+.doc-banded .bn-block-content[data-content-type="table"] tr:nth-child(even) td { background-color: color-mix(in oklch, black 6%, transparent); }
+
+.doc-dropcap .doc-body .bn-block-group > .bn-block-outer:first-child .bn-block-content[data-content-type="paragraph"] > p::first-letter { float: left; font-size: 3.4em; line-height: 0.85; padding-right: 0.08em; }
+
+.bn-block-content[data-content-type="numberedListItem"][data-nx-label]::before { content: attr(data-nx-label) !important; }
+.doc-body [data-field] { border-bottom: 1px dotted color-mix(in oklch, currentColor 40%, transparent); }
+
+.doc-body .bn-block-outer:has(> .bn-block > .bn-block-content[data-content-type="image"][data-wrap="left"]) { float: left; margin: 0 14px 6px 0; }
+.doc-body .bn-block-outer:has(> .bn-block > .bn-block-content[data-content-type="image"][data-wrap="right"]) { float: right; margin: 0 0 6px 14px; }

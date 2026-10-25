@@ -987,7 +987,7 @@ export function sheetSort(sheets: SheetIn[], sheet: string, range: string, colum
 	return invoke("sheet_sort", { sheets, sheet, range, column, descending, header });
 }
 // A chart of a range, as shapes and text to paint
-export function sheetChart(sheets: SheetIn[], sheet: string, spec: { range: string; kind: string; title: string; w: number; h: number }): Promise<ChartPrim[]> {
+export function sheetChart(sheets: SheetIn[], sheet: string, spec: { range: string; kind: string; title: string; w: number; h: number; opts?: object }): Promise<ChartPrim[]> {
 	return invoke("sheet_chart", { sheets, sheet, spec });
 }
 // Slide decks: the pieces of a deck from a file, a slide drawn as a picture, and the small edits the slide editor makes

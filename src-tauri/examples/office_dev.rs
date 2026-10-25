@@ -14,7 +14,18 @@ fn call(cmd: &str, a: &Value) -> Result<Value, String> {
     let n = |k: &str| a.get(k).and_then(Value::as_f64).unwrap_or(0.0);
     let ok = |v: Result<Value, serde_json::Error>| v.map_err(|e| e.to_string());
     match cmd {
+        "get_tasks" => Ok(json!([
+            {"id": "t1", "title": "Write report", "description": "", "status": "todo", "priority": "high", "tags": ["docs"], "created_at": "", "updated_at": ""},
+            {"id": "t2", "title": "Fix bug", "description": "", "status": "done", "priority": "low", "due_date": "2026-11-01", "tags": [], "created_at": "", "updated_at": ""}
+        ])),
+        "get_kanban" => Ok(json!([{"id": "c1", "title": "Doing", "position": 0, "cards": [{"id": "k1", "title": "Ship it", "description": "", "column_id": "c1", "position": 0, "tags": [], "checklist": [], "created_at": "", "updated_at": ""}]}])),
         "sheet_calculate" => ok(serde_json::to_value(sheets::calculate(&serde_json::from_value::<Vec<sheets::SheetIn>>(a["sheets"].clone()).map_err(|e| e.to_string())?)?)),
+        "sheet_write_file" => {
+            let book = serde_json::from_value::<Vec<sheets::SheetIn>>(a["sheets"].clone()).map_err(|e| e.to_string())?;
+            let bytes = sheets::write_xlsx(&book)?;
+            std::fs::write(s("path"), &bytes).map_err(|e| e.to_string())?;
+            Ok(json!(bytes.len()))
+        }
         "sheet_restructure" => {
             let op = serde_json::from_value(a["op"].clone()).map_err(|e| e.to_string())?;
             ok(serde_json::to_value(sheets::restructure(&serde_json::from_value::<Vec<sheets::SheetIn>>(a["sheets"].clone()).map_err(|e| e.to_string())?, &s("sheet"), op, n("at") as u32, n("count") as u32)?))
@@ -24,7 +35,8 @@ fn call(cmd: &str, a: &Value) -> Result<Value, String> {
             let spec = &a["spec"];
             let g = |k: &str| spec.get(k).and_then(Value::as_str).unwrap_or("").to_string();
             let f = |k: &str| spec.get(k).and_then(Value::as_f64).unwrap_or(0.0) as f32;
-            ok(serde_json::to_value(sheet_tools::chart(&serde_json::from_value::<Vec<sheets::SheetIn>>(a["sheets"].clone()).map_err(|e| e.to_string())?, &s("sheet"), &g("range"), &g("kind"), &g("title"), f("w"), f("h"))?))
+            let opts: sheets::ChartOpts = serde_json::from_value(spec.get("opts").cloned().unwrap_or(Value::Null)).unwrap_or_default();
+            ok(serde_json::to_value(sheet_tools::chart_with(&serde_json::from_value::<Vec<sheets::SheetIn>>(a["sheets"].clone()).map_err(|e| e.to_string())?, &s("sheet"), &g("range"), &g("kind"), &g("title"), f("w"), f("h"), &opts)?))
         }
         "deck_edit_slide" => Ok(json!(deck::edit_slide(&s("slide"), &serde_json::from_value(a["edit"].clone()).map_err(|e| e.to_string())?)?)),
         "deck_add_picture" => {
@@ -57,7 +69,11 @@ fn call(cmd: &str, a: &Value) -> Result<Value, String> {
         "deck_new_shape" => Ok(json!(deck::new_shape(&s("kind"), n("id") as u32, n("x"), n("y"), n("w"), n("h"))?)),
         "deck_edit_shape" => Ok(json!(deck::edit_shape(&s("shape"), &serde_json::from_value(a["edit"].clone()).map_err(|e| e.to_string())?)?)),
         "office_export_html" => {
-            let bytes = office::export(&s("ext"), &s("html"), &s("title"), &s("author"), None)?;
+            let layout: Option<office::Layout> = serde_json::from_value(a["layout"].clone()).ok();
+            let bytes = office::export(&s("ext"), &s("html"), &s("title"), &s("author"), layout.as_ref())?;
+            if let Some(path) = a.get("path").and_then(Value::as_str) {
+                std::fs::write(path, &bytes).map_err(|e| e.to_string())?;
+            }
             Ok(json!(bytes.len()))
         }
         other => Err(format!("The lab does not serve {other}")),

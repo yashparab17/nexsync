@@ -12,7 +12,9 @@ import { PeopleStack, usePeople } from "@/features/office/shared/People";
 import { OfficeFrame, type RibbonTab } from "@/features/office/shared/Ribbon";
 import ChartView from "@/features/office/sheets/components/ChartView";
 import SheetGrid, { COL_W, type Cursor, type Other } from "@/features/office/sheets/components/SheetGrid";
+import SheetDialogs, { type SheetDialogKind } from "@/features/office/sheets/components/SheetDialogs";
 import SheetRibbon from "@/features/office/sheets/components/SheetRibbon";
+import { useSheetFeatures } from "@/features/office/sheets/components/useSheetFeatures";
 import Loading from "@/components/Loading";
 import { Button } from "@/components/ui/button";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
@@ -21,8 +23,12 @@ import {
 	a1Of,
 	addSheet,
 	cellsOf,
+	cfOf,
 	chartsOf,
 	colLetters,
+	dvOf,
+	hiddenOf,
+	protectedOf,
 	duplicateAddresses,
 	jsonToRows,
 	parseA1,
@@ -57,7 +63,8 @@ import {
 	type SheetMeta,
 	type SheetOut,
 } from "@/features/office/sheets/lib/sheet";
-import { sheetCalculate, sheetRestructure, sheetSave, sheetSort } from "@/lib/tauri";
+import { cardRows, expandLive, taskRows } from "@/features/office/sheets/lib/liveRanges";
+import { getKanban, getTasks, sheetCalculate, sheetRestructure, sheetSave, sheetSort } from "@/lib/tauri";
 import { cn, errorText } from "@/lib/utils";
 
 const LOCAL = "local-edit";
@@ -110,6 +117,26 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const sheet = sheets.find((s) => s.id === activeId) ?? sheets[0] ?? null;
 
+	// The workspace's tasks and cards, for =TASKS() and =CARDS(); read again every twenty seconds
+	const [live, setLive] = useState<{ tasks: string[][]; cards: string[][] }>({ tasks: [], cards: [] });
+	useEffect(() => {
+		let off = false;
+		const load = () => {
+			getTasks(workspacePath)
+				.then((t) => !off && setLive((l) => (JSON.stringify(l.tasks) === JSON.stringify(taskRows(t)) ? l : { ...l, tasks: taskRows(t) })))
+				.catch(() => {});
+			getKanban(workspacePath)
+				.then((c) => !off && setLive((l) => (JSON.stringify(l.cards) === JSON.stringify(cardRows(c)) ? l : { ...l, cards: cardRows(c) })))
+				.catch(() => {});
+		};
+		load();
+		const timer = setInterval(load, 20_000);
+		return () => {
+			off = true;
+			clearInterval(timer);
+		};
+	}, [workspacePath]);
+
 	// The engine's answers, asked again shortly after the last change
 	const [calc, setCalc] = useState<SheetOut[]>([]);
 	const asked = useRef(0);
@@ -117,7 +144,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 		if (sheets.length === 0) return;
 		const n = ++asked.current;
 		const timer = setTimeout(() => {
-			sheetCalculate(readWorkbook(doc))
+			sheetCalculate(expandLive(readWorkbook(doc), live))
 				.then((r) => {
 					if (n !== asked.current) return;
 					setCalc(r.sheets);
@@ -132,7 +159,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 				});
 		}, 120);
 		return () => clearTimeout(timer);
-	}, [doc, version, sheets.length]);
+	}, [doc, version, sheets.length, live]);
 	const shown = useMemo(() => calc.find((c) => c.name === sheet?.name)?.cells ?? {}, [calc, sheet?.name]);
 
 	const typed = useCallback((a1: string) => (sheet ? typedText(doc, sheet.id, a1) : ""), [doc, sheet, version]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -141,7 +168,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 	const freeze = useMemo(() => (sheet ? freezeOf(doc, sheet.id) : ([0, 0] as [number, number])), [doc, sheet, version]); // eslint-disable-line react-hooks/exhaustive-deps
 	const used = useMemo(() => extent(sheet ? Object.fromEntries([...cellsOf(doc).keys(), ...looksOf(doc).keys()].filter((k) => k.startsWith(`${sheet.id}!`)).map((k) => [k.slice(k.indexOf("!") + 1), 1])) : {}), [doc, sheet, version]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	const undo = useMemo(() => new Y.UndoManager([cellsOf(doc), sheetsOf(doc), looksOf(doc), widthsOf(doc), frozenOf(doc), chartsOf(doc)], { trackedOrigins: new Set([LOCAL]) }), [doc]);
+	const undo = useMemo(() => new Y.UndoManager([cellsOf(doc), sheetsOf(doc), looksOf(doc), widthsOf(doc), frozenOf(doc), chartsOf(doc), cfOf(doc), dvOf(doc), hiddenOf(doc), protectedOf(doc)], { trackedOrigins: new Set([LOCAL]) }), [doc]);
 
 	const [active, setActive] = useState<Cursor>({ row: 0, col: 0 });
 	const [selection, setSelection] = useState<Range>({ r0: 0, c0: 0, r1: 0, c1: 0 });
@@ -151,6 +178,10 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 	const activeA1 = a1Of(active.row, active.col);
 	const activeLook = look(activeA1);
 	const single = selection.r0 === selection.r1 && selection.c0 === selection.c1;
+	const [dialogKind, setDialogKind] = useState<SheetDialogKind | null>(null);
+	const f = useSheetFeatures({ doc, sheet, version, selection, shown, typed, look, used, workspacePath, flash, setActiveId });
+	// A hidden column is a column of no width
+	const shownWidths = useMemo(() => ({ ...widths, ...Object.fromEntries([...f.hidden.cols].map((c) => [c, 0])) }), [widths, f.hidden.cols]);
 
 	// Who else is where, on this sheet
 	const [others, setOthers] = useState<Other[]>([]);
@@ -172,16 +203,21 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 	}, [collab, sheet, active.row, active.col, author]);
 
 	const edit = (fn: () => void) => doc.transact(fn, LOCAL);
-	const onCommit = (a1: string, text: string) => sheet && edit(() => setCell(doc, sheet.id, a1, text));
+	const onCommit = (a1: string, text: string) => {
+		if (!sheet) return;
+		const why = f.refusal(a1, text);
+		if (why) return flash(false, why);
+		edit(() => setCell(doc, sheet.id, a1, text));
+	};
 	const onClear = (r: Range) =>
 		sheet &&
 		edit(() => {
-			for (let row = r.r0; row <= r.r1; row++) for (let col = r.c0; col <= r.c1; col++) setCell(doc, sheet.id, a1Of(row, col), "");
+			for (let row = r.r0; row <= r.r1; row++) for (let col = r.c0; col <= r.c1; col++) if (!f.blocked(a1Of(row, col))) setCell(doc, sheet.id, a1Of(row, col), "");
 		});
 	const onPaste = (at: Cursor, rows: string[][]) =>
 		sheet &&
 		edit(() => {
-			rows.forEach((line, i) => line.forEach((text, j) => setCell(doc, sheet.id, a1Of(at.row + i, at.col + j), text)));
+			rows.forEach((line, i) => line.forEach((text, j) => !f.blocked(a1Of(at.row + i, at.col + j)) && setCell(doc, sheet.id, a1Of(at.row + i, at.col + j), text)));
 		});
 	const pasteRows = async (transposed: boolean) => {
 			try {
@@ -221,7 +257,11 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 			onPaste({ row: selection.r0, col: selection.c0 }, rows);
 			flash(true, `${rows.length.toLocaleString()} rows placed at ${a1Of(selection.r0, selection.c0)}.`);
 		};
-		const style = (change: (cur: CellStyle) => CellStyle) => sheet && styleRange(doc, sheet.id, selection, change);
+		const style = (change: (cur: CellStyle) => CellStyle) => {
+			if (!sheet) return;
+			if (f.locked) return flash(false, "This sheet is protected. Unprotect it on the Data tab to change how cells look.");
+			styleRange(doc, sheet.id, selection, change);
+		};
 
 	const restructure = async (op: "insertRows" | "deleteRows" | "insertCols" | "deleteCols") => {
 		if (!sheet) return;
@@ -431,6 +471,25 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 					}}
 					openFile={() => setTab("file")}
 					canSort={used.rows > 1}
+						fill={f.fill}
+						series={f.series}
+						hide={f.hide}
+						unhideAll={f.unhideAll}
+						openDialog={setDialogKind}
+						removeDuplicates={f.removeDuplicates}
+						clearFilter={f.clearFilter}
+						filtered={f.filtered}
+						locked={f.locked}
+						protect={f.protect}
+						unlock={f.unlock}
+						insertTasks={() => void f.insertTasks()}
+						chart={charts.find((c) => c.id === chartId) ? { title: charts.find((c) => c.id === chartId)!.title, opts: charts.find((c) => c.id === chartId)!.opts ?? {} } : null}
+						changeChart={(patch) => chartId && changeChart(chartId, patch)}
+						flashFill={f.flashFill}
+						formatAsTable={f.formatAsTable}
+						group={f.group}
+						ungroup={f.ungroup}
+						foldGroups={f.foldGroups}
 				/>
 </>
 			}
@@ -549,8 +608,14 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 						cols={Math.max(52, used.cols + 10)}
 						shown={shown}
 						typed={typed}
-						look={look}
-						widths={widths}
+						look={f.lookFor}
+						hiddenRows={f.hidden.rows}
+						suggest={f.suggest}
+						onFill={f.fill}
+						onFillDrag={f.fillTo}
+						groupMarks={f.groupMarks}
+						onToggleGroup={f.toggleGroup}
+						widths={shownWidths}
 						onWidth={(c, px) => edit(() => setWidth(doc, sheet.id, c, px))}
 						onAutoFit={autoFit}
 						freeze={freeze}
@@ -621,6 +686,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 					)}
 				</div>
 			</div>
+			{dialogKind && <SheetDialogs kind={dialogKind} onClose={() => setDialogKind(null)} f={f} selectionText={single ? activeA1 : rangeText(selection)} activeCol={active.col} />}
 		</OfficeFrame>
 	);
 }

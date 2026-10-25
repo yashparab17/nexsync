@@ -14,6 +14,10 @@ export interface OfficeLayout {
 	header: string;
 	footer: string;
 	pageNumbers: boolean;
+	firstHeader?: string;
+	firstFooter?: string;
+	evenHeader?: string;
+	evenFooter?: string;
 	// Where the text sits between the top and bottom margins: top, center, bottom or justify
 	valign: string;
 	// The font and size (points) of the file's ordinary text; empty and 0 when unknown

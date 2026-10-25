@@ -48,6 +48,25 @@ const fontFamily = createStyleSpec(
 	},
 );
 
+// A field: text that stands for a value (the title, the page count, today's date) and is brought up to date on request. The value of
+// the style is the field's kind; the file gets the plain text.
+const field = createStyleSpec(
+	{ type: "field", propSchema: "string" },
+	{
+		render: (value) => {
+			const dom = document.createElement("span");
+			dom.dataset.field = value;
+			dom.title = `Field: ${value}`;
+			return { dom, contentDOM: dom };
+		},
+		toExternalHTML: () => {
+			const dom = document.createElement("span");
+			return { dom, contentDOM: dom };
+		},
+		parse: () => undefined,
+	},
+);
+
 // BlockNote's own colours only know its palette names, and draw nothing for a hex such as #0F4761 (what a Word file or the colour
 // picker gives). These take any CSS colour, keep it as #rrggbb, and draw it.
 const hexOf = (css: string): string | undefined => {
@@ -115,9 +134,10 @@ const blockSpecs = {
 	bulletListItem: withWordProps(defaultBlockSpecs.bulletListItem),
 	numberedListItem: withWordProps(defaultBlockSpecs.numberedListItem),
 	checkListItem: withWordProps(defaultBlockSpecs.checkListItem),
-	image: withWordProps(defaultBlockSpecs.image),
+	// A picture also says whether text runs round it: none, left (the picture on the left) or right
+	image: ((s) => ({ ...s, config: { ...s.config, propSchema: { ...s.config.propSchema, wrap: { default: "none" } } } }) as typeof s)(withWordProps(defaultBlockSpecs.image)),
 };
 
 // The font goes before the size, so a run's size is drawn inside its font: its line is then as tall as that font at that size, as in Word
-export const documentSchema = BlockNoteSchema.create({ blockSpecs, styleSpecs: { ...defaultStyleSpecs, fontFamily, fontSize, textColor: colourSpec("textColor", "color"), backgroundColor: colourSpec("backgroundColor", "backgroundColor") } });
+export const documentSchema = BlockNoteSchema.create({ blockSpecs, styleSpecs: { ...defaultStyleSpecs, field, fontFamily, fontSize, textColor: colourSpec("textColor", "color"), backgroundColor: colourSpec("backgroundColor", "backgroundColor") } });
 export type DocumentEditorType = typeof documentSchema.BlockNoteEditor;

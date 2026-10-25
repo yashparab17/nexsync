@@ -30,6 +30,12 @@ pub fn sort(sheets: &[SheetIn], sheet: &str, range: &str, column: &str, descendi
 
 /// A chart of `range` as shapes, `w` by `h` pixels
 pub fn chart(sheets: &[SheetIn], sheet: &str, range: &str, kind: &str, title: &str, w: f32, h: f32) -> Result<Vec<Prim>, String> {
+    chart_with(sheets, sheet, range, kind, title, w, h, &super::sheets::ChartOpts::default())
+}
+
+/// [`chart`] with the options a chart can have beyond its data
+#[allow(clippy::too_many_arguments)]
+pub fn chart_with(sheets: &[SheetIn], sheet: &str, range: &str, kind: &str, title: &str, w: f32, h: f32, opts: &super::sheets::ChartOpts) -> Result<Vec<Prim>, String> {
     if !KINDS.contains(&kind) {
         return Err("That kind of chart is not offered.".to_string());
     }
@@ -44,6 +50,7 @@ pub fn chart(sheets: &[SheetIn], sheet: &str, range: &str, kind: &str, title: &s
             params["title"] = json!(title.trim());
         }
         s.execute("insert.chart", params).map_err(|e| e.to_string())?;
+        super::sheets::apply_chart_opts(&mut s, sheet, opts);
         let d = s.doc().map_err(|e| e.to_string())?;
         let i = d.wb.sheet_index(sheet).ok_or("That sheet is gone.")?;
         let sh = d.wb.sheet(i).ok_or("That sheet is gone.")?;
@@ -76,6 +83,8 @@ pub struct ChartSpec {
     pub title: String,
     pub w: f32,
     pub h: f32,
+    #[serde(default)]
+    pub opts: super::sheets::ChartOpts,
 }
 
 #[tauri::command]
@@ -85,7 +94,7 @@ pub async fn sheet_sort(sheets: Vec<SheetIn>, sheet: String, range: String, colu
 
 #[tauri::command]
 pub async fn sheet_chart(sheets: Vec<SheetIn>, sheet: String, spec: ChartSpec) -> Result<Vec<Prim>, String> {
-    tokio::task::spawn_blocking(move || chart(&sheets, &sheet, &spec.range, &spec.kind, &spec.title, spec.w, spec.h)).await.map_err(|e| e.to_string())?
+    tokio::task::spawn_blocking(move || chart_with(&sheets, &sheet, &spec.range, &spec.kind, &spec.title, spec.w, spec.h, &spec.opts)).await.map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]
@@ -122,7 +131,7 @@ mod tests {
         let bytes = pdf(&book(), Some("S")).unwrap();
         assert!(bytes.starts_with(b"%PDF"));
         let mut with = book();
-        with[0].charts.push(super::super::sheets::ChartIn { range: "A1:B4".into(), kind: "column".into(), title: "Stock".into(), at: "D2".into(), w: 400.0, h: 260.0 });
+        with[0].charts.push(super::super::sheets::ChartIn { range: "A1:B4".into(), kind: "column".into(), title: "Stock".into(), at: "D2".into(), w: 400.0, h: 260.0, opts: Default::default() });
         let plain = super::super::sheets::write_xlsx(&book()).unwrap();
         let charted = super::super::sheets::write_xlsx(&with).unwrap();
         assert!(charted.len() > plain.len(), "{} vs {}", charted.len(), plain.len());

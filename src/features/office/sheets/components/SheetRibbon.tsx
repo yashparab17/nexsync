@@ -36,10 +36,23 @@ import {
 	SquareFunction,
 	Eye,
 	Printer,
+	ArrowDownToLine,
+	EyeOff,
+	Filter,
+	GitCompareArrows,
+	ListChecks,
+	Lock,
+	LockOpen,
+	Palette,
+	SplitSquareHorizontal,
+	Target,
 } from "lucide-react";
 
 import { Big, Choice, ColorButton, Group, MenuItem, MenuRule, MenuTitle, Row, Rows, Sep, Small } from "@/features/office/shared/Ribbon";
 import { FONTS, PALETTE, SIZES } from "@/features/office/documents/lib/documentFormat";
+import type { SheetDialogKind } from "@/features/office/sheets/components/SheetDialogs";
+import type { ChartOptions } from "@/features/office/sheets/lib/sheet";
+import { TABLE_STYLES } from "@/features/office/sheets/lib/sheetFill";
 import { NUMBER_FORMATS, stepDecimals, type CellStyle } from "@/features/office/sheets/lib/sheet";
 
 export const FUNCTIONS: { group: string; names: string[] }[] = [
@@ -50,6 +63,17 @@ export const FUNCTIONS: { group: string; names: string[] }[] = [
 	{ group: "Text", names: ["CONCAT", "TEXTJOIN", "LEFT", "RIGHT", "MID", "LEN", "UPPER", "LOWER", "TRIM", "TEXT", "SUBSTITUTE"] },
 	{ group: "Date & time", names: ["TODAY", "NOW", "DATE", "YEAR", "MONTH", "DAY", "DATEDIF", "EDATE", "NETWORKDAYS"] },
 	{ group: "Financial", names: ["PMT", "FV", "PV", "NPV", "IRR", "RATE"] },
+];
+
+const CELL_STYLES: { label: string; look: CellStyle }[] = [
+	{ label: "Normal", look: {} },
+	{ label: "Good", look: { fill: "#C6EFCE", color: "#006100" } },
+	{ label: "Bad", look: { fill: "#FFC7CE", color: "#9C0006" } },
+	{ label: "Neutral", look: { fill: "#FFEB9C", color: "#9C5700" } },
+	{ label: "Input", look: { fill: "#FFCC99", color: "#3F3F76" } },
+	{ label: "Heading", look: { bold: true, size: 13, borders: "b" } },
+	{ label: "Title", look: { bold: true, size: 18 } },
+	{ label: "Total", look: { bold: true, borders: "t" } },
 ];
 
 const BORDERS: { label: string; value: string }[] = [
@@ -95,6 +119,26 @@ export interface SheetRibbonProps {
 	clear: (what: "all" | "formats") => void;
 	openFile: () => void;
 	canSort: boolean;
+	fill: (dir: "down" | "right") => void;
+	series: (dir: "down" | "right") => void;
+	hide: (what: "rows" | "cols") => void;
+	unhideAll: () => void;
+	openDialog: (kind: SheetDialogKind) => void;
+	removeDuplicates: () => void;
+	clearFilter: () => void;
+	filtered: boolean;
+	locked: boolean;
+	protect: (on: boolean) => void;
+	unlock: (on: boolean) => void;
+	insertTasks: () => void;
+	// The chart that is selected, and a change to how it looks (null: none is selected)
+	chart: { title: string; opts: ChartOptions } | null;
+	changeChart: (patch: { title?: string; opts?: ChartOptions }) => void;
+	flashFill: () => void;
+	formatAsTable: (styleId: string) => void;
+	group: (kind: "rows" | "cols") => void;
+	ungroup: () => void;
+	foldGroups: (fold: boolean) => void;
 }
 
 export default function SheetRibbon(p: SheetRibbonProps) {
@@ -186,6 +230,18 @@ export default function SheetRibbon(p: SheetRibbonProps) {
 				</Group>
 				<Group label="Cells">
 					<Big
+						icon={EyeOff}
+						label="Hide"
+						disabled={ro}
+						menu={
+							<div role="menu" className="w-48">
+								<MenuItem label="Hide Rows" onPress={() => p.hide("rows")} />
+								<MenuItem label="Hide Columns" onPress={() => p.hide("cols")} />
+								<MenuItem label="Unhide All" onPress={p.unhideAll} />
+							</div>
+						}
+					/>
+					<Big
 						icon={Rows3}
 						label="Insert"
 						disabled={ro}
@@ -209,7 +265,50 @@ export default function SheetRibbon(p: SheetRibbonProps) {
 						}
 					/>
 				</Group>
+				<Group label="Styles">
+					<Big
+							icon={TableIcon}
+							label="Format as Table"
+							title="A coloured heading row and shaded rows"
+							disabled={ro}
+							menu={
+								<div role="menu" className="w-40">
+									{TABLE_STYLES.map((t) => (
+										<MenuItem key={t.id} label={t.label} onPress={() => p.formatAsTable(t.id)} />
+									))}
+								</div>
+							}
+						/>
+						<Big icon={Palette} label="Conditional Formatting" title="Colour cells by what they show" disabled={ro} onPress={() => p.openDialog("cf")} />
+					<Big
+						icon={PaintBucket}
+						label="Cell Styles"
+						disabled={ro}
+						menu={
+							<div role="menu" className="w-40">
+								{CELL_STYLES.map((c) => (
+									<MenuItem key={c.label} label={c.label} onPress={() => style(() => ({ ...c.look }))} />
+								))}
+							</div>
+						}
+					/>
+				</Group>
 				<Group label="Editing">
+					<Big
+						icon={ArrowDownToLine}
+						label="Fill"
+						title="Carry the first cell, or a series, over the selection"
+						disabled={ro}
+						menu={
+							<div role="menu" className="w-52">
+								<MenuItem label="Down" onPress={() => p.fill("down")} />
+								<MenuItem label="Right" onPress={() => p.fill("right")} />
+								<MenuItem label="Series Down" hint="1, 2 then 3, 4" onPress={() => p.series("down")} />
+								<MenuItem label="Series Right" onPress={() => p.series("right")} />
+								<MenuItem label="Flash Fill" hint="learns from your examples" onPress={p.flashFill} />
+							</div>
+						}
+					/>
 					<Big
 						icon={Sigma}
 						label="AutoSum"
@@ -256,6 +355,46 @@ export default function SheetRibbon(p: SheetRibbonProps) {
 						<Big key={c.kind} icon={c.icon} label={c.label} title={`Insert a ${c.label.toLowerCase()} chart of the selected cells`} disabled={ro} onPress={() => p.insertChart(c.kind)} />
 					))}
 				</Group>
+				<Group label="Sparklines">
+					<Big icon={ChartLine} label="Sparkline" title="A small chart in one cell, from a range" disabled={ro} onPress={() => p.openDialog("spark")} />
+				</Group>
+				<Group label="Chart Options">
+					<Big
+						icon={ChartColumn}
+						label="Chart Options"
+						title={p.chart ? "How the selected chart looks" : "Select a chart first"}
+						disabled={ro || !p.chart}
+						menu={
+							p.chart ? (
+								<div role="menu" className="w-64">
+									<MenuItem label="Data labels" checked={!!p.chart.opts.labels} onPress={() => p.changeChart({ opts: { ...p.chart!.opts, labels: !p.chart!.opts.labels } })} />
+									<MenuItem label="Gridlines" checked={!p.chart.opts.noGrid} onPress={() => p.changeChart({ opts: { ...p.chart!.opts, noGrid: !p.chart!.opts.noGrid } })} />
+									<MenuRule />
+									<MenuTitle>Trendline</MenuTitle>
+									{(["", "linear", "exponential", "logarithmic", "poly2"] as const).map((t) => (
+										<MenuItem key={t} label={t === "" ? "None" : t === "poly2" ? "Polynomial (2)" : t[0].toUpperCase() + t.slice(1)} checked={(p.chart!.opts.trend ?? "") === t} onPress={() => p.changeChart({ opts: { ...p.chart!.opts, trend: t } })} />
+									))}
+									<MenuRule />
+									<form
+										className="space-y-1 p-1"
+										onSubmit={(e) => {
+											e.preventDefault();
+											const f = new FormData(e.currentTarget);
+											p.changeChart({ title: String(f.get("title") ?? ""), opts: { ...p.chart!.opts, xTitle: String(f.get("x") ?? ""), yTitle: String(f.get("y") ?? "") } });
+										}}
+									>
+										<input name="title" aria-label="Chart title" defaultValue={p.chart.title} placeholder="Chart title" className="h-7 w-full border bg-background px-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+										<input name="x" aria-label="Horizontal axis title" defaultValue={p.chart.opts.xTitle ?? ""} placeholder="Horizontal axis title" className="h-7 w-full border bg-background px-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+										<input name="y" aria-label="Vertical axis title" defaultValue={p.chart.opts.yTitle ?? ""} placeholder="Vertical axis title" className="h-7 w-full border bg-background px-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+										<button type="submit" className="h-7 w-full bg-[var(--office)] px-2 text-[13px] text-white">
+											Apply
+										</button>
+									</form>
+								</div>
+							) : null
+						}
+					/>
+				</Group>
 				<Group label="Sheets">
 					<Big icon={TableIcon} label="New Sheet" disabled={ro} onPress={p.addSheet} />
 				</Group>
@@ -301,17 +440,64 @@ export default function SheetRibbon(p: SheetRibbonProps) {
 	if (tab === "data")
 		return (
 			<>
-				<Group label="Sort">
+				<Group label="Sort & Filter">
 					<Big icon={ArrowDownAZ} label="Sort A to Z" disabled={ro || !p.canSort} onPress={() => p.sort(false)} />
 					<Big icon={ArrowUpZA} label="Sort Z to A" disabled={ro || !p.canSort} onPress={() => p.sort(true)} />
+					<Big icon={Filter} label="Filter" title="Show only the rows with chosen values in the selected column" disabled={ro || !p.canSort} onPress={() => p.openDialog("filter")} />
+					<Big icon={Eye} label="Clear Filter" disabled={!p.filtered} onPress={p.clearFilter} />
 				</Group>
-				<Group label="Tools">
-						<Big icon={Copy} label="Find Duplicates" title="Fill the cells of the selection whose text appears more than once" disabled={ro} onPress={p.highlightDuplicates} />
-					</Group>
-					<Group label="Get Data">
-						<Big icon={FileJson} label="From JSON" title="Put a JSON file (a list of objects or of rows) into the sheet at the selected cell" disabled={ro} onPress={p.importJson} />
-					</Group>
-					<Group label="Open">
+				<Group label="Data Tools">
+					<Rows>
+						<Small icon={SplitSquareHorizontal} label="Text to Columns" disabled={ro} onPress={() => p.openDialog("split")} />
+						<Small icon={Copy} label="Find Duplicates" title="Fill the cells of the selection whose text appears more than once" disabled={ro} onPress={p.highlightDuplicates} />
+						<Small icon={Trash2} label="Remove Duplicates" title="Keep the first of each repeated row in the selection or table" disabled={ro} onPress={p.removeDuplicates} />
+					</Rows>
+					<Big icon={GitCompareArrows} label="Data Validation" title="Say what may be typed into the selected cells" disabled={ro} onPress={() => p.openDialog("dv")} />
+				</Group>
+				<Group label="Analyze">
+					<Big icon={TableIcon} label="Summarise" title="Group the table by a column on a new sheet" disabled={ro} onPress={() => p.openDialog("pivot")} />
+					<Big
+						icon={Target}
+						label="What-If"
+						disabled={ro}
+						menu={
+							<div role="menu" className="w-56">
+								<MenuItem label="Goal Seek" hint="the input that gives a result" onPress={() => p.openDialog("goal")} />
+								<MenuItem label="Data Table" hint="results for a column of inputs" onPress={() => p.openDialog("datatable")} />
+								<MenuItem label="Scenarios" hint="named sets of values" onPress={() => p.openDialog("scenario")} />
+							</div>
+						}
+					/>
+				</Group>
+				<Group label="Outline">
+					<Big
+						icon={Rows3}
+						label="Group"
+						disabled={ro}
+						menu={
+							<div role="menu" className="w-48">
+								<MenuItem label="Group Rows" onPress={() => p.group("rows")} />
+								<MenuItem label="Group Columns" onPress={() => p.group("cols")} />
+								<MenuItem label="Ungroup" onPress={p.ungroup} />
+								<MenuRule />
+								<MenuItem label="Fold All Groups" onPress={() => p.foldGroups(true)} />
+								<MenuItem label="Unfold All Groups" onPress={() => p.foldGroups(false)} />
+							</div>
+						}
+					/>
+				</Group>
+				<Group label="Protect">
+					<Big icon={p.locked ? LockOpen : Lock} label={p.locked ? "Unprotect Sheet" : "Protect Sheet"} title="Stop changes to cells that are not unlocked" disabled={ro} onPress={() => p.protect(!p.locked)} />
+					<Rows>
+						<Small icon={LockOpen} label="Unlock Cells" title="Keep the selected cells editable on a protected sheet" disabled={ro} onPress={() => p.unlock(true)} />
+						<Small icon={Lock} label="Lock Cells" disabled={ro} onPress={() => p.unlock(false)} />
+					</Rows>
+				</Group>
+				<Group label="Get Data">
+					<Big icon={FileJson} label="From JSON" title="Put a JSON file (a list of objects or of rows) into the sheet at the selected cell" disabled={ro} onPress={p.importJson} />
+					<Big icon={ListChecks} label="Workspace Tasks" title="Put the workspace's tasks into the sheet at the selected cell" disabled={ro} onPress={p.insertTasks} />
+				</Group>
+				<Group label="Open">
 					<Big icon={Printer} label="Save a Copy" onPress={p.openFile} />
 				</Group>
 			</>

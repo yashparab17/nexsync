@@ -63,6 +63,11 @@ export interface PageSetup {
 	watermark?: string;
 	// A number beside each line of text in the editor (not written to the file)
 	lineNumbers?: boolean;
+	// Editor-only looks: break words at line ends, a border inside each page, shaded alternate table rows
+	hyphenate?: boolean;
+	border?: boolean;
+	banded?: boolean;
+	dropCap?: boolean;
 }
 
 export const DEFAULT_PAGE: PageSetup = { paper: "letter", landscape: false, margins: "normal", columns: 1, spacing: 1.15, valign: "top" };
@@ -91,9 +96,9 @@ const validBox = (b: unknown): b is PageBox => {
 };
 
 // The page set-up and header settings a file starts with, from what the backend read in it
-export function setupFromLayout(l: { width: number; height: number; landscape: boolean; top: number; right: number; bottom: number; left: number; columns: number; header: string; footer: string; pageNumbers: boolean; valign?: string }): { page: PageSetup; hf: HeaderFooter } {
+export function setupFromLayout(l: { width: number; height: number; landscape: boolean; top: number; right: number; bottom: number; left: number; columns: number; header: string; footer: string; pageNumbers: boolean; valign?: string; firstHeader?: string; firstFooter?: string; evenHeader?: string; evenFooter?: string }): { page: PageSetup; hf: HeaderFooter } {
 	const page = readPage({ landscape: l.landscape, columns: l.columns, valign: l.valign, custom: { width: l.width, height: l.height, top: l.top, right: l.right, bottom: l.bottom, left: l.left } });
-	return { page, hf: readHeaderFooter({ header: l.header, footer: l.footer, pageNumbers: l.pageNumbers }) };
+	return { page, hf: readHeaderFooter({ header: l.header, footer: l.footer, pageNumbers: l.pageNumbers, firstHeader: l.firstHeader, firstFooter: l.firstFooter, evenHeader: l.evenHeader, evenFooter: l.evenFooter }) };
 }
 
 // Reads a stored setup, keeping what is valid and the default for the rest
@@ -108,6 +113,10 @@ export function readPage(raw: unknown): PageSetup {
 		valign: r.valign === "center" || r.valign === "bottom" || r.valign === "justify" ? r.valign : "top",
 		...(validBox(r.custom) ? { custom: r.custom } : {}),
 		...(r.lineNumbers === true ? { lineNumbers: true } : {}),
+		...(r.hyphenate === true ? { hyphenate: true } : {}),
+		...(r.border === true ? { border: true } : {}),
+		...(r.banded === true ? { banded: true } : {}),
+		...(r.dropCap === true ? { dropCap: true } : {}),
 		...(typeof r.watermark === "string" && r.watermark.trim() ? { watermark: r.watermark.trim().slice(0, 40) } : {}),
 	};
 }
@@ -117,13 +126,29 @@ export interface HeaderFooter {
 	footer: string;
 	// "Page {n}" style numbering in the footer
 	pageNumbers: boolean;
+	// What the first page, and the even pages, have instead (empty: the same as the others)
+	firstHeader?: string;
+	firstFooter?: string;
+	evenHeader?: string;
+	evenFooter?: string;
 }
 
-export const NO_HEADER: HeaderFooter = { header: "", footer: "", pageNumbers: false };
+export const NO_HEADER: HeaderFooter = { header: "", footer: "", pageNumbers: false, firstHeader: "", firstFooter: "", evenHeader: "", evenFooter: "" };
+
+// The header or footer text a page shows: the first page's own, an even page's own, or the ordinary one
+export function textFor(hf: HeaderFooter, part: "header" | "footer", pageIndex: number): string {
+	const first = part === "header" ? hf.firstHeader : hf.firstFooter;
+	const even = part === "header" ? hf.evenHeader : hf.evenFooter;
+	if (pageIndex === 0 && first) return first;
+	if (pageIndex % 2 === 1 && even) return even;
+	return hf[part];
+}
 
 export function readHeaderFooter(raw: unknown): HeaderFooter {
 	const r = (raw && typeof raw === "object" ? raw : {}) as Partial<HeaderFooter>;
-	return { header: typeof r.header === "string" ? r.header.slice(0, 200) : "", footer: typeof r.footer === "string" ? r.footer.slice(0, 200) : "", pageNumbers: r.pageNumbers === true };
+	const text = (v: unknown) => (typeof v === "string" ? v.slice(0, 200) : "");
+	const extra = Object.fromEntries((["firstHeader", "firstFooter", "evenHeader", "evenFooter"] as const).map((k) => [k, text(r[k])]).filter(([, v]) => v));
+	return { header: text(r.header), footer: text(r.footer), pageNumbers: r.pageNumbers === true, ...extra };
 }
 
 export const PX_PER_PT = 96 / 72;

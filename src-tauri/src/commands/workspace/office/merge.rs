@@ -112,6 +112,10 @@ pub fn layout_of(doc: &Document) -> Layout {
         spacing: 0.0,
         header: part_text(s.headers.default),
         footer: part_text(s.footers.default),
+        first_header: part_text(s.headers.first),
+        first_footer: part_text(s.footers.first),
+        even_header: part_text(s.headers.even),
+        even_footer: part_text(s.footers.even),
         page_numbers: footer_has_page,
         valign: match s.valign {
             wordcraft_doc::section::PageVAlign::Top => "top",
@@ -122,6 +126,7 @@ pub fn layout_of(doc: &Document) -> Layout {
         .to_string(),
         font: normal.font,
         size: normal.size,
+        comments: Vec::new(),
     }
 }
 
@@ -138,6 +143,10 @@ pub fn same_page(a: &Layout, b: &Layout) -> bool {
         && a.columns == b.columns
         && a.header.trim() == b.header.trim()
         && a.footer.trim() == b.footer.trim()
+        && a.first_header.trim() == b.first_header.trim()
+        && a.first_footer.trim() == b.first_footer.trim()
+        && a.even_header.trim() == b.even_header.trim()
+        && a.even_footer.trim() == b.even_footer.trim()
         && a.page_numbers == b.page_numbers
         && a.valign == b.valign
 }

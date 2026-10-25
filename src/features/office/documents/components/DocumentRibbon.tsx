@@ -50,11 +50,14 @@ import {
 	Moon,
 	Focus,
 	Stamp,
+	Sigma,
+	Brush,
 } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { Big, Choice, ColorButton, Gallery, GridPicker, Group, MenuItem, MenuTitle, Row, Rows, Sep, Small } from "@/features/office/shared/Ribbon";
 import { type CaseKind, FONTS, HIGHLIGHTS, MARGINS, PALETTE, PAPER, SIZES, STYLES, type MarginName, type PageSetup, type PaperName, type StyleId } from "@/features/office/documents/lib/documentFormat";
+import ReferencesRibbon, { TextForm, type ReferencesProps } from "@/features/office/documents/components/ReferencesRibbon";
 import type { Fmt, useDocumentActions } from "@/features/office/documents/components/useDocumentActions";
 
 type Actions = ReturnType<typeof useDocumentActions>;
@@ -87,15 +90,21 @@ export interface RibbonProps {
 	openHeaderFooter: () => void;
 	openCounts: () => void;
 	openProofing: () => void;
+	comments: { open: boolean; count: number; canComment: boolean; start: () => void; toggle: () => void };
 	pickImage: () => void;
 	paste: () => void;
 	hasHeaderFooter: boolean;
+	// Text the fields of the Insert tab put in
+	fieldValues: () => { title: string; author: string; pages: number; words: number };
+	refs: Omit<ReferencesProps, "tab" | "a" | "readOnly">;
 }
 
 export default function DocumentRibbon(p: RibbonProps) {
 	const { tab, a, fmt, readOnly: ro } = p;
 	const [link, setLink] = useState("");
 	const linkInput = useRef<HTMLInputElement>(null);
+
+	if (tab === "references" || tab === "mailings") return <ReferencesRibbon tab={tab} a={a} readOnly={ro} {...p.refs} />;
 
 	if (tab === "home")
 		return (
@@ -172,6 +181,9 @@ export default function DocumentRibbon(p: RibbonProps) {
 				<Group label="Styles">
 					<Gallery label="Styles" items={STYLES.map((s) => ({ id: s.id, label: s.label, preview: previews[s.id] }))} current={fmt.style} onPick={(id) => !ro && a.style(id as StyleId)} width={78} className="w-[330px]" />
 				</Group>
+				<Group label="Style">
+					<Big icon={Brush} label="Update Style" title="Give the look at the caret to every paragraph in the same style" disabled={ro} onPress={a.updateStyle} />
+				</Group>
 				<Group label="Editing">
 					<Rows>
 						<Small icon={Search} label="Find" onPress={() => p.openFind(false)} />
@@ -186,9 +198,105 @@ export default function DocumentRibbon(p: RibbonProps) {
 			<>
 				<Group label="Tables">
 					<Big icon={TableIcon} label="Table" disabled={ro} menu={<GridPicker onPick={a.insertTable} />} />
+					<Rows>
+						<Small icon={TableIcon} label="Header Row" active={fmt.headerRow} disabled={ro || !fmt.inTable} onPress={a.toggleHeaderRow} />
+						<Small icon={TableIcon} label="Merge Cells" title="Select cells by dragging across them" disabled={ro || !fmt.inTable} onPress={() => a.table("merge")} />
+						<Small icon={TableIcon} label="Split Cell" disabled={ro || !fmt.inTable} onPress={() => a.table("split")} />
+					</Rows>
+					<Rows>
+						<Small icon={TableIcon} label="Sort A to Z" title="By the column the caret is in" disabled={ro || !fmt.inTable} onPress={() => a.sortTable(true)} />
+						<Small icon={TableIcon} label="Sort Z to A" disabled={ro || !fmt.inTable} onPress={() => a.sortTable(false)} />
+						<Small icon={TableIcon} label="Banded Rows" title="Shade every other row, shown in the editor and not written to the file" active={!!p.page.banded} disabled={ro} onPress={() => p.setPage({ banded: !p.page.banded })} />
+					</Rows>
+					<Rows>
+						<Small
+							icon={TableIcon}
+							label="Formula"
+							title="Add up or average the numbers above or to the left of the caret"
+							disabled={ro || !fmt.inTable}
+							menu={
+								<>
+									<MenuItem label="Sum above" onPress={() => a.tableFormula("sumAbove")} />
+									<MenuItem label="Sum to the left" onPress={() => a.tableFormula("sumLeft")} />
+									<MenuItem label="Average above" onPress={() => a.tableFormula("avgAbove")} />
+									<MenuItem label="Average to the left" onPress={() => a.tableFormula("avgLeft")} />
+								</>
+							}
+						/>
+					</Rows>
+					<Rows>
+						<Small icon={TableIcon} label="Row Above" disabled={ro || !fmt.inTable} onPress={() => a.table("rowAbove")} />
+						<Small icon={TableIcon} label="Row Below" disabled={ro || !fmt.inTable} onPress={() => a.table("rowBelow")} />
+						<Small icon={TableIcon} label="Delete Row" disabled={ro || !fmt.inTable} onPress={() => a.table("delRow")} />
+					</Rows>
+					<Rows>
+						<Small icon={TableIcon} label="Column Left" disabled={ro || !fmt.inTable} onPress={() => a.table("colLeft")} />
+						<Small icon={TableIcon} label="Column Right" disabled={ro || !fmt.inTable} onPress={() => a.table("colRight")} />
+						<Small icon={TableIcon} label="Delete Column" disabled={ro || !fmt.inTable} onPress={() => a.table("delCol")} />
+					</Rows>
 				</Group>
 				<Group label="Illustrations">
 					<Big icon={ImageIcon} label="Picture" disabled={ro} onPress={p.pickImage} />
+					<Rows>
+						<Small
+							icon={ImageIcon}
+							label="Picture Size"
+							title="The picture the caret is in"
+							disabled={ro || !fmt.inPicture}
+							menu={
+								<>
+									{[200, 320, 420, 560].map((w) => (
+										<MenuItem key={w} label={`${w} px wide`} onPress={() => a.picture({ width: w })} />
+									))}
+									<MenuItem label="Align left" onPress={() => a.picture({ align: "left" })} />
+									<MenuItem label="Center" onPress={() => a.picture({ align: "center" })} />
+									<MenuItem label="Align right" onPress={() => a.picture({ align: "right" })} />
+									<MenuItem label="Text wraps on the right" onPress={() => a.picture({ wrap: "left" })} />
+									<MenuItem label="Text wraps on the left" onPress={() => a.picture({ wrap: "right" })} />
+									<MenuItem label="No wrapping" onPress={() => a.picture({ wrap: "none" })} />
+								</>
+							}
+						/>
+						<Small
+							icon={ImageIcon}
+							label="Crop"
+							title="Crop the picture the caret is in"
+							disabled={ro || !fmt.inPicture}
+							menu={
+								<>
+									<MenuItem label="Square" onPress={() => void a.cropPicture("square")} />
+									<MenuItem label="Wide (16:9)" onPress={() => void a.cropPicture("wide")} />
+									<MenuItem label="Trim a tenth from each side" onPress={() => void a.cropPicture("trim")} />
+								</>
+							}
+						/>
+						<Small icon={ImageIcon} label="Alt Text" title="Describe the picture for people who cannot see it" disabled={ro || !fmt.inPicture} menu={<TextForm label="Description" button="Set" onSubmit={(t) => a.picture({ alt: t })} />} />
+					</Rows>
+					<Rows>
+						<Small icon={TableIcon} label="Text Box" title="A box for text" disabled={ro} onPress={a.textBox} />
+						<Small
+							icon={ImageIcon}
+							label="Shapes"
+							title="A shape, drawn as a picture"
+							disabled={ro}
+							menu={
+								<>
+									{(
+										[
+											["rect", "Rectangle"],
+											["round", "Rounded Rectangle"],
+											["ellipse", "Ellipse"],
+											["triangle", "Triangle"],
+											["arrow", "Right Arrow"],
+											["line", "Line"],
+										] as const
+									).map(([k, label]) => (
+										<MenuItem key={k} label={label} onPress={() => a.insertShape(k, "#9DC3E6")} />
+									))}
+								</>
+							}
+						/>
+					</Rows>
 				</Group>
 				<Group label="Links">
 					<Big
@@ -217,6 +325,26 @@ export default function DocumentRibbon(p: RibbonProps) {
 					<Big icon={Hash} label="Page Number" disabled={ro} onPress={p.openHeaderFooter} />
 				</Group>
 				<Group label="Text">
+					<Rows>
+						<Small icon={Sigma} label="Equation" title="Write it as x^2, a_1, \frac{a}{b}, \sqrt{x} or \alpha" disabled={ro} menu={<TextForm label="Equation" button="Insert" onSubmit={a.insertEquation} />} />
+						<Small icon={FileText} label="Page Break" disabled={ro} onPress={a.pageBreak} />
+						<Small
+							icon={FileText}
+							label="Field"
+							disabled={ro}
+							menu={
+								<>
+									<MenuItem label="Title" onPress={() => a.insertField("title", p.fieldValues().title)} />
+									<MenuItem label="Author" onPress={() => a.insertField("author", p.fieldValues().author)} />
+									<MenuItem label="Date" onPress={() => a.insertField("date", new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }))} />
+									<MenuItem label="Page count" onPress={() => a.insertField("pages", String(p.fieldValues().pages))} />
+									<MenuItem label="Word count" onPress={() => a.insertField("words", String(p.fieldValues().words))} />
+									<MenuItem label="Update all fields" onPress={() => a.updateFields({ title: p.fieldValues().title, author: p.fieldValues().author, date: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }), pages: String(p.fieldValues().pages), words: String(p.fieldValues().words) })} />
+									<MenuItem label="Text form field" onPress={a.formField} />
+								</>
+							}
+						/>
+					</Rows>
 					<Rows>
 						<Small icon={CalendarDays} label="Date & Time" disabled={ro} onPress={() => a.insertText(new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }))} />
 						<Small
@@ -313,6 +441,11 @@ export default function DocumentRibbon(p: RibbonProps) {
 					/>
 				</Group>
 				<Group label="Page Background">
+					<Rows>
+						<Small icon={FileText} label="Drop Cap" title="Enlarge the first letter of the document, shown in the editor and not written to the file" active={!!p.page.dropCap} disabled={ro} onPress={() => p.setPage({ dropCap: !p.page.dropCap })} />
+						<Small icon={FileText} label="Page Border" title="A border inside each page, shown in the editor and not written to the file" active={!!p.page.border} disabled={ro} onPress={() => p.setPage({ border: !p.page.border })} />
+						<Small icon={FileText} label="Hyphenation" title="Break long words at the end of a line, shown in the editor" active={!!p.page.hyphenate} disabled={ro} onPress={() => p.setPage({ hyphenate: !p.page.hyphenate })} />
+					</Rows>
 						<Big
 							icon={Stamp}
 							label="Watermark"
@@ -351,7 +484,8 @@ export default function DocumentRibbon(p: RibbonProps) {
 					<Big icon={Space} label="Word Count" onPress={p.openCounts} />
 				</Group>
 				<Group label="Comments">
-					<Big icon={MessageSquareText} label="Comments" disabled title="Comments on a document are not built yet" />
+					<Big icon={MessageSquareText} label="New Comment" disabled={!p.comments.canComment} title="Comment on the selected text" onPress={p.comments.start} />
+					<Big icon={MessageSquareText} label={p.comments.count ? `Show Comments (${p.comments.count})` : "Show Comments"} active={p.comments.open} onPress={p.comments.toggle} />
 				</Group>
 			</>
 		);

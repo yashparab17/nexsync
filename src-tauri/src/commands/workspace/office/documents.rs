@@ -90,6 +90,11 @@ pub struct Layout {
     pub spacing: f32,
     pub header: String,
     pub footer: String,
+    /// The header and footer of the first page, and of even pages, when they differ (empty: the same as the others)
+    pub first_header: String,
+    pub first_footer: String,
+    pub even_header: String,
+    pub even_footer: String,
     /// "Page 1" in the footer
     pub page_numbers: bool,
     /// Where the text sits between the top and bottom margins of each page: `top`, `center`, `bottom` or `justify`
@@ -97,6 +102,72 @@ pub struct Layout {
     /// The font and size of the file's ordinary text (its Normal style), which the editor's page starts from; empty and 0 when unknown
     pub font: String,
     pub size: f32,
+    /// The comments on the text, each on the words it was made on (written as the file format's own comments)
+    pub comments: Vec<CommentIn>,
+}
+
+/// A comment thread: the words it is on, who said what, and whether it was settled
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CommentIn {
+    pub quote: String,
+    pub author: String,
+    pub text: String,
+    /// ISO 8601
+    pub date: String,
+    pub resolved: bool,
+    pub replies: Vec<ReplyIn>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ReplyIn {
+    pub author: String,
+    pub text: String,
+    pub date: String,
+}
+
+/// Puts each comment on the first place its words stand in the body, with a reply on the same words; a comment whose words are
+/// not there is left out (the caller says so)
+pub fn add_comments(doc: &mut wordcraft_doc::Document, comments: &[CommentIn]) -> usize {
+    use wordcraft_doc::{Block, CharProps, Comment, InlineObject, PartKind};
+    let mut placed = 0;
+    for c in comments.iter().take(500) {
+        let quote = c.quote.trim();
+        if quote.is_empty() || c.text.trim().is_empty() {
+            continue;
+        }
+        // Where the words are: the first paragraph holding them
+        let Some((bi, off)) = doc.body.iter().enumerate().find_map(|(i, b)| match &**b {
+            Block::Para(p) => p.text.find(quote).map(|o| (i, o)),
+            _ => None,
+        }) else {
+            continue;
+        };
+        let mut thread: Vec<(Option<u32>, &str, &str, &str)> = vec![(None, &c.author, &c.date, &c.text)];
+        thread.extend(c.replies.iter().map(|r| (Some(0), r.author.as_str(), r.date.as_str(), r.text.as_str())));
+        let first_id = doc.comments.keys().next_back().map_or(1, |k| k + 1);
+        let mut ids = Vec::new();
+        for (n, (parent, author, date, text)) in thread.iter().enumerate() {
+            let id = first_id + n as u32;
+            let part = doc.add_part(PartKind::Comment, vec![line_block(&text.chars().take(4000).collect::<String>(), false, wordcraft_doc::Align::Left)]);
+            let author: String = author.chars().take(100).collect();
+            doc.comments.insert(id, Comment { initials: author.chars().next().map(|c| c.to_string()).unwrap_or_default(), author, date: date.to_string(), parent: parent.map(|_| first_id), resolved: c.resolved, part, ..Default::default() });
+            ids.push(id);
+        }
+        if let Block::Para(p) = std::sync::Arc::make_mut(&mut doc.body[bi]) {
+            let props = CharProps::default();
+            let end = off + quote.len();
+            for id in ids.iter().rev() {
+                let _ = p.insert_object(end, InlineObject::CommentEnd { id: *id }, &props);
+            }
+            for id in ids.iter().rev() {
+                let _ = p.insert_object(off, InlineObject::CommentStart { id: *id }, &props);
+            }
+        }
+        placed += 1;
+    }
+    placed
 }
 
 fn line_block(text: &str, page_number: bool, align: wordcraft_doc::Align) -> std::sync::Arc<wordcraft_doc::Block> {
@@ -155,6 +226,23 @@ pub fn apply_layout(doc: &mut wordcraft_doc::Document, l: &Layout) {
         let text = if l.page_numbers && !text.is_empty() { format!("{text}  Page ") } else if l.page_numbers { "Page ".to_string() } else { text };
         let id = doc.add_part(PartKind::Footer, vec![line_block(&text, l.page_numbers, if l.page_numbers { Align::Center } else { Align::Left })]);
         doc.last_section.footers.default = Some(id);
+    }
+    // Different first page, and different odd and even pages: each part is a line of text like the ordinary header or footer
+    let mut part = |kind: PartKind, text: &str| -> Option<u32> {
+        let t: String = text.trim().chars().take(200).collect();
+        (!t.is_empty()).then(|| doc.add_part(kind, vec![line_block(&t, false, Align::Left)]))
+    };
+    let first = (part(PartKind::Header, &l.first_header), part(PartKind::Footer, &l.first_footer));
+    let even = (part(PartKind::Header, &l.even_header), part(PartKind::Footer, &l.even_footer));
+    if first.0.is_some() || first.1.is_some() {
+        doc.last_section.title_page = true;
+        doc.last_section.headers.first = first.0;
+        doc.last_section.footers.first = first.1;
+    }
+    if even.0.is_some() || even.1.is_some() {
+        doc.settings.even_odd_headers = true;
+        doc.last_section.headers.even = even.0;
+        doc.last_section.footers.even = even.1;
     }
 }
 
@@ -343,6 +431,7 @@ fn build_document(html: &str, title: &str, author: &str, layout: Option<&Layout>
             Some(_) => apply_layout(&mut doc, &Layout { spacing: if (l.spacing - 1.15).abs() < 0.001 { 0.0 } else { l.spacing }, ..l.clone() }),
             None => apply_layout(&mut doc, l),
         }
+        add_comments(&mut doc, &l.comments);
     }
     Ok(doc)
 }
@@ -654,6 +743,21 @@ pub async fn office_inspect(app_handle: tauri::AppHandle, path: String, rel: Str
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn comments_are_written_on_their_words_with_replies() {
+        use std::io::Read;
+        let layout = Layout { comments: vec![CommentIn { quote: "second quarter".into(), author: "Ana".into(), text: "Which one?".into(), date: "2026-10-25T10:00:00Z".into(), resolved: false, replies: vec![ReplyIn { author: "Bo".into(), text: "Q2.".into(), date: "2026-10-25T11:00:00Z".into() }] }, CommentIn { quote: "not in the text".into(), author: "Ana".into(), text: "Lost".into(), ..Default::default() }], ..Default::default() };
+        let bytes = export("docx", "<p>This covers the second quarter well.</p>", "T", "A", Some(&layout)).unwrap();
+        let mut z = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+        let mut body = String::new();
+        z.by_name("word/document.xml").unwrap().read_to_string(&mut body).unwrap();
+        let mut comments = String::new();
+        z.by_name("word/comments.xml").unwrap().read_to_string(&mut comments).unwrap();
+        assert_eq!(body.matches("<w:commentRangeStart").count(), 2, "the comment and its reply sit on the same words: {body}");
+        assert!(comments.contains("Which one?") && comments.contains("Q2."));
+        assert!(!comments.contains("Lost"), "a comment whose words are gone is left out");
+    }
+
     use super::*;
 
     const HTML: &str = "<h1>Report</h1><p>Hello <strong>bold</strong> and <em>italic</em> with a <a href=\"https://example.com/x\">link</a>.</p><ul><li>one</li><li>two</li></ul><table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>";

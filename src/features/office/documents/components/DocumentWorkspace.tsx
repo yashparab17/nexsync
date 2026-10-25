@@ -7,6 +7,12 @@ import type * as Y from "yjs";
 
 import "@blocknote/mantine/style.css";
 
+import { MergeDialog, SourcesDialog, useSources } from "@/features/office/documents/components/ReferencesDialogs";
+import { citation } from "@/features/office/documents/lib/documentReferences";
+import { smartQuotesPlugin, forFile } from "@/features/office/documents/lib/documentTools";
+import { listLevelsPlugin } from "@/features/office/documents/lib/documentObjects";
+import { commentsPlugin, newCommentStore } from "@/features/office/documents/lib/documentComments";
+import { useDocumentComments } from "@/features/office/documents/components/useDocumentComments";
 import DocumentInspector from "@/features/office/documents/components/DocumentInspector";
 import DocumentRibbon from "@/features/office/documents/components/DocumentRibbon";
 import PrintView from "@/features/office/documents/components/PrintView";
@@ -27,7 +33,7 @@ import { setupFromLayout } from "@/features/office/documents/lib/documentFormat"
 import { paginate } from "@/features/office/documents/lib/pagination";
 import { pagePushPlugin, pushesOf, setPushes, splitsOf } from "@/features/office/documents/lib/pagePush";
 import { fillDone, setLegacySpacing, setListDefinitions, wordLayoutPlugin, type ListLevel, type ParaSpacing } from "@/features/office/documents/lib/wordLayout";
-import { countText, DEFAULT_PAGE, fontStack, NO_HEADER, pageBox, pageCount, PX_PER_PT, readHeaderFooter, readPage, type HeaderFooter, type PageSetup } from "@/features/office/documents/lib/documentFormat";
+import { countText, DEFAULT_PAGE, fontStack, NO_HEADER, pageBox, pageCount, PX_PER_PT, readHeaderFooter, readPage, textFor, type HeaderFooter, type PageSetup } from "@/features/office/documents/lib/documentFormat";
 import { lineMarks, type LineMark } from "@/features/office/documents/lib/lineNumbers";
 import { firstMatch, headingsOf, replaceInBlocks, textOfBlocks, type BlockLike } from "@/features/office/documents/lib/documentFind";
 import { documentSchema } from "@/features/office/documents/lib/documentSchema";
@@ -38,6 +44,8 @@ const TABS: RibbonTab[] = [
 	{ id: "home", label: "Home" },
 	{ id: "insert", label: "Insert" },
 	{ id: "layout", label: "Layout" },
+	{ id: "references", label: "References" },
+	{ id: "mailings", label: "Mailings" },
 	{ id: "review", label: "Review" },
 	{ id: "view", label: "View" },
 ];
@@ -68,13 +76,19 @@ export interface Layout {
 	spacing: number;
 	header: string;
 	footer: string;
+	firstHeader?: string;
+	firstFooter?: string;
+	evenHeader?: string;
+	evenFooter?: string;
 	pageNumbers: boolean;
 	valign: string;
+	// Comments to write into the file as its own comments
+	comments?: { quote: string; author: string; text: string; date: string; resolved: boolean; replies: { author: string; text: string; date: string }[] }[];
 }
 
 export function layoutOf(setup: PageSetup, hf: HeaderFooter): Layout {
 	const b = pageBox(setup);
-	return { width: b.width, height: b.height, landscape: setup.landscape, top: b.top, right: b.right, bottom: b.bottom, left: b.left, columns: setup.columns, spacing: setup.spacing, header: hf.header, footer: hf.footer, pageNumbers: hf.pageNumbers, valign: setup.valign };
+	return { width: b.width, height: b.height, landscape: setup.landscape, top: b.top, right: b.right, bottom: b.bottom, left: b.left, columns: setup.columns, spacing: setup.spacing, header: hf.header, footer: hf.footer, firstHeader: hf.firstHeader ?? "", firstFooter: hf.firstFooter ?? "", evenHeader: hf.evenHeader ?? "", evenFooter: hf.evenFooter ?? "", pageNumbers: hf.pageNumbers, valign: setup.valign };
 }
 
 interface Props {
@@ -100,6 +114,7 @@ interface Props {
 	// Reads the file again, for putting it back in place of the shared copy; null when it could not be read (the page says why)
 	// Where the file is, for its version history
 	history?: { workspacePath: string; rel: string };
+	canComment?: boolean;
 	onReload?: () => Promise<{ blocks: unknown[]; layout?: OfficeLayout | null; lists?: Record<string, ListLevel> } | null>;
 }
 
@@ -108,23 +123,31 @@ const zones = (text: string) => (text.includes("	") ? text.split("	").slice(0, 3
 
 // A document, laid out like a word processor: a ribbon of the things people do to text, a page on a desk with a ruler, a navigation
 // pane of headings, and a status bar. The text is shared live; so are the page set-up and the header and footer.
-function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload, history }: Props) {
+function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload, history, canComment = false }: Props) {
 	const doc = collab.doc;
+	const commentStore = useMemo(newCommentStore, []);
 	const options = useMemo(
 		() =>
 			withCollaboration({
 				schema: documentSchema,
+				tables: { splitCells: true, headers: true },
 				// Given at creation, so they are in the view the editor makes once the shared copy has loaded (one registered later is lost)
 				extensions: [
 					() => ({ key: "pagePush", prosemirrorPlugins: [pagePushPlugin] }),
 					() => ({ key: "wordLayout", prosemirrorPlugins: [wordLayoutPlugin] }),
+					() => ({ key: "docComments", prosemirrorPlugins: [commentsPlugin(commentStore)] }),
+					() => ({ key: "smartQuotes", prosemirrorPlugins: [smartQuotesPlugin] }),
+					() => ({ key: "listLevels", prosemirrorPlugins: [listLevelsPlugin] }),
 				],
 				collaboration: { fragment: doc.getXmlFragment("blocknote"), user: { name: author, color: colorOf(author) }, provider: { awareness: collab.awareness } },
 			}),
 		[doc, collab.awareness, author],
 	);
 	const editor = useCreateBlockNote(options, [doc]);
-	const a = useDocumentActions(editor);
+	const styleDefs = useMemo(() => doc.getMap<Record<string, unknown>>("styleDefs"), [doc]);
+	const a = useDocumentActions(editor, styleDefs);
+	const src = useSources(doc);
+	const comments = useDocumentComments(editor, commentStore, history?.rel ?? name, canComment);
 	const people = usePeople(collab.awareness);
 
 	// The editor can take text once its view exists, which is after the page has drawn it
@@ -267,13 +290,14 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 
 	const [tab, setTab] = useState("home");
 	const [anonymous, setAnonymous] = useState(false);
+	const [withComments, setWithComments] = useState(false);
 	const [zoom, setZoomState] = useState(100);
 	const [view, setViewState] = useState({ ruler: true, navigation: false, mode: "edit" as "print" | "edit" | "web" | "read", spelling: true, focus: false, marks: false, dark: false });
 	const setView = (v: Partial<typeof view>) => setViewState((c) => ({ ...c, ...v }));
 	const pageEl = useRef<HTMLDivElement>(null);
 	const [marks, setMarks] = useState<LineMark[]>([]);
 	const [find, setFind] = useState<{ replace: boolean; query: string; with: string; cs: boolean; rx: boolean; note: string } | null>(null);
-	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | null>(null);
+	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | "sources" | "merge" | null>(null);
 	// Puts the file back in place of the shared copy, for everyone: the text as the file has it now, with its spacing, page set-up and
 	// header and footer
 	const reload = async () => {
@@ -509,7 +533,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 	}, [editor, collab.synced, bodyHeight, a.fmt]); // eslint-disable-line react-hooks/exhaustive-deps
 	const headings = useMemo(() => (view.navigation ? headingsOf(editor.document as unknown as BlockLike[]) : []), [editor, view.navigation, bodyHeight, a.fmt]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	const html = useCallback(() => editor.blocksToHTMLLossy(editor.document as never), [editor]);
+	const html = useCallback(() => forFile(editor.blocksToHTMLLossy(editor.document as never)), [editor]);
 
 	// Spelling: the browser's own checker marks the words
 	useEffect(() => {
@@ -619,8 +643,12 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 								<input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
 								Leave my name out of the file
 							</label>
+							<label className="mb-2 flex items-center gap-2 text-sm">
+								<input type="checkbox" checked={withComments} onChange={(e) => setWithComments(e.target.checked)} />
+								Include the open comments (comments in .docx, at the end in the others)
+							</label>
 							{FORMATS.map((f) => (
-								<button key={f.ext} type="button" onClick={() => void onSaveCopy(f.ext, html(), layout, anonymous)} className="block w-full border px-4 py-3 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+								<button key={f.ext} type="button" onClick={() => void onSaveCopy(f.ext, html() + (withComments && f.ext !== "docx" ? comments.appendix() : ""), withComments && f.ext === "docx" ? { ...layout, comments: comments.list(anonymous) } : layout, anonymous)} className="block w-full border px-4 py-3 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
 									{f.label}
 								</button>
 							))}
@@ -716,9 +744,21 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					openHeaderFooter={() => setDialog("headerFooter")}
 					openCounts={() => setDialog("counts")}
 					openProofing={() => setDialog("proofing")}
+					comments={{ open: comments.open, count: comments.count, canComment, start: comments.start, toggle: comments.toggle }}
 					pickImage={pickImage}
 					paste={() => void paste()}
-					hasHeaderFooter={!!(hf.header || hf.footer || hf.pageNumbers)}
+					hasHeaderFooter={!!(hf.header || hf.footer || hf.pageNumbers || hf.firstHeader || hf.firstFooter || hf.evenHeader || hf.evenFooter)}
+					fieldValues={() => ({ title, author, pages, words: countText(editor.prosemirrorState.doc.textBetween(0, editor.prosemirrorState.doc.content.size, "\n", "\n")).words })}
+					refs={{
+						crossRefs: () => {
+							const blocks = editor.document as unknown as BlockLike[];
+							const captions = blocks.map((b) => textOfBlocks([{ ...b, children: [] }]).trim()).filter((t) => /^(Figure|Table) [0-9]+/.test(t)).map((t) => /^(Figure|Table) [0-9]+/.exec(t)![0]);
+							return [...captions, ...headingsOf(blocks).map((h) => h.text)];
+						},
+						citations: src.sources.map((s, i) => ({ label: `${s.author} ${s.year}`, text: citation(s, src.style, i + 1) })),
+						openSources: () => setDialog("sources"),
+						openMerge: () => setDialog("merge"),
+					}}
 				/>
 			}
 			file={file}
@@ -819,7 +859,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 							)}
 							<div className={cn("flex justify-center-safe py-6", mode === "print" && "hidden")} style={{ zoom: zoom / 100 }}>
 								<div
-									ref={pageEl} className={cn("doc-page relative shrink-0 text-black", view.marks && "doc-marks", view.dark && "doc-dark")}
+									ref={pageEl} className={cn("doc-page relative shrink-0 text-black", view.marks && "doc-marks", view.dark && "doc-dark", page.dropCap && "doc-dropcap", page.hyphenate && "doc-hyphen", page.banded && "doc-banded")}
 									style={
 										{
 											width: mode === "edit" ? widthPx : Math.min(widthPx, 920),
@@ -844,7 +884,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 									{/* The sheets, behind the text */}
 									{paged ? (
 										Array.from({ length: pages }, (_, i) => (
-											<div key={i} aria-hidden data-sheet={i + 1} className="pointer-events-none absolute right-0 left-0 bg-white bg-[length:100%_100%] shadow-md ring-1 ring-black/10" style={{ top: i * (heightPx + PAGE_GAP), height: heightPx, backgroundImage: fileMargins && margins.get(i + 1) ? `url(${margins.get(i + 1)})` : undefined }} />
+											<div key={i} aria-hidden data-sheet={i + 1} className="pointer-events-none absolute right-0 left-0 bg-white bg-[length:100%_100%] shadow-md ring-1 ring-black/10" style={{ top: i * (heightPx + PAGE_GAP), height: heightPx, ...(page.border ? { outline: "1px solid #444", outlineOffset: -18 } : {}), backgroundImage: fileMargins && margins.get(i + 1) ? `url(${margins.get(i + 1)})` : undefined }} />
 										))
 									) : (
 										<div aria-hidden className="pointer-events-none absolute inset-0 bg-white shadow-md ring-1 ring-black/10" />
@@ -855,16 +895,16 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 											const top = i * (heightPx + PAGE_GAP);
 											return (
 												<div key={i} className="pointer-events-none absolute right-0 left-0 z-10 text-[10pt] text-neutral-600" style={{ top, height: heightPx, paddingInline: box.left * PX_PER_PT }}>
-													{hf.header && (
+													{textFor(hf, "header", i) && (
 														<div className="absolute right-0 left-0 flex justify-between gap-4" style={{ top: 0.5 * 72 * PX_PER_PT, paddingInline: box.left * PX_PER_PT }}>
-															{zones(hf.header).map((z, k) => (
+															{zones(textFor(hf, "header", i)).map((z, k) => (
 																<span key={k}>{z}</span>
 															))}
 														</div>
 													)}
-													{(hf.footer || hf.pageNumbers) && (
+													{(textFor(hf, "footer", i) || hf.pageNumbers) && (
 														<div className="absolute right-0 left-0 flex justify-between" style={{ bottom: 0.5 * 72 * PX_PER_PT, paddingInline: box.left * PX_PER_PT }}>
-															{zones(hf.footer).map((z, k) => (
+															{zones(textFor(hf, "footer", i)).map((z, k) => (
 																<span key={k}>{z}</span>
 															))}
 															{hf.pageNumbers && <span>Page {i + 1}</span>}
@@ -881,7 +921,9 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 							</>
 						)}
 					</div>
+					{!view.focus && comments.panel}
 				</div>
+				{comments.dialog}
 			</div>
 
 			{dialog === "proofing" && (
@@ -896,6 +938,8 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					}}
 				/>
 			)}
+			{dialog === "sources" && <SourcesDialog doc={doc} editor={editor} onClose={() => setDialog(null)} />}
+			{dialog === "merge" && <MergeDialog editor={editor} workspacePath={history?.workspacePath} onClose={() => setDialog(null)} />}
 			{dialog === "headerFooter" && <HeaderFooterDialog value={hf} onClose={() => setDialog(null)} onSave={(v) => { saveHf(v); setDialog(null); }} />}
 			{dialog === "counts" && (
 				<Dialog isOpen onOpenChange={(o) => !o && setDialog(null)} className="max-w-sm">
@@ -978,6 +1022,12 @@ function HeaderFooterDialog({ value, onSave, onClose }: { value: HeaderFooter; o
 					<span className="mb-1 block text-muted-foreground">Footer</span>
 					<input aria-label="Footer" value={v.footer} onChange={(e) => setV({ ...v, footer: e.target.value })} maxLength={200} className="h-8 w-full border bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring" />
 				</label>
+				{(["firstHeader", "firstFooter", "evenHeader", "evenFooter"] as const).map((k) => (
+					<label key={k} className="block">
+						<span className="mb-1 block text-muted-foreground">{k === "firstHeader" ? "First page header (if different)" : k === "firstFooter" ? "First page footer (if different)" : k === "evenHeader" ? "Even pages header (if different)" : "Even pages footer (if different)"}</span>
+						<input aria-label={k} value={v[k] ?? ""} onChange={(e) => setV({ ...v, [k]: e.target.value })} maxLength={200} className="h-8 w-full border bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+					</label>
+				))}
 				<label className="flex items-center gap-2">
 					<input type="checkbox" checked={v.pageNumbers} onChange={(e) => setV({ ...v, pageNumbers: e.target.checked })} />
 					Page numbers in the footer

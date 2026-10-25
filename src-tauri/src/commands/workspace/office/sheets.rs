@@ -20,8 +20,9 @@ use std::{
 };
 
 use gridcraft_engine::{
-    core::CellRef,
+    core::{CellRef, RangeRef},
     display,
+    model::{CfOperator, CfRule, CfValueKind, CondFormat, SheetProtection, Validation, ValidationKind},
     model::style::{BorderLine, Color, Fill, HAlign, NumFmt, PatternType, Style, StyleId, Underline},
     Session,
 };
@@ -62,6 +63,65 @@ pub struct SheetIn {
     /// Charts over the grid; they go into saved files and PDFs, not into what a calculation works on
     #[serde(default)]
     pub charts: Vec<ChartIn>,
+    /// Rows and columns that are not drawn, by number from 0
+    #[serde(default, alias = "hiddenRows")]
+    pub hidden_rows: Vec<u32>,
+    #[serde(default, alias = "hiddenCols")]
+    pub hidden_cols: Vec<u32>,
+    /// What may be typed into ranges
+    #[serde(default)]
+    pub validations: Vec<ValidationIn>,
+    /// Conditional formatting rules
+    #[serde(default)]
+    pub rules: Vec<RuleIn>,
+    /// Cells cannot be changed except those with `unlocked`
+    #[serde(default)]
+    pub protect: bool,
+    /// Small charts that sit in one cell
+    #[serde(default)]
+    pub sparklines: Vec<SparkIn>,
+}
+
+/// A sparkline in `cell` of the numbers in `source` (a range such as `B2:E2`): `line`, `column` or `winloss`
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct SparkIn {
+    pub cell: String,
+    pub source: String,
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub color: String,
+}
+
+/// A data validation rule over a range: a `list`, `whole` numbers or `decimal` numbers (`min` and `max` may be empty)
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct ValidationIn {
+    pub range: String,
+    pub kind: String,
+    #[serde(default)]
+    pub list: Vec<String>,
+    #[serde(default)]
+    pub min: String,
+    #[serde(default)]
+    pub max: String,
+}
+
+/// A conditional formatting rule over a range: `gt`, `lt`, `eq`, `between`, `contains`, `scale` or `bar`
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct RuleIn {
+    pub range: String,
+    pub kind: String,
+    #[serde(default)]
+    pub a: String,
+    #[serde(default)]
+    pub b: String,
+    #[serde(default)]
+    pub color: String,
+}
+
+fn range_of(text: &str) -> Option<RangeRef> {
+    let (a, b) = text.split_once(':').unwrap_or((text, text));
+    Some(RangeRef::new(CellRef::parse(a.trim())?, CellRef::parse(b.trim())?))
 }
 
 /// A chart of a range, anchored at the cell `at` with a size in pixels
@@ -73,6 +133,56 @@ pub struct ChartIn {
     pub at: String,
     pub w: f32,
     pub h: f32,
+    #[serde(default)]
+    pub opts: ChartOpts,
+}
+
+/// What a chart shows beyond its data: value labels, gridlines, titles for the axes, and a trendline over each series
+/// (`linear`, `exponential`, `logarithmic` or `poly2`)
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChartOpts {
+    pub labels: bool,
+    pub no_grid: bool,
+    pub x_title: String,
+    pub y_title: String,
+    pub trend: String,
+}
+
+/// Gives the chart most recently made on a sheet its options
+pub(super) fn apply_chart_opts(s: &mut Session, sheet: &str, o: &ChartOpts) {
+    use gridcraft_engine::model::{Trendline, TrendlineKind};
+    if *o == ChartOpts::default() {
+        return;
+    }
+    let Ok(d) = s.doc_mut() else { return };
+    let wb = std::sync::Arc::make_mut(&mut d.wb);
+    let Some(i) = wb.sheet_index(sheet) else { return };
+    let sh = std::sync::Arc::make_mut(&mut wb.sheets[i]);
+    let Some(c) = sh.charts.last_mut() else { return };
+    c.data_labels = o.labels;
+    if o.no_grid {
+        c.gridlines = false;
+    }
+    let title = |t: &str| Some(t.trim().chars().take(100).collect::<String>()).filter(|t| !t.is_empty());
+    if let Some(t) = title(&o.x_title) {
+        c.x_title = Some(t);
+    }
+    if let Some(t) = title(&o.y_title) {
+        c.y_title = Some(t);
+    }
+    let kind = match o.trend.as_str() {
+        "linear" => Some(TrendlineKind::Linear),
+        "exponential" => Some(TrendlineKind::Exponential),
+        "logarithmic" => Some(TrendlineKind::Logarithmic),
+        "poly2" => Some(TrendlineKind::Polynomial(2)),
+        _ => None,
+    };
+    if let Some(kind) = kind {
+        for series in c.series.iter_mut() {
+            series.trendlines.push(Trendline { kind, ..Default::default() });
+        }
+    }
 }
 
 /// Puts the charts of the sheets into a session, for the file or PDF that is about to be written
@@ -87,7 +197,9 @@ pub(super) fn add_charts(s: &mut Session, sheets: &[SheetIn]) {
                 p["title"] = json!(c.title.trim());
             }
             // A chart the engine cannot make from its range is left out of the file
-            let _ = s.execute("insert.chart", p);
+            if s.execute("insert.chart", p).is_ok() {
+                apply_chart_opts(s, &sheet.name, &c.opts);
+            }
         }
     }
 }
@@ -101,6 +213,8 @@ fn is_false(b: &bool) -> bool {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct CellStyle {
+    #[serde(skip_serializing_if = "is_false")]
+    pub unlocked: bool,
     #[serde(skip_serializing_if = "is_false")]
     pub bold: bool,
     #[serde(skip_serializing_if = "is_false")]
@@ -235,7 +349,7 @@ fn hex(c: &Option<String>) -> Option<Color> {
 
 /// Gives the cells of a sheet the looks they were given, and the sheet its column widths and frozen panes
 fn apply_looks(s: &mut Session, sheet: &SheetIn) -> Result<(), String> {
-    if sheet.styles.is_empty() && sheet.widths.is_empty() && sheet.freeze.is_none() {
+    if sheet.styles.is_empty() && sheet.widths.is_empty() && sheet.freeze.is_none() && sheet.hidden_rows.is_empty() && sheet.hidden_cols.is_empty() && sheet.validations.is_empty() && sheet.rules.is_empty() && sheet.sparklines.is_empty() && !sheet.protect {
         return Ok(());
     }
     let d = s.doc_mut().map_err(|e| e.to_string())?;
@@ -269,6 +383,7 @@ fn apply_looks(s: &mut Session, sheet: &SheetIn) -> Result<(), String> {
                 _ => HAlign::General,
             };
             st.align.wrap = look.wrap;
+            st.protection.locked = !look.unlocked;
             if let Some(code) = look.nf.as_deref().filter(|c| !c.is_empty() && c.len() < 256) {
                 st.num_fmt = NumFmt::new(code);
             }
@@ -296,6 +411,76 @@ fn apply_looks(s: &mut Session, sheet: &SheetIn) -> Result<(), String> {
     if let Some((rows, cols)) = sheet.freeze.filter(|(r, c)| *r < 1000 && *c < 100 && (*r > 0 || *c > 0)) {
         sh.freeze = Some((rows, cols));
     }
+    for r in sheet.hidden_rows.iter().take(100_000) {
+        sh.rows.entry(*r).or_default().hidden = true;
+    }
+    for c in sheet.hidden_cols.iter().take(1000) {
+        sh.cols.entry(*c).or_default().hidden = true;
+    }
+    for v in sheet.validations.iter().take(200) {
+        let Some(range) = range_of(&v.range) else { continue };
+        let num = |t: &str| t.trim().parse::<f64>().is_ok();
+        let mut rule = Validation { ranges: vec![range], allow_blank: true, in_cell_dropdown: true, show_error: true, ..Default::default() };
+        match v.kind.as_str() {
+            "list" if !v.list.is_empty() => {
+                rule.kind = ValidationKind::List;
+                rule.f1 = format!("\"{}\"", v.list.iter().map(|x| x.replace(['"', ','], "")).collect::<Vec<_>>().join(","));
+            }
+            "whole" | "decimal" => {
+                rule.kind = if v.kind == "whole" { ValidationKind::Whole } else { ValidationKind::Decimal };
+                (rule.op, rule.f1, rule.f2) = match (num(&v.min), num(&v.max)) {
+                    (true, true) => (CfOperator::Between, v.min.trim().to_string(), Some(v.max.trim().to_string())),
+                    (true, false) => (CfOperator::GreaterOrEqual, v.min.trim().to_string(), None),
+                    (false, true) => (CfOperator::LessOrEqual, v.max.trim().to_string(), None),
+                    (false, false) => continue,
+                };
+            }
+            _ => continue,
+        }
+        sh.validations.push(rule);
+    }
+    for (i, rl) in sheet.rules.iter().take(200).enumerate() {
+        let Some(range) = range_of(&rl.range) else { continue };
+        let color = hex(&Some(rl.color.clone())).unwrap_or(Color::Auto);
+        let style = || Box::new(Style { fill: Fill::solid(color), ..Default::default() });
+        let (a, b) = (rl.a.trim().to_string(), Some(rl.b.trim().to_string()).filter(|x| !x.is_empty()));
+        let rule = match rl.kind.as_str() {
+            "gt" => CfRule::CellIs { op: CfOperator::Greater, a, b: None, style: style() },
+            "lt" => CfRule::CellIs { op: CfOperator::Less, a, b: None, style: style() },
+            "eq" => CfRule::CellIs { op: CfOperator::Equal, a, b: None, style: style() },
+            "between" => CfRule::CellIs { op: CfOperator::Between, a, b, style: style() },
+            "contains" => CfRule::ContainsText { text: a, style: style() },
+            "scale" => CfRule::ColorScale { stops: vec![(CfValueKind::Min, Color::from_hex("#F8696B").unwrap_or(Color::Auto)), (CfValueKind::Percentile(50.0), Color::from_hex("#FFEB84").unwrap_or(Color::Auto)), (CfValueKind::Max, Color::from_hex("#63BE7B").unwrap_or(Color::Auto))] },
+            "bar" => CfRule::DataBar { min: CfValueKind::Min, max: CfValueKind::Max, color, gradient: true, show_value: true },
+            "top" => CfRule::Top10 { bottom: false, percent: false, rank: a.parse().unwrap_or(10), style: style() },
+            "bottom" => CfRule::Top10 { bottom: true, percent: false, rank: a.parse().unwrap_or(10), style: style() },
+            "above" => CfRule::AboveAverage { below: false, equal: false, std_dev: 0, style: style() },
+            "below" => CfRule::AboveAverage { below: true, equal: false, std_dev: 0, style: style() },
+            "duplicate" => CfRule::Duplicate { style: style() },
+            "blank" => CfRule::Blanks { style: style() },
+            "error" => CfRule::Errors { style: style() },
+            "icons" => {
+                let set = if ["3Arrows", "3TrafficLights1", "3Symbols", "4Rating", "5Quarters"].contains(&a.as_str()) { a.clone() } else { "3Arrows".to_string() };
+                CfRule::IconSet { thresholds: gridcraft_engine::model::default_icon_thresholds(&set), set, reverse: false, show_value: true }
+            }
+            _ => continue,
+        };
+        sh.cond_formats.push(CondFormat { ranges: vec![range], rule, priority: i as u32 + 1, stop_if_true: false });
+    }
+    for sp in sheet.sparklines.iter().take(200) {
+        let (Some(cell), Some(range)) = (CellRef::parse(sp.cell.trim()), range_of(&sp.source)) else { continue };
+        let kind = match sp.kind.as_str() {
+            "column" => gridcraft_engine::model::SparklineKind::Column,
+            "winloss" => gridcraft_engine::model::SparklineKind::WinLoss,
+            _ => gridcraft_engine::model::SparklineKind::Line,
+        };
+        let quoted = if sheet.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') { sheet.name.clone() } else { format!("'{}'", sheet.name.replace('\'', "''")) };
+        let color = hex(&Some(sp.color.clone())).unwrap_or(Color::Auto);
+        sh.sparklines.push(gridcraft_engine::model::Sparkline { cell, source: format!("{quoted}!{}:{}", range.start.a1(), range.end.a1()), kind, color, markers: false });
+    }
+    if sheet.protect {
+        sh.protection = Some(SheetProtection::default());
+    }
     Ok(())
 }
 
@@ -313,6 +498,7 @@ fn look_of(st: &Style, wb: &gridcraft_engine::model::Workbook) -> Option<CellSty
     }
     let nf = st.num_fmt.as_str();
     let look = CellStyle {
+        unlocked: !st.protection.locked,
         bold: st.font.bold,
         italic: st.font.italic,
         underline: st.font.underline != Underline::None,
@@ -410,6 +596,7 @@ pub(super) fn inputs(s: &Session) -> Result<Vec<SheetIn>, String> {
             widths: sh.cols.iter().filter_map(|(c, info)| info.size.map(|pt| (gridcraft_engine::core::addr::col_to_letters(*c), (pt / 0.75 * 10.0).round() / 10.0))).take(1000).collect(),
             freeze: sh.freeze.filter(|(r, c)| *r > 0 || *c > 0),
             charts: Vec::new(),
+            ..Default::default()
         })
         .collect())
 }
@@ -676,6 +863,37 @@ mod tests {
             let c = calculate(&[sheet("S", &[("A1", f)])]);
             eprintln!("{f}: {:?} in {} ms", c.as_ref().map(|c| c.sheets[0].cells.len()).map_err(|e| e.clone()), started.elapsed().as_millis());
         }
+    }
+
+    #[test]
+    fn hidden_rows_validation_rules_and_protection_are_written_to_the_xlsx() {
+        use std::io::Read;
+        let mut s = sheet("S", &[("A1", "n"), ("A2", "5"), ("A3", "9")]);
+        s.hidden_rows = vec![2];
+        s.hidden_cols = vec![3];
+        s.protect = true;
+        s.validations.push(ValidationIn { range: "B1:B3".into(), kind: "list".into(), list: vec!["Yes".into(), "No".into()], ..Default::default() });
+        s.rules.push(RuleIn { range: "A2:A3".into(), kind: "gt".into(), a: "6".into(), color: "#FFC7CE".into(), ..Default::default() });
+        s.rules.push(RuleIn { range: "A2:A3".into(), kind: "icons".into(), a: "3Arrows".into(), ..Default::default() });
+        s.sparklines.push(SparkIn { cell: "C1".into(), source: "A2:A3".into(), kind: "column".into(), color: "#2F5597".into() });
+        s.charts.push(ChartIn { range: "A1:A3".into(), kind: "column".into(), title: "T".into(), at: "D2".into(), w: 400.0, h: 300.0, opts: ChartOpts { labels: true, trend: "linear".into(), y_title: "Units".into(), ..Default::default() } });
+        let bytes = write_xlsx(&[s]).unwrap();
+        let mut z = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+        let mut read = |name: &str| {
+            let mut t = String::new();
+            z.by_name(name).unwrap().read_to_string(&mut t).unwrap();
+            t
+        };
+        let sheet1 = read("xl/worksheets/sheet1.xml");
+        assert!(sheet1.contains("<row r=\"3\" hidden=\"1\""), "{sheet1}");
+        assert!(sheet1.contains("hidden=\"1\"/>"), "a hidden column");
+        assert!(sheet1.contains("<dataValidation type=\"list\""));
+        assert!(sheet1.contains("<cfRule type=\"cellIs\""));
+        assert!(sheet1.contains("<sheetProtection"));
+        assert!(sheet1.contains("<iconSet iconSet=\"3Arrows\">"), "an icon set");
+        assert!(sheet1.contains("<xm:f>S!A2:A3</xm:f>") && sheet1.contains("<xm:sqref>C1</xm:sqref>"), "a sparkline");
+        let chart = read("xl/charts/chart1.xml");
+        assert!(chart.contains("trendline") && chart.contains("Units"));
     }
 
     #[test]

@@ -83,7 +83,7 @@ interface ChatContextType {
 	setWorkspaceIcon: (icon: WorkspaceIcon | null) => Promise<void>;
 }
 
-const NONE: ChatContextType = {
+export const NONE: ChatContextType = {
 	active: false,
 	entries: [],
 	me: "",
@@ -142,7 +142,7 @@ const store = (key: string, value: unknown) => {
 	}
 };
 
-const ChatContext = createContext<ChatContextType>(NONE);
+export const ChatContext = createContext<ChatContextType>(NONE);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
 	const { workspace, metadata } = useWorkspace();

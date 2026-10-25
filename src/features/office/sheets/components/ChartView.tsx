@@ -89,7 +89,8 @@ export default function ChartView({
 	const [error, setError] = useState("");
 	const [live, setLive] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 	const asked = useRef(0);
-	const { range, kind, title } = spec;
+	const { range, kind, title, opts } = spec;
+	const optsKey = JSON.stringify(opts ?? {});
 	const w = live?.w ?? spec.w;
 	const h = live?.h ?? spec.h;
 
@@ -97,7 +98,7 @@ export default function ChartView({
 	useEffect(() => {
 		const n = ++asked.current;
 		const timer = setTimeout(() => {
-			sheetChart(book(), sheetName, { range, kind, title, w: spec.w, h: spec.h })
+			sheetChart(book(), sheetName, { range, kind, title, w: spec.w, h: spec.h, opts })
 				.then((r) => {
 					if (n !== asked.current) return;
 					setPrims(r);
@@ -106,7 +107,7 @@ export default function ChartView({
 				.catch((e) => n === asked.current && setError(typeof e === "string" ? e : "The chart could not be drawn."));
 		}, 300);
 		return () => clearTimeout(timer);
-	}, [book, sheetName, range, kind, title, spec.w, spec.h, version]);
+	}, [book, sheetName, range, kind, title, spec.w, spec.h, version, optsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const drag = (e: React.PointerEvent, mode: "move" | "size") => {
 		if (readOnly || e.button !== 0) return;
