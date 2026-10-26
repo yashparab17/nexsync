@@ -24,7 +24,7 @@ pub fn check(text: &str) -> Result<Vec<Problem>, String> {
         return Err("This document is too long to check.".to_string());
     }
     let mut out: Vec<Problem> = Vec::new();
-    for issue in std::panic::catch_unwind(|| check_text_with(text, &[(0..text.len(), ProofLang::En)], &Options::default(), true)).map_err(|_| "The check could not be done.".to_string())? {
+    for issue in std::panic::catch_unwind(|| check_text_with(text, &[(0..text.len(), ProofLang::En)], &Options::default(), true, false)).map_err(|_| "The check could not be done.".to_string())? {
         let Some(said) = text.get(issue.start..issue.end) else { continue };
         let kind = if issue.kind == IssueKind::Spelling { "spelling" } else { "grammar" };
         if out.iter().any(|p| p.text == said && p.kind == kind) {
