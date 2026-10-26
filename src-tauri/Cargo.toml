@@ -50,15 +50,15 @@ portable-pty = "0.9"
 ignore = "0.4.33"
 regex = "1.13.1"
 # Office file formats (Phase 21): the format crates of WordCraft, by commit. MIT OR Apache-2.0; see THIRD_PARTY_NOTICES.md.
-wordcraft-doc = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
-wordcraft-docx = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
-wordcraft-formats = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
-wordcraft-docbin = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
-wordcraft-pdf = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
-wordcraft-proof = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
-wordcraft-layout = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
-wordcraft-render = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
-wordcraft-fonts = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
+wordcraft-doc = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
+wordcraft-docx = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
+wordcraft-formats = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
+wordcraft-docbin = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
+wordcraft-pdf = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
+wordcraft-proof = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
+wordcraft-layout = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
+wordcraft-render = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
+wordcraft-fonts = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
 # Spreadsheet engine and .xlsx files (Phase 21): GridCraft, by commit. MIT OR Apache-2.0; see THIRD_PARTY_NOTICES.md.
 gridcraft-engine = { git = "https://github.com/storytold/gridcraft", rev = "f1894c6da64d4326022ae644c767581816a23c2c" }
 gridcraft-xlsx = { git = "https://github.com/storytold/gridcraft", rev = "f1894c6da64d4326022ae644c767581816a23c2c" }
