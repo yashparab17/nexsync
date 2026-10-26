@@ -4,7 +4,7 @@ Nexsync uses the following open-source projects whose licenses ask that their no
 
 ## WordCraft (wordcraft-doc, wordcraft-docx, wordcraft-formats, wordcraft-docbin, wordcraft-pdf, wordcraft-proof)
 
-Used to read and write .docx, .odt, .rtf, Markdown, HTML and plain-text documents, to read the old .doc format, to write PDF, and to check spelling and grammar (Phase 21). The PDF writer is `craft-pdf` with a patched `krilla` from https://github.com/storytold/craft-libs (pinned at `c3487320b2d1de657b860b3c8abb44e1f2b32bd8`, which WordCraft requires; its own licenses are in that repository). Pinned at commit `eae242176108d328c5dd81fbc10370c51ab90706` of https://github.com/storytold/wordcraft, used under the MIT License (the project is licensed MIT OR Apache-2.0).
+Used to read and write .docx, .odt, .rtf, Markdown, HTML and plain-text documents, to read the old .doc format, to write PDF, and to check spelling and grammar (Phase 21). The PDF writer is `craft-pdf` with a patched `krilla` from https://github.com/storytold/craft-libs (pinned at `c3487320b2d1de657b860b3c8abb44e1f2b32bd8`, which WordCraft requires; its own licenses are in that repository). Pinned at commit `611f6fbbbd1cbb35c80fef779e2641fdb3a9f9fc` of our fork https://github.com/yashparab17/wordcraft (branch `nexsync-fidelity`: four small patches on upstream commit `eae242176108d328c5dd81fbc10370c51ab90706` of https://github.com/storytold/wordcraft, to be offered upstream), used under the MIT License (the project is licensed MIT OR Apache-2.0; the fork keeps both license files).
 
 The ArtCraft name, wordmark and logos are trademarks of the ArtCraft Team and are not part of what is used here.
 

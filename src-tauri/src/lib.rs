@@ -4,7 +4,7 @@ mod database;
 /// Development only: the office engines, for `examples/office_dev.rs`, which lets the editors run in a browser
 #[cfg(debug_assertions)]
 pub mod lab {
-    pub use crate::commands::workspace::office::{documents as office, sheet_tools, sheets, slides as deck};
+    pub use crate::commands::workspace::office::{documents as office, fonts, sheet_tools, sheets, slides as deck};
 }
 
 /// Initializes plugins, registers Tauri command handlers, and runs the application
@@ -27,6 +27,8 @@ pub fn run() {
             }
             // Font discovery is the first-open cost of a document: pay it now, off the main thread
             std::thread::spawn(|| {
+                // Word's downloaded fonts (Aptos...) first, so documents set in them are laid out as Word lays them out
+                let _ = commands::workspace::office::fonts::load_cloud_fonts();
                 let _ = wordcraft_fonts::word::resolve("Calibri", false, false);
             });
             // The updater checks GitHub Releases for a signed newer build; desktop-only, like

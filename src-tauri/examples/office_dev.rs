@@ -6,7 +6,7 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
-use nexsync_lib::lab::{deck, office, sheet_tools, sheets};
+use nexsync_lib::lab::{deck, fonts, office, sheet_tools, sheets};
 use serde_json::{json, Value};
 
 fn call(cmd: &str, a: &Value) -> Result<Value, String> {
@@ -120,6 +120,7 @@ fn handle(mut stream: TcpStream) {
 }
 
 fn main() {
+    eprintln!("cloud fonts added: {}", fonts::load_cloud_fonts());
     let listener = TcpListener::bind("127.0.0.1:7878").expect("port 7878 is busy");
     eprintln!("office lab on http://127.0.0.1:7878");
     for stream in listener.incoming().flatten() {
