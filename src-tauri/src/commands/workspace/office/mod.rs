@@ -4,6 +4,8 @@
 pub mod blocks;
 pub mod documents;
 pub mod fonts;
+#[cfg(test)]
+mod hostile;
 pub mod merge;
 pub mod presets;
 pub mod proof;
