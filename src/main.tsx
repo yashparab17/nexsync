@@ -17,32 +17,33 @@ import { initSecurityPolicies } from "@/lib/security";
 initSecurityPolicies();
 
 // Development only: /?lab=documents shows an editor on its own (src/dev/Lab.tsx)
-const lab = import.meta.env.DEV ? new URLSearchParams(location.search).get("lab") : null;
+const lab = import.meta.env.DEV
+  ? new URLSearchParams(location.search).get("lab")
+  : null;
 if (lab) {
-	void import("@/dev/Lab").then(({ default: Lab }) => {
-		ReactDOM.createRoot(document.getElementById("root")!).render(
-			<ThemeProvider>
-				<Lab which={lab} />
-			</ThemeProvider>,
-		);
-	});
+  void import("@/dev/Lab").then(({ default: Lab }) => {
+    ReactDOM.createRoot(document.getElementById("root")!).render(
+      <ThemeProvider>
+        <Lab which={lab} />
+      </ThemeProvider>,
+    );
+  });
 } else
-// Application root bootstrap mounting React providers and router
-ReactDOM.createRoot(document.getElementById("root")!).render(
-	<React.StrictMode>
-		<ThemeProvider>
-			<NotificationProvider>
-			<WorkspaceProvider>
-				<P2PProvider>
-					<WorkspaceLoader>
-						<ErrorBoundary>
-							<RouterProvider router={router} />
-						</ErrorBoundary>
-					</WorkspaceLoader>
-				</P2PProvider>
-			</WorkspaceProvider>
-		</NotificationProvider>
-		</ThemeProvider>
-	</React.StrictMode>,
-);
-
+  // Application root bootstrap mounting React providers and router
+  ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <ThemeProvider>
+        <NotificationProvider>
+          <WorkspaceProvider>
+            <P2PProvider>
+              <WorkspaceLoader>
+                <ErrorBoundary>
+                  <RouterProvider router={router} />
+                </ErrorBoundary>
+              </WorkspaceLoader>
+            </P2PProvider>
+          </WorkspaceProvider>
+        </NotificationProvider>
+      </ThemeProvider>
+    </React.StrictMode>,
+  );

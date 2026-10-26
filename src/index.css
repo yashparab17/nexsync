@@ -7,137 +7,145 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
-    --font-sans: 'Onest Variable', system-ui, sans-serif;
-    --text-xs: 0.8125rem;
-    --text-sm: 0.9375rem;
-    --text-base: 0.9375rem;
-    --text-4xl: 2rem;
-    --color-scrim: var(--scrim);
-    --color-success: var(--success);
-    --color-warning: var(--warning);
-    --color-info: var(--info);
-    --color-sidebar-ring: var(--sidebar-ring);
-    --color-panel: var(--panel);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar: var(--sidebar);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
-    --color-ring: var(--ring);
-    --color-input: var(--input);
-    --color-border: var(--border);
-    --color-destructive: var(--destructive);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-accent: var(--accent);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-fg-3: var(--fg-3);
-    --color-muted: var(--muted);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-secondary: var(--secondary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-primary: var(--primary);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-popover: var(--popover);
-    --color-card-foreground: var(--card-foreground);
-    --color-card: var(--card);
-    --color-foreground: var(--foreground);
-    --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+  --font-heading: var(--font-sans);
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+  --font-sans: "Onest Variable", system-ui, sans-serif;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-base: 0.9375rem;
+  --text-4xl: 2rem;
+  --color-scrim: var(--scrim);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-panel: var(--panel);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-fg-3: var(--fg-3);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 /* The original light and dark themes are the plain :root and .dark. Every other theme (src/lib/themes.ts, and the ones people
    make) is a rule ThemeContext adds for data-theme on <html>, and applies only in its own mode. */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.141 0.005 285.823);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.141 0.005 285.823);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.141 0.005 285.823);
-    --primary: oklch(0.511 0.096 186.391);
-    --primary-foreground: oklch(0.984 0.014 180.72);
-    --secondary: oklch(0.967 0.001 286.375);
-    --secondary-foreground: oklch(0.21 0.006 285.885);
-    --muted: oklch(0.967 0.001 286.375);
-    --muted-foreground: color-mix(in srgb, var(--foreground) 66%, var(--background));
-    --accent: oklch(0.967 0.001 286.375);
-    --accent-foreground: oklch(0.21 0.006 285.885);
-    --destructive: oklch(0.577 0.245 27.325);
-    --success: oklch(0.52 0.13 150);
-    --warning: oklch(0.55 0.13 70);
-    --info: oklch(0.5 0.18 260);
-    --border: oklch(0.92 0.004 286.32);
-    --input: oklch(0.92 0.004 286.32);
-    --ring: oklch(0.705 0.015 286.067);
-    --scrim: color-mix(in srgb, black 45%, transparent);
-    --chart-1: oklch(0.855 0.138 181.071);
-    --chart-2: oklch(0.704 0.14 182.503);
-    --chart-3: oklch(0.6 0.118 184.704);
-    --chart-4: oklch(0.511 0.096 186.391);
-    --chart-5: oklch(0.437 0.078 188.216);
-    --radius: 0.5rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.141 0.005 285.823);
-    --sidebar-primary: oklch(0.6 0.118 184.704);
-    --sidebar-primary-foreground: oklch(0.984 0.014 180.72);
-    --sidebar-accent: oklch(0.967 0.001 286.375);
-    --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-    --sidebar-border: oklch(0.92 0.004 286.32);
-    --sidebar-ring: oklch(0.705 0.015 286.067);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.141 0.005 285.823);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.141 0.005 285.823);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.141 0.005 285.823);
+  --primary: oklch(0.511 0.096 186.391);
+  --primary-foreground: oklch(0.984 0.014 180.72);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: color-mix(
+    in srgb,
+    var(--foreground) 66%,
+    var(--background)
+  );
+  --accent: oklch(0.967 0.001 286.375);
+  --accent-foreground: oklch(0.21 0.006 285.885);
+  --destructive: oklch(0.577 0.245 27.325);
+  --success: oklch(0.52 0.13 150);
+  --warning: oklch(0.55 0.13 70);
+  --info: oklch(0.5 0.18 260);
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.705 0.015 286.067);
+  --scrim: color-mix(in srgb, black 45%, transparent);
+  --chart-1: oklch(0.855 0.138 181.071);
+  --chart-2: oklch(0.704 0.14 182.503);
+  --chart-3: oklch(0.6 0.118 184.704);
+  --chart-4: oklch(0.511 0.096 186.391);
+  --chart-5: oklch(0.437 0.078 188.216);
+  --radius: 0.5rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.141 0.005 285.823);
+  --sidebar-primary: oklch(0.6 0.118 184.704);
+  --sidebar-primary-foreground: oklch(0.984 0.014 180.72);
+  --sidebar-accent: oklch(0.967 0.001 286.375);
+  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
+  --sidebar-border: oklch(0.92 0.004 286.32);
+  --sidebar-ring: oklch(0.705 0.015 286.067);
 }
 
 .dark {
-    --background: oklch(0.141 0.005 285.823);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.21 0.006 285.885);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.21 0.006 285.885);
-    --popover-foreground: oklch(0.985 0 0);
-    /* The lighter teal the original used for the sidebar's active item, so text and buttons in the accent colour are legible */
-    --primary: oklch(0.704 0.14 182.503);
-    --primary-foreground: oklch(0.277 0.046 192.524);
-    --secondary: oklch(0.274 0.006 286.033);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.274 0.006 286.033);
-    --muted-foreground: color-mix(in srgb, var(--foreground) 66%, var(--background));
-    --accent: oklch(0.274 0.006 286.033);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --success: oklch(0.8 0.16 150);
-    --warning: oklch(0.84 0.15 85);
-    --info: oklch(0.75 0.12 250);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.552 0.016 285.938);
-    --scrim: color-mix(in srgb, black 70%, transparent);
-    --chart-1: oklch(0.855 0.138 181.071);
-    --chart-2: oklch(0.704 0.14 182.503);
-    --chart-3: oklch(0.6 0.118 184.704);
-    --chart-4: oklch(0.511 0.096 186.391);
-    --chart-5: oklch(0.437 0.078 188.216);
-    --sidebar: oklch(0.21 0.006 285.885);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.704 0.14 182.503);
-    --sidebar-primary-foreground: oklch(0.277 0.046 192.524);
-    --sidebar-accent: oklch(0.274 0.006 286.033);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.552 0.016 285.938);
+  --background: oklch(0.141 0.005 285.823);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.21 0.006 285.885);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.21 0.006 285.885);
+  --popover-foreground: oklch(0.985 0 0);
+  /* The lighter teal the original used for the sidebar's active item, so text and buttons in the accent colour are legible */
+  --primary: oklch(0.704 0.14 182.503);
+  --primary-foreground: oklch(0.277 0.046 192.524);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.274 0.006 286.033);
+  --muted-foreground: color-mix(
+    in srgb,
+    var(--foreground) 66%,
+    var(--background)
+  );
+  --accent: oklch(0.274 0.006 286.033);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.8 0.16 150);
+  --warning: oklch(0.84 0.15 85);
+  --info: oklch(0.75 0.12 250);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.552 0.016 285.938);
+  --scrim: color-mix(in srgb, black 70%, transparent);
+  --chart-1: oklch(0.855 0.138 181.071);
+  --chart-2: oklch(0.704 0.14 182.503);
+  --chart-3: oklch(0.6 0.118 184.704);
+  --chart-4: oklch(0.511 0.096 186.391);
+  --chart-5: oklch(0.437 0.078 188.216);
+  --sidebar: oklch(0.21 0.006 285.885);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.704 0.14 182.503);
+  --sidebar-primary-foreground: oklch(0.277 0.046 192.524);
+  --sidebar-accent: oklch(0.274 0.006 286.033);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.552 0.016 285.938);
 }
 
 /* Code colours follow the theme unless a scheme is chosen (src/lib/codeSchemes.ts sets these on :root[data-code]) */
@@ -157,17 +165,23 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+  }
 }
 /* Slightly rounded: controls take the medium radius by default (a utility class on the element wins), tiles and dialogs the large one. */
 @layer base {
-  button:not([class*="w-full"]), input:not([type="checkbox"], [type="radio"], [type="color"]), select, textarea, kbd { border-radius: var(--radius-md); }
+  button:not([class*="w-full"]),
+  input:not([type="checkbox"], [type="radio"], [type="color"]),
+  select,
+  textarea,
+  kbd {
+    border-radius: var(--radius-md);
+  }
 }
 :root {
   --mantine-radius-xs: 6px;
@@ -194,7 +208,11 @@
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+  background-color: color-mix(
+    in oklch,
+    var(--muted-foreground) 35%,
+    transparent
+  );
   background-clip: padding-box;
   border: 3px solid transparent;
   min-height: 32px;
@@ -202,7 +220,11 @@
   transition: background-color 150ms;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background-color: color-mix(in oklch, var(--muted-foreground) 65%, transparent);
+  background-color: color-mix(
+    in oklch,
+    var(--muted-foreground) 65%,
+    transparent
+  );
   border-width: 2px;
 }
 
@@ -219,14 +241,26 @@
 }
 
 /* Panels that change size glide to the new one; while a splitter is being dragged they follow the pointer at once */
-.glide { transition: width 250ms cubic-bezier(.22, 1, .36, 1); }
-.glide-rows { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 250ms cubic-bezier(.22, 1, .36, 1); }
-.glide-rows[data-folded="true"] { grid-template-rows: 0fr; }
-body[data-resizing] .glide { transition: none; }
+.glide {
+  transition: width 250ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.glide-rows {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 250ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.glide-rows[data-folded="true"] {
+  grid-template-rows: 0fr;
+}
+body[data-resizing] .glide {
+  transition: none;
+}
 
 /* People who ask their system for less motion get none, except the loading logo, which turns to a slow pulse */
 @media (prefers-reduced-motion: reduce) {
-  *:not([role="status"] *), *:not([role="status"] *)::before, *:not([role="status"] *)::after {
+  *:not([role="status"] *),
+  *:not([role="status"] *)::before,
+  *:not([role="status"] *)::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -235,16 +269,39 @@ body[data-resizing] .glide { transition: none; }
 }
 
 /* Icons run about 15% larger than their size classes say; unscoped CSS wins over the utility classes */
-.lucide.size-3 { width: 0.875rem; height: 0.875rem; }
-.lucide.size-3\.5 { width: 1rem; height: 1rem; }
-.lucide.size-4 { width: 1.125rem; height: 1.125rem; }
-.lucide.size-5 { width: 1.375rem; height: 1.375rem; }
-.lucide.size-6 { width: 1.625rem; height: 1.625rem; }
-.lucide.size-8 { width: 2.125rem; height: 2.125rem; }
+.lucide.size-3 {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.lucide.size-3\.5 {
+  width: 1rem;
+  height: 1rem;
+}
+.lucide.size-4 {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.lucide.size-5 {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+.lucide.size-6 {
+  width: 1.625rem;
+  height: 1.625rem;
+}
+.lucide.size-8 {
+  width: 2.125rem;
+  height: 2.125rem;
+}
 /* Button icons that take their size from the button */
-.group\/button .lucide:not([class*='size-']) { width: 1rem; height: 1rem; }
+.group\/button .lucide:not([class*="size-"]) {
+  width: 1rem;
+  height: 1rem;
+}
 /* The rich-text editor would otherwise ask for Inter first */
-.bn-root.bn-root { --bn-font-family: "Onest Variable", system-ui, sans-serif; }
+.bn-root.bn-root {
+  --bn-font-family: "Onest Variable", system-ui, sans-serif;
+}
 
 /* Rich-text editor (BlockNote) on the app palette in both themes; the page behind it is crust, menus raise to the card tone */
 .bn-container.bn-container[data-color-scheme] {
@@ -268,7 +325,8 @@ body[data-resizing] .glide { transition: none; }
 
 /* Checkboxes and radios drawn from the theme: a square (or round) box, filled with the accent and a tick
    when on. Square corners are the rule everywhere, so only radios are round. */
-input[type="checkbox"], input[type="radio"] {
+input[type="checkbox"],
+input[type="radio"] {
   appearance: none;
   display: inline-grid;
   flex-shrink: 0;
@@ -277,16 +335,25 @@ input[type="checkbox"], input[type="radio"] {
   height: 1.125rem;
   margin: 0;
   cursor: pointer;
-  border: 1px solid color-mix(in oklch, var(--muted-foreground) 55%, transparent);
+  border: 1px solid
+    color-mix(in oklch, var(--muted-foreground) 55%, transparent);
   background: var(--background);
-  transition: background-color 120ms, border-color 120ms;
+  transition:
+    background-color 120ms,
+    border-color 120ms;
 }
-input[type="checkbox"] { border-radius: 4px; }
-input[type="radio"] { border-radius: 50%; }
-input[type="checkbox"]:hover:not(:disabled), input[type="radio"]:hover:not(:disabled) {
+input[type="checkbox"] {
+  border-radius: 4px;
+}
+input[type="radio"] {
+  border-radius: 50%;
+}
+input[type="checkbox"]:hover:not(:disabled),
+input[type="radio"]:hover:not(:disabled) {
   border-color: var(--primary);
 }
-input[type="checkbox"]:checked, input[type="radio"]:checked {
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
   background: var(--primary);
   border-color: var(--primary);
 }
@@ -299,8 +366,12 @@ input[type="checkbox"]::after {
   transform: scale(0);
   transition: transform 120ms;
 }
-input[type="checkbox"]:checked::after { transform: scale(1); }
-input[type="radio"] { border-radius: 9999px !important; }
+input[type="checkbox"]:checked::after {
+  transform: scale(1);
+}
+input[type="radio"] {
+  border-radius: 9999px !important;
+}
 input[type="radio"]::after {
   content: "";
   width: 0.45rem;
@@ -310,8 +381,14 @@ input[type="radio"]::after {
   transform: scale(0);
   transition: transform 120ms;
 }
-input[type="radio"]:checked::after { transform: scale(1); }
-input[type="checkbox"]:disabled, input[type="radio"]:disabled { cursor: not-allowed; opacity: 0.5; }
+input[type="radio"]:checked::after {
+  transform: scale(1);
+}
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
 
 /* Native selects match the text fields */
 select {
@@ -323,285 +400,515 @@ select {
 }
 
 /* Native controls (scrollbars, form widgets) follow the theme; headings do not leave a single word on the last line */
-:root { color-scheme: light; }
-.dark { color-scheme: dark; }
-h1, h2, h3 { text-wrap: balance; }
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
 /* No double-tap zoom delay on controls; no rubber-band scrolling of the whole window with a mouse */
-button, a, select, summary, label, [role="button"] { touch-action: manipulation; }
-@media (pointer: fine) { html { overscroll-behavior: none; } }
+button,
+a,
+select,
+summary,
+label,
+[role="button"] {
+  touch-action: manipulation;
+}
+@media (pointer: fine) {
+  html {
+    overscroll-behavior: none;
+  }
+}
 
 /* The Markdown reading view (Editor preview and Notes) */
-.md-preview { font-size: 1rem; line-height: 1.7; color: var(--foreground); max-width: 48rem; margin-inline: auto; }
-.md-preview > :first-child { margin-top: 0; }
-.md-preview h1, .md-preview h2, .md-preview h3, .md-preview h4 { font-weight: 700; line-height: 1.25; margin: 1.6em 0 0.5em; letter-spacing: -0.01em; }
-.md-preview h1 { font-size: 2rem; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
-.md-preview h2 { font-size: 1.5rem; padding-bottom: 0.25em; border-bottom: 1px solid var(--border); }
-.md-preview h3 { font-size: 1.2rem; }
-.md-preview p, .md-preview ul, .md-preview ol, .md-preview blockquote, .md-preview pre, .md-preview table { margin: 0.9em 0; }
-.md-preview ul { list-style: disc; padding-left: 1.5rem; }
-.md-preview ol { list-style: decimal; padding-left: 1.5rem; }
-.md-preview li > ul, .md-preview li > ol { margin: 0.2em 0; }
-.md-preview li::marker { color: var(--muted-foreground); }
-.md-preview a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.md-preview a.wikilink { text-decoration: none; border-bottom: 1px solid color-mix(in oklch, var(--primary) 50%, transparent); }
-.md-preview a.wikilink-missing { color: var(--muted-foreground); border-bottom-style: dashed; }
-.md-preview blockquote { border-left: 3px solid var(--primary); padding: 0.1em 1em; color: var(--muted-foreground); background: var(--card); }
-.md-preview code { font-family: var(--font-mono); font-size: 0.9em; background: var(--muted); padding: 0.1em 0.35em; }
-.md-preview pre { background: var(--card); border: 1px solid var(--border); padding: 0.9rem 1rem; overflow-x: auto; }
-.md-preview pre code { background: transparent; padding: 0; font-size: 0.875rem; }
-.md-preview hr { border: 0; border-top: 1px solid var(--border); margin: 1.8em 0; }
-.md-preview table { border-collapse: collapse; width: 100%; font-size: 0.95em; }
-.md-preview th, .md-preview td { border: 1px solid var(--border); padding: 0.4em 0.7em; text-align: left; }
-.md-preview th { background: var(--card); font-weight: 600; }
-.md-preview img { max-width: 100%; }
-.md-preview input[type="checkbox"] { margin-right: 0.5em; pointer-events: none; }
+.md-preview {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--foreground);
+  max-width: 48rem;
+  margin-inline: auto;
+}
+.md-preview > :first-child {
+  margin-top: 0;
+}
+.md-preview h1,
+.md-preview h2,
+.md-preview h3,
+.md-preview h4 {
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 1.6em 0 0.5em;
+  letter-spacing: -0.01em;
+}
+.md-preview h1 {
+  font-size: 2rem;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border);
+}
+.md-preview h2 {
+  font-size: 1.5rem;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--border);
+}
+.md-preview h3 {
+  font-size: 1.2rem;
+}
+.md-preview p,
+.md-preview ul,
+.md-preview ol,
+.md-preview blockquote,
+.md-preview pre,
+.md-preview table {
+  margin: 0.9em 0;
+}
+.md-preview ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+}
+.md-preview ol {
+  list-style: decimal;
+  padding-left: 1.5rem;
+}
+.md-preview li > ul,
+.md-preview li > ol {
+  margin: 0.2em 0;
+}
+.md-preview li::marker {
+  color: var(--muted-foreground);
+}
+.md-preview a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.md-preview a.wikilink {
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in oklch, var(--primary) 50%, transparent);
+}
+.md-preview a.wikilink-missing {
+  color: var(--muted-foreground);
+  border-bottom-style: dashed;
+}
+.md-preview blockquote {
+  border-left: 3px solid var(--primary);
+  padding: 0.1em 1em;
+  color: var(--muted-foreground);
+  background: var(--card);
+}
+.md-preview code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--muted);
+  padding: 0.1em 0.35em;
+}
+.md-preview pre {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+}
+.md-preview pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.875rem;
+}
+.md-preview hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.8em 0;
+}
+.md-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.95em;
+}
+.md-preview th,
+.md-preview td {
+  border: 1px solid var(--border);
+  padding: 0.4em 0.7em;
+  text-align: left;
+}
+.md-preview th {
+  background: var(--card);
+  font-weight: 600;
+}
+.md-preview img {
+  max-width: 100%;
+}
+.md-preview input[type="checkbox"] {
+  margin-right: 0.5em;
+  pointer-events: none;
+}
 
 /* Borderless: boxes (cards, panels, fields, buttons, chips) are told apart by their fill. Only the lines that separate things
    stay: the sidebar's and any single-side border (border-b, border-r, divide-y…). Dashed drop zones, status colours and focus
    rings keep theirs. */
-.border:not(.border-dashed, .border-primary, .border-destructive, .border-success, .border-warning, .border-info, .border-ring, .border-foreground, [class*="border-primary/"], [class*="border-destructive/"], [class*="border-warning/"]) {
+.border:not(
+  .border-dashed,
+  .border-primary,
+  .border-destructive,
+  .border-success,
+  .border-warning,
+  .border-info,
+  .border-ring,
+  .border-foreground,
+  [class*="border-primary/"],
+  [class*="border-destructive/"],
+  [class*="border-warning/"]
+) {
   border-color: transparent;
 }
 
 /* Terminal / HUD layer. Rules frame the tiles; the accent takes over on hover and focus. */
-:root { --fg-3: color-mix(in srgb, var(--foreground) 45%, var(--background)); --rule: color-mix(in oklch, var(--foreground) 16%, transparent); }
+:root {
+  --fg-3: color-mix(in srgb, var(--foreground) 45%, var(--background));
+  --rule: color-mix(in oklch, var(--foreground) 16%, transparent);
+}
 
 /* A thin rule round a tile, in place of a border. The accent takes over on hover and focus. */
-.frame { box-shadow: none; outline: 1px solid var(--rule); outline-offset: -1px; border-radius: var(--radius-lg); }
-.frame:is(button, a):hover, .frame:focus-visible { outline-color: var(--primary); }
+.frame {
+  box-shadow: none;
+  outline: 1px solid var(--rule);
+  outline-offset: -1px;
+  border-radius: var(--radius-lg);
+}
+.frame:is(button, a):hover,
+.frame:focus-visible {
+  outline-color: var(--primary);
+}
 
 /* Dialogs take focus as a whole (so Escape and Tab work) but do not draw a ring round themselves */
-[data-slot="dialog"]:focus-visible, [data-slot="dialog-content"]:focus-visible { outline: none; }
+[data-slot="dialog"]:focus-visible,
+[data-slot="dialog-content"]:focus-visible {
+  outline: none;
+}
 
 /* One focus look for every text field and search box: a single 1px accent outline, no glow, no inner box */
-input:not([type="checkbox"], [type="radio"], [type="color"], [type="range"]):focus-visible, textarea:focus-visible, select:focus-visible, .field-focus:focus-within {
+input:not(
+    [type="checkbox"],
+    [type="radio"],
+    [type="color"],
+    [type="range"]
+  ):focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+.field-focus:focus-within {
   outline: 1px solid var(--primary);
   outline-offset: 0;
 }
-.field-focus input:focus-visible, .field-focus textarea:focus-visible { outline: none; }
+.field-focus input:focus-visible,
+.field-focus textarea:focus-visible {
+  outline: none;
+}
 
 /* The edge of the page card: drawn on top of whatever a page paints, so no page can cover it */
-.window-edge { position: relative; }
-.window-edge::after { content: ""; position: absolute; inset: 0; z-index: 30; pointer-events: none; border: 1px solid var(--rule); border-radius: inherit; }
+.window-edge {
+  position: relative;
+}
+.window-edge::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  border: 1px solid var(--rule);
+  border-radius: inherit;
+}
 
 /* The list a dropdown opens is drawn by the system: give it the theme's popup colours so the text can be read in every theme */
-select option, select optgroup { background-color: var(--popover); color: var(--foreground); }
-select option:checked { background-color: var(--accent); color: var(--foreground); }
+select option,
+select optgroup {
+  background-color: var(--popover);
+  color: var(--foreground);
+}
+select option:checked {
+  background-color: var(--accent);
+  color: var(--foreground);
+}
 
 /* The page of a document: the look of a word processor, whatever the app's own theme is */
 .doc-page .bn-container,
 .doc-page .bn-editor {
-	font-family: var(--doc-font);
-	font-size: var(--doc-size, 11pt);
-	color: #000;
-	background: transparent;
-	--bn-colors-editor-background: transparent;
-	--bn-colors-editor-text: #000;
+  font-family: var(--doc-font);
+  font-size: var(--doc-size, 11pt);
+  color: #000;
+  background: transparent;
+  --bn-colors-editor-background: transparent;
+  --bn-colors-editor-text: #000;
 }
 .doc-page .bn-editor {
-	padding-inline: 0;
+  padding-inline: 0;
 }
 .doc-page .bn-block-outer {
-	background: transparent;
-	/* Keeps a block's own margins inside its box, so the height measured for the page breaks counts them */
-	display: flow-root;
+  background: transparent;
+  /* Keeps a block's own margins inside its box, so the height measured for the page breaks counts them */
+  display: flow-root;
 }
 /* A paragraph whose spacing comes from the file: the spacing is drawn on the block, so the editor's own is taken off */
 .doc-page .bn-block-content.nx-sp,
 .doc-page .bn-block-content.nx-sp :is(h1, h2, h3, h4, h5, h6, p) {
-	margin-block: 0;
+  margin-block: 0;
 }
 /* A line of a table of contents ("Title<tab>12"): the page number sits at the right edge, the tab before it hidden */
 .doc-page .nx-toc .bn-inline-content {
-	flex: 1;
+  flex: 1;
 }
 .doc-page .nx-toc .nx-toc-tab {
-	display: none;
+  display: none;
 }
 .doc-page .nx-toc .nx-toc-num {
-	float: right;
-	margin-left: 1em;
+  float: right;
+  margin-left: 1em;
 }
 /* Lines as tall as Word draws them: each font's own single line height (--nx-lf, measured by the backend from the font) times the
    paragraph's line spacing (--nx-mult). The paragraph mark's font and size, on the block, give the least a line is. */
 .doc-page .nx-sp > .bn-inline-content,
 .doc-page .nx-sp [data-style-type="fontFamily"] {
-	line-height: calc(var(--nx-lf, 1.2) * var(--nx-mult, 1));
+  line-height: calc(var(--nx-lf, 1.2) * var(--nx-mult, 1));
 }
 /* A heading with Word formatting is drawn in its own runs' look; the editor's heading font and size would sit on its lines as a second,
    differently placed font and make them taller */
-.doc-page .bn-editor .bn-block > .bn-block-content.nx-sp[data-content-type="heading"],
-.doc-page .bn-editor .bn-block > .bn-block-content.nx-sp[data-content-type="heading"] > :is(h1, h2, h3, h4, h5, h6) {
-	font-family: inherit;
-	font-size: inherit;
-	font-weight: inherit;
-	color: inherit;
+.doc-page
+  .bn-editor
+  .bn-block
+  > .bn-block-content.nx-sp[data-content-type="heading"],
+.doc-page
+  .bn-editor
+  .bn-block
+  > .bn-block-content.nx-sp[data-content-type="heading"]
+  > :is(h1, h2, h3, h4, h5, h6) {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
 }
 /* BlockNote eases a heading's size and weight when they change; in a long document that is thousands of animations when the look arrives
    (pages are measured half way through them) */
 .bn-editor .bn-block-content {
-	transition: none;
+  transition: none;
 }
 /* Line spacing of exactly so many points */
 .doc-page .nx-exact > .bn-inline-content,
 .doc-page .nx-exact .bn-inline-content [data-style-type] {
-	line-height: var(--nx-exact) !important;
+  line-height: var(--nx-exact) !important;
 }
 /* A Word list item's label hangs in front of its first line, at the first-line indent. It sits on that line (taking no room), so its
    font's line height counts for the line, as it does in Word. */
 .doc-page .bn-block-content.nx-label > .bn-inline-content::before {
-	content: var(--nx-label);
-	display: inline-block;
-	width: 0;
-	white-space: pre;
-	text-indent: 0;
-	position: relative;
-	left: var(--nx-hang);
-	line-height: calc(var(--nx-label-lf, var(--nx-lf, 1.2)) * var(--nx-mult, 1));
+  content: var(--nx-label);
+  display: inline-block;
+  width: 0;
+  white-space: pre;
+  text-indent: 0;
+  position: relative;
+  left: var(--nx-hang);
+  line-height: calc(var(--nx-label-lf, var(--nx-lf, 1.2)) * var(--nx-mult, 1));
 }
 /* Lists as Word lays them out by default: the bullet or number 0.25in in, the text at 0.5in, each level a further 0.5in */
-.doc-page .bn-block-content:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"]) {
-	padding-left: 18pt;
+.doc-page
+  .bn-block-content:is(
+    [data-content-type="bulletListItem"],
+    [data-content-type="numberedListItem"]
+  ) {
+  padding-left: 18pt;
 }
-.doc-page .bn-block-content:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"])::before {
-	min-width: 18pt;
-	padding-right: 0;
-	justify-content: flex-start;
+.doc-page
+  .bn-block-content:is(
+    [data-content-type="bulletListItem"],
+    [data-content-type="numberedListItem"]
+  )::before {
+  min-width: 18pt;
+  padding-right: 0;
+  justify-content: flex-start;
 }
 .doc-page .bn-block-group .bn-block-group {
-	margin-left: 36pt;
+  margin-left: 36pt;
 }
 /* The editor's line beside nested blocks is not part of the page */
 .doc-page .bn-editor .bn-block-group .bn-block-group > .bn-block-outer::before {
-	display: none;
+  display: none;
 }
 /* Line spacing is a multiple of single, and single in Word is the font's own line height, about 1.21 times its size */
 .doc-page .bn-block-content {
-	line-height: calc(1.21 * var(--doc-ls, 1.15));
-	padding-block: 0;
+  line-height: calc(1.21 * var(--doc-ls, 1.15));
+  padding-block: 0;
 }
 .doc-page [data-content-type="heading"] h1,
 .doc-page [data-content-type="heading"] h2,
 .doc-page [data-content-type="heading"] h3,
 .doc-page [data-content-type="heading"] h4 {
-	font-weight: 400;
-	color: #2f5496;
-	font-family: "Calibri Light", Carlito, var(--doc-font);
-	line-height: 1.1;
+  font-weight: 400;
+  color: #2f5496;
+  font-family: "Calibri Light", Carlito, var(--doc-font);
+  line-height: 1.1;
 }
 .doc-page [data-content-type="heading"] h1 {
-	font-size: 16pt;
-	margin-top: 14pt;
+  font-size: 16pt;
+  margin-top: 14pt;
 }
 .doc-page [data-content-type="heading"] h2 {
-	font-size: 13pt;
-	margin-top: 10pt;
+  font-size: 13pt;
+  margin-top: 10pt;
 }
 .doc-page [data-content-type="heading"] h3 {
-	font-size: 12pt;
-	color: #1f3763;
-	margin-top: 8pt;
+  font-size: 12pt;
+  color: #1f3763;
+  margin-top: 8pt;
 }
 .doc-page [data-content-type="paragraph"] {
-	margin-bottom: 8pt;
+  margin-bottom: 8pt;
 }
 .doc-page [data-content-type="bulletListItem"],
 .doc-page [data-content-type="numberedListItem"],
 .doc-page [data-content-type="checkListItem"] {
-	margin-bottom: 2pt;
+  margin-bottom: 2pt;
 }
 /* Tables as Word draws them: no space around the table, cells 0.075in in from the sides and none above or below. The editor's own room for its row and column handles is kept, but takes no space on the page. */
 .doc-page [data-content-type="table"] {
-	margin-block: 0;
+  margin-block: 0;
 }
 /* Tables take the column widths the backend worked out with Word's AutoFit; the browser's own table layout is told not to change them.
    (The editor's fixed layout would give every column without a set width the same 120 pixels.) */
 .doc-page .bn-editor [data-content-type="table"] table {
-	table-layout: auto !important;
-	width: auto !important;
-	/* (the editor sets a minimum of 120 pixels a column on the table itself) */
-	min-width: 0 !important;
+  table-layout: auto !important;
+  width: auto !important;
+  /* (the editor sets a minimum of 120 pixels a column on the table itself) */
+  min-width: 0 !important;
 }
 .doc-page .ProseMirror.bn-editor [data-content-type="table"] :is(td, th) {
-	min-width: 0 !important;
+  min-width: 0 !important;
 }
 /* The bars beside a table that add rows or columns by dragging are too easily caught; rows and columns are added from its handles */
 .doc-page .bn-extend-button {
-	display: none;
+  display: none;
 }
 .doc-page .bn-editor [data-content-type="table"] .tableWrapper {
-	margin: -9px -22px -22px -9px;
-	/* (its width then reaches into the margins too, so the room for its handles is not taken from the table) */
-	width: auto;
+  margin: -9px -22px -22px -9px;
+  /* (its width then reaches into the margins too, so the room for its handles is not taken from the table) */
+  width: auto;
 }
 .doc-page .bn-editor [data-content-type="table"] :is(td, th) {
-	/* The space after a paragraph of the file's ordinary text, which Word keeps in a cell over what the table style says */
-	/* (Word's 5.4 pt cell margins hold half of each border; here the border is drawn inside the cell, so the margin gives it room) */
-	padding: 0 calc(5.4pt - 0.5px) 4pt;
-	border-color: #bfbfbf;
-	/* A header cell is bold only where its text is, as in Word (bold text in a bold cell would otherwise go to the heaviest weight) */
-	font-weight: inherit;
-	text-align: left;
+  /* The space after a paragraph of the file's ordinary text, which Word keeps in a cell over what the table style says */
+  /* (Word's 5.4 pt cell margins hold half of each border; here the border is drawn inside the cell, so the margin gives it room) */
+  padding: 0 calc(5.4pt - 0.5px) 4pt;
+  border-color: #bfbfbf;
+  /* A header cell is bold only where its text is, as in Word (bold text in a bold cell would otherwise go to the heaviest weight) */
+  font-weight: inherit;
+  text-align: left;
 }
-.doc-page .bn-editor [data-content-type="table"] :is(td, th)[data-text-alignment="center"] {
-	text-align: center;
+.doc-page
+  .bn-editor
+  [data-content-type="table"]
+  :is(td, th)[data-text-alignment="center"] {
+  text-align: center;
 }
-.doc-page .bn-editor [data-content-type="table"] :is(td, th)[data-text-alignment="right"] {
-	text-align: right;
+.doc-page
+  .bn-editor
+  [data-content-type="table"]
+  :is(td, th)[data-text-alignment="right"] {
+  text-align: right;
 }
-.doc-page .bn-editor [data-content-type="table"] :is(td, th)[data-text-alignment="justify"] {
-	text-align: justify;
+.doc-page
+  .bn-editor
+  [data-content-type="table"]
+  :is(td, th)[data-text-alignment="justify"] {
+  text-align: justify;
 }
 /* ponytail: every table drawn with the look of Word's own table styles (Table Grid and the like: single spacing, no space after);
    a file whose table style says otherwise is drawn so too, as the editor keeps no style per table */
 /* The first row of a table on its second page draws the top edge the table has there */
 .doc-page .bn-editor [data-content-type="table"] tr.nx-row-break > :is(td, th) {
-	border-top-width: 1px;
+  border-top-width: 1px;
 }
 .doc-page .bn-editor [data-content-type="table"] :is(td, th) > p {
-	min-height: 0;
-	line-height: 1.21;
+  min-height: 0;
+  line-height: 1.21;
 }
 .doc-page .bn-block-group .bn-block-outer {
-	margin-block: 0;
+  margin-block: 0;
 }
 @media print {
-	.doc-page {
-		box-shadow: none;
-		zoom: 1 !important;
-	}
+  .doc-page {
+    box-shadow: none;
+    zoom: 1 !important;
+  }
 }
 
 /* "Hide the headers": the workspace bar above the page and the page's own toolbar are folded away together */
 [data-hide-toolbars] [data-page-toolbar] {
-	display: none;
+  display: none;
 }
 
 /* Formatting marks: a pilcrow at the end of each paragraph */
 .doc-marks .bn-block-content[data-content-type="paragraph"] > p::after,
-.doc-marks .bn-block-content[data-content-type="heading"] > :is(h1, h2, h3)::after {
-	content: "¶";
-	color: #4f81bd;
-	margin-left: 2px;
+.doc-marks
+  .bn-block-content[data-content-type="heading"]
+  > :is(h1, h2, h3)::after {
+  content: "¶";
+  color: #4f81bd;
+  margin-left: 2px;
 }
 /* A dark page: the page is turned over, and pictures turned back so they keep their colours */
 .doc-dark {
-	filter: invert(1) hue-rotate(180deg);
+  filter: invert(1) hue-rotate(180deg);
 }
 .doc-dark img {
-	filter: invert(1) hue-rotate(180deg);
+  filter: invert(1) hue-rotate(180deg);
 }
 
-.doc-comment { background-color: color-mix(in oklch, var(--warning) 25%, transparent); cursor: pointer; }
-.doc-comment-active { background-color: color-mix(in oklch, var(--warning) 50%, transparent); }
+.doc-comment {
+  background-color: color-mix(in oklch, var(--warning) 25%, transparent);
+  cursor: pointer;
+}
+.doc-comment-active {
+  background-color: color-mix(in oklch, var(--warning) 50%, transparent);
+}
 
-.doc-hyphen .doc-body { hyphens: auto; }
-.doc-banded .bn-block-content[data-content-type="table"] tr:nth-child(even) td { background-color: color-mix(in oklch, black 6%, transparent); }
+.doc-hyphen .doc-body {
+  hyphens: auto;
+}
+.doc-banded .bn-block-content[data-content-type="table"] tr:nth-child(even) td {
+  background-color: color-mix(in oklch, black 6%, transparent);
+}
 
-.doc-dropcap .doc-body .bn-block-group > .bn-block-outer:first-child .bn-block-content[data-content-type="paragraph"] > p::first-letter { float: left; font-size: 3.4em; line-height: 0.85; padding-right: 0.08em; }
+.doc-dropcap
+  .doc-body
+  .bn-block-group
+  > .bn-block-outer:first-child
+  .bn-block-content[data-content-type="paragraph"]
+  > p::first-letter {
+  float: left;
+  font-size: 3.4em;
+  line-height: 0.85;
+  padding-right: 0.08em;
+}
 
-.bn-block-content[data-content-type="numberedListItem"][data-nx-label]::before { content: attr(data-nx-label) !important; }
-.doc-body [data-field] { border-bottom: 1px dotted color-mix(in oklch, currentColor 40%, transparent); }
+.bn-block-content[data-content-type="numberedListItem"][data-nx-label]::before {
+  content: attr(data-nx-label) !important;
+}
+.doc-body [data-field] {
+  border-bottom: 1px dotted color-mix(in oklch, currentColor 40%, transparent);
+}
 
-.doc-body .bn-block-outer:has(> .bn-block > .bn-block-content[data-content-type="image"][data-wrap="left"]) { float: left; margin: 0 14px 6px 0; }
-.doc-body .bn-block-outer:has(> .bn-block > .bn-block-content[data-content-type="image"][data-wrap="right"]) { float: right; margin: 0 0 6px 14px; }
+.doc-body
+  .bn-block-outer:has(
+    > .bn-block > .bn-block-content[data-content-type="image"][data-wrap="left"]
+  ) {
+  float: left;
+  margin: 0 14px 6px 0;
+}
+.doc-body
+  .bn-block-outer:has(
+    > .bn-block
+      > .bn-block-content[data-content-type="image"][data-wrap="right"]
+  ) {
+  float: right;
+  margin: 0 0 6px 14px;
+}
