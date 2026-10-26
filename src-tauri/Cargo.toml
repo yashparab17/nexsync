@@ -50,15 +50,15 @@ portable-pty = "0.9"
 ignore = "0.4.33"
 regex = "1.13.1"
 # Office file formats (Phase 21): the format crates of WordCraft, by commit. MIT OR Apache-2.0; see THIRD_PARTY_NOTICES.md.
-wordcraft-doc = { git = "https://github.com/yashparab17/wordcraft", rev = "a70fe02db78ba802b76a3912240542d9a1cef9cd" }
-wordcraft-docx = { git = "https://github.com/yashparab17/wordcraft", rev = "a70fe02db78ba802b76a3912240542d9a1cef9cd" }
-wordcraft-formats = { git = "https://github.com/yashparab17/wordcraft", rev = "a70fe02db78ba802b76a3912240542d9a1cef9cd" }
-wordcraft-docbin = { git = "https://github.com/yashparab17/wordcraft", rev = "a70fe02db78ba802b76a3912240542d9a1cef9cd" }
-wordcraft-pdf = { git = "https://github.com/yashparab17/wordcraft", rev = "a70fe02db78ba802b76a3912240542d9a1cef9cd" }
-wordcraft-proof = { git = "https://github.com/yashparab17/wordcraft", rev = "a70fe02db78ba802b76a3912240542d9a1cef9cd" }
-wordcraft-layout = { git = "https://github.com/yashparab17/wordcraft", rev = "a70fe02db78ba802b76a3912240542d9a1cef9cd" }
-wordcraft-render = { git = "https://github.com/yashparab17/wordcraft", rev = "a70fe02db78ba802b76a3912240542d9a1cef9cd" }
-wordcraft-fonts = { git = "https://github.com/yashparab17/wordcraft", rev = "a70fe02db78ba802b76a3912240542d9a1cef9cd" }
+wordcraft-doc = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
+wordcraft-docx = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
+wordcraft-formats = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
+wordcraft-docbin = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
+wordcraft-pdf = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
+wordcraft-proof = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
+wordcraft-layout = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
+wordcraft-render = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
+wordcraft-fonts = { git = "https://github.com/yashparab17/wordcraft", rev = "02f099d2e82df185286eab155497a706f8a4c963" }
 # Spreadsheet engine and .xlsx files (Phase 21): GridCraft, by commit. MIT OR Apache-2.0; see THIRD_PARTY_NOTICES.md.
 gridcraft-engine = { git = "https://github.com/storytold/gridcraft", rev = "f1894c6da64d4326022ae644c767581816a23c2c" }
 gridcraft-xlsx = { git = "https://github.com/storytold/gridcraft", rev = "f1894c6da64d4326022ae644c767581816a23c2c" }
@@ -79,7 +79,7 @@ keyring = { version = "3", default-features = false, features = ["windows-native
 
 # Required by craft-pdf (used by wordcraft-pdf): the PDF backend must be the patched one, which rejects writers that failed while unwinding.
 [patch.crates-io]
-krilla = { git = "https://github.com/storytold/craft-libs", rev = "17744430be327d0257496a6a31c8d38fe20a6756" }
+krilla = { git = "https://github.com/storytold/craft-libs", rev = "b926b5c03e256c86ca10934f58d03f628810b5b7" }
 
 # Every dependency is optimised in debug builds too (built once, then cached): unoptimised, the office engines, the picture decoders
 # behind slides (a photo slide took 1.6 s to draw), signature checks and pattern matching make `tauri dev` far slower than a release.

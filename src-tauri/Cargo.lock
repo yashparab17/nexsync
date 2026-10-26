@@ -897,7 +897,7 @@ dependencies = [
 [[package]]
 name = "craft-pdf"
 version = "0.1.0"
-source = "git+https://github.com/storytold/craft-libs?rev=17744430be327d0257496a6a31c8d38fe20a6756#17744430be327d0257496a6a31c8d38fe20a6756"
+source = "git+https://github.com/storytold/craft-libs?rev=b926b5c03e256c86ca10934f58d03f628810b5b7#b926b5c03e256c86ca10934f58d03f628810b5b7"
 dependencies = [
  "krilla",
  "thiserror 2.0.20",
@@ -3365,7 +3365,7 @@ dependencies = [
 [[package]]
 name = "krilla"
 version = "0.8.2"
-source = "git+https://github.com/storytold/craft-libs?rev=17744430be327d0257496a6a31c8d38fe20a6756#17744430be327d0257496a6a31c8d38fe20a6756"
+source = "git+https://github.com/storytold/craft-libs?rev=b926b5c03e256c86ca10934f58d03f628810b5b7#b926b5c03e256c86ca10934f58d03f628810b5b7"
 dependencies = [
  "base64 0.22.1",
  "bumpalo",
@@ -8257,9 +8257,10 @@ dependencies = [
 [[package]]
 name = "wordcraft-doc"
 version = "0.11.0"
-source = "git+https://github.com/yashparab17/wordcraft?rev=a70fe02db78ba802b76a3912240542d9a1cef9cd#a70fe02db78ba802b76a3912240542d9a1cef9cd"
+source = "git+https://github.com/yashparab17/wordcraft?rev=02f099d2e82df185286eab155497a706f8a4c963#02f099d2e82df185286eab155497a706f8a4c963"
 dependencies = [
  "base64 0.23.1",
+ "log",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -8270,7 +8271,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-docbin"
 version = "0.11.0"
-source = "git+https://github.com/yashparab17/wordcraft?rev=a70fe02db78ba802b76a3912240542d9a1cef9cd#a70fe02db78ba802b76a3912240542d9a1cef9cd"
+source = "git+https://github.com/yashparab17/wordcraft?rev=02f099d2e82df185286eab155497a706f8a4c963#02f099d2e82df185286eab155497a706f8a4c963"
 dependencies = [
  "cfb 0.15.0",
  "chrono",
@@ -8286,7 +8287,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-docx"
 version = "0.11.0"
-source = "git+https://github.com/yashparab17/wordcraft?rev=a70fe02db78ba802b76a3912240542d9a1cef9cd#a70fe02db78ba802b76a3912240542d9a1cef9cd"
+source = "git+https://github.com/yashparab17/wordcraft?rev=02f099d2e82df185286eab155497a706f8a4c963#02f099d2e82df185286eab155497a706f8a4c963"
 dependencies = [
  "aes 0.9.3",
  "base64 0.23.1",
@@ -8309,8 +8310,9 @@ dependencies = [
 [[package]]
 name = "wordcraft-fonts"
 version = "0.11.0"
-source = "git+https://github.com/yashparab17/wordcraft?rev=a70fe02db78ba802b76a3912240542d9a1cef9cd#a70fe02db78ba802b76a3912240542d9a1cef9cd"
+source = "git+https://github.com/yashparab17/wordcraft?rev=02f099d2e82df185286eab155497a706f8a4c963#02f099d2e82df185286eab155497a706f8a4c963"
 dependencies = [
+ "brotli-decompressor",
  "harfrust",
  "kurbo",
  "log",
@@ -8323,7 +8325,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-formats"
 version = "0.11.0"
-source = "git+https://github.com/yashparab17/wordcraft?rev=a70fe02db78ba802b76a3912240542d9a1cef9cd#a70fe02db78ba802b76a3912240542d9a1cef9cd"
+source = "git+https://github.com/yashparab17/wordcraft?rev=02f099d2e82df185286eab155497a706f8a4c963#02f099d2e82df185286eab155497a706f8a4c963"
 dependencies = [
  "cfb 0.15.0",
  "chardetng",
@@ -8341,7 +8343,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-geom"
 version = "0.11.0"
-source = "git+https://github.com/yashparab17/wordcraft?rev=a70fe02db78ba802b76a3912240542d9a1cef9cd#a70fe02db78ba802b76a3912240542d9a1cef9cd"
+source = "git+https://github.com/yashparab17/wordcraft?rev=02f099d2e82df185286eab155497a706f8a4c963#02f099d2e82df185286eab155497a706f8a4c963"
 dependencies = [
  "image",
  "serde",
@@ -8350,7 +8352,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-layout"
 version = "0.11.0"
-source = "git+https://github.com/yashparab17/wordcraft?rev=a70fe02db78ba802b76a3912240542d9a1cef9cd#a70fe02db78ba802b76a3912240542d9a1cef9cd"
+source = "git+https://github.com/yashparab17/wordcraft?rev=02f099d2e82df185286eab155497a706f8a4c963#02f099d2e82df185286eab155497a706f8a4c963"
 dependencies = [
  "image",
  "js-sys",
@@ -8371,7 +8373,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-metafile"
 version = "0.11.0"
-source = "git+https://github.com/yashparab17/wordcraft?rev=a70fe02db78ba802b76a3912240542d9a1cef9cd#a70fe02db78ba802b76a3912240542d9a1cef9cd"
+source = "git+https://github.com/yashparab17/wordcraft?rev=02f099d2e82df185286eab155497a706f8a4c963#02f099d2e82df185286eab155497a706f8a4c963"
 dependencies = [
  "kurbo",
  "thiserror 2.0.20",
@@ -8380,7 +8382,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-pdf"
 version = "0.11.0"
-source = "git+https://github.com/yashparab17/wordcraft?rev=a70fe02db78ba802b76a3912240542d9a1cef9cd#a70fe02db78ba802b76a3912240542d9a1cef9cd"
+source = "git+https://github.com/yashparab17/wordcraft?rev=02f099d2e82df185286eab155497a706f8a4c963#02f099d2e82df185286eab155497a706f8a4c963"
 dependencies = [
  "chrono",
  "craft-pdf",
@@ -8399,7 +8401,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-proof"
 version = "0.11.0"
-source = "git+https://github.com/yashparab17/wordcraft?rev=a70fe02db78ba802b76a3912240542d9a1cef9cd#a70fe02db78ba802b76a3912240542d9a1cef9cd"
+source = "git+https://github.com/yashparab17/wordcraft?rev=02f099d2e82df185286eab155497a706f8a4c963#02f099d2e82df185286eab155497a706f8a4c963"
 dependencies = [
  "log",
  "miniz_oxide 0.9.1",
@@ -8409,7 +8411,7 @@ dependencies = [
 [[package]]
 name = "wordcraft-render"
 version = "0.11.0"
-source = "git+https://github.com/yashparab17/wordcraft?rev=a70fe02db78ba802b76a3912240542d9a1cef9cd#a70fe02db78ba802b76a3912240542d9a1cef9cd"
+source = "git+https://github.com/yashparab17/wordcraft?rev=02f099d2e82df185286eab155497a706f8a4c963#02f099d2e82df185286eab155497a706f8a4c963"
 dependencies = [
  "image",
  "log",

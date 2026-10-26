@@ -22,6 +22,12 @@ fn main() {
     }
     let laid = wordcraft_layout::layout(&doc, &mut wordcraft_layout::LayoutCache::new(), &wordcraft_layout::LayoutOptions::default());
     println!("pages {}", laid.pages.len());
+    // PDF=out.pdf: the document as the app would export it, to compare page by page with the PDF Word saved (`compare_pdfs.py`)
+    if let Ok(out) = std::env::var("PDF") {
+        let pdf = wordcraft_pdf::export(&doc, &wordcraft_pdf::PdfOptions::default()).expect("pdf export");
+        std::fs::write(out, pdf).expect("writable pdf path");
+        return;
+    }
     for fam in std::env::args().skip(2) {
         for (b, i) in [(false, false), (true, false)] {
             let r = wordcraft_fonts::word::resolve(&fam, b, i);
