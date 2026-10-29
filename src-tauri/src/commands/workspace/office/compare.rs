@@ -28,7 +28,6 @@ fn text_of(blocks: &[Arc<Block>], out: &mut Vec<String>) {
                     out.push(cells.join("\t"));
                 }
             }
-            _ => {}
         }
     }
 }

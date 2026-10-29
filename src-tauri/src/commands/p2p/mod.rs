@@ -17,6 +17,8 @@ pub(crate) mod membership;
 #[cfg(test)]
 mod membership_sim;
 #[cfg(test)]
+mod group_key_sim;
+#[cfg(test)]
 mod peer_check;
 mod mesh;
 mod node;

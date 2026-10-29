@@ -2,6 +2,12 @@
 // suggesting, what they type is marked as inserted and what they delete is marked as deleted (and stays on the page, struck through)
 // until someone accepts or rejects it. The marks are in the shared text, so everyone sees them, and they go to the file as Word's
 // w:ins and w:del (see the Rust side). `compareLines` is the other source of changes: two versions of a text, side by side.
+//
+// Two people reviewing at once can leave a mark behind: when one accepts or rejects a change while another types inside or beside it,
+// the merged text can carry the resolved change's mark again, on words nobody suggested (RESEARCH.md §8p: 16% of two-person and 34% of
+// three-person sessions in simulation). So every resolved mark value goes on a shared list, and a mark whose value is on it is
+// removed wherever it turns up (`strayMarks`, `staleMarksPlugin`). A pending deletion mark that spreads onto neighbouring new text is
+// not caught (0.4% and 1.4% of sessions), since nothing says the text was not part of it.
 
 import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { Mark, Node as PmNode } from "@tiptap/pm/model";
@@ -25,6 +31,8 @@ export interface Change {
 	author: string;
 	date: string;
 	text: string;
+	// Every mark value inside it: each stretch of typing has its own date
+	values: string[];
 }
 
 const markOf = (m: readonly Mark[]): { kind: ChangeKind; value: string } | null => {
@@ -43,7 +51,8 @@ export function changesOf(doc: PmNode): Change[] {
 		if (last && last.kind === m.kind && last.to === pos && last.author === readMark(m.value).author) {
 			last.to = pos + node.nodeSize;
 			last.text += node.text ?? "";
-		} else out.push({ kind: m.kind, from: pos, to: pos + node.nodeSize, text: node.text ?? "", ...readMark(m.value) });
+			if (!last.values.includes(m.value)) last.values.push(m.value);
+		} else out.push({ kind: m.kind, from: pos, to: pos + node.nodeSize, text: node.text ?? "", values: [m.value], ...readMark(m.value) });
 		return false;
 	});
 	return out;
@@ -51,7 +60,9 @@ export function changesOf(doc: PmNode): Change[] {
 
 // Accepting an insertion or rejecting a deletion keeps the text and drops the mark; the other two remove the text. From the end back,
 // so the positions of the changes still to do hold.
-export function resolveChanges(view: EditorView, changes: Change[], accept: boolean): void {
+export function resolveChanges(view: EditorView, changes: Change[], accept: boolean, store?: ReviewStore): void {
+	// Written first, so a device that merges the resolution and a late edit finds the list already there
+	store?.resolved?.add(changes.flatMap((c) => c.values));
 	const tr = view.state.tr;
 	for (const c of [...changes].sort((a, b) => b.from - a.from)) {
 		const keep = (c.kind === "insertion") === accept;
@@ -69,12 +80,51 @@ export function nextChange(changes: Change[], pos: number, backwards = false): C
 	return changes.find((c) => c.from >= pos) ?? changes[0];
 }
 
+// The mark values of changes that have been accepted or rejected, shared by everyone with the document
+export interface ResolvedSet {
+	has(value: string): boolean;
+	add(values: string[]): void;
+	size(): number;
+	// Calls back when the list changes (also for what other people add); returns the way to stop
+	watch(cb: () => void): () => void;
+}
+
+// A Y.Map, as far as the list needs one
+interface ResolvedMap {
+	has(key: string): boolean;
+	set(key: string, value: boolean): unknown;
+	size: number;
+	observe(cb: () => void): void;
+	unobserve(cb: () => void): void;
+	doc?: { transact(fn: () => void): void } | null;
+}
+
+// ponytail: nothing is ever removed from the list; every mark value of a resolved change stays (about 55 bytes each). Drop old ones if a document's list grows large.
+export function resolvedSetOf(map: ResolvedMap): ResolvedSet {
+	return {
+		has: (v) => map.has(v),
+		add: (values) => {
+			const fresh = values.filter((v) => !map.has(v));
+			if (!fresh.length) return;
+			const write = () => fresh.forEach((v) => map.set(v, true));
+			if (map.doc) map.doc.transact(write);
+			else write();
+		},
+		size: () => map.size,
+		watch: (cb) => {
+			map.observe(cb);
+			return () => map.unobserve(cb);
+		},
+	};
+}
+
 export interface ReviewStore {
 	suggesting: boolean;
 	author: string;
+	resolved?: ResolvedSet;
 }
 
-export const newReviewStore = (author = ""): ReviewStore => ({ suggesting: false, author });
+export const newReviewStore = (author = "", resolved?: ResolvedSet): ReviewStore => ({ suggesting: false, author, resolved });
 
 const reviewKey = new PluginKey("docReview");
 
@@ -150,6 +200,52 @@ export function suggestingPlugin(store: ReviewStore): Plugin {
 		},
 	});
 }
+
+// Marks in the text whose change was already accepted or rejected
+export function strayMarks(doc: PmNode, resolved: ResolvedSet): { from: number; to: number; kind: ChangeKind }[] {
+	const out: { from: number; to: number; kind: ChangeKind }[] = [];
+	if (resolved.size() === 0) return out;
+	doc.descendants((node, pos) => {
+		if (!node.isText) return true;
+		for (const m of node.marks) {
+			const kind = m.type.name;
+			if ((kind === "insertion" || kind === "deletion") && resolved.has(String(m.attrs.stringValue ?? ""))) out.push({ from: pos, to: pos + node.nodeSize, kind });
+		}
+		return false;
+	});
+	return out;
+}
+
+const isRemote = (tr: Transaction) => tr.getMeta("y-sync$") != null;
+
+// Removes stray marks after a merge, and when the list of resolved changes grows. It is not typing, so it is not marked as a
+// suggestion and not put on the undo stack; every device does the same, so they stay in step.
+export function staleMarksPlugin(store: ReviewStore): Plugin {
+	return new Plugin({
+		key: staleKey,
+		appendTransaction(trs: readonly Transaction[], _old: EditorState, state: EditorState) {
+			const resolved = store.resolved;
+			if (!resolved || resolved.size() === 0) return null;
+			if (!trs.some((t) => (t.docChanged && isRemote(t)) || t.getMeta(staleKey) === "check")) return null;
+			const strays = strayMarks(state.doc, resolved);
+			if (!strays.length) return null;
+			const tr = state.tr;
+			for (const s of strays) tr.removeMark(s.from, s.to, state.schema.marks[s.kind]);
+			return tr.setMeta(reviewKey, "repair").setMeta("addToHistory", false);
+		},
+		view(view: EditorView) {
+			const check = () => {
+				if (!view.isDestroyed) view.dispatch(view.state.tr.setMeta(staleKey, "check"));
+			};
+			const stop = store.resolved?.watch(check);
+			// A copy opened with changes already on the list is cleaned too
+			queueMicrotask(check);
+			return { destroy: () => stop?.() };
+		},
+	});
+}
+
+const staleKey = new PluginKey("docStaleMarks");
 
 // ----- Compare: two versions of a text, as insertions and deletions
 

@@ -35,6 +35,8 @@ struct Act {
     id: Id,
     kind: Kind,
     deps: BTreeSet<Id>,
+    /// Place in the arbiter's log (only the `Era` rule reads it; 0 until the arbiter has numbered the history)
+    rank: usize,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -86,20 +88,24 @@ enum Rule {
     Sticky,
     /// Sticky, except that when two Admins remove each other at the same time only the lower key's removal counts
     StickyPairBreak,
+    /// Epoch-resolved arbitration (Dougal, arXiv:2601.22963): an arbiter puts concurrent actions into one fixed order, a
+    /// log every device replays from its start, skipping an action whose author lacked the right at that point. Modelled
+    /// as the arbiter numbering the history in a random order that keeps causality; devices receive the log in order
+    Era,
 }
 
-const RULES: [Rule; 3] = [Rule::Replay, Rule::Sticky, Rule::StickyPairBreak];
+const RULES: [Rule; 4] = [Rule::Replay, Rule::Sticky, Rule::StickyPairBreak, Rule::Era];
 
 /// The order every device uses: an action only after what it names, and among those available the owner's before the
 /// Admins', removals before role changes, then the lower key, then the earlier
-fn canonical(acts: &BTreeMap<Id, Act>) -> Vec<Id> {
+fn canonical(rule: Rule, acts: &BTreeMap<Id, Act>) -> Vec<Id> {
     let mut done: BTreeSet<Id> = BTreeSet::new();
     let mut out = Vec::new();
     while out.len() < acts.len() {
         let next = acts
             .values()
             .filter(|a| !done.contains(&a.id) && a.deps.iter().all(|d| done.contains(d) || !acts.contains_key(d)))
-            .min_by_key(|a| (usize::from(a.id.0 != OWNER), usize::from(!matches!(a.kind, Kind::Remove(_))), a.id.0, a.id.1))
+            .min_by_key(|a| if rule == Rule::Era { (a.rank, 0, 0, 0) } else { (0, usize::from(a.id.0 != OWNER), usize::from(!matches!(a.kind, Kind::Remove(_))), a.id.0 * 1_000_000 + a.id.1) })
             .expect("a dependency cycle cannot happen");
         done.insert(next.id);
         out.push(next.id);
@@ -119,7 +125,7 @@ struct Counts {
 fn resolve(rule: Rule, admins_equal: bool, acts: &BTreeMap<Id, Act>) -> (State, Counts) {
     let mut st = initial();
     let mut counts = Counts::default();
-    let order = canonical(acts);
+    let order = canonical(rule, acts);
     // Mutual removals: two removals that name each other's authors, neither having seen the other
     let suppressed: BTreeSet<Id> = if rule == Rule::StickyPairBreak {
         let removals: Vec<&Act> = acts.values().filter(|a| matches!(a.kind, Kind::Remove(_))).collect();
@@ -143,7 +149,7 @@ fn resolve(rule: Rule, admins_equal: bool, acts: &BTreeMap<Id, Act>) -> (State, 
             counts.skipped += 1;
             continue;
         }
-        if rule == Rule::Replay && !may(&st, admins_equal, a.id.0, a.kind) {
+        if (rule == Rule::Replay || rule == Rule::Era) && !may(&st, admins_equal, a.id.0, a.kind) {
             counts.skipped += 1;
             continue;
         }
@@ -193,12 +199,18 @@ fn generate(rng: &mut StdRng, rule: Rule, admins_equal: bool, steps: usize, p_sy
             continue;
         }
         seq += 1;
-        let act = Act { id: (a, seq), kind, deps: seen[&a].keys().copied().collect() };
+        let act = Act { id: (a, seq), kind, deps: seen[&a].keys().copied().collect(), rank: 0 };
         seen.get_mut(&a).unwrap().insert(act.id, act);
     }
     let mut all = BTreeMap::new();
     for s in seen.values() {
         all.extend(s.clone());
+    }
+    if rule == Rule::Era {
+        // The arbiter numbers the history (only for this rule, so the other rules' random streams are unchanged)
+        for (i, id) in arrival_order(rng, &all).into_iter().enumerate() {
+            all.get_mut(&id).unwrap().rank = i + 1;
+        }
     }
     let list: Vec<&Act> = all.values().collect();
     let mut concurrent_pairs = 0;
@@ -265,7 +277,14 @@ fn study(rule: Rule, admins_equal: bool, steps: usize, p_sync: f64, trials: usiz
         let mut naive_ends: Vec<State> = Vec::new();
         let mut readmit = false;
         for _ in 0..4 {
-            let order = arrival_order(&mut rng, &h.acts);
+            // With arbitration devices receive the arbiter's log, in order; otherwise in any order the actions name
+            let order = if rule == Rule::Era {
+                let mut log: Vec<Id> = h.acts.keys().copied().collect();
+                log.sort_by_key(|id| h.acts[id].rank);
+                log
+            } else {
+                arrival_order(&mut rng, &h.acts)
+            };
             // No merge rule: apply what the author may do at that moment, in arrival order
             let mut st = initial();
             for id in &order {

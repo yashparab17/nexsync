@@ -47,7 +47,7 @@ export function useDocumentReview(editor: DocumentEditorType, store: ReviewStore
 		view.focus();
 	};
 	const resolve = (list: Change[], accept: boolean) => {
-		if (list.length) resolveChanges(editor.prosemirrorView, list, accept);
+		if (list.length) resolveChanges(editor.prosemirrorView, list, accept, store);
 	};
 	return {
 		suggesting,

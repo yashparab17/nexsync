@@ -19,7 +19,7 @@ import PrintView from "@/features/office/documents/components/PrintView";
 import ProofingDialog from "@/features/office/documents/components/ProofingDialog";
 import CompareDialog from "@/features/office/documents/components/CompareDialog";
 import { useDocumentReview } from "@/features/office/documents/components/useDocumentReview";
-import { newReviewStore, suggestingPlugin } from "@/features/office/documents/lib/documentReview";
+import { newReviewStore, resolvedSetOf, staleMarksPlugin, suggestingPlugin } from "@/features/office/documents/lib/documentReview";
 import { useDocumentActions } from "@/features/office/documents/components/useDocumentActions";
 import Backstage from "@/features/office/shared/Backstage";
 import HistoryPanel from "@/features/office/shared/HistoryPanel";
@@ -129,7 +129,7 @@ const zones = (text: string) => (text.includes("	") ? text.split("	").slice(0, 3
 function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload, history, canComment = false }: Props) {
 	const doc = collab.doc;
 	const commentStore = useMemo(newCommentStore, []);
-	const reviewStore = useMemo(() => newReviewStore(author), [author]);
+	const reviewStore = useMemo(() => newReviewStore(author, resolvedSetOf(doc.getMap<boolean>("resolvedChanges"))), [author, doc]);
 	const options = useMemo(
 		() =>
 			withCollaboration({
@@ -140,7 +140,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					() => ({ key: "pagePush", prosemirrorPlugins: [pagePushPlugin] }),
 					() => ({ key: "wordLayout", prosemirrorPlugins: [wordLayoutPlugin] }),
 					() => ({ key: "docComments", prosemirrorPlugins: [commentsPlugin(commentStore)] }),
-					() => ({ key: "docReview", prosemirrorPlugins: [suggestingPlugin(reviewStore)] }),
+					() => ({ key: "docReview", prosemirrorPlugins: [suggestingPlugin(reviewStore), staleMarksPlugin(reviewStore)] }),
 					() => ({ key: "smartQuotes", prosemirrorPlugins: [smartQuotesPlugin] }),
 					() => ({ key: "listLevels", prosemirrorPlugins: [listLevelsPlugin] }),
 				],

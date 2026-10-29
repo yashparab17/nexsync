@@ -19,6 +19,8 @@ mod crdt_sim;
 mod clock_sim;
 #[cfg(test)]
 mod reach_sim;
+#[cfg(test)]
+mod sheet_sim;
 pub mod filesystem;
 pub mod registry;
 pub mod tasks;
