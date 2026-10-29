@@ -17,6 +17,9 @@ import DocumentInspector from "@/features/office/documents/components/DocumentIn
 import DocumentRibbon from "@/features/office/documents/components/DocumentRibbon";
 import PrintView from "@/features/office/documents/components/PrintView";
 import ProofingDialog from "@/features/office/documents/components/ProofingDialog";
+import CompareDialog from "@/features/office/documents/components/CompareDialog";
+import { useDocumentReview } from "@/features/office/documents/components/useDocumentReview";
+import { newReviewStore, suggestingPlugin } from "@/features/office/documents/lib/documentReview";
 import { useDocumentActions } from "@/features/office/documents/components/useDocumentActions";
 import Backstage from "@/features/office/shared/Backstage";
 import HistoryPanel from "@/features/office/shared/HistoryPanel";
@@ -126,6 +129,7 @@ const zones = (text: string) => (text.includes("	") ? text.split("	").slice(0, 3
 function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload, history, canComment = false }: Props) {
 	const doc = collab.doc;
 	const commentStore = useMemo(newCommentStore, []);
+	const reviewStore = useMemo(() => newReviewStore(author), [author]);
 	const options = useMemo(
 		() =>
 			withCollaboration({
@@ -136,6 +140,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					() => ({ key: "pagePush", prosemirrorPlugins: [pagePushPlugin] }),
 					() => ({ key: "wordLayout", prosemirrorPlugins: [wordLayoutPlugin] }),
 					() => ({ key: "docComments", prosemirrorPlugins: [commentsPlugin(commentStore)] }),
+					() => ({ key: "docReview", prosemirrorPlugins: [suggestingPlugin(reviewStore)] }),
 					() => ({ key: "smartQuotes", prosemirrorPlugins: [smartQuotesPlugin] }),
 					() => ({ key: "listLevels", prosemirrorPlugins: [listLevelsPlugin] }),
 				],
@@ -148,6 +153,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 	const a = useDocumentActions(editor, styleDefs);
 	const src = useSources(doc);
 	const comments = useDocumentComments(editor, commentStore, history?.rel ?? name, canComment);
+	const review = useDocumentReview(editor, reviewStore);
 	const people = usePeople(collab.awareness);
 
 	// The editor can take text once its view exists, which is after the page has drawn it
@@ -297,7 +303,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 	const pageEl = useRef<HTMLDivElement>(null);
 	const [marks, setMarks] = useState<LineMark[]>([]);
 	const [find, setFind] = useState<{ replace: boolean; query: string; with: string; cs: boolean; rx: boolean; note: string } | null>(null);
-	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | "sources" | "merge" | null>(null);
+	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | "sources" | "merge" | "compare" | null>(null);
 	// Puts the file back in place of the shared copy, for everyone: the text as the file has it now, with its spacing, page set-up and
 	// header and footer
 	const reload = async () => {
@@ -744,6 +750,8 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					openHeaderFooter={() => setDialog("headerFooter")}
 					openCounts={() => setDialog("counts")}
 					openProofing={() => setDialog("proofing")}
+					review={review}
+					openCompare={() => setDialog("compare")}
 					comments={{ open: comments.open, count: comments.count, canComment, start: comments.start, toggle: comments.toggle }}
 					pickImage={pickImage}
 					paste={() => void paste()}
@@ -938,6 +946,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					}}
 				/>
 			)}
+			{dialog === "compare" && history && <CompareDialog workspacePath={history.workspacePath} rel={history.rel} lines={() => textOfBlocks(editor.document as never).split(String.fromCharCode(10))} onClose={() => setDialog(null)} />}
 			{dialog === "sources" && <SourcesDialog doc={doc} editor={editor} onClose={() => setDialog(null)} />}
 			{dialog === "merge" && <MergeDialog editor={editor} workspacePath={history?.workspacePath} onClose={() => setDialog(null)} />}
 			{dialog === "headerFooter" && <HeaderFooterDialog value={hf} onClose={() => setDialog(null)} onSave={(v) => { saveHf(v); setDialog(null); }} />}

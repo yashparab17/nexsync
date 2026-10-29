@@ -52,6 +52,11 @@ import {
 	Stamp,
 	Sigma,
 	Brush,
+	Check,
+	ChevronLeft,
+	ChevronRight,
+	GitCompareArrows,
+	X as XIcon,
 } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -91,6 +96,8 @@ export interface RibbonProps {
 	openCounts: () => void;
 	openProofing: () => void;
 	comments: { open: boolean; count: number; canComment: boolean; start: () => void; toggle: () => void };
+	review: { suggesting: boolean; count: number; toggle: () => void; accept: () => void; reject: () => void; acceptAll: () => void; rejectAll: () => void; next: () => void; previous: () => void };
+	openCompare: () => void;
 	pickImage: () => void;
 	paste: () => void;
 	hasHeaderFooter: boolean;
@@ -486,6 +493,24 @@ export default function DocumentRibbon(p: RibbonProps) {
 				<Group label="Comments">
 					<Big icon={MessageSquareText} label="New Comment" disabled={!p.comments.canComment} title="Comment on the selected text" onPress={p.comments.start} />
 					<Big icon={MessageSquareText} label={p.comments.count ? `Show Comments (${p.comments.count})` : "Show Comments"} active={p.comments.open} onPress={p.comments.toggle} />
+				</Group>
+				<Group label="Tracking">
+					<Big icon={PenLine} label="Track Changes" title="What you type and delete is marked, for others to accept or reject" disabled={p.readOnly} active={p.review.suggesting} onPress={p.review.toggle} />
+					<Rows>
+						<Small icon={Check} label="Accept" disabled={p.readOnly || !p.review.count} onPress={p.review.accept} />
+						<Small icon={XIcon} label="Reject" disabled={p.readOnly || !p.review.count} onPress={p.review.reject} />
+					</Rows>
+					<Rows>
+						<Small icon={ChevronLeft} label="Previous" disabled={!p.review.count} onPress={p.review.previous} />
+						<Small icon={ChevronRight} label={p.review.count ? `Next (${p.review.count})` : "Next"} disabled={!p.review.count} onPress={p.review.next} />
+					</Rows>
+					<Rows>
+						<Small icon={Check} label="Accept All" disabled={p.readOnly || !p.review.count} onPress={p.review.acceptAll} />
+						<Small icon={XIcon} label="Reject All" disabled={p.readOnly || !p.review.count} onPress={p.review.rejectAll} />
+					</Rows>
+				</Group>
+				<Group label="Compare">
+					<Big icon={GitCompareArrows} label="Compare" title="Compare this document with a saved version" onPress={p.openCompare} />
 				</Group>
 			</>
 		);

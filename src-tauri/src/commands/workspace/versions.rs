@@ -42,7 +42,7 @@ pub struct FileVersion {
     pub created_at: String,
 }
 
-fn blob_dir(workspace: &str) -> PathBuf {
+pub(crate) fn blob_dir(workspace: &str) -> PathBuf {
     Path::new(workspace).join(".nexsync").join("versions")
 }
 
@@ -231,7 +231,7 @@ pub fn rename_path(workspace: &str, old_rel: &str, new_rel: &str) -> Result<(), 
     Ok(())
 }
 
-fn version_row(db: &WorkspaceDb, ws_id: &str, id: i64) -> Result<FileVersion, String> {
+pub(crate) fn version_row(db: &WorkspaceDb, ws_id: &str, id: i64) -> Result<FileVersion, String> {
     db.conn
         .query_row(
             "SELECT id, path, hash, size, source, label, author, created_at FROM file_versions WHERE workspace_id = ?1 AND id = ?2",

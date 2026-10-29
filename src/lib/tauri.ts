@@ -960,6 +960,10 @@ export function projectContainers(path: string, project: string): Promise<Contai
 export function officeImport(path: string, rel: string, password?: string | null): Promise<ImportAnswer> {
 	return invoke("office_import", { path, rel, password: password ?? null });
 }
+// The lines of a kept version of a document (a paragraph, or a table row with tabs between its cells), for Compare
+export function officeVersionLines(path: string, id: number, ext: string): Promise<string[]> {
+	return invoke("office_version_lines", { path, id, ext });
+}
 // Writes the editor's HTML as the file `dest` names (.docx, .odt, .rtf, .md, .html, .txt, .tex); `author` empty leaves the file unnamed
 export function officeExport(path: string, dest: string, html: string, title: string, author: string, layout?: OfficeLayout | null, sourceId?: string | null): Promise<number> {
 	return invoke("office_export", { path, dest, html, title, author, layout: layout ?? null, sourceId: sourceId ?? null });

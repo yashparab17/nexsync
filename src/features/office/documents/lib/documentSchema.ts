@@ -67,6 +67,29 @@ const field = createStyleSpec(
 	},
 );
 
+// A tracked change: text somebody inserted or deleted while suggesting, and who and when ("author|date"). It stays in the text,
+// drawn in colour, until it is accepted or rejected (see `documentReview`). In the file it is Word's w:ins or w:del.
+function change(type: "insertion" | "deletion") {
+	const tag = type === "insertion" ? "ins" : "del";
+	const draw = (value: string) => {
+		const i = value.indexOf("|");
+		const dom = document.createElement(tag);
+		dom.className = `doc-${tag}`;
+		dom.dataset.author = i < 0 ? value : value.slice(0, i);
+		dom.dataset.date = i < 0 ? "" : value.slice(i + 1);
+		dom.title = `${type === "insertion" ? "Inserted" : "Deleted"} by ${dom.dataset.author}`;
+		return { dom, contentDOM: dom };
+	};
+	return createStyleSpec(
+		{ type, propSchema: "string" },
+		{
+			render: draw,
+			toExternalHTML: draw,
+			parse: (el) => (el.tagName === tag.toUpperCase() ? `${el.dataset.author ?? ""}|${el.dataset.date ?? ""}` : undefined),
+		},
+	);
+}
+
 // BlockNote's own colours only know its palette names, and draw nothing for a hex such as #0F4761 (what a Word file or the colour
 // picker gives). These take any CSS colour, keep it as #rrggbb, and draw it.
 const hexOf = (css: string): string | undefined => {
@@ -139,5 +162,5 @@ const blockSpecs = {
 };
 
 // The font goes before the size, so a run's size is drawn inside its font: its line is then as tall as that font at that size, as in Word
-export const documentSchema = BlockNoteSchema.create({ blockSpecs, styleSpecs: { ...defaultStyleSpecs, field, fontFamily, fontSize, textColor: colourSpec("textColor", "color"), backgroundColor: colourSpec("backgroundColor", "backgroundColor") } });
+export const documentSchema = BlockNoteSchema.create({ blockSpecs, styleSpecs: { ...defaultStyleSpecs, field, insertion: change("insertion"), deletion: change("deletion"), fontFamily, fontSize, textColor: colourSpec("textColor", "color"), backgroundColor: colourSpec("backgroundColor", "backgroundColor") } });
 export type DocumentEditorType = typeof documentSchema.BlockNoteEditor;

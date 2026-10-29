@@ -96,3 +96,20 @@ fn a_remote_picture_is_listed_and_never_fetched_and_macros_are_noticed_not_run()
     assert!(i.inspect.macros, "the macro part is noticed");
     assert!(listener.accept().is_err(), "nothing connected to the address");
 }
+
+#[test]
+fn table_structure_goes_through_a_docx_and_back() {
+    use super::documents::export;
+    let html = "<table><thead><tr><th>Name</th><th colspan=\"2\">Scores</th></tr></thead><tbody><tr><td rowspan=\"2\">Ana</td><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr></tbody></table>";
+    let bytes = export("docx", html, "T", "A", None).unwrap();
+    use std::io::Read;
+    let mut z = zip::ZipArchive::new(std::io::Cursor::new(bytes.clone())).unwrap();
+    let mut xml = String::new();
+    z.by_name("word/document.xml").unwrap().read_to_string(&mut xml).unwrap();
+    assert!(xml.contains("<w:gridSpan"), "a merged cell across columns: {xml}");
+    assert!(xml.contains("<w:vMerge"), "a merged cell down rows");
+    assert!(xml.contains("<w:tblHeader"), "the header row repeats on each page");
+    let back = import("t.docx", &bytes, None).unwrap();
+    let json = serde_json::to_string(&back.blocks).unwrap();
+    assert!(json.contains("\"colspan\":2") && json.contains("\"rowspan\":2"), "{json}");
+}

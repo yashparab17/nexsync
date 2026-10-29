@@ -236,6 +236,7 @@ pub fn run() {
             commands::workspace::office::sheets::sheet_open,
             commands::workspace::office::sheets::sheet_save,
             commands::workspace::office::documents::office_import,
+            commands::workspace::office::compare::office_version_lines,
             commands::workspace::office::documents::office_render,
             commands::workspace::office::documents::office_layout,
             commands::workspace::office::documents::office_page,

@@ -362,6 +362,22 @@ fn read_document(ext: &str, bytes: &[u8], password: Option<&str>) -> Result<word
     }
 }
 
+/// The lines of a file as a document (see `compare`), read under the same limits as opening it
+pub fn lines_of(name: &str, bytes: &[u8]) -> Result<Vec<String>, String> {
+    if bytes.len() as u64 > MAX_FILE_BYTES {
+        return Err("This version is bigger than 64 MB.".to_string());
+    }
+    let ext = ext_of(name);
+    if !IMPORTABLE.contains(&ext.as_str()) {
+        return Err(format!("A .{ext} file cannot be compared."));
+    }
+    if matches!(ext.as_str(), "docx" | "docm" | "dotx" | "dotm" | "odt") {
+        check_package(bytes)?;
+    }
+    let doc = read_document(&ext, bytes, None).map_err(|e| e.message)?;
+    catch_unwind(AssertUnwindSafe(|| super::compare::document_lines(&doc))).map_err(|_| "This version could not be read.".to_string())
+}
+
 /// Opens a file's bytes as an editable document. `name` gives the format by its extension.
 pub fn import(name: &str, bytes: &[u8], password: Option<&str>) -> Result<Imported, Refusal> {
     if bytes.len() as u64 > MAX_FILE_BYTES {

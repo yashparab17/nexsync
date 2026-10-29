@@ -863,6 +863,17 @@ select option:checked {
   filter: invert(1) hue-rotate(180deg);
 }
 
+.bn-root .doc-ins,
+.doc-ins {
+	color: #1a7f37;
+	text-decoration: underline;
+	text-decoration-style: double;
+}
+.bn-root .doc-del,
+.doc-del {
+	color: #c62828;
+	text-decoration: line-through;
+}
 .doc-comment {
   background-color: color-mix(in oklch, var(--warning) 25%, transparent);
   cursor: pointer;
