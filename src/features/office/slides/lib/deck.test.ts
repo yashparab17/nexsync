@@ -100,3 +100,79 @@ describe("dragging a frame", () => {
 		expect(nw.y + nw.h).toBeCloseTo(200, 5);
 	});
 });
+
+describe("a shape in pieces", () => {
+	const two = () => {
+		const a = new Y.Doc();
+		seed(a, "{}", [JSON.stringify({ id: 10, layout: 1, shapes: [{ id: 11, name: "a", xfrm: { x: 10, y: 10, w: 100, h: 50 }, text: { paragraphs: [{ runs: [{ text: "hello" }] }] } }, { id: 12, name: "b", xfrm: { x: 0, y: 0, w: 20, h: 20 } }] })]);
+		const b = new Y.Doc();
+		Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
+		return { a, b, key: slideKeys(a)[0] };
+	};
+	const sync = (a: Y.Doc, b: Y.Doc) => {
+		Y.applyUpdate(a, Y.encodeStateAsUpdate(b));
+		Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
+	};
+	const shapeOf = (d: Y.Doc, key: string, id: number) => readSlide(d, key)!.shapes.find((s) => s.id === id)!;
+
+	it("keeps a move and an edit of the text of the same shape", () => {
+		const { a, b, key } = two();
+		const moved = { ...shapeOf(a, key, 11), xfrm: { x: 300, y: 200, w: 100, h: 50 } };
+		setShape(a, key, moved);
+		const edited = { ...shapeOf(b, key, 11), text: { paragraphs: [{ runs: [{ text: "edited" }] }] } };
+		setShape(b, key, edited);
+		sync(a, b);
+		for (const d of [a, b]) {
+			expect(shapeOf(d, key, 11).xfrm).toEqual({ x: 300, y: 200, w: 100, h: 50 });
+			expect(textOf(shapeOf(d, key, 11))).toBe("edited");
+		}
+	});
+
+	it("keeps a move and a resize that change different numbers of the same shape", () => {
+		const { a, b, key } = two();
+		setShape(a, key, { ...shapeOf(a, key, 11), xfrm: { x: 500, y: 10, w: 100, h: 50 } });
+		setShape(b, key, { ...shapeOf(b, key, 11), xfrm: { x: 10, y: 10, w: 250, h: 90 } });
+		sync(a, b);
+		expect(shapeOf(a, key, 11).xfrm).toEqual({ x: 500, y: 10, w: 250, h: 90 });
+		expect(shapeOf(b, key, 11).xfrm).toEqual(shapeOf(a, key, 11).xfrm);
+	});
+
+	it("draws a shape once when two people change its order at the same time", () => {
+		const { a, b, key } = two();
+		arrange(a, key, 11, "front");
+		arrange(b, key, 11, "front");
+		sync(a, b);
+		for (const d of [a, b]) expect(readSlide(d, key)!.shapes.filter((s) => s.id === 11)).toHaveLength(1);
+	});
+
+	it("does not bring a deleted shape back when somebody moved it at the same time", () => {
+		const { a, b, key } = two();
+		removeShape(a, key, 12);
+		setShape(b, key, { ...shapeOf(b, key, 12), xfrm: { x: 400, y: 0, w: 20, h: 20 } });
+		arrange(b, key, 12, "front");
+		sync(a, b);
+		for (const d of [a, b]) expect(readSlide(d, key)!.shapes.map((s) => s.id)).toEqual([11]);
+	});
+
+	it("reads a deck saved before shapes were in pieces, and moves it to pieces when a shape is changed", () => {
+		const doc = new Y.Doc();
+		const key = "old";
+		doc.getArray("slides").push([key]);
+		doc.getMap(`slide:${key}`).set("meta", JSON.stringify({ id: 10, layout: 1 }));
+		doc.getArray(`shapes:${key}`).push([11]);
+		const whole = { id: 11, name: "old", xfrm: { x: 1, y: 2, w: 30, h: 40 }, text: { paragraphs: [{ runs: [{ text: "kept" }] }] } };
+		doc.getMap(`slide:${key}`).set("s:11", JSON.stringify(whole));
+		expect(readSlide(doc, key)!.shapes[0]).toEqual(whole);
+		setShape(doc, key, { ...whole, xfrm: { ...whole.xfrm, x: 9 } });
+		expect(readSlide(doc, key)!.shapes[0]).toEqual({ ...whole, xfrm: { x: 9, y: 2, w: 30, h: 40 } });
+	});
+
+	it("keeps a null box and a null text as they were", () => {
+		const doc = new Y.Doc();
+		seed(doc, "{}", [JSON.stringify({ id: 10, layout: 1, shapes: [{ id: 11, name: "placeholder", xfrm: null, text: null }] })]);
+		const key = slideKeys(doc)[0];
+		expect(readSlide(doc, key)!.shapes[0]).toEqual({ id: 11, name: "placeholder", xfrm: null, text: null });
+		setShape(doc, key, { id: 11, name: "renamed", xfrm: null, text: null });
+		expect(readSlide(doc, key)!.shapes[0]).toEqual({ id: 11, name: "renamed", xfrm: null, text: null });
+	});
+});

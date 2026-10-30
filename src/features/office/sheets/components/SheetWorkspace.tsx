@@ -47,6 +47,12 @@ import {
 	readWorkbookForFile,
 	renameSheet,
 	replaceWorkbook,
+	axisTypes,
+	deleteColumns,
+	deleteRows,
+	insertColumns,
+	insertRows,
+	usedAddresses,
 	seed,
 	setCell,
 	setFreeze,
@@ -64,7 +70,7 @@ import {
 	type SheetOut,
 } from "@/features/office/sheets/lib/sheet";
 import { cardRows, expandLive, taskRows } from "@/features/office/sheets/lib/liveRanges";
-import { getKanban, getTasks, sheetCalculate, sheetRestructure, sheetSave, sheetSort } from "@/lib/tauri";
+import { getKanban, getTasks, sheetCalculate, sheetSave, sheetSort } from "@/lib/tauri";
 import { cn, errorText } from "@/lib/utils";
 
 const LOCAL = "local-edit";
@@ -166,9 +172,13 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 	const look = useCallback((a1: string) => (sheet ? lookOf(doc, sheet.id, a1) : {}), [doc, sheet, version]); // eslint-disable-line react-hooks/exhaustive-deps
 	const widths = useMemo(() => (sheet ? widthsFor(doc, sheet.id) : {}), [doc, sheet, version]); // eslint-disable-line react-hooks/exhaustive-deps
 	const freeze = useMemo(() => (sheet ? freezeOf(doc, sheet.id) : ([0, 0] as [number, number])), [doc, sheet, version]); // eslint-disable-line react-hooks/exhaustive-deps
-	const used = useMemo(() => extent(sheet ? Object.fromEntries([...cellsOf(doc).keys(), ...looksOf(doc).keys()].filter((k) => k.startsWith(`${sheet.id}!`)).map((k) => [k.slice(k.indexOf("!") + 1), 1])) : {}), [doc, sheet, version]); // eslint-disable-line react-hooks/exhaustive-deps
+	const used = useMemo(() => extent(sheet ? usedAddresses(doc, sheet.id) : {}), [doc, sheet, version]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	const undo = useMemo(() => new Y.UndoManager([cellsOf(doc), sheetsOf(doc), looksOf(doc), widthsOf(doc), frozenOf(doc), chartsOf(doc), cfOf(doc), dvOf(doc), hiddenOf(doc), protectedOf(doc)], { trackedOrigins: new Set([LOCAL]) }), [doc]);
+	const undo = useMemo(() => new Y.UndoManager([cellsOf(doc), sheetsOf(doc), looksOf(doc), widthsOf(doc), frozenOf(doc), chartsOf(doc), cfOf(doc), dvOf(doc), hiddenOf(doc), protectedOf(doc), doc.getMap("axisDead")], { trackedOrigins: new Set([LOCAL]) }), [doc]);
+	// Inserting and deleting rows and columns writes to the lists of the sheet being shown
+	useEffect(() => {
+		if (sheet) undo.addToScope(axisTypes(doc, sheet.id));
+	}, [undo, doc, sheet?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const [active, setActive] = useState<Cursor>({ row: 0, col: 0 });
 	const [selection, setSelection] = useState<Range>({ r0: 0, c0: 0, r1: 0, c1: 0 });
@@ -263,16 +273,14 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 			styleRange(doc, sheet.id, selection, change);
 		};
 
-	const restructure = async (op: "insertRows" | "deleteRows" | "insertCols" | "deleteCols") => {
+	// Only the list of row or column ids changes, so what other people type meanwhile still lands where they meant it
+	const restructure = (op: "insertRows" | "deleteRows" | "insertCols" | "deleteCols") => {
 		if (!sheet) return;
 		const rowsOp = op.endsWith("Rows");
 		const count = rowsOp ? selection.r1 - selection.r0 + 1 : selection.c1 - selection.c0 + 1;
-		try {
-			const next = await sheetRestructure(readWorkbook(doc), sheet.name, op, rowsOp ? selection.r0 : selection.c0, count);
-			edit(() => replaceWorkbook(doc, next));
-		} catch (err) {
-			flash(false, errorText(err, "That did not work."));
-		}
+		const at = rowsOp ? selection.r0 : selection.c0;
+		const change = op === "insertRows" ? insertRows : op === "deleteRows" ? deleteRows : op === "insertCols" ? insertColumns : deleteColumns;
+		edit(() => change(doc, sheet.id, at, count));
 	};
 
 	// The rows of the selection, or of the whole used area when one cell is chosen
@@ -455,7 +463,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 						copyValues={() => void copyValues()}
 						highlightDuplicates={highlightDuplicates}
 						importJson={() => jsonPicker.current?.click()}
-					restructure={(op) => void restructure(op)}
+					restructure={(op) => restructure(op)}
 					autoSum={autoSum}
 					insertFunction={insertFunction}
 					sort={(d) => void sort(d)}

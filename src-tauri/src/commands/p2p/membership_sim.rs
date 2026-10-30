@@ -365,3 +365,218 @@ fn membership_sim_table() {
         }
     }
 }
+
+// ── Every history, not a sample (N15) ──
+
+/// Every action an author could make: remove a member, or give a role
+fn all_kinds() -> Vec<Kind> {
+    let mut v = Vec::new();
+    for t in 1..KEYS {
+        v.push(Kind::Remove(t));
+        for r in [ADMIN, EDITOR, VIEWER] {
+            v.push(Kind::Role(t, r));
+        }
+    }
+    v
+}
+
+/// Every order in which the actions can arrive: each only after the ones it names
+fn all_orders(acts: &BTreeMap<Id, Act>) -> Vec<Vec<Id>> {
+    fn go(acts: &BTreeMap<Id, Act>, done: &mut Vec<Id>, out: &mut Vec<Vec<Id>>) {
+        if done.len() == acts.len() {
+            out.push(done.clone());
+            return;
+        }
+        for a in acts.values() {
+            if !done.contains(&a.id) && a.deps.iter().all(|d| done.contains(d)) {
+                done.push(a.id);
+                go(acts, done, out);
+                done.pop();
+            }
+        }
+    }
+    let mut out = Vec::new();
+    go(acts, &mut Vec::new(), &mut out);
+    out
+}
+
+/// Calls `visit` once for every history of 1 to `n_max` actions by the owner (0) and the two Admins (1, 2). Each action names a
+/// set of earlier actions that holds all of its author's own and everything those name; it is made only if its author may in the
+/// list those actions give. Of two actions that do not depend on each other only one order is listed.
+fn enumerate(admins_equal: bool, n_max: usize, visit: &mut impl FnMut(&BTreeMap<Id, Act>)) {
+    fn go(acts: &mut Vec<Act>, admins_equal: bool, n_max: usize, kinds: &[Kind], visit: &mut impl FnMut(&BTreeMap<Id, Act>)) {
+        if !acts.is_empty() {
+            let m: BTreeMap<Id, Act> = acts.iter().map(|a| (a.id, a.clone())).collect();
+            visit(&m);
+        }
+        let i = acts.len();
+        if i == n_max {
+            return;
+        }
+        let dep_masks: Vec<u32> = acts.iter().map(|a| acts.iter().enumerate().filter(|(_, b)| a.deps.contains(&b.id)).fold(0u32, |m, (j, _)| m | (1 << j))).collect();
+        for actor in 0..3usize {
+            let own: u32 = acts.iter().enumerate().filter(|(_, a)| a.id.0 == actor).fold(0, |m, (j, _)| m | (1 << j));
+            let seq = acts.iter().filter(|a| a.id.0 == actor).count() + 1;
+            for mask in 0u32..(1 << i) {
+                if mask & own != own || (0..i).any(|j| mask >> j & 1 == 1 && mask & dep_masks[j] != dep_masks[j]) {
+                    continue;
+                }
+                // Independent of the one before it: only the order with the higher author last
+                if i > 0 && mask >> (i - 1) & 1 == 0 && actor <= acts[i - 1].id.0 {
+                    continue;
+                }
+                let seen: BTreeMap<Id, Act> = acts.iter().enumerate().filter(|(j, _)| mask >> j & 1 == 1).map(|(_, a)| (a.id, a.clone())).collect();
+                let (view, _) = resolve(Rule::Sticky, admins_equal, &seen);
+                if actor != OWNER && view.role[actor] != ADMIN {
+                    continue;
+                }
+                for kind in kinds {
+                    if !may(&view, admins_equal, actor, *kind) {
+                        continue;
+                    }
+                    acts.push(Act { id: (actor, seq), kind: *kind, deps: seen.keys().copied().collect(), rank: 0 });
+                    go(acts, admins_equal, n_max, kinds, visit);
+                    acts.pop();
+                }
+            }
+        }
+    }
+    go(&mut Vec::new(), admins_equal, n_max, &all_kinds(), visit);
+}
+
+#[derive(Default, Clone, Debug)]
+struct Exhaustive {
+    /// Cases: a history under a merge rule, and for the arbiter each order it could have put the history in
+    cases: usize,
+    readmitted: usize,
+    owner_hurt: usize,
+    no_admin_left: usize,
+    /// Valid actions that did not take effect, summed
+    skipped: usize,
+    actions: usize,
+    /// The smallest history in which a removed member was let back in
+    example: Option<String>,
+}
+
+const AUTHORS: [&str; 3] = ["owner", "A1", "A2"];
+
+fn describe(acts: &BTreeMap<Id, Act>) -> String {
+    let name = |id: &Id| format!("{}{}", AUTHORS[id.0], id.1);
+    acts.values().map(|a| format!("{} {:?} after {:?}", name(&a.id), a.kind, a.deps.iter().map(name).collect::<Vec<_>>())).collect::<Vec<_>>().join("; ")
+}
+
+/// Did the list a device shows ever bring back a removed member, in any of these orders of arrival?
+fn readmits(rule: Rule, admins_equal: bool, acts: &BTreeMap<Id, Act>, orders: &[Vec<Id>]) -> bool {
+    orders.iter().any(|order| {
+        let mut have: BTreeMap<Id, Act> = BTreeMap::new();
+        let mut previous = initial();
+        for id in order {
+            have.insert(*id, acts[id].clone());
+            let (now, _) = resolve(rule, admins_equal, &have);
+            if (0..KEYS).any(|k| previous.role[k] == GONE && now.role[k] != GONE) {
+                return true;
+            }
+            previous = now;
+        }
+        false
+    })
+}
+
+/// The order of the arbiter's log
+fn order_of(acts: &BTreeMap<Id, Act>) -> Vec<Id> {
+    let mut v: Vec<Id> = acts.keys().copied().collect();
+    v.sort_by_key(|id| acts[id].rank);
+    v
+}
+
+/// Checks every history of up to `n_max` actions under every rule. Returns, per rule, the counts, and how many histories there were
+/// and how many of them leave devices on different lists when no rule is used
+fn check_all(admins_equal: bool, n_max: usize) -> (Vec<(Rule, Exhaustive)>, usize, usize) {
+    let mut by_rule: Vec<(Rule, Exhaustive)> = RULES.iter().map(|r| (*r, Exhaustive::default())).collect();
+    let (mut histories, mut disagree) = (0, 0);
+    enumerate(admins_equal, n_max, &mut |acts| {
+        histories += 1;
+        let orders = all_orders(acts);
+        let mut ends: Vec<State> = Vec::new();
+        for order in &orders {
+            let mut st = initial();
+            for id in order {
+                let a = &acts[id];
+                if may(&st, admins_equal, a.id.0, a.kind) {
+                    effect(&mut st, a.kind);
+                }
+            }
+            ends.push(st);
+        }
+        disagree += usize::from(ends.windows(2).any(|w| w[0] != w[1]));
+        for (rule, ex) in by_rule.iter_mut() {
+            // The arbiter's log is any of the orders; the other rules are a function of the set alone
+            let variants: Vec<BTreeMap<Id, Act>> = if *rule == Rule::Era {
+                orders.iter().map(|o| acts.iter().map(|(id, a)| (*id, Act { rank: o.iter().position(|x| x == id).unwrap() + 1, ..a.clone() })).collect()).collect()
+            } else {
+                vec![acts.clone()]
+            };
+            for v in &variants {
+                let (end, counts) = resolve(*rule, admins_equal, v);
+                ex.cases += 1;
+                ex.actions += v.len();
+                ex.skipped += counts.skipped;
+                ex.owner_hurt += usize::from(end.role[OWNER] != 0);
+                ex.no_admin_left += usize::from(!end.role.contains(&ADMIN));
+                // With an arbiter devices receive its log in order; otherwise any order the actions name
+                let back = if *rule == Rule::Era { readmits(*rule, admins_equal, v, &[order_of(v)]) } else { readmits(*rule, admins_equal, v, &orders) };
+                ex.readmitted += usize::from(back);
+                if back && ex.example.as_ref().is_none_or(|e| e.len() > describe(v).len()) {
+                    ex.example = Some(describe(v));
+                }
+            }
+        }
+    });
+    (by_rule, histories, disagree)
+}
+
+#[test]
+fn in_every_history_of_up_to_three_actions_the_sticky_rule_never_lets_a_removed_member_back_and_the_owner_is_safe() {
+    for admins_equal in [true, false] {
+        let (rows, histories, _) = check_all(admins_equal, 3);
+        assert!(histories > 100, "only {histories} histories");
+        for (rule, ex) in &rows {
+            assert_eq!(ex.owner_hurt, 0, "{rule:?}: the owner was removed or demoted");
+            if matches!(rule, Rule::Sticky | Rule::Era) {
+                assert_eq!(ex.readmitted, 0, "{rule:?} let a removed member back in: {:?}", ex.example);
+            }
+        }
+    }
+}
+
+#[test]
+#[ignore = "prints the table used in RESEARCH.md; slow without --release"]
+fn membership_exhaustive_table() {
+    for admins_equal in [true, false] {
+        for n_max in [3, 4] {
+            let t = std::time::Instant::now();
+            let (rows, histories, disagree) = check_all(admins_equal, n_max);
+            println!(
+                "\nAdmins {} act on Admins; every history of up to {n_max} actions: {histories} histories, {disagree} ({:.1}%) leave devices on different lists when they apply actions as they arrive; {:.0} s",
+                if admins_equal { "may" } else { "may not" },
+                100.0 * disagree as f64 / histories as f64,
+                t.elapsed().as_secs_f64()
+            );
+            println!("| rule | cases | a removed member let back in | owner removed or demoted | no Admin left | valid actions with no effect (per 100) | smallest case of a removed member let back in |");
+            println!("|---|---|---|---|---|---|---|");
+            for (rule, ex) in rows {
+                println!(
+                    "| {rule:?} | {} | {} ({:.1}%) | {} | {} ({:.1}%) | {:.1} | {} |",
+                    ex.cases,
+                    ex.readmitted,
+                    100.0 * ex.readmitted as f64 / ex.cases as f64,
+                    ex.owner_hurt,
+                    ex.no_admin_left,
+                    100.0 * ex.no_admin_left as f64 / ex.cases as f64,
+                    100.0 * ex.skipped as f64 / ex.actions.max(1) as f64,
+                    ex.example.unwrap_or_else(|| "none".to_string())
+                );
+            }
+        }
+    }
+}

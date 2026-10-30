@@ -3,6 +3,7 @@
 
 import * as Y from "yjs";
 
+import { cellKeyOf, decodeFormula, deleteAxis, dropAxes, encodeFormula, ensureUpgraded, idAt, insertAxis, parseCellKey, positionOf } from "@/features/office/sheets/lib/sheetIds";
 import type { CfRule, DvRule } from "@/features/office/sheets/lib/sheetTools";
 
 // How one cell looks: colours are #RRGGBB, `borders` holds the sides drawn from "ltrb", `nf` is a number format code
@@ -134,7 +135,24 @@ export const rangeText = (r: Range) => (r.r0 === r.r1 && r.c0 === r.c1 ? a1Of(r.
 
 // ── the shared document ──
 
-const cellKey = (id: string, a1: string) => `${id}!${a1}`;
+// A cell is stored under its sheet and the ids of its row and column (see sheetIds), so inserting a row moves nothing that is stored
+function keyAt(doc: Y.Doc, sid: string, row: number, col: number): string {
+	return cellKeyOf(sid, idAt(doc, sid, "rows", row), idAt(doc, sid, "cols", col));
+}
+
+function keyOfA1(doc: Y.Doc, sid: string, a1: string): string {
+	const p = parseA1(a1);
+	return p ? keyAt(doc, sid, p.row, p.col) : `${sid}!${a1}`;
+}
+
+// Where a stored key is now: its sheet and address, or null when its row or column was deleted
+function addressOfKey(doc: Y.Doc, key: string): { sid: string; a1: string } | null {
+	const k = parseCellKey(key);
+	if (!k) return null;
+	const row = positionOf(doc, k.sid, "rows", k.rowId);
+	const col = positionOf(doc, k.sid, "cols", k.colId);
+	return row === null || col === null ? null : { sid: k.sid, a1: a1Of(row, col) };
+}
 
 export const sheetsOf = (doc: Y.Doc) => doc.getArray<SheetMeta>("sheets");
 export const cellsOf = (doc: Y.Doc) => doc.getMap<string>("cells");
@@ -194,7 +212,8 @@ export const MAX_STYLED_AT_ONCE = 50_000;
 const clean = (s: CellStyle): CellStyle => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined && v !== false && v !== "")) as CellStyle;
 
 export function lookOf(doc: Y.Doc, id: string, a1: string): CellStyle {
-	const raw = looksOf(doc).get(cellKey(id, a1));
+	ensureUpgraded(doc);
+	const raw = looksOf(doc).get(keyOfA1(doc, id, a1));
 	if (!raw) return {};
 	try {
 		return JSON.parse(raw) as CellStyle;
@@ -206,13 +225,14 @@ export function lookOf(doc: Y.Doc, id: string, a1: string): CellStyle {
 // Changes how the cells of a range look: `change` gets each cell's current look and returns the new one. A range of more cells than
 // MAX_STYLED_AT_ONCE is cut short, since each styled cell is kept and sent to everyone.
 export function styleRange(doc: Y.Doc, id: string, r: Range, change: (cur: CellStyle) => CellStyle) {
+	ensureUpgraded(doc);
 	const looks = looksOf(doc);
 	let n = 0;
 	doc.transact(() => {
 		for (let row = r.r0; row <= r.r1; row++)
 			for (let col = r.c0; col <= r.c1; col++) {
 				if (++n > MAX_STYLED_AT_ONCE) return;
-				const key = cellKey(id, a1Of(row, col));
+				const key = keyAt(doc, id, row, col);
 				const next = clean(change(lookOf(doc, id, a1Of(row, col))));
 				if (Object.keys(next).length === 0) looks.delete(key);
 				else looks.set(key, JSON.stringify(next));
@@ -221,12 +241,18 @@ export function styleRange(doc: Y.Doc, id: string, r: Range, change: (cur: CellS
 }
 
 export function setWidth(doc: Y.Doc, id: string, col: number, px: number) {
-	widthsOf(doc).set(`${id}!${colLetters(col)}`, Math.round(px));
+	ensureUpgraded(doc);
+	widthsOf(doc).set(`${id}!${idAt(doc, id, "cols", col)}`, Math.round(px));
 }
 
 export function widthsFor(doc: Y.Doc, id: string): Record<number, number> {
+	ensureUpgraded(doc);
 	const out: Record<number, number> = {};
-	for (const [k, px] of widthsOf(doc)) if (k.startsWith(`${id}!`)) out[lettersCol(k.slice(id.length + 1))] = px;
+	for (const [k, px] of widthsOf(doc)) {
+		if (!k.startsWith(`${id}!`)) continue;
+		const at = positionOf(doc, id, "cols", k.slice(id.length + 1));
+		if (at !== null) out[at] = px;
+	}
 	return out;
 }
 
@@ -241,40 +267,90 @@ export function listSheets(doc: Y.Doc): SheetMeta[] {
 }
 
 export function typedText(doc: Y.Doc, id: string, a1: string): string {
-	return cellsOf(doc).get(cellKey(id, a1)) ?? "";
+	ensureUpgraded(doc);
+	return decodeFormula(doc, id, cellsOf(doc).get(keyOfA1(doc, id, a1)) ?? "");
 }
 
-// Types into a cell; empty text clears it
+// Types into a cell; empty text clears it. A formula is kept with the ids of the cells it names, so it follows them when rows are inserted.
 export function setCell(doc: Y.Doc, id: string, a1: string, text: string) {
+	ensureUpgraded(doc);
 	const cells = cellsOf(doc);
-	if (text === "") cells.delete(cellKey(id, a1));
-	else cells.set(cellKey(id, a1), text);
+	const key = keyOfA1(doc, id, a1);
+	if (text === "") cells.delete(key);
+	else cells.set(key, encodeFormula(doc, id, text));
 }
 
-// The sheets as the engine wants them: names, and what is typed in each cell
+// The addresses of what is stored for a sheet (cells and looks), for sizing the grid
+export function usedAddresses(doc: Y.Doc, sid: string): Record<string, 1> {
+	ensureUpgraded(doc);
+	const out: Record<string, 1> = {};
+	for (const m of [cellsOf(doc), looksOf(doc)] as Y.Map<unknown>[]) {
+		for (const key of m.keys()) {
+			if (!key.startsWith(`${sid}!`)) continue;
+			const at = addressOfKey(doc, key);
+			if (at) out[at.a1] = 1;
+		}
+	}
+	return out;
+}
+
+// The shared lists that changing rows and columns writes to, for undo to cover them
+export const axisTypes = (doc: Y.Doc, sid: string): (Y.Array<string> | Y.Map<boolean>)[] => [doc.getArray<string>(`rows:${sid}`), doc.getArray<string>(`cols:${sid}`), doc.getMap<boolean>("axisDead")];
+
+// Inserts or deletes rows or columns: only the list of ids changes, so what other people type meanwhile still lands where they meant. What
+// was in deleted rows or columns is cleared.
+export function insertRows(doc: Y.Doc, id: string, at: number, count: number) {
+	ensureUpgraded(doc);
+	insertAxis(doc, id, "rows", at, count);
+}
+export function insertColumns(doc: Y.Doc, id: string, at: number, count: number) {
+	ensureUpgraded(doc);
+	insertAxis(doc, id, "cols", at, count);
+}
+function clearIn(doc: Y.Doc, sid: string, gone: string[], which: "rowId" | "colId") {
+	const drop = new Set(gone);
+	for (const m of [cellsOf(doc), looksOf(doc)] as Y.Map<unknown>[]) {
+		for (const key of [...m.keys()]) {
+			const k = parseCellKey(key);
+			if (k && k.sid === sid && drop.has(k[which])) m.delete(key);
+		}
+	}
+}
+export function deleteRows(doc: Y.Doc, id: string, at: number, count: number) {
+	ensureUpgraded(doc);
+	doc.transact(() => clearIn(doc, id, deleteAxis(doc, id, "rows", at, count), "rowId"));
+}
+export function deleteColumns(doc: Y.Doc, id: string, at: number, count: number) {
+	ensureUpgraded(doc);
+	doc.transact(() => clearIn(doc, id, deleteAxis(doc, id, "cols", at, count), "colId"));
+}
+
+// The sheets as the engine wants them: names, and what is typed in each cell (each at the address it has now)
 export function readWorkbook(doc: Y.Doc): SheetIn[] {
+	ensureUpgraded(doc);
 	const sheets = listSheets(doc);
 	const byId = new Map<string, SheetIn>(sheets.map((s) => [s.id, { name: s.name, cells: {} }]));
 	for (const [key, text] of cellsOf(doc)) {
-		const bang = key.indexOf("!");
-		const sheet = byId.get(key.slice(0, bang));
-		if (sheet) sheet.cells[key.slice(bang + 1)] = text;
+		const at = addressOfKey(doc, key);
+		const sheet = at && byId.get(at.sid);
+		if (at && sheet) sheet.cells[at.a1] = decodeFormula(doc, at.sid, text);
 	}
 	// Looks, widths and frozen panes ride along only where there are some
 	for (const [key, raw] of looksOf(doc)) {
-		const bang = key.indexOf("!");
-		const sheet = byId.get(key.slice(0, bang));
-		if (!sheet) continue;
+		const at = addressOfKey(doc, key);
+		const sheet = at && byId.get(at.sid);
+		if (!at || !sheet) continue;
 		try {
-			(sheet.styles ??= {})[key.slice(bang + 1)] = JSON.parse(raw) as CellStyle;
+			(sheet.styles ??= {})[at.a1] = JSON.parse(raw) as CellStyle;
 		} catch {
 			// A look nobody can read is left out
 		}
 	}
 	for (const [key, px] of widthsOf(doc)) {
-		const bang = key.indexOf("!");
-		const sheet = byId.get(key.slice(0, bang));
-		if (sheet) (sheet.widths ??= {})[key.slice(bang + 1)] = px;
+		const sid = key.slice(0, key.indexOf("!"));
+		const sheet = byId.get(sid);
+		const col = sheet ? positionOf(doc, sid, "cols", key.slice(sid.length + 1)) : null;
+		if (sheet && col !== null) (sheet.widths ??= {})[colLetters(col)] = px;
 	}
 	for (const [id, f] of frozenOf(doc)) {
 		const sheet = byId.get(id);
@@ -288,41 +364,42 @@ const newId = () => Math.random().toString(36).slice(2, 10);
 // Fills an empty document from sheets read from a file; does nothing when the document already has sheets
 export function seed(doc: Y.Doc, sheets: SheetIn[]): boolean {
 	if (sheetsOf(doc).length > 0) return false;
+	ensureUpgraded(doc);
 	doc.transact(() => {
 		const list = sheets.length > 0 ? sheets : [{ name: "Sheet1", cells: {} }];
 		for (const s of list) {
 			const id = newId();
 			sheetsOf(doc).push([{ id, name: s.name }]);
-			for (const [a1, text] of Object.entries(s.cells)) if (text !== "") cellsOf(doc).set(cellKey(id, a1), text);
-			for (const [a1, look] of Object.entries(s.styles ?? {})) if (Object.keys(clean(look)).length > 0) looksOf(doc).set(cellKey(id, a1), JSON.stringify(clean(look)));
-			for (const [letters, px] of Object.entries(s.widths ?? {})) widthsOf(doc).set(`${id}!${letters}`, px);
+for (const [a1, text] of Object.entries(s.cells)) if (text !== "") cellsOf(doc).set(keyOfA1(doc, id, a1), encodeFormula(doc, id, text));
+				for (const [a1, look] of Object.entries(s.styles ?? {})) if (Object.keys(clean(look)).length > 0) looksOf(doc).set(keyOfA1(doc, id, a1), JSON.stringify(clean(look)));
+				for (const [letters, px] of Object.entries(s.widths ?? {})) widthsOf(doc).set(`${id}!${idAt(doc, id, "cols", lettersCol(letters))}`, px);
 			if (s.freeze && (s.freeze[0] > 0 || s.freeze[1] > 0)) frozenOf(doc).set(id, s.freeze);
 		}
 	});
 	return true;
 }
 
-// Makes the document match sheets the engine rewrote (after rows or columns were inserted or removed); keeps the ids
+// Makes the document match sheets the engine rewrote (after a sort): what differs from what is there is written under the ids of the
+// rows and columns it is at now
 export function replaceWorkbook(doc: Y.Doc, sheets: SheetIn[]) {
+	ensureUpgraded(doc);
 	doc.transact(() => {
 		const metas = listSheets(doc);
-		const cells = cellsOf(doc);
-		const want = new Map<string, string>();
+		const sync = (map: Y.Map<string>, want: Map<string, string>, sid: string) => {
+			for (const key of [...map.keys()]) if (key.startsWith(`${sid}!`) && parseCellKey(key) && addressOfKey(doc, key) && !want.has(key)) map.delete(key);
+			for (const [key, text] of want) if (map.get(key) !== text) map.set(key, text);
+		};
 		sheets.forEach((s, i) => {
 			const meta = metas[i];
-			if (meta) for (const [a1, text] of Object.entries(s.cells)) want.set(cellKey(meta.id, a1), text);
+			if (!meta) return;
+			const cells = new Map<string, string>();
+			for (const [a1, text] of Object.entries(s.cells)) cells.set(keyOfA1(doc, meta.id, a1), encodeFormula(doc, meta.id, text));
+			sync(cellsOf(doc), cells, meta.id);
+			// The engine moves looks with the cells it moves
+			const looks = new Map<string, string>();
+			for (const [a1, look] of Object.entries(s.styles ?? {})) looks.set(keyOfA1(doc, meta.id, a1), JSON.stringify(clean(look)));
+			sync(looksOf(doc), looks, meta.id);
 		});
-		for (const key of [...cells.keys()]) if (!want.has(key)) cells.delete(key);
-		for (const [key, text] of want) if (cells.get(key) !== text) cells.set(key, text);
-		// The engine moves looks with the cells it moves
-		const looks = looksOf(doc);
-		const wantLooks = new Map<string, string>();
-		sheets.forEach((s, i) => {
-			const meta = metas[i];
-			if (meta) for (const [a1, look] of Object.entries(s.styles ?? {})) wantLooks.set(cellKey(meta.id, a1), JSON.stringify(clean(look)));
-		});
-		for (const key of [...looks.keys()]) if (!wantLooks.has(key)) looks.delete(key);
-		for (const [key, text] of wantLooks) if (looks.get(key) !== text) looks.set(key, text);
 	});
 }
 
@@ -357,8 +434,9 @@ export function deleteSheet(doc: Y.Doc, id: string): string | null {
 	const i = sheets.findIndex((s) => s.id === id);
 	if (i < 0) return null;
 	doc.transact(() => {
-		sheetsOf(doc).delete(i, 1);
-		const cells = cellsOf(doc);
+sheetsOf(doc).delete(i, 1);
+			dropAxes(doc, id);
+			const cells = cellsOf(doc);
 		for (const key of [...cells.keys()]) if (key.startsWith(`${id}!`)) cells.delete(key);
 		for (const m of [looksOf(doc), widthsOf(doc)] as Y.Map<unknown>[]) for (const key of [...m.keys()]) if (key.startsWith(`${id}!`)) m.delete(key);
 		frozenOf(doc).delete(id);
