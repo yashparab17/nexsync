@@ -25,6 +25,10 @@ import {
 	Scissors,
 	Search,
 	SpellCheck,
+	Accessibility,
+	ListTodo,
+	Lock,
+	Braces,
 	Strikethrough,
 	Table as TableIcon,
 	Type,
@@ -60,6 +64,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { RESTRICTIONS, type Restriction } from "@/features/office/documents/lib/documentRestrict";
 import { Big, Choice, ColorButton, Gallery, GridPicker, Group, MenuItem, MenuTitle, Row, Rows, Sep, Small } from "@/features/office/shared/Ribbon";
 import { type CaseKind, FONTS, HIGHLIGHTS, MARGINS, PALETTE, PAPER, SIZES, STYLES, type MarginName, type PageSetup, type PaperName, type StyleId } from "@/features/office/documents/lib/documentFormat";
 import ReferencesRibbon, { TextForm, type ReferencesProps } from "@/features/office/documents/components/ReferencesRibbon";
@@ -95,9 +100,15 @@ export interface RibbonProps {
 	openHeaderFooter: () => void;
 	openCounts: () => void;
 	openProofing: () => void;
-	comments: { open: boolean; count: number; canComment: boolean; start: () => void; toggle: () => void };
+	comments: { open: boolean; count: number; canComment: boolean; start: () => void; toggle: () => void; next: () => void; previous: () => void };
 	review: { suggesting: boolean; count: number; toggle: () => void; accept: () => void; reject: () => void; acceptAll: () => void; rejectAll: () => void; next: () => void; previous: () => void };
 	openCompare: () => void;
+	openAccessibility: () => void;
+	copyOutline: () => void;
+	makeTask: () => void;
+	taskMade: boolean;
+	restrict: { value: Restriction; canSet: boolean; set: (r: Restriction) => void };
+	outlineCopied: boolean;
 	pickImage: () => void;
 	paste: () => void;
 	hasHeaderFooter: boolean;
@@ -493,6 +504,11 @@ export default function DocumentRibbon(p: RibbonProps) {
 				<Group label="Comments">
 					<Big icon={MessageSquareText} label="New Comment" disabled={!p.comments.canComment} title="Comment on the selected text" onPress={p.comments.start} />
 					<Big icon={MessageSquareText} label={p.comments.count ? `Show Comments (${p.comments.count})` : "Show Comments"} active={p.comments.open} onPress={p.comments.toggle} />
+					<Rows>
+						<Small icon={ChevronLeft} label="Previous Comment" disabled={!p.comments.count} onPress={p.comments.previous} />
+						<Small icon={ChevronRight} label="Next Comment" disabled={!p.comments.count} onPress={p.comments.next} />
+					</Rows>
+					<Big icon={ListTodo} label={p.taskMade ? "Task Made" : "Make Task"} title="Turn the selected words into a task in the workspace, with a comment that points to it" disabled={!fmt.hasSelection} onPress={p.makeTask} />
 				</Group>
 				<Group label="Tracking">
 					<Big icon={PenLine} label="Track Changes" title="What you type and delete is marked, for others to accept or reject" disabled={p.readOnly} active={p.review.suggesting} onPress={p.review.toggle} />
@@ -511,6 +527,24 @@ export default function DocumentRibbon(p: RibbonProps) {
 				</Group>
 				<Group label="Compare">
 					<Big icon={GitCompareArrows} label="Compare" title="Compare this document with a saved version" onPress={p.openCompare} />
+				</Group>
+				<Group label="Accessibility">
+					<Big icon={Accessibility} label="Check Accessibility" title="Find what makes the document hard to read with a screen reader" onPress={p.openAccessibility} />
+				</Group>
+				<Group label="Protect">
+					<Big
+						icon={Lock}
+						label="Restrict Editing"
+						title={p.restrict.canSet ? "Choose who may change this document" : "Only an Owner or an Admin can restrict editing"}
+						active={p.restrict.value !== "none"}
+						disabled={!p.restrict.canSet}
+						menu={RESTRICTIONS.map(([k, l]) => (
+							<MenuItem key={k} label={l} checked={p.restrict.value === k} onPress={() => p.restrict.set(k)} />
+						))}
+					/>
+				</Group>
+				<Group label="Inspect">
+					<Big icon={Braces} label={p.outlineCopied ? "Copied" : "Copy Outline"} title="Copy the headings, tables, pictures, links, changes and comments as JSON, for a script or an assistant" onPress={p.copyOutline} />
 				</Group>
 			</>
 		);

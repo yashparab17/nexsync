@@ -39,7 +39,44 @@ export function sortTable(table: TableContent, col: number, asc: boolean): Table
 export const TOC = "toc";
 export const TOC_TITLE = "toc-title";
 
-// What typing one character turns the text before it into: (c) (r) (tm) become symbols, -- a dash, ... an ellipsis, -> an arrow
+// Words that are nearly always a slip, and what was meant
+const CORRECTIONS: Record<string, string> = {
+	teh: "the", adn: "and", taht: "that", wiht: "with", wich: "which", thier: "their", becuase: "because", beleive: "believe", freind: "friend",
+	recieve: "receive", recieved: "received", occured: "occurred", occurence: "occurrence", seperate: "separate", definately: "definitely",
+	alot: "a lot", untill: "until", tommorow: "tomorrow", accomodate: "accommodate", acheive: "achieve", adress: "address", begining: "beginning",
+	calender: "calendar", enviroment: "environment", existance: "existence", foriegn: "foreign", goverment: "government", independant: "independent",
+	publically: "publicly", refered: "referred", succesful: "successful", wierd: "weird", writting: "writing",
+	dont: "don't", cant: "can't", wont: "won't", doesnt: "doesn't", isnt: "isn't", wasnt: "wasn't", didnt: "didn't", couldnt: "couldn't", shouldnt: "shouldn't", wouldnt: "wouldn't",
+};
+
+// A full stop after these does not end a sentence
+const ABBREVIATIONS = new Set(["e.g", "i.e", "etc", "vs", "approx", "fig", "eq", "dr", "mr", "mrs", "ms", "prof", "inc", "ltd", "st", "cf", "al", "no", "p", "pp"]);
+
+// The word before the caret, put right: a slip from the list, two capitals at the start, a lone i, a small letter that starts a sentence.
+// `ch` is what was typed after it; null when the word is fine. Only a space makes a sentence start (so "e.g." is left alone), and a word
+// with a capital inside (iPhone, eBay) is never touched.
+function correctWord(before: string, ch: string): { remove: number; insert: string } | null {
+	const m = /([A-Za-z][A-Za-z']*)$/.exec(before);
+	if (!m || !/^[ .,;:!?)']$/.test(ch)) return null;
+	const word = m[1];
+	const prefix = before.slice(0, before.length - word.length);
+	if (/[\p{L}\p{N}/@._-]$/u.test(prefix) && !/[.!?]["')\]]*\s+$/.test(prefix)) return null; // part of a longer word, a path or an address
+	let fixed = word;
+	if (word === "i" && (ch === " " || ch === "'")) fixed = "I";
+	else if (ch !== "'") {
+		const hit = CORRECTIONS[word.toLowerCase()];
+		if (hit) fixed = word === word.toUpperCase() && word.length > 1 ? hit.toUpperCase() : /^[A-Z]/.test(word) ? hit[0].toUpperCase() + hit.slice(1) : hit;
+		else if (/^[A-Z]{2}[a-z]+$/.test(word) && word.slice(2) !== "s") fixed = word[0] + word.slice(1).toLowerCase();
+	}
+	if (ch === " " && /^[a-z][a-z']*$/.test(fixed)) {
+		const starts = prefix === "" || /\n$/.test(prefix) || (/[.!?]["')\]]*\s+$/.test(prefix) && !ABBREVIATIONS.has((/([A-Za-z.]+)[.!?]["')\]]*\s+$/.exec(prefix)?.[1] ?? "").replace(/\.$/, "").toLowerCase()) && !/[0-9][.!?]\s+$/.test(prefix));
+		if (starts) fixed = fixed[0].toUpperCase() + fixed.slice(1);
+	}
+	return fixed === word ? null : { remove: word.length, insert: fixed + (ch === "'" ? "'" : ch) };
+}
+
+// What typing one character turns the text before it into: (c) (r) (tm) become symbols, -- a dash, ... an ellipsis, -> an arrow; after a
+// word, a slip from the list is put right, two capitals at the start of a word become one, i becomes I, and a sentence starts with a capital
 export function autoCorrect(before: string, ch: string): { remove: number; insert: string } | null {
 	const rules: [string, string, string][] = [
 		["(c", ")", "©"],
@@ -50,7 +87,7 @@ export function autoCorrect(before: string, ch: string): { remove: number; inser
 		["-", ">", "→"],
 	];
 	for (const [tail, typed, out] of rules) if (ch === typed && before.endsWith(tail) && !(tail === "-" && typed === "-" && before.endsWith("--"))) return { remove: tail.length, insert: out };
-	return null;
+	return correctWord(before, ch);
 }
 
 // Paragraphs for a table of contents, one per heading, indented by level

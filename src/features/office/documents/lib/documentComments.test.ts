@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { locateDocAnchor, makeDocAnchor } from "@/features/office/documents/lib/documentComments";
+import { locateDocAnchor, makeDocAnchor, neighbourComment } from "@/features/office/documents/lib/documentComments";
 
 // A document of blocks: each block is a container (id) holding one text block
 const docOf = (blocks: [string, string][]) => ({
@@ -24,5 +24,24 @@ describe("document comment anchors", () => {
 		const moved = docOf([["b", "Second paragraph"], ["c", "so brave a start"]]);
 		expect(locateDocAnchor(moved, anchor).state).toBe("moved");
 		expect(locateDocAnchor(docOf([["a", "Hello world"]]), anchor).state).toBe("orphaned");
+	});
+});
+
+describe("the comment after or before the current one", () => {
+	const items = [{ id: "b", from: 40 }, { id: "a", from: 10 }, { id: "c", from: 90 }];
+	it("goes from one to the next by place in the text, and round at the ends", () => {
+		expect(neighbourComment(items, "a", 0, false)).toBe("b");
+		expect(neighbourComment(items, "c", 0, false)).toBe("a");
+		expect(neighbourComment(items, "a", 0, true)).toBe("c");
+		expect(neighbourComment(items, "b", 0, true)).toBe("a");
+	});
+	it("with no current comment, starts from the caret", () => {
+		expect(neighbourComment(items, null, 20, false)).toBe("b");
+		expect(neighbourComment(items, null, 20, true)).toBe("a");
+		expect(neighbourComment(items, null, 95, false)).toBe("a");
+		expect(neighbourComment(items, null, 5, true)).toBe("c");
+	});
+	it("is null when no comment has a place", () => {
+		expect(neighbourComment([], null, 0, false)).toBeNull();
 	});
 });

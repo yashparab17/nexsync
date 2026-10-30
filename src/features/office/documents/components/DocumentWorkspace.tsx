@@ -18,8 +18,12 @@ import DocumentRibbon from "@/features/office/documents/components/DocumentRibbo
 import PrintView from "@/features/office/documents/components/PrintView";
 import ProofingDialog from "@/features/office/documents/components/ProofingDialog";
 import CompareDialog from "@/features/office/documents/components/CompareDialog";
+import { documentOutline } from "@/features/office/documents/lib/documentOutline";
+import { access, isRestriction, type Restriction } from "@/features/office/documents/lib/documentRestrict";
+import { useChat } from "@/store/chat/ChatContext";
+import AccessibilityDialog from "@/features/office/documents/components/AccessibilityDialog";
 import { useDocumentReview } from "@/features/office/documents/components/useDocumentReview";
-import { newReviewStore, resolvedSetOf, staleMarksPlugin, suggestingPlugin } from "@/features/office/documents/lib/documentReview";
+import { changesOf, newReviewStore, resolvedSetOf, staleMarksPlugin, suggestingPlugin } from "@/features/office/documents/lib/documentReview";
 import { useDocumentActions } from "@/features/office/documents/components/useDocumentActions";
 import Backstage from "@/features/office/shared/Backstage";
 import HistoryPanel from "@/features/office/shared/HistoryPanel";
@@ -126,8 +130,21 @@ const zones = (text: string) => (text.includes("	") ? text.split("	").slice(0, 3
 
 // A document, laid out like a word processor: a ribbon of the things people do to text, a page on a desk with a ruler, a navigation
 // pane of headings, and a status bar. The text is shared live; so are the page set-up and the header and footer.
-function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload, history, canComment = false }: Props) {
+function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly: baseReadOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload, history, canComment: baseCanComment = false }: Props) {
 	const doc = collab.doc;
+	// An Owner or Admin may make the document comments-only or read-only for the others; it is kept in the shared document
+	const chatRole = useChat().role;
+	const isAdmin = chatRole === "Owner" || chatRole === "Admin";
+	const settings = useMemo(() => doc.getMap<string>("docSettings"), [doc]);
+	const [restriction, setRestrictionState] = useState<Restriction>(() => (isRestriction(settings.get("restrict")) ? (settings.get("restrict") as Restriction) : "none"));
+	useEffect(() => {
+		const read = () => setRestrictionState(isRestriction(settings.get("restrict")) ? (settings.get("restrict") as Restriction) : "none");
+		read();
+		settings.observe(read);
+		return () => settings.unobserve(read);
+	}, [settings]);
+	const { readOnly, canComment } = access(restriction, isAdmin, { readOnly: baseReadOnly, canComment: baseCanComment });
+	const restricted = restriction !== "none" && !isAdmin;
 	const commentStore = useMemo(newCommentStore, []);
 	const reviewStore = useMemo(() => newReviewStore(author, resolvedSetOf(doc.getMap<boolean>("resolvedChanges"))), [author, doc]);
 	const options = useMemo(
@@ -303,7 +320,34 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 	const pageEl = useRef<HTMLDivElement>(null);
 	const [marks, setMarks] = useState<LineMark[]>([]);
 	const [find, setFind] = useState<{ replace: boolean; query: string; with: string; cs: boolean; rx: boolean; note: string } | null>(null);
-	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | "sources" | "merge" | "compare" | null>(null);
+	const [taskMade, setTaskMade] = useState(false);
+	const makeTask = async () => {
+		if (!history) return;
+		try {
+			if (await comments.makeTask(history.workspacePath)) {
+				setTaskMade(true);
+				setTimeout(() => setTaskMade(false), 2000);
+			}
+		} catch {
+			// The task could not be made; nothing was changed in the document
+		}
+	};
+	const [outlineCopied, setOutlineCopied] = useState(false);
+	// The document as JSON on the clipboard: what a script or an assistant would read instead of the page
+	const copyOutline = async () => {
+		const outline = documentOutline(editor.document as unknown as BlockLike[], {
+			trackedChanges: changesOf(editor.prosemirrorState.doc).map((c) => ({ kind: c.kind, author: c.author, date: c.date, text: c.text })),
+			comments: comments.list(false).map((c) => ({ author: c.author, text: c.text, resolved: c.resolved })),
+		});
+		try {
+			await navigator.clipboard.writeText(JSON.stringify(outline, null, 2));
+			setOutlineCopied(true);
+			setTimeout(() => setOutlineCopied(false), 2000);
+		} catch {
+			// The clipboard is not available in this window; nothing was copied
+		}
+	};
+	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | "sources" | "merge" | "compare" | "accessibility" | null>(null);
 	// Puts the file back in place of the shared copy, for everyone: the text as the file has it now, with its spacing, page set-up and
 	// header and footer
 	const reload = async () => {
@@ -716,7 +760,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 		<OfficeFrame
 			accent="word"
 			name={title}
-			state={readOnly ? "Read-only" : "Shared"}
+			state={restricted ? "Restricted" : readOnly ? "Read-only" : "Shared"}
 			tabs={TABS}
 			tab={tab}
 			onTab={setTab}
@@ -752,7 +796,13 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					openProofing={() => setDialog("proofing")}
 					review={review}
 					openCompare={() => setDialog("compare")}
-					comments={{ open: comments.open, count: comments.count, canComment, start: comments.start, toggle: comments.toggle }}
+					openAccessibility={() => setDialog("accessibility")}
+					restrict={{ value: restriction, canSet: isAdmin && !baseReadOnly, set: (r) => settings.set("restrict", r) }}
+					copyOutline={() => void copyOutline()}
+					makeTask={() => void makeTask()}
+					taskMade={taskMade}
+					outlineCopied={outlineCopied}
+					comments={{ open: comments.open, count: comments.count, canComment, start: comments.start, toggle: comments.toggle, next: comments.next, previous: comments.previous }}
 					pickImage={pickImage}
 					paste={() => void paste()}
 					hasHeaderFooter={!!(hf.header || hf.footer || hf.pageNumbers || hf.firstHeader || hf.firstFooter || hf.evenHeader || hf.evenFooter)}
@@ -947,6 +997,17 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 				/>
 			)}
 			{dialog === "compare" && history && <CompareDialog workspacePath={history.workspacePath} rel={history.rel} lines={() => textOfBlocks(editor.document as never).split(String.fromCharCode(10))} onClose={() => setDialog(null)} />}
+			{dialog === "accessibility" && (
+				<AccessibilityDialog
+					blocks={() => editor.document as unknown as BlockLike[]}
+					goTo={(id) => {
+						setDialog(null);
+						editor.setTextCursorPosition(id, "start");
+						editor.focus();
+					}}
+					onClose={() => setDialog(null)}
+				/>
+			)}
 			{dialog === "sources" && <SourcesDialog doc={doc} editor={editor} onClose={() => setDialog(null)} />}
 			{dialog === "merge" && <MergeDialog editor={editor} workspacePath={history?.workspacePath} onClose={() => setDialog(null)} />}
 			{dialog === "headerFooter" && <HeaderFooterDialog value={hf} onClose={() => setDialog(null)} onSave={(v) => { saveHf(v); setDialog(null); }} />}

@@ -10,14 +10,18 @@ import type { Placement } from "@/features/chat/lib/anchors";
 import { buildThreads, docChannel, type Thread, type ThreadComment } from "@/features/chat/lib/entries";
 import { plainPreview } from "@/features/chat/lib/preview";
 import { encodeMentions } from "@/features/chat/lib/mentions";
-import { type CommentStore, locateDocAnchor, makeDocAnchor, refreshComments } from "@/features/office/documents/lib/documentComments";
+import { type CommentStore, locateDocAnchor, makeDocAnchor, neighbourComment, refreshComments } from "@/features/office/documents/lib/documentComments";
 import type { documentSchema } from "@/features/office/documents/lib/documentSchema";
 import { useChat } from "@/store/chat/ChatContext";
+import { useP2P } from "@/store/p2p/P2PContext";
+import { createTask } from "@/lib/tauri";
+import type { Task } from "@/types/workspace";
 
 type Editor = typeof documentSchema.BlockNoteEditor;
 
 export function useDocumentComments(editor: Editor, store: CommentStore, path: string, canComment: boolean) {
 	const chat = useChat();
+	const { publishDataChange } = useP2P();
 	const channel = docChannel(path);
 	const threads = useMemo(() => buildThreads(chat.entries, channel), [chat.entries, channel]);
 	const [open, setOpen] = useState(false);
@@ -76,6 +80,34 @@ export function useDocumentComments(editor: Editor, store: CommentStore, path: s
 			view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at.from, at.to)).scrollIntoView());
 			view.focus();
 		}
+	};
+
+	// The comment after or before the current one that has a place in the text, going round at the ends
+	const step = (backwards: boolean) => {
+		const items = threads
+			.filter((t) => !t.resolved)
+			.flatMap((t) => {
+				const at = placements.get(t.id);
+				return at && at.state !== "orphaned" ? [{ id: t.id, from: at.from }] : [];
+			});
+		const id = neighbourComment(items, active, editor.prosemirrorState.selection.from, backwards);
+		if (!id) return;
+		setOpen(true);
+		activate(id);
+	};
+
+	// The selected words become a task, and a comment on the same words says where the task is, so the document points to it and it to the document
+	const makeTask = async (workspacePath: string): Promise<boolean> => {
+		const { from, to } = editor.prosemirrorState.selection;
+		const quote = editor.prosemirrorState.doc.textBetween(from, to, " ").trim();
+		if (!quote) return false;
+		const now = new Date().toISOString();
+		const task: Task = { id: crypto.randomUUID(), title: quote.length > 80 ? `${quote.slice(0, 77)}...` : quote, description: `${quote}\n\nFrom the document ${path}.`, status: "todo", priority: "medium", tags: [], created_at: now, updated_at: now };
+		await createTask({ path: workspacePath, task });
+		publishDataChange({ entity: "task", op: "upsert", task });
+		const anchor = canComment ? makeDocAnchor(editor.prosemirrorState.doc as never, from, to) : null;
+		if (anchor) await chat.post({ kind: "comment", channel, body: JSON.stringify({ text: `Made a task: [[task:${task.id}]]`, anchor }) });
+		return true;
 	};
 
 	const text = (value: string) => JSON.stringify({ text: encodeMentions(value, chat.people) });
@@ -139,5 +171,5 @@ export function useDocumentComments(editor: Editor, store: CommentStore, path: s
 				return first ? [{ quote: t.anchor!.quote, author: who(first.name), text: plainPreview(first.text, chat.people, 100_000), date: at(first.ts), resolved: false, replies: rest.map((c) => ({ author: who(c.name), text: plainPreview(c.text, chat.people, 100_000), date: at(c.ts) })) }] : [];
 			});
 
-	return { open, toggle: () => setOpen((v) => !v), start, appendix, list, count: threads.filter((t) => !t.resolved).length, panel, dialog };
+	return { open, toggle: () => setOpen((v) => !v), start, makeTask, next: () => step(false), previous: () => step(true), appendix, list, count: threads.filter((t) => !t.resolved).length, panel, dialog };
 }

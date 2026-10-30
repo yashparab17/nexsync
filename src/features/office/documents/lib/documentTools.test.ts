@@ -25,6 +25,38 @@ describe("document tools", () => {
 		expect(autoCorrect("wait -", "-")).toEqual({ remove: 1, insert: "—" });
 		expect(autoCorrect("wait..", ".")).toEqual({ remove: 2, insert: "…" });
 		expect(autoCorrect("a-", ">")).toEqual({ remove: 1, insert: "→" });
+	});
+
+	it("puts a slip right after the word, keeping the capitals and the space that was typed", () => {
+		expect(autoCorrect("so teh", " ")).toEqual({ remove: 3, insert: "the " });
+		expect(autoCorrect("so Teh", " ")).toEqual({ remove: 3, insert: "The " });
+		expect(autoCorrect("so TEH", " ")).toEqual({ remove: 3, insert: "THE " });
+		expect(autoCorrect("we recieve", ".")).toEqual({ remove: 7, insert: "receive." });
+		expect(autoCorrect("I dont", " ")).toEqual({ remove: 4, insert: "don't " });
+		expect(autoCorrect("it is alot", " ")).toEqual({ remove: 4, insert: "a lot " });
+	});
+
+	it("makes two capitals one and a lone i a capital, but leaves plurals, names and acronyms", () => {
+		expect(autoCorrect("see THe", " ")).toEqual({ remove: 3, insert: "The " });
+		expect(autoCorrect("two PCs", " ")).toBeNull();
+		expect(autoCorrect("the NASA", " ")).toBeNull();
+		expect(autoCorrect("so i", " ")).toEqual({ remove: 1, insert: "I " });
+		expect(autoCorrect("so i", "'")).toEqual({ remove: 1, insert: "I'" });
+		expect(autoCorrect("see i.e", ".")).toBeNull();
+		expect(autoCorrect("my iPhone", " ")).toBeNull();
+	});
+
+	it("starts a sentence with a capital, but not after an abbreviation, a number, a comma or inside an address", () => {
+		expect(autoCorrect("Hello. world", " ")).toEqual({ remove: 5, insert: "World " });
+		expect(autoCorrect("Really? yes", " ")).toEqual({ remove: 3, insert: "Yes " });
+		expect(autoCorrect("hello", " ")).toEqual({ remove: 5, insert: "Hello " });
+		expect(autoCorrect("see e.g. next", " ")).toBeNull();
+		expect(autoCorrect("Version 3. next", " ")).toBeNull();
+		expect(autoCorrect("hello, world", " ")).toBeNull();
+		expect(autoCorrect("https://example.com/page", " ")).toBeNull();
+		expect(autoCorrect("write to me@site", " ")).toBeNull();
+		expect(autoCorrect("a slip. teh", " ")).toEqual({ remove: 3, insert: "The " });
+		expect(autoCorrect("Fine.", " ")).toBeNull();
 		expect(autoCorrect("plain", "x")).toBeNull();
 	});
 	it("prepares html for the file writers", () => {

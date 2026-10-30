@@ -10,6 +10,17 @@ import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { MAX_QUOTE, type Placement } from "@/features/chat/lib/anchors";
 import type { Anchor } from "@/features/chat/lib/entries";
 
+// The comment after (or before) the current one, going round at the ends: `items` are the comments that have a place in the text. With
+// no current comment it is the next one after the caret at `pos`.
+export function neighbourComment(items: { id: string; from: number }[], current: string | null, pos: number, backwards: boolean): string | null {
+	if (items.length === 0) return null;
+	const sorted = [...items].sort((a, b) => a.from - b.from || a.id.localeCompare(b.id));
+	const at = current === null ? -1 : sorted.findIndex((i) => i.id === current);
+	if (at >= 0) return sorted[(at + (backwards ? sorted.length - 1 : 1)) % sorted.length].id;
+	if (backwards) return ([...sorted].reverse().find((i) => i.from < pos) ?? sorted[sorted.length - 1]).id;
+	return (sorted.find((i) => i.from > pos) ?? sorted[0]).id;
+}
+
 export interface MarkedThread {
 	id: string;
 	anchor: Anchor;
