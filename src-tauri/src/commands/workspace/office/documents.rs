@@ -57,6 +57,8 @@ pub struct Inspect {
     pub hidden_words: usize,
     /// The start of some of that text, for the person to see what it is
     pub hidden: Vec<String>,
+    /// Fonts the document uses that this computer does not have, each with the font it is laid out in instead ("Aptos → Carlito")
+    pub stand_ins: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -453,7 +455,7 @@ fn inspect_file(ext: &str, package: bool, names: &[String], bytes: &[u8], doc: &
         inspect.left_out.push(format!("{} tracked change{}: the text is shown as it reads with them accepted.", inspect.revisions, if inspect.revisions == 1 { "" } else { "s" }));
     }
     if package || ext == "rtf" {
-        inspect.left_out.push("Style names (the formatting they give is kept), footnotes, comments and fields other than page numbers.".into());
+        inspect.left_out.push("Fields other than page numbers and the fields the editor can update.".into());
     }
     inspect
 }
@@ -479,7 +481,8 @@ pub fn import(name: &str, bytes: &[u8], password: Option<&str>) -> Result<Import
         }
     }
     let converted = catch_unwind(AssertUnwindSafe(|| super::blocks::convert(&doc))).map_err(|_| Refusal::text("This document could not be shown."))?;
-    let inspect = inspect_file(&ext, package, &names, bytes, &doc);
+    let mut inspect = inspect_file(&ext, package, &names, bytes, &doc);
+    inspect.stand_ins = super::fonts::stand_ins(converted.fonts.keys());
     let title = if doc.core.title.trim().is_empty() { name.rsplit(['/', '\\']).next().unwrap_or(name).rsplit_once('.').map(|(s, _)| s.to_string()).unwrap_or_else(|| name.to_string()) } else { doc.core.title.clone() };
     let styles = super::styles::styles_of(&doc);
     Ok(Imported { notes: super::notes::notes_of(&doc), blocks: converted.blocks, fonts: converted.fonts, lists: converted.lists, title, inspect, styles, layout, source_id })

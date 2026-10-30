@@ -61,6 +61,17 @@ export default function DocumentInspector({ inspect, inline = false }: { inspect
 					<p className="mt-1 text-[13px] text-muted-foreground">Nothing is fetched from these.</p>
 				</section>
 			)}
+			{(inspect.standIns?.length ?? 0) > 0 && (
+				<section>
+					<h3 className="mb-1 text-[13px] font-semibold text-muted-foreground">Fonts this computer does not have</h3>
+					<ul className="list-disc space-y-1 pl-4 text-[13px]">
+						{inspect.standIns!.map((f) => (
+							<li key={f}>{f}</li>
+						))}
+					</ul>
+					<p className="mt-1 text-[13px] text-muted-foreground">The text is shown and printed in the font on the right, which may break lines in other places than Word does. The file keeps the font it names.</p>
+				</section>
+			)}
 			{inspect.leftOut.length > 0 && (
 				<section>
 					<h3 className="mb-1 text-[13px] font-semibold text-muted-foreground">Not carried into the editor</h3>

@@ -48,6 +48,8 @@ export interface OfficeInspect {
 	external: string[];
 	// Parts of the file that did not come into the editor
 	leftOut: string[];
+	// Fonts the document uses that this computer lacks, each with the one laid out in its place ("Aptos → Carlito")
+	standIns?: string[];
 	// Words of text the file marks as hidden, and the start of some of it; the editor does not show it
 	hiddenWords?: number;
 	hidden?: string[];

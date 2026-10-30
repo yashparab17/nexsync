@@ -6,7 +6,7 @@ use wordcraft_doc::Block;
 fn main() {
     let path = std::env::args().nth(1).expect("a .docx path");
     if std::env::var("NOCLOUD").is_err() {
-        eprintln!("cloud fonts added: {}", nexsync_lib::lab::fonts::load_cloud_fonts());
+        eprintln!("cloud fonts added: {}", nexsync_lib::lab::fonts::load_fonts());
     }
     let bytes = std::fs::read(&path).expect("readable file");
     let mut doc = wordcraft_docx::read_with_password(&bytes, None).expect("readable docx");

@@ -120,7 +120,7 @@ fn handle(mut stream: TcpStream) {
 }
 
 fn main() {
-    eprintln!("cloud fonts added: {}", fonts::load_cloud_fonts());
+    eprintln!("cloud fonts added: {}", fonts::load_fonts());
     let listener = TcpListener::bind("127.0.0.1:7878").expect("port 7878 is busy");
     eprintln!("office lab on http://127.0.0.1:7878");
     for stream in listener.incoming().flatten() {

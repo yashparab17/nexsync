@@ -64,7 +64,7 @@ fn marks(bytes: &[u8]) -> Vec<(&'static str, usize)> {
 
 fn main() {
     let dir = std::env::args().nth(1).expect("a folder");
-    let _ = nexsync_lib::lab::fonts::load_cloud_fonts();
+    let _ = nexsync_lib::lab::fonts::load_fonts();
     let mut files: Vec<_> = std::fs::read_dir(&dir).expect("folder").flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("docx")) && !p.file_name().unwrap().to_string_lossy().starts_with("~$")).collect();
     files.sort();
     let (mut ok, mut bad) = (0, 0);

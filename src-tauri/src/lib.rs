@@ -13,7 +13,7 @@ pub mod cli {
 
     /// Word's downloaded fonts (Aptos and others), so that a document set in them is laid out as Word lays it out
     pub fn load_fonts() {
-        crate::commands::workspace::office::fonts::load_cloud_fonts();
+        crate::commands::workspace::office::fonts::load_fonts();
     }
 }
 
@@ -38,7 +38,7 @@ pub fn run() {
             // Font discovery is the first-open cost of a document: pay it now, off the main thread
             std::thread::spawn(|| {
                 // Word's downloaded fonts (Aptos...) first, so documents set in them are laid out as Word lays them out
-                let _ = commands::workspace::office::fonts::load_cloud_fonts();
+                let _ = commands::workspace::office::fonts::load_fonts();
                 let _ = wordcraft_fonts::word::resolve("Calibri", false, false);
             });
             // The updater checks GitHub Releases for a signed newer build; desktop-only, like

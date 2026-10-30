@@ -22,4 +22,15 @@ describe("what a document holds before it is shared", () => {
 		expect(screen.getByText("Hidden words").nextSibling?.textContent).toBe("0");
 		expect(screen.queryByText("Hidden text")).toBeNull();
 	});
+
+	it("names the fonts the computer lacks with the ones that stand in for them", () => {
+		render(<DocumentInspector inspect={{ ...base, standIns: ["Aptos → Carlito"] }} />);
+		expect(screen.getByText("Fonts this computer does not have")).toBeTruthy();
+		expect(screen.getByText("Aptos → Carlito")).toBeTruthy();
+	});
+
+	it("says nothing about fonts when none is missing", () => {
+		render(<DocumentInspector inspect={base} />);
+		expect(screen.queryByText("Fonts this computer does not have")).toBeNull();
+	});
 });
