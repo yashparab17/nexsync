@@ -8,6 +8,7 @@ export default function DocumentInspector({ inspect, inline = false }: { inspect
 		["Pictures", String(inspect.images)],
 		["Comments", String(inspect.comments)],
 		["Tracked changes", String(inspect.revisions)],
+		["Hidden words", String(inspect.hiddenWords ?? 0)],
 	];
 	return (
 		<aside aria-label="What this file holds" className={inline ? "space-y-4 text-sm" : "w-72 shrink-0 space-y-4 overflow-y-auto border-l p-4 text-sm"}>
@@ -25,6 +26,19 @@ export default function DocumentInspector({ inspect, inline = false }: { inspect
 					<h3 className="mb-1 text-[13px] font-semibold text-muted-foreground">Names in the file</h3>
 					<p>{inspect.people.join(", ")}</p>
 					<p className="mt-1 text-[13px] text-muted-foreground">These stay in the file when it is shared. Exporting without a name leaves them out of the new file.</p>
+				</section>
+			)}
+			{(inspect.hidden?.length ?? 0) > 0 && (
+				<section>
+					<h3 className="mb-1 text-[13px] font-semibold text-muted-foreground">Hidden text</h3>
+					<ul className="space-y-0.5 text-[13px]">
+						{inspect.hidden!.map((h) => (
+							<li key={h} className="break-words">
+								{h}
+							</li>
+						))}
+					</ul>
+					<p className="mt-1 text-[13px] text-muted-foreground">The file marks this text as hidden. The editor does not show it, and it stays in the file when it is shared.</p>
 				</section>
 			)}
 			{inspect.macros && (

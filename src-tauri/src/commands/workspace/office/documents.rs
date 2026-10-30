@@ -53,6 +53,10 @@ pub struct Inspect {
     pub external: Vec<String>,
     /// Parts of the file that did not come into the editor
     pub left_out: Vec<String>,
+    /// Words of text that the file marks as hidden (Word's Hidden font effect): the editor does not show them, and they travel with the file
+    pub hidden_words: usize,
+    /// The start of some of that text, for the person to see what it is
+    pub hidden: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -306,6 +310,38 @@ fn external_targets(bytes: &[u8], names: &[String]) -> Vec<String> {
     out
 }
 
+/// The text that is marked hidden, run by run (formatting set on the run itself; hidden text that comes from a character style is not found):
+/// how many words, and the start of the first few stretches
+fn hidden_text_of(blocks: &[std::sync::Arc<wordcraft_doc::Block>], words: &mut usize, previews: &mut Vec<String>) {
+    for b in blocks {
+        match &**b {
+            wordcraft_doc::Block::Para(p) => {
+                let mut at = 0;
+                for run in &p.runs {
+                    let end = (at + run.len).min(p.text.len());
+                    if run.props.hidden == Some(true) {
+                        if let Some(t) = p.text.get(at..end) {
+                            *words += t.split_whitespace().count();
+                            let t = t.trim();
+                            if !t.is_empty() && previews.len() < 10 {
+                                previews.push(t.chars().take(80).collect());
+                            }
+                        }
+                    }
+                    at = end;
+                }
+            }
+            wordcraft_doc::Block::Table(t) => {
+                for row in &t.rows {
+                    for cell in &row.cells {
+                        hidden_text_of(&cell.blocks, words, previews);
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn inspect_of(doc: &wordcraft_doc::Document) -> Inspect {
     let mut people: Vec<String> = Vec::new();
     let mut add = |p: &str| {
@@ -318,6 +354,8 @@ fn inspect_of(doc: &wordcraft_doc::Document) -> Inspect {
     add(&doc.core.last_modified_by);
     doc.comments.values().for_each(|c| add(&c.author));
     doc.revisions.iter().for_each(|r| add(&r.author));
+    let (mut hidden_words, mut hidden) = (0, Vec::new());
+    hidden_text_of(&doc.body, &mut hidden_words, &mut hidden);
     Inspect {
         words: doc.word_count(),
         images: doc.media.len(),
@@ -327,6 +365,8 @@ fn inspect_of(doc: &wordcraft_doc::Document) -> Inspect {
         title: doc.core.title.clone(),
         created: doc.core.created.clone(),
         modified: doc.core.modified.clone(),
+        hidden_words,
+        hidden,
         ..Default::default()
     }
 }
@@ -378,6 +418,38 @@ pub fn lines_of(name: &str, bytes: &[u8]) -> Result<Vec<String>, String> {
     catch_unwind(AssertUnwindSafe(|| super::compare::document_lines(&doc))).map_err(|_| "This version could not be read.".to_string())
 }
 
+/// What a file holds that a person should know before sharing it, and what the editor does not take from it
+fn inspect_file(ext: &str, package: bool, names: &[String], bytes: &[u8], doc: &wordcraft_doc::Document) -> Inspect {
+    let mut inspect = inspect_of(doc);
+    if package {
+        inspect.macros = names.iter().any(|n| n.ends_with("vbaProject.bin"));
+        for (prefix, what) in [("word/charts/", "charts"), ("word/diagrams/", "diagrams (SmartArt)"), ("word/embeddings/", "embedded objects"), ("ppt/", "slides")] {
+            let n = names.iter().filter(|x| x.starts_with(prefix) && !x.ends_with('/') && !x.contains("/_rels/")).count();
+            if n > 0 {
+                inspect.embedded.push(format!("{n} {what}"));
+            }
+        }
+        inspect.external = external_targets(bytes, names);
+        if inspect.macros {
+            inspect.left_out.push("A macro project. It stays in the original file and is never run.".into());
+        }
+        inspect.left_out.extend(inspect.embedded.iter().map(|e| format!("{e}: the editor shows no chart, diagram or object.")));
+    }
+    if inspect.hidden_words > 0 {
+        inspect.left_out.push(format!("{} word{} of hidden text. The editor does not show it; the original file keeps it until Update the File replaces it.", inspect.hidden_words, if inspect.hidden_words == 1 { "" } else { "s" }));
+    }
+    if inspect.comments > 0 {
+        inspect.left_out.push(format!("{} comment{} (they are not shown in the editor yet).", inspect.comments, if inspect.comments == 1 { "" } else { "s" }));
+    }
+    if inspect.revisions > 0 {
+        inspect.left_out.push(format!("{} tracked change{}: the text is shown as it reads with them accepted.", inspect.revisions, if inspect.revisions == 1 { "" } else { "s" }));
+    }
+    if package || ext == "rtf" {
+        inspect.left_out.push("Style names (the formatting they give is kept), footnotes, comments and fields other than page numbers.".into());
+    }
+    inspect
+}
+
 /// Opens a file's bytes as an editable document. `name` gives the format by its extension.
 pub fn import(name: &str, bytes: &[u8], password: Option<&str>) -> Result<Imported, Refusal> {
     if bytes.len() as u64 > MAX_FILE_BYTES {
@@ -399,32 +471,50 @@ pub fn import(name: &str, bytes: &[u8], password: Option<&str>) -> Result<Import
         }
     }
     let converted = catch_unwind(AssertUnwindSafe(|| super::blocks::convert(&doc))).map_err(|_| Refusal::text("This document could not be shown."))?;
-    let mut inspect = inspect_of(&doc);
-    if package {
-        inspect.macros = names.iter().any(|n| n.ends_with("vbaProject.bin"));
-        for (prefix, what) in [("word/charts/", "charts"), ("word/diagrams/", "diagrams (SmartArt)"), ("word/embeddings/", "embedded objects"), ("ppt/", "slides")] {
-            let n = names.iter().filter(|x| x.starts_with(prefix) && !x.ends_with('/') && !x.contains("/_rels/")).count();
-            if n > 0 {
-                inspect.embedded.push(format!("{n} {what}"));
-            }
-        }
-        inspect.external = external_targets(bytes, &names);
-        if inspect.macros {
-            inspect.left_out.push("A macro project. It stays in the original file and is never run.".into());
-        }
-        inspect.left_out.extend(inspect.embedded.iter().map(|e| format!("{e}: the editor shows no chart, diagram or object.")));
-    }
-    if inspect.comments > 0 {
-        inspect.left_out.push(format!("{} comment{} (they are not shown in the editor yet).", inspect.comments, if inspect.comments == 1 { "" } else { "s" }));
-    }
-    if inspect.revisions > 0 {
-        inspect.left_out.push(format!("{} tracked change{}: the text is shown as it reads with them accepted.", inspect.revisions, if inspect.revisions == 1 { "" } else { "s" }));
-    }
-    if package || ext == "rtf" {
-        inspect.left_out.push("Style names (the formatting they give is kept), footnotes, comments and fields other than page numbers.".into());
-    }
+    let inspect = inspect_file(&ext, package, &names, bytes, &doc);
     let title = if doc.core.title.trim().is_empty() { name.rsplit(['/', '\\']).next().unwrap_or(name).rsplit_once('.').map(|(s, _)| s.to_string()).unwrap_or_else(|| name.to_string()) } else { doc.core.title.clone() };
     Ok(Imported { blocks: converted.blocks, fonts: converted.fonts, lists: converted.lists, title, inspect, layout, source_id })
+}
+
+/// A file's bytes read as a document under the limits of opening one (size, kind, package checks, password)
+fn open_bytes(name: &str, bytes: &[u8], password: Option<&str>) -> Result<(wordcraft_doc::Document, String, bool, Vec<String>), String> {
+    if bytes.len() as u64 > MAX_FILE_BYTES {
+        return Err("This file is bigger than 64 MB.".to_string());
+    }
+    let ext = ext_of(name);
+    if !IMPORTABLE.contains(&ext.as_str()) {
+        return Err(format!("Nexsync cannot open .{ext} files as documents. It opens {}.", IMPORTABLE.join(", ")));
+    }
+    let package = matches!(ext.as_str(), "docx" | "docm" | "dotx" | "dotm" | "odt");
+    let names = if package && !bytes.starts_with(&[0xD0, 0xCF, 0x11, 0xE0]) { check_package(bytes)? } else { Vec::new() };
+    let doc = read_document(&ext, bytes, password).map_err(|e| e.message)?;
+    Ok((doc, ext, package, names))
+}
+
+/// A file converted to another format, from bytes to bytes (the format is the extension of `to`: docx, odt, rtf, md, html, txt, tex, pdf), for the command line;
+/// `markup` and `comments` are for a PDF (see `write_document`)
+pub fn convert_bytes(name: &str, bytes: &[u8], to: &str, password: Option<&str>, markup: bool, comments: bool) -> Result<Vec<u8>, String> {
+    let to = to.trim_start_matches('.').to_ascii_lowercase();
+    if !EXPORTABLE.contains(&to.as_str()) {
+        return Err(format!("Nexsync writes {} files.", EXPORTABLE.join(", ")));
+    }
+    if (markup || comments) && to != "pdf" {
+        return Err("Showing changes and comments is for PDF files only.".to_string());
+    }
+    let (doc, ..) = open_bytes(name, bytes, password)?;
+    catch_unwind(AssertUnwindSafe(|| write_document(&doc, &to, markup, comments))).map_err(|_| "The file could not be written safely.".to_string())?
+}
+
+/// The text of a file, one line for each paragraph and each table row (cells separated by a tab), for the command line
+pub fn text_bytes(name: &str, bytes: &[u8], password: Option<&str>) -> Result<String, String> {
+    let (doc, ..) = open_bytes(name, bytes, password)?;
+    catch_unwind(AssertUnwindSafe(|| super::compare::document_lines(&doc).join("\n"))).map_err(|_| "The file could not be read.".to_string())
+}
+
+/// What a file holds, as the inspector shows it, for the command line
+pub fn inspect_bytes(name: &str, bytes: &[u8], password: Option<&str>) -> Result<Inspect, String> {
+    let (doc, ext, package, names) = open_bytes(name, bytes, password)?;
+    catch_unwind(AssertUnwindSafe(|| inspect_file(&ext, package, &names, bytes, &doc))).map_err(|_| "The file could not be read.".to_string())
 }
 
 /// The document the editor's HTML stands for. With the file it came from (`source`), that file is brought up to date with the text, so
@@ -468,16 +558,22 @@ pub fn export_with(ext: &str, html: &str, title: &str, author: &str, layout: Opt
     }
     catch_unwind(AssertUnwindSafe(|| -> Result<Vec<u8>, String> {
         let doc = build_document(html, title, author, layout, source)?;
-        if ext == "docx" {
-            wordcraft_docx::write(&doc).map_err(|e| format!("The file could not be written: {e}"))
-        } else if ext == "pdf" {
-            let opts = wordcraft_pdf::PdfOptions { title: Some(doc.core.title.clone()).filter(|t| !t.is_empty()), author: Some(doc.core.creator.clone()).filter(|t| !t.is_empty()), ..Default::default() };
-            wordcraft_pdf::export(&doc, &opts).map_err(|e| format!("The PDF could not be written: {e}"))
-        } else {
-            wordcraft_formats::export(&ext, &doc).ok_or_else(|| "That format is not supported.".to_string())?
-        }
+        write_document(&doc, &ext, false, false)
     }))
     .map_err(|_| "The file could not be written safely.".to_string())?
+}
+
+/// A document written in one of the formats in `EXPORTABLE` (`ext` lower case, no dot). For a PDF, `markup` shows tracked changes as coloured
+/// insertions and struck-out deletions and `comments` prints the comments in balloons beside the page; every PDF is tagged and has links and bookmarks.
+fn write_document(doc: &wordcraft_doc::Document, ext: &str, markup: bool, comments: bool) -> Result<Vec<u8>, String> {
+    if ext == "docx" {
+        wordcraft_docx::write(doc).map_err(|e| format!("The file could not be written: {e}"))
+    } else if ext == "pdf" {
+        let opts = wordcraft_pdf::PdfOptions { title: Some(doc.core.title.clone()).filter(|t| !t.is_empty()), author: Some(doc.core.creator.clone()).filter(|t| !t.is_empty()), include_markup: markup, comments, ..Default::default() };
+        wordcraft_pdf::export(doc, &opts).map_err(|e| format!("The PDF could not be written: {e}"))
+    } else {
+        wordcraft_formats::export(ext, doc).ok_or_else(|| "That format is not supported.".to_string())?
+    }
 }
 
 /// A document laid out once, kept so its pages can be drawn one at a time as they come into view
@@ -805,6 +901,61 @@ mod tests {
         recover_original(&same, &id);
         assert!(super::super::merge::get(&id).is_some(), "the file it came from is");
         fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn text_marked_hidden_is_counted_and_shown_to_the_person_before_they_share_the_file() {
+        use wordcraft_doc::{props::CharProps, para::Run, Block};
+        let mut doc = wordcraft_formats::import("html", b"<p>Visible secret words end</p>").unwrap().unwrap();
+        let Block::Para(p) = std::sync::Arc::make_mut(&mut doc.body[0]) else { panic!("a paragraph") };
+        let (before, hidden) = ("Visible ".len(), "secret words".len());
+        let rest = p.text.len() - before - hidden;
+        p.runs = vec![Run { len: before, props: CharProps::default() }, Run { len: hidden, props: CharProps { hidden: Some(true), ..Default::default() } }, Run { len: rest, props: CharProps::default() }];
+        let bytes = wordcraft_docx::write(&doc).unwrap();
+        let opened = import("secret.docx", &bytes, None).unwrap();
+        assert_eq!(opened.inspect.hidden_words, 2);
+        assert_eq!(opened.inspect.hidden, vec!["secret words".to_string()]);
+        assert!(opened.inspect.left_out.iter().any(|l| l.contains("2 words of hidden text")), "{:?}", opened.inspect.left_out);
+        // The editor does not show it
+        assert!(!json(&opened).contains("secret"), "hidden text stays out of the editor");
+        // A file with none says nothing
+        let plain = import("plain.docx", &wordcraft_docx::write(&wordcraft_formats::import("html", b"<p>All shown</p>").unwrap().unwrap()).unwrap(), None).unwrap();
+        assert_eq!(plain.inspect.hidden_words, 0);
+        assert!(plain.inspect.hidden.is_empty());
+    }
+
+    #[test]
+    fn merged_cells_and_a_repeating_header_row_are_written_to_the_docx_and_come_back() {
+        use std::io::Read;
+        // The HTML the editor gives for a table with a header row, a cell across two columns and a cell down two rows
+        let html = "<table><colgroup><col><col></colgroup><tr><th colspan=\"2\" rowspan=\"1\" colwidth=\",\"><p>Head</p></th></tr><tr><td colspan=\"1\" rowspan=\"2\"><p>A</p></td><td colspan=\"1\" rowspan=\"1\"><p>1</p></td></tr><tr><td colspan=\"1\" rowspan=\"1\"><p>2</p></td></tr></table>";
+        let bytes = export("docx", html, "T", "", None).unwrap();
+        let mut z = zip::ZipArchive::new(std::io::Cursor::new(bytes.clone())).unwrap();
+        let mut body = String::new();
+        z.by_name("word/document.xml").unwrap().read_to_string(&mut body).unwrap();
+        assert!(body.contains("<w:gridSpan w:val=\"2\"/>"), "a cell across two columns: {body}");
+        assert!(body.contains("<w:vMerge w:val=\"restart\"/>") && body.contains("<w:vMerge/>"), "a cell down two rows");
+        assert!(body.contains("<w:tblHeader/>"), "the header row repeats on each page");
+        // And the file opens with the same cells merged
+        let back = json(&import("t.docx", &bytes, None).unwrap());
+        assert!(back.contains("\"colspan\":2") && back.contains("\"rowspan\":2"), "{back}");
+    }
+
+    #[test]
+    fn a_pdf_has_links_bookmarks_and_tags_and_can_show_changes_and_comments() {
+        let html = "<h1>Title</h1><p>See <a href=\"https://example.com/x\">the page</a>.</p><h2>Part</h2><p>More.</p>";
+        let pdf = export("pdf", html, "T", "A", None).unwrap();
+        let t = String::from_utf8_lossy(&pdf).into_owned();
+        assert!(t.contains("/URI") && t.contains("/Link"), "a link is a link annotation");
+        assert!(t.contains("/Outlines"), "the headings are bookmarks");
+        assert!(t.contains("/StructTreeRoot") && t.contains("/MarkInfo") && t.contains("/Lang"), "tagged, with a language");
+        // With the comments printed beside the page, the file is a different one
+        let layout = Layout { comments: vec![CommentIn { quote: "More.".into(), author: "Ana".into(), text: "Say more.".into(), date: "2026-10-30T10:00:00Z".into(), resolved: false, replies: vec![] }], ..Default::default() };
+        let docx = export("docx", html, "T", "A", Some(&layout)).unwrap();
+        let plain = convert_bytes("a.docx", &docx, "pdf", None, false, false).unwrap();
+        let balloons = convert_bytes("a.docx", &docx, "pdf", None, false, true).unwrap();
+        assert!(plain.starts_with(b"%PDF") && balloons.starts_with(b"%PDF") && plain != balloons);
+        assert!(convert_bytes("a.docx", &docx, "txt", None, true, false).is_err(), "markup is for a PDF");
     }
 
     #[test]

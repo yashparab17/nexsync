@@ -104,6 +104,19 @@ CI is split into two workflows:
 
 The app checks GitHub Releases for a newer signed build from **Settings → Updates & About → Check for updates**, shows the release notes under "What's new", downloads it, and relaunches. The **update channel** there is Stable (the newest published release) or Beta (a pre-release you point testers at by running the **Point the beta channel** workflow with the pre-release tag; tags with a dash, such as `v0.2.0-beta.1`, are published as pre-releases). The notes come from the release body, so edit the draft release before publishing it. Releases are signed with a minisign keypair (the public half lives in `src-tauri/tauri.conf.json`); `release.yml` needs `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` set as repo secrets to produce a release the updater will trust. Windows signing imports the certificate from `WINDOWS_CERTIFICATE` and `WINDOWS_CERTIFICATE_PASSWORD`, and macOS signing and notarization use the `APPLE_*` secrets. Neither has been run yet, because no certificate is configured, so builds are unsigned for now.
 
+## Command line
+
+`nexsync-cli` is the document engines without a window, for scripts and CI. From `src-tauri`:
+
+```bash
+cargo run --bin nexsync-cli -- convert report.docx report.pdf     # the format is the extension of the second name
+cargo run --bin nexsync-cli -- convert report.docx report.pdf --markup --comments
+cargo run --bin nexsync-cli -- text report.docx                   # one line per paragraph and table row
+cargo run --bin nexsync-cli -- inspect report.docx                # words, comments, tracked changes, hidden text, names, links, as JSON
+```
+
+It reads and writes documents (docx, odt, rtf, md, html, txt; a PDF as output). `--password` opens a protected file. The exit status is 0 when it worked, 1 when a file could not be read or written (the reason is on standard error) and 2 when it was called wrongly.
+
 ## Collaborating with someone
 
 Both people need Nexsync running and an internet connection. Being on the same network is optional.

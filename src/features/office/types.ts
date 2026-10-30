@@ -41,6 +41,9 @@ export interface OfficeInspect {
 	external: string[];
 	// Parts of the file that did not come into the editor
 	leftOut: string[];
+	// Words of text the file marks as hidden, and the start of some of it; the editor does not show it
+	hiddenWords?: number;
+	hidden?: string[];
 }
 
 export interface Imported {

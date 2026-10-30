@@ -7,6 +7,16 @@ pub mod lab {
     pub use crate::commands::workspace::office::{documents as office, fonts, sheet_tools, sheets, slides as deck};
 }
 
+/// What the command-line tool (`src/bin/nexsync-cli.rs`) uses: the document engines, with no window
+pub mod cli {
+    pub use crate::commands::workspace::office::documents::{convert_bytes as convert, inspect_bytes as inspect, text_bytes as text, Inspect};
+
+    /// Word's downloaded fonts (Aptos and others), so that a document set in them is laid out as Word lays it out
+    pub fn load_fonts() {
+        crate::commands::workspace::office::fonts::load_cloud_fonts();
+    }
+}
+
 /// Initializes plugins, registers Tauri command handlers, and runs the application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
