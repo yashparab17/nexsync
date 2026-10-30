@@ -152,6 +152,7 @@ export default function Lab({ which }: { which: string }) {
 				sourceId={(opened as unknown as { sourceId?: string } | null)?.sourceId}
 				lists={(opened as unknown as { lists?: never } | null)?.lists}
 				styles={(opened as unknown as { styles?: never } | null)?.styles}
+				notes={(opened as unknown as { notes?: never } | null)?.notes}
 				initialBlocks={opened ? (opened as unknown as { blocks: unknown[] }).blocks : new URLSearchParams(location.search).has("long") ? SAMPLE + Array.from({ length: 40 }, (_, i) => `<h2>Section ${i + 1}</h2><p>${"Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(5)}</p>`).join("") : SAMPLE}
 				name="Quarterly Review.docx"
 				title="Quarterly Review"

@@ -51,7 +51,7 @@ pub fn convert(doc: &Document) -> Converted {
     let text_w = (s.page_w - s.margin_left - s.margin_right).max(72.0);
     for (i, b) in doc.body.iter().enumerate() {
         match &**b {
-            Block::Para(p) => c.paragraph(p, gaps[i], starts.get(&i).copied()),
+            Block::Para(p) => c.paragraph(p, gaps[i], starts.get(&i).cloned()),
             Block::Table(t) => {
                 let block = c.table(t, text_w);
                 if std::mem::take(&mut c.break_next) {
@@ -78,7 +78,7 @@ struct Conv<'a> {
 }
 
 /// The first paragraph of each section after the first: whether it starts a page, and how the section's text sits on it (c, b, j or empty)
-fn section_starts(doc: &Document) -> HashMap<usize, (bool, &'static str)> {
+fn section_starts(doc: &Document) -> HashMap<usize, (bool, &'static str, String)> {
     use wordcraft_doc::section::{PageVAlign, SectionStart};
     let mut ends: Vec<(usize, &wordcraft_doc::SectionProps)> = doc.body.iter().enumerate().filter_map(|(i, b)| if let Block::Para(p) = &**b { p.section.as_deref().map(|s| (i, s)) } else { None }).collect();
     let mut out = HashMap::new();
@@ -95,8 +95,8 @@ fn section_starts(doc: &Document) -> HashMap<usize, (bool, &'static str)> {
             _ => "",
         };
         let brk = k > 0 && s.start != SectionStart::Continuous;
-        if (brk || !valign.is_empty()) && start <= *end {
-            out.insert(start, (brk, valign));
+        if (k > 0 || !valign.is_empty()) && start <= *end {
+            out.insert(start, (brk, valign, if k > 0 { super::sections::spec_of(s) } else { String::new() }));
         }
         start = end + 1;
     }
@@ -256,7 +256,7 @@ impl Conv<'_> {
     /// The paragraph as blocks: one per page where page breaks fall inside it, then its pictures. A break at the end of a paragraph keeps
     /// the paragraph's mark on the old page with it (Word shows "Page Break¶" there), so nothing of it starts the new page: the next
     /// block does.
-    fn paragraph(&mut self, p: &Paragraph, gap: (f32, f32), section: Option<(bool, &'static str)>) {
+    fn paragraph(&mut self, p: &Paragraph, gap: (f32, f32), section: Option<(bool, &'static str, String)>) {
         let r = self.styles.resolve_para(&p.props);
         let style = p.props.style.as_deref();
         let heading = r.outline_level.is_some_and(|l| l < 6) || style.is_some_and(|s| matches!(s, "Title" | "Subtitle"));
@@ -276,10 +276,13 @@ impl Conv<'_> {
         props.insert("keepNext".into(), json!(r.keep_next));
         props.insert("keepLines".into(), json!(r.keep_lines));
         props.insert("widowControl".into(), json!(r.widow_control));
-        let (brk, valign) = section.unwrap_or((false, ""));
+        let (brk, valign, spec) = section.unwrap_or((false, "", String::new()));
         props.insert("pageBreakBefore".into(), json!(r.page_break_before || brk || std::mem::take(&mut self.break_next)));
         if !valign.is_empty() {
             props.insert("sectionVAlign".into(), json!(valign));
+        }
+        if !spec.is_empty() {
+            props.insert("sectionBreak".into(), json!(spec));
         }
         if let Some(id) = style {
             props.insert("styleId".into(), json!(id));
@@ -349,6 +352,7 @@ impl Conv<'_> {
                 match ch {
                     OBJ => match objects.next() {
                         Some(InlineObject::Field { result, .. }) if !hidden => buf.push_str(result),
+                        Some(InlineObject::NoteRef { id, .. }) if !hidden => buf.push_str(&super::notes::marker(*id)),
                         Some(InlineObject::Image { media, w, alt, .. }) => {
                             if let Some(url) = self.doc.media.get(media).and_then(|b| data_url(b)) {
                                 pictures.push(json!({ "type": "image", "props": { "url": url, "name": alt, "previewWidth": (f64::from(*w) * 4.0 / 3.0).round(), "textAlignment": props.get("textAlignment").cloned().unwrap_or(json!("left")) } }));

@@ -6,6 +6,8 @@ import { changeCase, type CaseKind, DEFAULT_FONT, DEFAULT_SIZE, HIGHLIGHTS, poin
 import { headingsOf, textOfBlocks, type BlockLike } from "@/features/office/documents/lib/documentFind";
 import { equationText, indexEntries, withFormula, type Formula } from "@/features/office/documents/lib/documentReferences";
 import { cropImage, drawShape, type CropMode, type ShapeKind } from "@/features/office/documents/lib/documentObjects";
+import { formatSection, NEW_SECTION, sectionStart, type SectionSpec } from "@/features/office/documents/lib/documentSections";
+import { nextNoteId, noteValue, REF_TEXT, type NoteDef } from "@/features/office/documents/lib/documentNotes";
 import { applyToRuns, blockPropsOf, fromCaret, idFromName, isBuiltInWordId, WORD_ID, type StyleDef } from "@/features/office/documents/lib/documentStyles";
 import { nextCaption, TOC, TOC_TITLE, sortTable, tocBlocks, type TableContent } from "@/features/office/documents/lib/documentTools";
 import { documentSchema } from "@/features/office/documents/lib/documentSchema";
@@ -31,9 +33,11 @@ export interface Fmt {
 	inTable: boolean;
 	headerRow: boolean;
 	inPicture: boolean;
+	// The page set-up of the section the caret is in when a break started it, else empty (the first section, which the page set-up is)
+	section: string;
 }
 
-const NONE: Fmt = { bold: false, italic: false, underline: false, strike: false, font: DEFAULT_FONT, size: DEFAULT_SIZE, color: "", highlight: "", align: "left", style: "normal", list: null, canNest: false, canUnnest: false, hasSelection: false, inTable: false, headerRow: false, inPicture: false };
+const NONE: Fmt = { bold: false, italic: false, underline: false, strike: false, font: DEFAULT_FONT, size: DEFAULT_SIZE, color: "", highlight: "", align: "left", style: "normal", list: null, canNest: false, canUnnest: false, hasSelection: false, inTable: false, headerRow: false, inPicture: false, section: "" };
 
 type AnyBlock = { id: string; type: string; props?: Record<string, unknown>; content?: unknown; children?: AnyBlock[] };
 
@@ -62,13 +66,11 @@ function styleName(block: { type: string; props?: { level?: number; styleId?: un
 	return typeof id === "string" && id && sheet?.has(id) && !isBuiltInWordId(id) ? id : styleOf(block);
 }
 
-const sup = (n: number) => [...String(n)].map((c) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[Number(c)]).join("");
-
 const LISTS = { bullet: "bulletListItem", number: "numberedListItem", check: "checkListItem" } as const;
 
 // What the ribbon shows about the text the caret is in, kept up to date as the selection and the text change, and the things the
 // ribbon does to it
-export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<string, unknown>>, sheet?: Y.Map<StyleDef>) {
+export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<string, unknown>>, sheet?: Y.Map<StyleDef>, notes?: Y.Map<NoteDef>) {
 	const [fmt, setFmt] = useState<Fmt>(NONE);
 	// The look picked up by Format Painter, waiting for a selection to paint
 	const [painter, setPainter] = useState<Record<string, unknown> | null>(null);
@@ -96,6 +98,10 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 				hasSelection: editor.getSelectedText().length > 0,
 				inTable: type === "table",
 				inPicture: type === "image",
+				section: (() => {
+					const found = sectionStart(editor.document as unknown as AnyBlock[], block.id);
+					return found ? formatSection(found.spec) : "";
+				})(),
 				headerRow: type === "table" && ((block.content as { headerRows?: number } | undefined)?.headerRows ?? 0) > 0,
 			};
 			// Unchanged (most keystrokes): the same object, so the page around the text is not drawn again for nothing
@@ -245,6 +251,27 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 				const at = e.getTextCursorPosition().block;
 				e.insertBlocks([{ type: "paragraph", props: { pageBreakBefore: true }, content: [] } as never], at, "after");
 			}),
+		// A new section starts here: an empty paragraph that begins it, on a new page or continuing the page
+		sectionBreak: (continuous: boolean) =>
+			act((e) => {
+				const at = e.getTextCursorPosition().block;
+				e.insertBlocks([{ type: "paragraph", props: { sectionBreak: formatSection({ ...NEW_SECTION, continuous }) }, content: [] } as never], at, "after");
+				// The caret goes into the new section, so its set-up is what the ribbon shows
+				const first = e.getNextBlock(at);
+				if (first) e.setTextCursorPosition(first, "start");
+			}),
+		// Changes the page set-up of the section the caret is in (a section a break started)
+		setSection: (change: Partial<SectionSpec>) =>
+			act((e) => {
+				const found = sectionStart(e.document as unknown as AnyBlock[], (e.getTextCursorPosition().block as unknown as AnyBlock).id);
+				if (found) e.updateBlock(found.block.id, { props: { sectionBreak: formatSection({ ...found.spec, ...change }) } } as never);
+			}),
+		// Takes the break away: the section joins the one before it
+		removeSection: () =>
+			act((e) => {
+				const found = sectionStart(e.document as unknown as AnyBlock[], (e.getTextCursorPosition().block as unknown as AnyBlock).id);
+				if (found) e.updateBlock(found.block.id, { props: { sectionBreak: "" } } as never);
+			}),
 		// A box for text: a table of one cell
 		textBox: () =>
 			act((e) => {
@@ -261,17 +288,20 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 				if (b.type !== "image") return;
 				e.updateBlock(b.id, { props: { ...(change.width ? { previewWidth: change.width } : {}), ...(change.align ? { textAlignment: change.align } : {}), ...(change.alt !== undefined ? { name: change.alt } : {}), ...(change.wrap ? { wrap: change.wrap } : {}) } } as never);
 			}),
-		// A note at the end of the document: its number goes in the text, its words under a Notes heading
-		footnote: (words: string, heading = "Notes") =>
+		// A footnote (or, with `end`, an endnote): a reference where the caret is, numbered by its place in the text, and its words kept beside the
+		// text; in the file it is a real note
+		footnote: (words: string, end = false) =>
 			act((e) => {
-				const top = e.document as unknown as AnyBlock[];
-				const at = top.findIndex((b) => b.type === "heading" && textOfBlocks([{ ...b, children: [] } as BlockLike]).trim() === heading);
-				const n = at < 0 ? 1 : top.length - at;
-				const mark = sup(n);
-				e.insertInlineContent([{ type: "text", text: mark, styles: {} }] as never);
-				const end = e.document[e.document.length - 1];
-				e.insertBlocks([...(at < 0 ? [{ type: "heading", props: { level: 2 }, content: heading }] : []), { type: "paragraph", content: `${mark} ${words}` }] as never, end, "after");
+				if (!notes) return;
+				const id = nextNoteId([...notes.keys()].map(Number));
+				notes.set(String(id), { end, text: words.trim() });
+				e.insertInlineContent([{ type: "text", text: REF_TEXT, styles: { note: noteValue(end, id) } }] as never);
 			}),
+		// New words for a note
+		editNote: (id: number, text: string) => {
+			const n = notes?.get(String(id));
+			if (n && notes) notes.set(String(id), { ...n, text });
+		},
 		// Marks the words as an index entry (a highlight, which the index then collects)
 		markEntry: () => act((e) => e.addStyles({ backgroundColor: `#${HIGHLIGHTS[5]}` } as never)),
 		insertIndex: () =>

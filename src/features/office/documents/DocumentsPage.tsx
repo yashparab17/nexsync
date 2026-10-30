@@ -343,6 +343,7 @@ export default function DocumentsPage() {
 							initialBlocks={state.imported!.blocks}
 							lists={state.imported!.lists}
 							styles={state.imported!.styles}
+							notes={state.imported!.notes}
 							name={selected.split("/").pop() ?? ""}
 							title={title}
 							author={author}

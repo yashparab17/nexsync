@@ -128,6 +128,7 @@ pub fn layout_of(doc: &Document) -> Layout {
         size: normal.size,
         comments: Vec::new(),
         styles: Vec::new(),
+        notes: None,
     }
 }
 

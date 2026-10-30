@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { autoCorrect, forFile, nextCaption, smartQuote, sortTable, tocBlocks } from "@/features/office/documents/lib/documentTools";
+import { autoCorrect, autoCorrectOn, setAutoCorrect, forFile, nextCaption, smartQuote, sortTable, tocBlocks } from "@/features/office/documents/lib/documentTools";
 
 const t = (vals: string[], headerRows = 1) => ({ type: "tableContent" as const, headerRows, rows: vals.map((v) => ({ cells: [v, "x"] })) });
 
@@ -80,3 +80,22 @@ describe("document tools", () => {
 		expect(forFile("<p>plain</p>")).toBe("<p>plain</p>");
 	});
 });
+
+describe("turning AutoCorrect off", () => {
+	it("is on until a person turns it off, and the choice is kept", () => {
+		localStorage.removeItem("docAutoCorrect");
+		expect(autoCorrectOn()).toBe(true);
+		setAutoCorrect(false);
+		expect(autoCorrectOn()).toBe(false);
+		setAutoCorrect(true);
+		expect(autoCorrectOn()).toBe(true);
+	});
+});
+
+describe("a paragraph that starts a section", () => {
+	it("carries its set-up as a marker, after which the style's marker stands first", () => {
+		const out = forFile('<p data-section-break="next|l||2" data-style-id="Callout">Text</p><p>Plain</p>');
+		expect(out).toBe('<p data-section-break="next|l||2" data-style-id="Callout">Calloutnext|l||2Text</p><p>Plain</p>');
+	});
+});
+

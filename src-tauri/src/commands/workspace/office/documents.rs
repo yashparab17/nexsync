@@ -62,6 +62,8 @@ pub struct Inspect {
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Imported {
+    /// The footnotes and endnotes of the file, which the blocks refer to with a marker in the text (see `notes`)
+    pub notes: Vec<super::notes::NoteOut>,
     /// The document body as the editor's blocks, every paragraph and run carrying its Word formatting (see `blocks`)
     pub blocks: Vec<serde_json::Value>,
     /// The line height of each font the blocks use, as Word measures single spacing (a multiple of the font's size)
@@ -82,6 +84,8 @@ pub struct Imported {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Layout {
+    /// The notes the editor holds; `None` from a client that does not know notes, which leaves the document's notes as they are
+    pub notes: Option<Vec<super::notes::NoteIn>>,
     /// The page in points, already turned on its side when it is landscape
     pub width: f32,
     pub height: f32,
@@ -478,7 +482,7 @@ pub fn import(name: &str, bytes: &[u8], password: Option<&str>) -> Result<Import
     let inspect = inspect_file(&ext, package, &names, bytes, &doc);
     let title = if doc.core.title.trim().is_empty() { name.rsplit(['/', '\\']).next().unwrap_or(name).rsplit_once('.').map(|(s, _)| s.to_string()).unwrap_or_else(|| name.to_string()) } else { doc.core.title.clone() };
     let styles = super::styles::styles_of(&doc);
-    Ok(Imported { blocks: converted.blocks, fonts: converted.fonts, lists: converted.lists, title, inspect, styles, layout, source_id })
+    Ok(Imported { notes: super::notes::notes_of(&doc), blocks: converted.blocks, fonts: converted.fonts, lists: converted.lists, title, inspect, styles, layout, source_id })
 }
 
 /// A file's bytes read as a document under the limits of opening one (size, kind, package checks, password)
@@ -529,6 +533,8 @@ fn build_document(html: &str, title: &str, author: &str, layout: Option<&Layout>
     let mut edited = wordcraft_formats::import("html", page.as_bytes()).ok_or("The document could not be read.")??;
     // The style each paragraph was given in the editor (see `styles`)
     let chosen = super::styles::take_markers(&mut edited);
+    let (note_at, note_ids) = super::notes::take_markers(&mut edited);
+    let breaks = super::sections::take_markers(&mut edited);
     let original = source.and_then(super::merge::get);
     let mut doc = match &original {
         Some(o) => super::merge::merge(o, edited),
@@ -548,6 +554,8 @@ fn build_document(html: &str, title: &str, author: &str, layout: Option<&Layout>
         super::styles::apply(&mut doc, &l.styles);
     }
     super::styles::settle(&mut doc, &chosen);
+    super::sections::settle(&mut doc, &breaks);
+    super::notes::settle(&mut doc, &note_at, &note_ids, layout.and_then(|l| l.notes.as_deref()));
     Ok(doc)
 }
 
@@ -1024,6 +1032,119 @@ mod tests {
         let back = import("b.docx", &bytes, None).unwrap();
         let s = back.styles.iter().find(|s| s.id == "Callout").unwrap();
         assert_eq!((s.size, s.font.as_str()), (24.0, "Georgia"), "the size changed and the font stayed");
+    }
+
+    fn with_notes(notes: Vec<super::super::notes::NoteIn>) -> Layout {
+        Layout { notes: Some(notes), ..Default::default() }
+    }
+
+    fn note(id: u32, end: bool, text: &str) -> super::super::notes::NoteIn {
+        super::super::notes::NoteIn { id, end, text: text.into() }
+    }
+
+    #[test]
+    fn a_footnote_added_in_the_editor_is_a_real_footnote_in_the_docx_and_comes_back_as_one() {
+        let mark = super::super::notes::marker(1_000_001);
+        let html = format!("<p>First line</p><p>A claim{mark} to check.</p>");
+        let bytes = export("docx", &html, "T", "", Some(&with_notes(vec![note(1_000_001, false, "Source: the report")]))).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert_eq!(body.matches("<w:footnoteReference").count(), 1, "{body}");
+        assert!(!body.contains('\u{E002}') && !body.contains('\u{E003}') && body.contains("A claim"));
+        assert!(part(&bytes, "word/footnotes.xml").contains("Source: the report"));
+        let back = import("n.docx", &bytes, None).unwrap();
+        assert_eq!(back.notes.len(), 1);
+        assert_eq!((back.notes[0].text.as_str(), back.notes[0].end), ("Source: the report", false));
+        let id = back.notes[0].id;
+        assert!(json(&back).contains(&format!("A claim{}", super::super::notes::marker(id))), "{}", json(&back));
+    }
+
+    #[test]
+    fn a_file_with_a_footnote_keeps_it_unless_the_person_changes_or_removes_it() {
+        let mark = super::super::notes::marker(1_000_001);
+        let html = format!("<p>Keep me{mark}.</p><p>Other</p>");
+        let bytes = export("docx", &html, "T", "", Some(&with_notes(vec![note(1_000_001, false, "Original words")]))).unwrap();
+        let opened = import("n.docx", &bytes, None).unwrap();
+        let id = opened.notes[0].id;
+        let m = super::super::notes::marker(id);
+        let same = format!("<p>Keep me{m}.</p><p>Other</p>");
+        // Untouched: one note, same words
+        let a = export_with("docx", &same, "T", "", Some(&with_notes(vec![note(id, false, "Original words")])), opened.source_id.as_deref()).unwrap();
+        assert_eq!(part(&a, "word/document.xml").matches("<w:footnoteReference").count(), 1);
+        assert!(part(&a, "word/footnotes.xml").contains("Original words"));
+        // The words changed
+        let b = export_with("docx", &same, "T", "", Some(&with_notes(vec![note(id, false, "Better words")])), opened.source_id.as_deref()).unwrap();
+        let notes = part(&b, "word/footnotes.xml");
+        assert!(notes.contains("Better words") && !notes.contains("Original words"), "{notes}");
+        // The reference taken out of a paragraph whose other text did not change
+        let gone = "<p>Keep me.</p><p>Other</p>";
+        let c = export_with("docx", gone, "T", "", Some(&with_notes(vec![])), opened.source_id.as_deref()).unwrap();
+        assert_eq!(part(&c, "word/document.xml").matches("<w:footnoteReference").count(), 0, "{}", part(&c, "word/document.xml"));
+        // A client that does not know notes leaves them alone
+        let d = export_with("docx", gone, "T", "", None, opened.source_id.as_deref()).unwrap();
+        assert_eq!(part(&d, "word/document.xml").matches("<w:footnoteReference").count(), 1);
+    }
+
+    #[test]
+    fn an_endnote_is_an_endnote() {
+        let mark = super::super::notes::marker(1_000_002);
+        let html = format!("<p>Text{mark}</p>");
+        let bytes = export("docx", &html, "T", "", Some(&with_notes(vec![note(1_000_002, true, "At the end")]))).unwrap();
+        assert!(part(&bytes, "word/document.xml").contains("<w:endnoteReference"));
+        assert!(part(&bytes, "word/endnotes.xml").contains("At the end"));
+    }
+
+    /// A paragraph that starts a section, as `documentTools.forFile` writes it
+    fn section_start(spec: &str, text: &str) -> String {
+        format!("<p>{}{spec}{}{text}</p>", '\u{E004}', '\u{E005}')
+    }
+
+    #[test]
+    fn a_section_made_in_the_editor_is_a_section_of_the_docx_with_its_own_page_set_up() {
+        let html = format!("<p>Portrait one</p><p>Portrait two</p>{}<p>Wide too</p>", section_start("next|l|36,36,36,36|2", "Wide table here"));
+        let bytes = export("docx", &html, "T", "", None).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert_eq!(body.matches("<w:sectPr").count(), 2, "{body}");
+        assert!(!body.contains('\u{E004}') && !body.contains('\u{E005}'));
+        assert_eq!(body.matches("w:orient=\"landscape\"").count(), 1, "only the second section is landscape: {body}");
+        assert!(body.contains("w:num=\"2\""), "{body}");
+        // It comes back with the break on the first paragraph of the section, and the first section as it was
+        let back = import("s.docx", &bytes, None).unwrap();
+        let all = json(&back);
+        assert!(all.contains("\"sectionBreak\":\"next|l|36,36,36,36|2\""), "{all}");
+        assert_eq!(all.matches("sectionBreak").count(), 1);
+    }
+
+    #[test]
+    fn a_section_a_file_has_is_left_as_it_is_unless_the_person_changes_it() {
+        let html = format!("<p>One</p>{}<p>Two B</p>", section_start("next|p|72,72,72,72|1", "Two"));
+        let original = export("docx", &html, "T", "", None).unwrap();
+        let opened = import("o.docx", &original, None).unwrap();
+        let spec = opened.blocks.iter().find_map(|b| b["props"]["sectionBreak"].as_str().map(str::to_string)).expect("the section starts a block");
+        assert!(spec.starts_with("next|p|"), "{spec}");
+        let same = format!("<p>One</p>{}<p>Two B</p>", section_start(&spec, "Two"));
+        let a = export_with("docx", &same, "T", "", None, opened.source_id.as_deref()).unwrap();
+        assert_eq!(part(&a, "word/document.xml").matches("<w:sectPr").count(), 2);
+        // Continuous, in three columns
+        let spec3 = format!("cont|p|{}|3", spec.split('|').nth(2).unwrap());
+        let changed = format!("<p>One</p>{}<p>Two B</p>", section_start(&spec3, "Two"));
+        let b = export_with("docx", &changed, "T", "", None, opened.source_id.as_deref()).unwrap();
+        let body = part(&b, "word/document.xml");
+        assert_eq!(body.matches("<w:sectPr").count(), 2, "{body}");
+        assert!(body.contains("w:num=\"3\"") && body.contains("w:val=\"continuous\""), "{body}");
+    }
+
+    #[test]
+    fn a_break_in_a_file_with_one_section_splits_it_and_the_first_part_keeps_what_it_had() {
+        let original = export("docx", "<p>One</p><p>Two</p><p>Three</p>", "T", "", Some(&Layout { width: 612.0, height: 792.0, columns: 2, ..Default::default() })).unwrap();
+        let opened = import("o.docx", &original, None).unwrap();
+        let html = format!("<p>One</p><p>Two</p>{}", section_start("next|l|54,54,54,54|1", "Three"));
+        let bytes = export_with("docx", &html, "T", "", None, opened.source_id.as_deref()).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert_eq!(body.matches("<w:sectPr").count(), 2, "{body}");
+        let first = body.find("<w:sectPr").unwrap();
+        let sect = &body[first..body[first..].find("</w:sectPr>").unwrap() + first];
+        assert!(sect.contains("w:num=\"2\"") && !sect.contains("landscape"), "the first section keeps its two columns: {sect}");
+        assert_eq!(body.matches("w:orient=\"landscape\"").count(), 1);
     }
 
     #[test]

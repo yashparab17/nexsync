@@ -67,6 +67,26 @@ const field = createStyleSpec(
 	},
 );
 
+// A reference to a footnote or an endnote: one character whose value is the kind and number of the note (see `documentNotes`). The page
+// draws its number from a counter; the file gets a real reference to a real note.
+const note = createStyleSpec(
+	{ type: "note", propSchema: "string" },
+	{
+		render: (value) => {
+			const dom = document.createElement("span");
+			dom.dataset.note = value;
+			dom.className = value.startsWith("e") ? "doc-note doc-endnote" : "doc-note";
+			return { dom, contentDOM: dom };
+		},
+		toExternalHTML: (value) => {
+			const dom = document.createElement("span");
+			dom.dataset.note = value;
+			return { dom, contentDOM: dom };
+		},
+		parse: (el) => el.dataset.note || undefined,
+	},
+);
+
 // A tracked change: text somebody inserted or deleted while suggesting, and who and when ("author|date"). It stays in the text,
 // drawn in colour, until it is accepted or rejected (see `documentReview`). In the file it is Word's w:ins or w:del.
 function change(type: "insertion" | "deletion") {
@@ -131,6 +151,8 @@ export const WORD_PROPS = {
 	keepLines: { default: false },
 	widowControl: { default: true },
 	pageBreakBefore: { default: false },
+	// A paragraph that starts a section: its page set-up (see `documentSections`)
+	sectionBreak: { default: "" },
 	// How the text of the section this paragraph starts sits on its page: c(entre), b(ottom), j(ustify)
 	sectionVAlign: { default: "" },
 	// What follows the paragraph's one tab sits at the right edge (a right tab stop: a contents line)
@@ -162,5 +184,5 @@ const blockSpecs = {
 };
 
 // The font goes before the size, so a run's size is drawn inside its font: its line is then as tall as that font at that size, as in Word
-export const documentSchema = BlockNoteSchema.create({ blockSpecs, styleSpecs: { ...defaultStyleSpecs, field, insertion: change("insertion"), deletion: change("deletion"), fontFamily, fontSize, textColor: colourSpec("textColor", "color"), backgroundColor: colourSpec("backgroundColor", "backgroundColor") } });
+export const documentSchema = BlockNoteSchema.create({ blockSpecs, styleSpecs: { ...defaultStyleSpecs, field, note, insertion: change("insertion"), deletion: change("deletion"), fontFamily, fontSize, textColor: colourSpec("textColor", "color"), backgroundColor: colourSpec("backgroundColor", "backgroundColor") } });
 export type DocumentEditorType = typeof documentSchema.BlockNoteEditor;

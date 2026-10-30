@@ -1,5 +1,6 @@
 // Office documents: what a file holds, and what the editor was given from it
 
+import type { NoteWire } from "@/features/office/documents/lib/documentNotes";
 import type { StyleIn, StyleOut } from "@/features/office/documents/lib/documentStyles";
 
 // How a document sits on paper: written into the file with the text
@@ -27,6 +28,8 @@ export interface OfficeLayout {
 	size?: number;
 	// Paragraph styles made or changed in the editor, written into the file's styles
 	styles?: StyleIn[];
+	// The notes the text refers to; leaving it out leaves the file's own notes as they are
+	notes?: NoteWire[];
 }
 
 export interface OfficeInspect {
@@ -51,6 +54,8 @@ export interface OfficeInspect {
 }
 
 export interface Imported {
+	// The footnotes and endnotes of the file; the blocks refer to them by a marker in the text
+	notes?: NoteWire[];
 	// The document body as the editor's blocks, every paragraph and run carrying its Word formatting
 	blocks: unknown[];
 	// Each font's single line height as a multiple of its size, as Word measures it

@@ -39,9 +39,10 @@ export interface ReferencesProps {
 	citations: { label: string; text: string }[];
 	openSources: () => void;
 	openMerge: () => void;
+	openNotes: () => void;
 }
 
-export default function ReferencesRibbon({ tab, a, readOnly: ro, crossRefs, citations, openSources, openMerge }: ReferencesProps) {
+export default function ReferencesRibbon({ tab, a, readOnly: ro, crossRefs, citations, openSources, openMerge, openNotes }: ReferencesProps) {
 	if (tab === "mailings")
 		return (
 			<Group label="Mail Merge">
@@ -54,8 +55,9 @@ export default function ReferencesRibbon({ tab, a, readOnly: ro, crossRefs, cita
 				<Big icon={ListOrdered} label="Table of Contents" title="Insert the headings as a contents list; press again to bring it up to date" disabled={ro} onPress={a.insertToc} />
 			</Group>
 			<Group label="Notes">
-				<Big icon={StickyNote} label="Footnote" title="A numbered note under Notes at the end of the document" disabled={ro} menu={<TextForm label="Note text" button="Add" onSubmit={(t) => a.footnote(t)} />} />
-				<Big icon={StickyNote} label="Endnote" title="A numbered note under Endnotes at the end of the document" disabled={ro} menu={<TextForm label="Endnote text" button="Add" onSubmit={(t) => a.footnote(t, "Endnotes")} />} />
+				<Big icon={StickyNote} label="Footnote" title="A numbered note, which the file keeps as a real footnote" disabled={ro} menu={<TextForm label="Note text" button="Add" onSubmit={(t) => a.footnote(t)} />} />
+				<Big icon={StickyNote} label="Endnote" title="A numbered note, which the file keeps as a real endnote" disabled={ro} menu={<TextForm label="Endnote text" button="Add" onSubmit={(t) => a.footnote(t, true)} />} />
+				<Big icon={StickyNote} label="Show Notes" title="Read and change the words of the notes" onPress={openNotes} />
 			</Group>
 			<Group label="Captions">
 				<Rows>

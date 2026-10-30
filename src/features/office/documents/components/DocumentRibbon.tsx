@@ -25,6 +25,7 @@ import {
 	Scissors,
 	Search,
 	SpellCheck,
+	Wand2,
 	Accessibility,
 	SquarePlus,
 	ListTodo,
@@ -64,7 +65,9 @@ import {
 	X as XIcon,
 } from "lucide-react";
 import { useRef, useState } from "react";
+import { autoCorrectOn, setAutoCorrect } from "@/features/office/documents/lib/documentTools";
 
+import { parseSection } from "@/features/office/documents/lib/documentSections";
 import { type StyleDef } from "@/features/office/documents/lib/documentStyles";
 import { RESTRICTIONS, type Restriction } from "@/features/office/documents/lib/documentRestrict";
 import { Big, Choice, ColorButton, Gallery, GridPicker, Group, MenuItem, MenuTitle, Row, Rows, Sep, Small } from "@/features/office/shared/Ribbon";
@@ -127,6 +130,8 @@ export interface RibbonProps {
 export default function DocumentRibbon(p: RibbonProps) {
 	const { tab, a, fmt, readOnly: ro } = p;
 	const [link, setLink] = useState("");
+	const [auto, setAuto] = useState(autoCorrectOn);
+	const section = parseSection(fmt.section);
 	const linkInput = useRef<HTMLInputElement>(null);
 
 	if (tab === "references" || tab === "mailings") return <ReferencesRibbon tab={tab} a={a} readOnly={ro} {...p.refs} />;
@@ -468,6 +473,50 @@ export default function DocumentRibbon(p: RibbonProps) {
 						}
 					/>
 				</Group>
+				<Group label="Sections">
+					<Big
+						icon={FileText}
+						label="Section Break"
+						title="Start a section: its own orientation, margins and columns"
+						disabled={ro}
+						menu={
+							<>
+								<MenuTitle>Section break</MenuTitle>
+								<MenuItem label="Next Page" onPress={() => a.sectionBreak(false)} />
+								<MenuItem label="Continuous" onPress={() => a.sectionBreak(true)} />
+								{section && <MenuItem label="Remove This Break" onPress={a.removeSection} />}
+							</>
+						}
+					/>
+					<Big
+						icon={RectangleHorizontal}
+						label="This Section"
+						title={section ? "The orientation, margins and columns of the section the caret is in" : "The first section is set up with Orientation, Margins and Columns; insert a section break to set up another"}
+						disabled={ro || !section}
+						menu={
+							section && (
+								<>
+									<MenuTitle>Orientation</MenuTitle>
+									<MenuItem label="Portrait" checked={!section.landscape} onPress={() => a.setSection({ landscape: false })} />
+									<MenuItem label="Landscape" checked={section.landscape} onPress={() => a.setSection({ landscape: true })} />
+									<MenuTitle>Margins</MenuTitle>
+									{(["normal", "narrow", "moderate", "wide"] as const).map((m) => {
+										const v = MARGINS[m];
+										const set: [number, number, number, number] = [v.top, v.right, v.bottom, v.left];
+										return <MenuItem key={m} label={`${v.label} (${v.note})`} checked={section.margins?.join() === set.join()} onPress={() => a.setSection({ margins: set })} />;
+									})}
+									<MenuTitle>Columns</MenuTitle>
+									{([1, 2, 3] as const).map((n) => (
+										<MenuItem key={n} label={n === 1 ? "One" : n === 2 ? "Two" : "Three"} checked={section.columns === n} onPress={() => a.setSection({ columns: n })} />
+									))}
+									<MenuTitle>Starts</MenuTitle>
+									<MenuItem label="On a new page" checked={!section.continuous} onPress={() => a.setSection({ continuous: false })} />
+									<MenuItem label="Continuous" checked={section.continuous} onPress={() => a.setSection({ continuous: true })} />
+								</>
+							)
+						}
+					/>
+				</Group>
 				<Group label="Page Background">
 					<Rows>
 						<Small icon={FileText} label="Drop Cap" title="Enlarge the first letter of the document, shown in the editor and not written to the file" active={!!p.page.dropCap} disabled={ro} onPress={() => p.setPage({ dropCap: !p.page.dropCap })} />
@@ -509,6 +558,7 @@ export default function DocumentRibbon(p: RibbonProps) {
 				<Group label="Proofing">
 					<Big icon={SpellCheck} label="Spelling & Grammar" onPress={p.openProofing} />
 					<Big icon={SpellCheck} label="Underline Errors" active={p.view.spelling} onPress={() => p.setView({ spelling: !p.view.spelling })} />
+					<Big icon={Wand2} label="AutoCorrect" title="Put right common slips and curl quotes as you type; press to turn it off for you" active={auto} onPress={() => { setAutoCorrect(!auto); setAuto(!auto); }} />
 					<Big icon={Space} label="Word Count" onPress={p.openCounts} />
 				</Group>
 				<Group label="Comments">

@@ -3,6 +3,8 @@
 
 import { Plugin } from "@tiptap/pm/state";
 
+import { CLOSE, OPEN, parseNoteValue } from "@/features/office/documents/lib/documentNotes";
+
 type Cell = { type?: string; content?: unknown; props?: unknown } | unknown;
 interface Row {
 	cells: Cell[];
@@ -111,10 +113,27 @@ export function smartQuote(ch: string, before: string): string | null {
 	return null;
 }
 
+// Each person turns AutoCorrect and smart quotes off for themselves (kept in the browser, so it is not part of the shared document)
+const AUTOCORRECT_KEY = "docAutoCorrect";
+export function autoCorrectOn(): boolean {
+	try {
+		return localStorage.getItem(AUTOCORRECT_KEY) !== "off";
+	} catch {
+		return true;
+	}
+}
+export function setAutoCorrect(on: boolean) {
+	try {
+		localStorage.setItem(AUTOCORRECT_KEY, on ? "on" : "off");
+	} catch {
+		// private window: the choice lasts until the page is closed only
+	}
+}
+
 export const smartQuotesPlugin = new Plugin({
 	props: {
 		handleTextInput(view, from, to, text) {
-			if (text.length !== 1) return false;
+			if (text.length !== 1 || !autoCorrectOn()) return false;
 			const $from = view.state.doc.resolve(from);
 			if ($from.parent.type.spec.code || $from.marks().some((m) => m.type.name === "code")) return false;
 			const typed = $from.parent.textBetween(0, $from.parentOffset, undefined, "￼");
@@ -135,8 +154,20 @@ export const smartQuotesPlugin = new Plugin({
 // The editor's HTML as the file writers read it: a block that starts a page gets `page-break-before`, and a picture, which the editor
 // aligns with an attribute of its own, is put in a paragraph with that alignment
 export function forFile(html: string): string {
-	if (!html.includes("data-page-break-before") && !html.includes("<img") && !html.includes("data-style-id")) return html;
+	if (!html.includes("data-page-break-before") && !html.includes("<img") && !html.includes("data-style-id") && !html.includes("data-note") && !html.includes("data-section-break")) return html;
 	const d = new DOMParser().parseFromString(html, "text/html");
+	// A reference to a footnote or endnote goes as its marker (see `documentNotes`)
+	d.body.querySelectorAll<HTMLElement>("[data-note]").forEach((el) => {
+		const p = parseNoteValue(el.dataset.note ?? "");
+		el.replaceWith(d.createTextNode(p ? `${OPEN}${p.id}${CLOSE}` : ""));
+	});
+	// A paragraph that starts a section carries its page set-up the same way (put first, so that the style's marker, put after, stands first)
+	d.body.querySelectorAll<HTMLElement>("[data-section-break]").forEach((el) => {
+		const spec = el.getAttribute("data-section-break");
+		if (!spec || /[\uE000-\uE005]/.test(spec) || ["IMG", "HR", "BR", "TABLE"].includes(el.tagName)) return;
+		const target = el.tagName === "LI" ? (el.querySelector(":scope > p") ?? el) : el;
+		target.insertBefore(d.createTextNode(`\uE004${spec}\uE005`), target.firstChild);
+	});
 	// A paragraph's style goes to the backend as its id between two private-use characters at the start of its text (read there by `styles.rs`)
 	d.body.querySelectorAll<HTMLElement>("[data-style-id]").forEach((el) => {
 		const id = el.getAttribute("data-style-id");

@@ -13,6 +13,8 @@ pub mod proof;
 pub mod sheet_tools;
 pub mod sheets;
 pub mod slides;
+pub mod notes;
+pub mod sections;
 pub mod styles;
 
 /// Keeps a saved Office file in the workspace's version history: what was there before (so an update can be undone even the first

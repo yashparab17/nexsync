@@ -904,6 +904,30 @@ select option:checked {
 .bn-block-content[data-content-type="numberedListItem"][data-nx-label]::before {
   content: attr(data-nx-label) !important;
 }
+.doc-body .bn-editor {
+  counter-reset: nx-foot nx-end;
+}
+/* A reference to a note: its number comes from a counter, so it follows the order of the text */
+.doc-body .doc-note {
+  counter-increment: nx-foot;
+  font-size: 0 !important;
+}
+.doc-body .doc-note * {
+  font-size: 0 !important;
+}
+.doc-body .doc-note::before {
+  content: counter(nx-foot);
+  font-size: 0.7rem;
+  vertical-align: super;
+  line-height: 0;
+  color: var(--office, inherit);
+}
+.doc-body .doc-endnote {
+  counter-increment: nx-end;
+}
+.doc-body .doc-endnote::before {
+  content: counter(nx-end, lower-roman);
+}
 .doc-body [data-field] {
   border-bottom: 1px dotted color-mix(in oklch, currentColor 40%, transparent);
 }

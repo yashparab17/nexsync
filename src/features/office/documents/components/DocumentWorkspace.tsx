@@ -19,6 +19,8 @@ import PrintView from "@/features/office/documents/components/PrintView";
 import ProofingDialog from "@/features/office/documents/components/ProofingDialog";
 import CompareDialog from "@/features/office/documents/components/CompareDialog";
 import { documentOutline } from "@/features/office/documents/lib/documentOutline";
+import NotesDialog from "@/features/office/documents/components/NotesDialog";
+import { notesToSend, referencesIn, withReferences, type NoteDef, type NoteWire } from "@/features/office/documents/lib/documentNotes";
 import { editedStyles, fromFile, galleryStyles, type StyleDef, type StyleIn, type StyleOut } from "@/features/office/documents/lib/documentStyles";
 import { access, isRestriction, type Restriction } from "@/features/office/documents/lib/documentRestrict";
 import { useChat } from "@/store/chat/ChatContext";
@@ -92,6 +94,8 @@ export interface Layout {
 	valign: string;
 	// Paragraph styles made or changed in the editor, to write into the file's styles
 	styles?: StyleIn[];
+	// The notes the text refers to
+	notes?: NoteWire[];
 	// Comments to write into the file as its own comments
 	comments?: { quote: string; author: string; text: string; date: string; resolved: boolean; replies: { author: string; text: string; date: string }[] }[];
 }
@@ -127,7 +131,9 @@ interface Props {
 	canComment?: boolean;
 	// The paragraph styles the file has, for the Styles gallery
 	styles?: StyleOut[];
-	onReload?: () => Promise<{ blocks: unknown[]; layout?: OfficeLayout | null; lists?: Record<string, ListLevel> } | null>;
+	// The footnotes and endnotes the file has
+	notes?: NoteWire[];
+	onReload?: () => Promise<{ blocks: unknown[]; layout?: OfficeLayout | null; lists?: Record<string, ListLevel>; notes?: NoteWire[] } | null>;
 }
 
 // A header or footer written as left, middle and right parts (Word separates them with tabs) is drawn so
@@ -135,7 +141,7 @@ const zones = (text: string) => (text.includes("	") ? text.split("	").slice(0, 3
 
 // A document, laid out like a word processor: a ribbon of the things people do to text, a page on a desk with a ruler, a navigation
 // pane of headings, and a status bar. The text is shared live; so are the page set-up and the header and footer.
-function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly: baseReadOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload, history, canComment: baseCanComment = false, styles }: Props) {
+function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly: baseReadOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload, history, canComment: baseCanComment = false, styles, notes: fileNotes }: Props) {
 	const doc = collab.doc;
 	// An Owner or Admin may make the document comments-only or read-only for the others; it is kept in the shared document
 	const chatRole = useChat().role;
@@ -185,7 +191,22 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 		const missing = (styles ?? []).filter((s) => !sheet.has(s.id));
 		if (missing.length > 0 && !baseReadOnly) doc.transact(() => missing.forEach((s) => sheet.set(s.id, fromFile(s))));
 	}, [styles, sheet, doc, baseReadOnly]);
-	const a = useDocumentActions(editor, styleDefs, sheet);
+	// The words of the footnotes and endnotes, shared; the text holds only the references (see `documentNotes`)
+	const noteMap = useMemo(() => doc.getMap<NoteDef>("notes"), [doc]);
+	const [noteTick, setNoteTick] = useState(0);
+	useEffect(() => {
+		const again = () => setNoteTick((t) => t + 1);
+		noteMap.observe(again);
+		return () => noteMap.unobserve(again);
+	}, [noteMap]);
+	// The notes of a file replace the document's own (a file read again brings its notes with it); the document then sends its notes with the text
+	const putNotes = (list: NoteWire[]) =>
+		doc.transact(() => {
+			[...noteMap.keys()].forEach((k) => noteMap.delete(k));
+			list.forEach((n) => noteMap.set(String(n.id), { end: n.end, text: n.text }));
+			doc.getMap<string>("docmeta").set("notesKnown", "1");
+		});
+	const a = useDocumentActions(editor, styleDefs, sheet, noteMap);
 	const src = useSources(doc);
 	const comments = useDocumentComments(editor, commentStore, history?.rel ?? name, canComment);
 	const review = useDocumentReview(editor, reviewStore);
@@ -270,7 +291,8 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 			const blank = doc.getXmlFragment("blocknote").length === 0 || (editor.document.length === 1 && first?.type === "paragraph" && (first.content?.length ?? 0) === 0);
 			if (!blank || !initialBlocks.length) return;
 			if (lists) meta.set("lists", JSON.stringify(lists));
-			void fill(initialBlocks);
+			putNotes(fileNotes ?? []);
+			void fill(Array.isArray(initialBlocks) ? withReferences(initialBlocks, fileNotes ?? []) : initialBlocks);
 		},
 		[collab, editor, initialBlocks, mounted],
 	);
@@ -365,16 +387,17 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 			// The clipboard is not available in this window; nothing was copied
 		}
 	};
-	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | "sources" | "merge" | "compare" | "accessibility" | null>(null);
+	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | "sources" | "merge" | "compare" | "accessibility" | "notes" | null>(null);
 	// Puts the file back in place of the shared copy, for everyone: the text as the file has it now, with its spacing, page set-up and
 	// header and footer
 	const reload = async () => {
 		setDialog(null);
-		const fresh = onReload ? await onReload() : { blocks: typeof initialBlocks === "string" ? editor.tryParseHTMLToBlocks(initialBlocks) : initialBlocks, layout: fileLayout, lists };
+		const fresh = onReload ? await onReload() : { blocks: typeof initialBlocks === "string" ? editor.tryParseHTMLToBlocks(initialBlocks) : initialBlocks, layout: fileLayout, lists, notes: fileNotes };
 		if (!fresh || !fresh.blocks.length) return;
 		// (The spacing kept for the blocks being replaced stays, so that undoing the reload brings them back as they were)
 		doc.transact(() => {
 			if (fresh.lists) meta.set("lists", JSON.stringify(fresh.lists));
+			putNotes(fresh.notes ?? []);
 			if (fresh.layout) {
 				const { page: p, hf: h } = setupFromLayout(fresh.layout);
 				meta.set("page", JSON.stringify(p));
@@ -394,7 +417,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 		undo?.stopCapturing();
 		if (undo) undo.captureTimeout = Number.POSITIVE_INFINITY;
 		try {
-			await fill(fresh.blocks);
+			await fill(withReferences(fresh.blocks, fresh.notes ?? []));
 		} finally {
 			undo?.stopCapturing();
 			if (undo) undo.captureTimeout = timeout;
@@ -625,8 +648,19 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 			if (k === "y" || e.shiftKey) actions.current.redo();
 			else actions.current.undo();
 		};
+		// Ctrl+Alt+1, 2, 3 make the paragraph Heading 1, 2, 3 and Ctrl+Alt+0 Normal, as in Word (Alt changes the key, so the code is read)
+		const onStyle = (e: KeyboardEvent) => {
+			const id = (e.ctrlKey || e.metaKey) && e.altKey && !e.shiftKey ? ({ Digit0: "normal", Digit1: "h1", Digit2: "h2", Digit3: "h3" } as Record<string, string>)[e.code] : undefined;
+			if (!id || !(e.target as HTMLElement).closest?.(".ProseMirror")) return;
+			e.preventDefault();
+			actions.current.style(id);
+		};
 		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
+		window.addEventListener("keydown", onStyle);
+		return () => {
+			window.removeEventListener("keydown", onKey);
+			window.removeEventListener("keydown", onStyle);
+		};
 	}, [readOnly]);
 
 	const doFind = (backwards: boolean) => {
@@ -670,7 +704,9 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 		}
 	};
 
-	const layout = { ...layoutOf(page, hf), styles: editedStyles(styleList) };
+	// The notes to send: the ones the text refers to. A document made before notes were kept this way, from a file, leaves the file's notes alone.
+	const notesNow = (): NoteWire[] | undefined => (sourceId && doc.getMap<string>("docmeta").get("notesKnown") !== "1" ? undefined : notesToSend(editor.document as never, new Map([...noteMap.entries()].map(([k, v]) => [Number(k), v]))));
+	const layout = { ...layoutOf(page, hf), styles: editedStyles(styleList), notes: useMemo(notesNow, [bodyHeight, a.fmt, noteTick, sourceId]) }; // eslint-disable-line react-hooks/exhaustive-deps
 	const accent = ACCENTS.word.color;
 	const columnsCss = { ...(page.columns > 1 ? { columnCount: page.columns, columnGap: "0.5in" } : {}), "--doc-w": `${(box.width - box.left - box.right) * PX_PER_PT}px` } as React.CSSProperties;
 
@@ -835,6 +871,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 						citations: src.sources.map((s, i) => ({ label: `${s.author} ${s.year}`, text: citation(s, src.style, i + 1) })),
 						openSources: () => setDialog("sources"),
 						openMerge: () => setDialog("merge"),
+						openNotes: () => setDialog("notes"),
 					}}
 				/>
 			}
@@ -1024,6 +1061,17 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 						editor.setTextCursorPosition(id, "start");
 						editor.focus();
 					}}
+					onClose={() => setDialog(null)}
+				/>
+			)}
+			{dialog === "notes" && (
+				<NotesDialog
+					rows={referencesIn(editor.document as never).flatMap((r) => {
+						const d = noteMap.get(String(r.id));
+						return d ? [{ id: r.id, end: r.end, text: d.text }] : [];
+					})}
+					readOnly={readOnly}
+					onEdit={a.editNote}
 					onClose={() => setDialog(null)}
 				/>
 			)}
