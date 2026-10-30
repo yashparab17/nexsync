@@ -4,9 +4,10 @@
 //! the first document is laid out.
 //!
 //! The open fonts that are metric-compatible with Word's older ones travel with the app (`assets/fonts`, all under the SIL Open Font License,
-//! see `assets/fonts/README.md`): Carlito stands in for Calibri, Caladea for Cambria, and Liberation Sans, Serif and Mono for Arial, Times New
-//! Roman and Courier New. A computer without Word's fonts (a Mac, a Linux machine, a phone) then lays a document out with the same line widths,
-//! so its lines and pages break where they do in Word. The layout engine already prefers them as stand-ins; they only have to be in its list.
+//! see `assets/fonts/README.md`): Carlito stands in for Calibri, Caladea for Cambria, Arimo for Arial, Tinos for Times New
+//! Roman, Cousine for Courier New, and Intos for Aptos. A computer without Word's fonts (a Mac, a Linux machine, a phone) then lays a document
+//! out with the same line widths, so its lines and pages break where they do in Word. The layout engine already prefers most of them as
+//! stand-ins by name, so they only have to be in its list; Intos and Cousine are added under the Word names (see `ALIASES`).
 
 use std::path::{Path, PathBuf};
 
@@ -38,62 +39,70 @@ fn font_files(dir: &Path, out: &mut Vec<PathBuf>, depth: usize) {
     }
 }
 
-/// The bundled faces: (file name, bytes)
-pub const BUNDLED: &[(&str, &[u8])] = &[
-    ("Carlito-Regular.ttf", include_bytes!("../../../../assets/fonts/Carlito-Regular.ttf")),
-    ("Carlito-Bold.ttf", include_bytes!("../../../../assets/fonts/Carlito-Bold.ttf")),
-    ("Carlito-Italic.ttf", include_bytes!("../../../../assets/fonts/Carlito-Italic.ttf")),
-    ("Carlito-BoldItalic.ttf", include_bytes!("../../../../assets/fonts/Carlito-BoldItalic.ttf")),
-    ("Caladea-Regular.ttf", include_bytes!("../../../../assets/fonts/Caladea-Regular.ttf")),
-    ("Caladea-Bold.ttf", include_bytes!("../../../../assets/fonts/Caladea-Bold.ttf")),
-    ("Caladea-Italic.ttf", include_bytes!("../../../../assets/fonts/Caladea-Italic.ttf")),
-    ("Caladea-BoldItalic.ttf", include_bytes!("../../../../assets/fonts/Caladea-BoldItalic.ttf")),
-    ("LiberationSans-Regular.ttf", include_bytes!("../../../../assets/fonts/LiberationSans-Regular.ttf")),
-    ("LiberationSans-Bold.ttf", include_bytes!("../../../../assets/fonts/LiberationSans-Bold.ttf")),
-    ("LiberationSans-Italic.ttf", include_bytes!("../../../../assets/fonts/LiberationSans-Italic.ttf")),
-    ("LiberationSans-BoldItalic.ttf", include_bytes!("../../../../assets/fonts/LiberationSans-BoldItalic.ttf")),
-    ("LiberationSerif-Regular.ttf", include_bytes!("../../../../assets/fonts/LiberationSerif-Regular.ttf")),
-    ("LiberationSerif-Bold.ttf", include_bytes!("../../../../assets/fonts/LiberationSerif-Bold.ttf")),
-    ("LiberationSerif-Italic.ttf", include_bytes!("../../../../assets/fonts/LiberationSerif-Italic.ttf")),
-    ("LiberationSerif-BoldItalic.ttf", include_bytes!("../../../../assets/fonts/LiberationSerif-BoldItalic.ttf")),
-    ("LiberationMono-Regular.ttf", include_bytes!("../../../../assets/fonts/LiberationMono-Regular.ttf")),
-    ("LiberationMono-Bold.ttf", include_bytes!("../../../../assets/fonts/LiberationMono-Bold.ttf")),
-    ("LiberationMono-Italic.ttf", include_bytes!("../../../../assets/fonts/LiberationMono-Italic.ttf")),
-    ("LiberationMono-BoldItalic.ttf", include_bytes!("../../../../assets/fonts/LiberationMono-BoldItalic.ttf")),
+macro_rules! files {
+    ($($f:literal),*) => { &[$(($f, include_bytes!(concat!("../../../../assets/fonts/", $f)))),*] };
+}
+
+/// The files of one font: (file name, bytes)
+pub type Files = &'static [(&'static str, &'static [u8])];
+
+/// The bundled faces added under their own names: Carlito (for Calibri), Caladea (Cambria), Arimo (Arial) and Tinos (Times New Roman). The layout
+/// engine already picks each of them by name when the computer lacks the Word font. Arimo is two variable files (weight 400 to 700), which the
+/// engine reads as Regular, Bold and the other named weights.
+pub const BUNDLED: Files = files!(
+    "Carlito-Regular.ttf",
+    "Carlito-Bold.ttf",
+    "Carlito-Italic.ttf",
+    "Carlito-BoldItalic.ttf",
+    "Caladea-Regular.ttf",
+    "Caladea-Bold.ttf",
+    "Caladea-Italic.ttf",
+    "Caladea-BoldItalic.ttf",
+    "Arimo-VF.ttf",
+    "Arimo-Italic-VF.ttf",
+    "Tinos-Regular.ttf",
+    "Tinos-Bold.ttf",
+    "Tinos-Italic.ttf",
+    "Tinos-BoldItalic.ttf"
+);
+
+/// Open fonts added under the name of the Word font they stand for, which the engine has no name for or no font like: (the Word family, the open
+/// font's name, its files). Each is added only when the computer has no font of the Word name (so Word's own Aptos, or Courier New, is the one
+/// used when it is there).
+pub const ALIASES: &[(&str, &str, Files)] = &[
+    // Intos (https://github.com/muglug/intos), built to have Aptos's letter widths, kerning and line metrics, and so to break lines and pages
+    // where Word does
+    ("Aptos", "Intos", files!("Intos-Regular.ttf", "Intos-Bold.ttf", "Intos-Italic.ttf", "Intos-BoldItalic.ttf")),
+    ("Aptos Display", "Intos", files!("IntosDisplay-Regular.ttf", "IntosDisplay-Bold.ttf", "IntosDisplay-Italic.ttf", "IntosDisplay-BoldItalic.ttf")),
+    ("Aptos Narrow", "Intos", files!("IntosNarrow-Regular.ttf", "IntosNarrow-Bold.ttf", "IntosNarrow-Italic.ttf", "IntosNarrow-BoldItalic.ttf")),
+    ("Aptos Serif", "Intos", files!("IntosSerif-Regular.ttf", "IntosSerif-Bold.ttf", "IntosSerif-Italic.ttf", "IntosSerif-BoldItalic.ttf")),
+    // Cousine has Courier New's widths; the engine's list for it has no open mono font
+    ("Courier New", "Cousine", files!("Cousine-Regular.ttf", "Cousine-Bold.ttf", "Cousine-Italic.ttf", "Cousine-BoldItalic.ttf")),
 ];
 
-/// Inter, laid out where Aptos is wanted and the computer has no Aptos: Aptos, the default of recent Word files, has no metric clone, and Inter is
-/// the nearest open face of its kind (a clean grotesque of about the same width)
-pub const INTER: &[(&str, &[u8])] = &[
-    ("Inter-Regular.ttf", include_bytes!("../../../../assets/fonts/Inter-Regular.ttf")),
-    ("Inter-Bold.ttf", include_bytes!("../../../../assets/fonts/Inter-Bold.ttf")),
-    ("Inter-Italic.ttf", include_bytes!("../../../../assets/fonts/Inter-Italic.ttf")),
-    ("Inter-BoldItalic.ttf", include_bytes!("../../../../assets/fonts/Inter-BoldItalic.ttf")),
-];
+/// The families an open font was added under, which the computer did not have, with the open font: a document set in one is laid out in it
+static ALIASED: std::sync::Mutex<Vec<(String, String)>> = std::sync::Mutex::new(Vec::new());
 
-/// The families Inter answers to
-pub const APTOS: &[&str] = &["Aptos", "Aptos Display"];
-
-/// The families that Inter was added under, which the computer did not have (so a document set in them is laid out in Inter)
-static ALIASED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
-
-/// Adds Inter under the name `family`. A face the computer already has under that name (Word's own Aptos) is kept and Inter is not used; returns
-/// whether Inter now answers to the name.
-pub fn alias_inter(family: &str) -> bool {
-    let files = INTER.iter().map(|(_, bytes)| (bytes.to_vec(), family.to_string())).collect();
-    let added = wordcraft_fonts::FontDb::global().add_document_fonts(files);
+/// Adds `files` (the faces of one open font called `open`) under the name `family`, unless the computer has a font of that name already;
+/// returns whether the open font now answers to the name.
+pub fn alias_font(family: &str, open: &str, files: Files) -> bool {
+    let db = wordcraft_fonts::FontDb::global();
+    if db.has_family(family) {
+        return false;
+    }
+    let added = db.add_document_fonts(files.iter().map(|(_, bytes)| (bytes.to_vec(), family.to_string())).collect());
     if added > 0 {
         let mut said = ALIASED.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        if !said.iter().any(|s| s.eq_ignore_ascii_case(family)) {
-            said.push(family.to_string());
+        if !said.iter().any(|(f, _)| f.eq_ignore_ascii_case(family)) {
+            said.push((family.to_string(), open.to_string()));
         }
     }
     added > 0
 }
 
 /// Which open font stands in for which of Word's (the layout engine picks them by these names when the computer has no font of the
-/// requested name)
-pub const STAND_INS: &[(&str, &str)] = &[("Calibri", "Carlito"), ("Cambria", "Caladea"), ("Arial", "Liberation Sans"), ("Times New Roman", "Liberation Serif"), ("Courier New", "Liberation Mono")];
+/// requested name; Courier New is an alias, see [`ALIASES`])
+pub const STAND_INS: &[(&str, &str)] = &[("Calibri", "Carlito"), ("Cambria", "Caladea"), ("Arial", "Arimo"), ("Times New Roman", "Tinos")];
 
 /// Adds the bundled fonts to the layout engine's font list; returns how many faces were added
 pub fn load_bundled_fonts() -> usize {
@@ -106,8 +115,8 @@ pub fn stand_ins<'a>(fonts: impl Iterator<Item = &'a String>) -> Vec<String> {
     let aliased = ALIASED.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
     let mut out: Vec<String> = fonts
         .filter_map(|f| {
-            if aliased.iter().any(|a| a.eq_ignore_ascii_case(f)) {
-                return Some(format!("{f} → Inter"));
+            if let Some((_, open)) = aliased.iter().find(|(a, _)| a.eq_ignore_ascii_case(f)) {
+                return Some(format!("{f} → {open}"));
             }
             let r = wordcraft_fonts::word::resolve(f, false, false);
             r.substituted.then(|| format!("{f} → {}", r.face.family))
@@ -118,11 +127,11 @@ pub fn stand_ins<'a>(fonts: impl Iterator<Item = &'a String>) -> Vec<String> {
     out
 }
 
-/// Every font the app adds to the layout engine: the bundled ones, then Word's downloaded ones, and last Inter for Aptos where Word's did not
-/// bring it (so Word's own Aptos, when the computer has it, is the one used)
+/// Every font the app adds to the layout engine: the bundled ones, then Word's downloaded ones, and last the aliases for the Word families the
+/// computer still lacks (so Word's own Aptos, when the computer has it, is the one used)
 pub fn load_fonts() -> usize {
     let n = load_bundled_fonts() + load_cloud_fonts();
-    n + APTOS.iter().filter(|f| alias_inter(f)).count()
+    n + ALIASES.iter().filter(|(family, open, files)| alias_font(family, open, files)).count()
 }
 
 /// Adds the cloud fonts to the layout engine's font list; returns how many faces were added
@@ -145,9 +154,9 @@ mod tests {
 
     #[test]
     fn the_bundled_fonts_are_all_real_faces_and_give_the_families_that_stand_in_for_word_s() {
-        assert_eq!(BUNDLED.len(), 20);
-        assert_eq!(INTER.len(), 4);
-        for (name, bytes) in BUNDLED.iter().chain(INTER) {
+        assert_eq!(BUNDLED.len(), 14);
+        assert_eq!(ALIASES.len(), 5);
+        for (name, bytes) in BUNDLED.iter().chain(ALIASES.iter().flat_map(|(_, _, files)| files.iter())) {
             assert!(bytes.len() > 20_000 && matches!(&bytes[..4], [0, 1, 0, 0] | b"OTTO"), "{name} is a font file");
         }
         load_bundled_fonts();
@@ -158,18 +167,34 @@ mod tests {
     }
 
     #[test]
-    fn a_family_inter_answers_to_is_laid_out_in_inter_and_named_so() {
-        // (A name nobody has stands for Aptos, which this computer may have, in which case Word's is kept and Inter is not used for it)
-        assert!(alias_inter("Zzyzx Aptos Test"));
-        let db = wordcraft_fonts::FontDb::global();
-        assert!(db.has_family("Zzyzx Aptos Test"));
-        let plain = wordcraft_fonts::word::resolve("Zzyzx Aptos Test", false, false);
-        let bold_italic = wordcraft_fonts::word::resolve("Zzyzx Aptos Test", true, true);
-        assert!(!plain.substituted && !bold_italic.synth_bold && !bold_italic.synth_italic, "Inter has all four faces");
-        assert_eq!(stand_ins(["Zzyzx Aptos Test".to_string()].iter()), vec!["Zzyzx Aptos Test → Inter".to_string()]);
+    fn the_open_fonts_have_a_real_bold_and_italic_not_a_slanted_or_thickened_one() {
+        load_bundled_fonts();
+        for (_, open) in STAND_INS {
+            let plain = wordcraft_fonts::word::resolve(open, false, false);
+            assert!(!plain.substituted, "{open} itself is found");
+            let both = wordcraft_fonts::word::resolve(open, true, true);
+            assert!(!both.synth_bold && !both.synth_italic, "{open} has a real bold italic");
+            let bold = wordcraft_fonts::word::resolve(open, true, false);
+            assert!(!bold.synth_bold, "{open} has a real bold");
+        }
+    }
+
+    #[test]
+    fn a_family_an_open_font_answers_to_is_laid_out_in_it_and_named_so() {
+        // (A name nobody has stands for Aptos or Courier New, which this computer may have, in which case Word's is kept and the open font is not used)
+        for (open, files) in [("Intos", ALIASES[0].2), ("Cousine", ALIASES[4].2)] {
+            let family = format!("Zzyzx {open} Test");
+            assert!(alias_font(&family, open, files));
+            let db = wordcraft_fonts::FontDb::global();
+            assert!(db.has_family(&family));
+            let plain = wordcraft_fonts::word::resolve(&family, false, false);
+            let bold_italic = wordcraft_fonts::word::resolve(&family, true, true);
+            assert!(!plain.substituted && !bold_italic.synth_bold && !bold_italic.synth_italic, "{open} has all four faces");
+            assert_eq!(stand_ins([family.clone()].iter()), vec![format!("{family} → {open}")]);
+        }
         // A real family is not replaced: Carlito is there, so an alias under its name adds nothing
         load_bundled_fonts();
-        assert!(!alias_inter("Carlito"));
+        assert!(!alias_font("Carlito", "Cousine", ALIASES[4].2));
     }
 
     #[test]
@@ -179,17 +204,5 @@ mod tests {
         let said = stand_ins(fonts.iter());
         assert_eq!(said.len(), 1, "{said:?}");
         assert!(said[0].starts_with("Zzyzx Display Pro → "), "{said:?}");
-    }
-
-    #[test]
-    fn a_family_the_computer_lacks_is_laid_out_in_the_open_font_that_has_its_widths() {
-        load_bundled_fonts();
-        // Fonts no computer is likely to have under these names get the stand-in by name; they are not "Aptos" or other unknowns
-        for (word, open) in [("Calibri", "Carlito"), ("Cambria", "Caladea"), ("Arial", "Liberation Sans"), ("Times New Roman", "Liberation Serif"), ("Courier New", "Liberation Mono")] {
-            let r = wordcraft_fonts::word::resolve(open, false, false);
-            assert!(!r.substituted, "{open} itself is found (for {word})");
-            let bold = wordcraft_fonts::word::resolve(open, true, true);
-            assert!(!bold.synth_bold && !bold.synth_italic, "{open} has a real bold italic");
-        }
     }
 }
