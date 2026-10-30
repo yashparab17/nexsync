@@ -100,9 +100,17 @@ CI is split into two workflows:
 - **`.github/workflows/build.yml`** builds unsigned Linux (`.AppImage`, `.deb`), Windows (`.msi`, `.exe`) and macOS (universal `.dmg`) bundles and uploads them as workflow artifacts. It does **not** run on every push — only on a manual trigger (Actions tab, or `gh workflow run "Build App"`) or when a commit message contains `[build]`.
 - **`.github/workflows/release.yml`** cuts an actual signed GitHub Release with auto-update artifacts. It only runs on a `v*` tag push (`git tag v0.2.0 && git push --tags`) or manual dispatch, and lands as a **draft** for review before it goes public.
 
+### Making a release
+
+```bash
+pnpm bump 0.9.1 --release
+```
+
+Sets the version in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and `src-tauri/tauri.conf.json` (the updater offers a build only when its version is higher), commits them as "Version 0.9.1", tags `v0.9.1` and pushes both, which makes `release.yml` build, sign and draft the release. It refuses if other files have uncommitted changes. Without `--release` it only changes the four files. The version is three numbers; Windows installers cannot carry words such as `-beta` in it. When the build is done, open the draft under Releases, edit its notes (the app shows them as "What's new") and publish it: the updater only sees published releases.
+
 ### Auto-updates
 
-The app checks GitHub Releases for a newer signed build from **Settings → Updates & About → Check for updates**, shows the release notes under "What's new", downloads it, and relaunches. The **update channel** there is Stable (the newest published release) or Beta (a pre-release you point testers at by running the **Point the beta channel** workflow with the pre-release tag; tags with a dash, such as `v0.2.0-beta.1`, are published as pre-releases). The notes come from the release body, so edit the draft release before publishing it. Releases are signed with a minisign keypair (the public half lives in `src-tauri/tauri.conf.json`); `release.yml` needs `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` set as repo secrets to produce a release the updater will trust. Windows signing imports the certificate from `WINDOWS_CERTIFICATE` and `WINDOWS_CERTIFICATE_PASSWORD`, and macOS signing and notarization use the `APPLE_*` secrets. Neither has been run yet, because no certificate is configured, so builds are unsigned for now.
+The app looks for a newer signed build by itself about eight seconds after it starts (a small card offers **Update & restart**, **Later** or **Skip this version**; a failed check says nothing), and again from **Settings → Updates & About → Check for updates**, on the update channel chosen there. It checks GitHub Releases, shows the release notes under "What's new", downloads it, and relaunches. The **update channel** there is Stable (the newest published release) or Beta (a pre-release you point testers at by running the **Point the beta channel** workflow with the pre-release tag; tags with a dash, such as `v0.2.0-beta.1`, are published as pre-releases). The notes come from the release body, so edit the draft release before publishing it. Releases are signed with a minisign keypair (the public half lives in `src-tauri/tauri.conf.json`); `release.yml` needs `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` set as repo secrets to produce a release the updater will trust. Windows signing imports the certificate from `WINDOWS_CERTIFICATE` and `WINDOWS_CERTIFICATE_PASSWORD`, and macOS signing and notarization use the `APPLE_*` secrets. Neither has been run yet, because no certificate is configured, so builds are unsigned for now.
 
 ## Command line
 

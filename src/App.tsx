@@ -5,6 +5,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import ErrorDialog from "@/components/ErrorDialog";
 import TitleBar from "@/components/TitleBar";
 import Toaster from "@/components/Toaster";
+import UpdatePrompt from "@/components/UpdatePrompt";
 import { t } from "@/i18n";
 
 // Root application layout container
@@ -42,6 +43,9 @@ export default function App() {
 
         {/* Pop-ups for background events */}
         <Toaster />
+
+        {/* A newer signed build, offered a few seconds after start */}
+        <UpdatePrompt />
       </div>
     </MotionConfig>
   );
