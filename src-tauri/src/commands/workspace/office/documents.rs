@@ -70,6 +70,8 @@ pub struct Imported {
     pub lists: std::collections::BTreeMap<String, super::blocks::ListLevel>,
     pub title: String,
     pub inspect: Inspect,
+    /// The paragraph styles the file has that the Styles gallery should offer, each with the look it gives
+    pub styles: Vec<super::styles::StyleOut>,
     /// The page set-up the file has, for the editor's page and header settings to start from
     pub layout: Layout,
     /// The file as it was read, kept so that drawing or saving can bring back what the editor does not hold (see `merge`)
@@ -108,6 +110,8 @@ pub struct Layout {
     pub size: f32,
     /// The comments on the text, each on the words it was made on (written as the file format's own comments)
     pub comments: Vec<CommentIn>,
+    /// Paragraph styles made or changed in the editor, written into the file's styles
+    pub styles: Vec<super::styles::StyleIn>,
 }
 
 /// A comment thread: the words it is on, who said what, and whether it was settled
@@ -473,7 +477,8 @@ pub fn import(name: &str, bytes: &[u8], password: Option<&str>) -> Result<Import
     let converted = catch_unwind(AssertUnwindSafe(|| super::blocks::convert(&doc))).map_err(|_| Refusal::text("This document could not be shown."))?;
     let inspect = inspect_file(&ext, package, &names, bytes, &doc);
     let title = if doc.core.title.trim().is_empty() { name.rsplit(['/', '\\']).next().unwrap_or(name).rsplit_once('.').map(|(s, _)| s.to_string()).unwrap_or_else(|| name.to_string()) } else { doc.core.title.clone() };
-    Ok(Imported { blocks: converted.blocks, fonts: converted.fonts, lists: converted.lists, title, inspect, layout, source_id })
+    let styles = super::styles::styles_of(&doc);
+    Ok(Imported { blocks: converted.blocks, fonts: converted.fonts, lists: converted.lists, title, inspect, styles, layout, source_id })
 }
 
 /// A file's bytes read as a document under the limits of opening one (size, kind, package checks, password)
@@ -521,7 +526,9 @@ pub fn inspect_bytes(name: &str, bytes: &[u8], password: Option<&str>) -> Result
 /// the styles, sections, headers and footers the editor does not hold are still there; without one it is made from the HTML alone.
 fn build_document(html: &str, title: &str, author: &str, layout: Option<&Layout>, source: Option<&str>) -> Result<wordcraft_doc::Document, String> {
     let page = format!("<!doctype html><html><head><meta charset=\"utf-8\"><title>{}</title></head><body>{html}</body></html>", escape(title));
-    let edited = wordcraft_formats::import("html", page.as_bytes()).ok_or("The document could not be read.")??;
+    let mut edited = wordcraft_formats::import("html", page.as_bytes()).ok_or("The document could not be read.")??;
+    // The style each paragraph was given in the editor (see `styles`)
+    let chosen = super::styles::take_markers(&mut edited);
     let original = source.and_then(super::merge::get);
     let mut doc = match &original {
         Some(o) => super::merge::merge(o, edited),
@@ -538,7 +545,9 @@ fn build_document(html: &str, title: &str, author: &str, layout: Option<&Layout>
             None => apply_layout(&mut doc, l),
         }
         add_comments(&mut doc, &l.comments);
+        super::styles::apply(&mut doc, &l.styles);
     }
+    super::styles::settle(&mut doc, &chosen);
     Ok(doc)
 }
 
@@ -956,6 +965,65 @@ mod tests {
         let balloons = convert_bytes("a.docx", &docx, "pdf", None, false, true).unwrap();
         assert!(plain.starts_with(b"%PDF") && balloons.starts_with(b"%PDF") && plain != balloons);
         assert!(convert_bytes("a.docx", &docx, "txt", None, true, false).is_err(), "markup is for a PDF");
+    }
+
+    /// The HTML of a paragraph the editor gave a style, as `documentTools.forFile` writes it
+    fn styled(id: &str, text: &str) -> String {
+        format!("<p>{}{id}{}{text}</p>", '\u{E000}', '\u{E001}')
+    }
+
+    fn part(bytes: &[u8], name: &str) -> String {
+        use std::io::Read;
+        let mut z = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
+        let mut out = String::new();
+        z.by_name(name).unwrap().read_to_string(&mut out).unwrap();
+        out
+    }
+
+    fn callout() -> super::super::styles::StyleIn {
+        super::super::styles::StyleIn { id: "Callout".into(), name: "Callout".into(), font: "Georgia".into(), size: Some(13.0), bold: true, color: "#c00000".into(), ..Default::default() }
+    }
+
+    #[test]
+    fn a_style_made_in_the_editor_and_a_paragraph_that_uses_it_are_both_in_the_docx() {
+        let html = format!("{}<p>Plain text</p>", styled("Callout", "Look here"));
+        let layout = Layout { styles: vec![callout()], ..Default::default() };
+        let bytes = export("docx", &html, "T", "", Some(&layout)).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert_eq!(body.matches("<w:pStyle w:val=\"Callout\"/>").count(), 1, "one paragraph uses it: {body}");
+        assert!(body.contains("Look here") && !body.contains('\u{E000}') && !body.contains('\u{E001}'), "the marker is gone from the text");
+        let styles = part(&bytes, "word/styles.xml");
+        assert!(styles.contains("w:styleId=\"Callout\"") && styles.contains("Georgia") && styles.contains("C00000") || styles.contains("c00000"), "{styles}");
+        // And the file opens with the style in its gallery and the text in the editor without the marker
+        let back = import("c.docx", &bytes, None).unwrap();
+        assert!(back.styles.iter().any(|s| s.id == "Callout" && s.size == 13.0 && s.bold), "{:?}", back.styles);
+        assert!(json(&back).contains("\"styleId\":\"Callout\"") && !json(&back).contains("E000"));
+    }
+
+    #[test]
+    fn choosing_another_style_for_a_paragraph_whose_text_did_not_change_changes_it_in_the_file() {
+        let layout = Layout { styles: vec![callout()], ..Default::default() };
+        let original = export("docx", "<p>Hello there</p><p>Second</p>", "T", "", Some(&layout)).unwrap();
+        let opened = import("o.docx", &original, None).unwrap();
+        assert!(!part(&original, "word/document.xml").contains("w:pStyle w:val=\"Callout\""));
+        // The person applied Callout to "Hello there" and changed nothing else: the editor sends the file's styles back unchanged
+        let html = format!("{}<p>Second</p>", styled("Callout", "Hello there"));
+        let bytes = export_with("docx", &html, "T", "", None, opened.source_id.as_deref()).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert_eq!(body.matches("<w:pStyle w:val=\"Callout\"/>").count(), 1, "{body}");
+        assert!(body.find("Callout").unwrap() < body.find("Second").unwrap(), "it is the first paragraph that has it");
+    }
+
+    #[test]
+    fn a_style_changed_in_the_editor_replaces_the_files_own_definition() {
+        let layout = Layout { styles: vec![callout()], ..Default::default() };
+        let original = export("docx", &styled("Callout", "Hello there"), "T", "", Some(&layout)).unwrap();
+        let opened = import("o.docx", &original, None).unwrap();
+        let bigger = super::super::styles::StyleIn { id: "Callout".into(), size: Some(24.0), bold: true, ..Default::default() };
+        let bytes = export_with("docx", &styled("Callout", "Hello there"), "T", "", Some(&Layout { styles: vec![bigger], ..Default::default() }), opened.source_id.as_deref()).unwrap();
+        let back = import("b.docx", &bytes, None).unwrap();
+        let s = back.styles.iter().find(|s| s.id == "Callout").unwrap();
+        assert_eq!((s.size, s.font.as_str()), (24.0, "Georgia"), "the size changed and the font stayed");
     }
 
     #[test]

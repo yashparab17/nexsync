@@ -27,6 +27,20 @@ describe("document tools", () => {
 		expect(autoCorrect("a-", ">")).toEqual({ remove: 1, insert: "→" });
 	});
 
+	it("marks a styled paragraph with its style id for the file writer: in the text of a paragraph, a heading and a list item", () => {
+		const out = forFile('<p data-style-id="Callout">Look</p><h2 data-level="2" data-style-id="Heading2">Part</h2><ul><li data-style-id="ListParagraph"><p class="bn-inline-content">item</p></li></ul><p>plain</p><p data-style-id="">none</p>');
+		const d = new DOMParser().parseFromString(out, "text/html");
+		const texts = [...d.body.querySelectorAll("p, h2")].map((e) => e.textContent);
+		expect(texts).toEqual(["CalloutLook", "Heading2Part", "ListParagraphitem", "plain", "none"]);
+		expect(d.body.querySelector("li")?.textContent).toBe("ListParagraphitem");
+	});
+
+	it("leaves a picture, and an id that holds a marker character, alone", () => {
+		const out = forFile('<img data-style-id="Pic" src="x.png"><p data-style-id="ab">x</p>');
+		expect(out).not.toMatch(/Pic|Pic/);
+		expect(new DOMParser().parseFromString(out, "text/html").body.querySelector("p")?.textContent).toBe("x");
+	});
+
 	it("puts a slip right after the word, keeping the capitals and the space that was typed", () => {
 		expect(autoCorrect("so teh", " ")).toEqual({ remove: 3, insert: "the " });
 		expect(autoCorrect("so Teh", " ")).toEqual({ remove: 3, insert: "The " });

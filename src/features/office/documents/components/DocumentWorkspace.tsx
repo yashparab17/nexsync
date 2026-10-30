@@ -19,6 +19,7 @@ import PrintView from "@/features/office/documents/components/PrintView";
 import ProofingDialog from "@/features/office/documents/components/ProofingDialog";
 import CompareDialog from "@/features/office/documents/components/CompareDialog";
 import { documentOutline } from "@/features/office/documents/lib/documentOutline";
+import { editedStyles, fromFile, galleryStyles, type StyleDef, type StyleIn, type StyleOut } from "@/features/office/documents/lib/documentStyles";
 import { access, isRestriction, type Restriction } from "@/features/office/documents/lib/documentRestrict";
 import { useChat } from "@/store/chat/ChatContext";
 import AccessibilityDialog from "@/features/office/documents/components/AccessibilityDialog";
@@ -89,6 +90,8 @@ export interface Layout {
 	evenFooter?: string;
 	pageNumbers: boolean;
 	valign: string;
+	// Paragraph styles made or changed in the editor, to write into the file's styles
+	styles?: StyleIn[];
 	// Comments to write into the file as its own comments
 	comments?: { quote: string; author: string; text: string; date: string; resolved: boolean; replies: { author: string; text: string; date: string }[] }[];
 }
@@ -122,6 +125,8 @@ interface Props {
 	// Where the file is, for its version history
 	history?: { workspacePath: string; rel: string };
 	canComment?: boolean;
+	// The paragraph styles the file has, for the Styles gallery
+	styles?: StyleOut[];
 	onReload?: () => Promise<{ blocks: unknown[]; layout?: OfficeLayout | null; lists?: Record<string, ListLevel> } | null>;
 }
 
@@ -130,7 +135,7 @@ const zones = (text: string) => (text.includes("	") ? text.split("	").slice(0, 3
 
 // A document, laid out like a word processor: a ribbon of the things people do to text, a page on a desk with a ruler, a navigation
 // pane of headings, and a status bar. The text is shared live; so are the page set-up and the header and footer.
-function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly: baseReadOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload, history, canComment: baseCanComment = false }: Props) {
+function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly: baseReadOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload, history, canComment: baseCanComment = false, styles }: Props) {
 	const doc = collab.doc;
 	// An Owner or Admin may make the document comments-only or read-only for the others; it is kept in the shared document
 	const chatRole = useChat().role;
@@ -167,7 +172,20 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 	);
 	const editor = useCreateBlockNote(options, [doc]);
 	const styleDefs = useMemo(() => doc.getMap<Record<string, unknown>>("styleDefs"), [doc]);
-	const a = useDocumentActions(editor, styleDefs);
+	// The document's named styles, shared: the file's own come in when it is opened, and the ones made or changed here go back into the file
+	const sheet = useMemo(() => doc.getMap<StyleDef>("styleSheet"), [doc]);
+	const [styleList, setStyleList] = useState<StyleDef[]>([]);
+	useEffect(() => {
+		const read = () => setStyleList([...sheet.values()]);
+		read();
+		sheet.observe(read);
+		return () => sheet.unobserve(read);
+	}, [sheet]);
+	useEffect(() => {
+		const missing = (styles ?? []).filter((s) => !sheet.has(s.id));
+		if (missing.length > 0 && !baseReadOnly) doc.transact(() => missing.forEach((s) => sheet.set(s.id, fromFile(s))));
+	}, [styles, sheet, doc, baseReadOnly]);
+	const a = useDocumentActions(editor, styleDefs, sheet);
 	const src = useSources(doc);
 	const comments = useDocumentComments(editor, commentStore, history?.rel ?? name, canComment);
 	const review = useDocumentReview(editor, reviewStore);
@@ -652,7 +670,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 		}
 	};
 
-	const layout = layoutOf(page, hf);
+	const layout = { ...layoutOf(page, hf), styles: editedStyles(styleList) };
 	const accent = ACCENTS.word.color;
 	const columnsCss = { ...(page.columns > 1 ? { columnCount: page.columns, columnGap: "0.5in" } : {}), "--doc-w": `${(box.width - box.left - box.right) * PX_PER_PT}px` } as React.CSSProperties;
 
@@ -797,6 +815,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					review={review}
 					openCompare={() => setDialog("compare")}
 					openAccessibility={() => setDialog("accessibility")}
+					styles={galleryStyles(styleList)}
 					restrict={{ value: restriction, canSet: isAdmin && !baseReadOnly, set: (r) => settings.set("restrict", r) }}
 					copyOutline={() => void copyOutline()}
 					makeTask={() => void makeTask()}
@@ -913,7 +932,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 						) : (
 							<>
 							{mode === "print" && (
-								<PrintView getHtml={html} subscribe={(cb) => editor.onChange(cb)} title={title} layout={layoutOf(page, hf)} sourceId={sourceId} zoom={zoom} onPages={setPrintPages} />
+								<PrintView getHtml={html} subscribe={(cb) => editor.onChange(cb)} title={title} layout={layout} sourceId={sourceId} zoom={zoom} onPages={setPrintPages} />
 							)}
 							<div className={cn("flex justify-center-safe py-6", mode === "print" && "hidden")} style={{ zoom: zoom / 100 }}>
 								<div

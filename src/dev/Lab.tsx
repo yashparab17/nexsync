@@ -13,6 +13,7 @@ import { setFontFactors } from "@/features/office/documents/lib/fontMetrics";
 import SheetWorkspace from "@/features/office/sheets/components/SheetWorkspace";
 import SlideWorkspace from "@/features/office/slides/components/SlideWorkspace";
 import { readWorkbookForFile, type SheetIn } from "@/features/office/sheets/lib/sheet";
+import { P2PContext } from "@/store/p2p/P2PContext";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
 
 const SAMPLE = `<h1 style="text-align:center">Centered Title</h1><p style="text-align:center">Centered paragraph</p><p style="text-align:right">Right paragraph</p>
@@ -144,12 +145,13 @@ export default function Lab({ which }: { which: string }) {
 	if (fileParam && !opened) return <p className="p-6">Opening…</p>;
 	if (which !== "documents") return <p className="p-6">The lab has no “{which}” yet.</p>;
 	return (
-		<LabChat><div style={{ height: new URLSearchParams(location.search).get("h") ?? "100vh" }}>
+		<P2PContext.Provider value={{ publishDataChange: () => {} } as never}><LabChat><div style={{ height: new URLSearchParams(location.search).get("h") ?? "100vh" }}>
 			<DocumentWorkspace canComment
 				collab={collab}
 				fileLayout={(opened as unknown as { layout?: never } | null)?.layout}
 				sourceId={(opened as unknown as { sourceId?: string } | null)?.sourceId}
 				lists={(opened as unknown as { lists?: never } | null)?.lists}
+				styles={(opened as unknown as { styles?: never } | null)?.styles}
 				initialBlocks={opened ? (opened as unknown as { blocks: unknown[] }).blocks : new URLSearchParams(location.search).has("long") ? SAMPLE + Array.from({ length: 40 }, (_, i) => `<h2>Section ${i + 1}</h2><p>${"Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(5)}</p>`).join("") : SAMPLE}
 				name="Quarterly Review.docx"
 				title="Quarterly Review"
@@ -162,11 +164,11 @@ export default function Lab({ which }: { which: string }) {
 						const out = new URLSearchParams(location.search).get("out");
 						if (!out) return;
 						const path = `${out}/lab-copy.${format}`;
-						await viaLab("office_export_html", { ext: format, html, title: "Quarterly Review", author: "Ana", path, layout });
+						await viaLab("office_export_html", { ext: format, html, title: "Quarterly Review", author: "Ana", path, layout, sourceId: (opened as { sourceId?: string } | null)?.sourceId });
 						(window as unknown as { __labCopy: string }).__labCopy = path;
 					}}
 				onUpdateFile={async () => {}}
 			/>
-		</div></LabChat>
+		</div></LabChat></P2PContext.Provider>
 	);
 }

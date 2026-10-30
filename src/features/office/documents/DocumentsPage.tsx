@@ -342,6 +342,7 @@ export default function DocumentsPage() {
 							collab={collab}
 							initialBlocks={state.imported!.blocks}
 							lists={state.imported!.lists}
+							styles={state.imported!.styles}
 							name={selected.split("/").pop() ?? ""}
 							title={title}
 							author={author}

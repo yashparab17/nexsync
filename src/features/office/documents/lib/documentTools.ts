@@ -135,8 +135,15 @@ export const smartQuotesPlugin = new Plugin({
 // The editor's HTML as the file writers read it: a block that starts a page gets `page-break-before`, and a picture, which the editor
 // aligns with an attribute of its own, is put in a paragraph with that alignment
 export function forFile(html: string): string {
-	if (!html.includes("data-page-break-before") && !html.includes("<img")) return html;
+	if (!html.includes("data-page-break-before") && !html.includes("<img") && !html.includes("data-style-id")) return html;
 	const d = new DOMParser().parseFromString(html, "text/html");
+	// A paragraph's style goes to the backend as its id between two private-use characters at the start of its text (read there by `styles.rs`)
+	d.body.querySelectorAll<HTMLElement>("[data-style-id]").forEach((el) => {
+		const id = el.getAttribute("data-style-id");
+		if (!id || /[]/.test(id) || ["IMG", "HR", "BR", "TABLE"].includes(el.tagName)) return;
+		const target = el.tagName === "LI" ? (el.querySelector(":scope > p") ?? el) : el;
+		target.insertBefore(d.createTextNode(`${id}`), target.firstChild);
+	});
 	d.body.querySelectorAll<HTMLElement>('[data-page-break-before="true"]').forEach((el) => (el.style.pageBreakBefore = "always"));
 	d.body.querySelectorAll<HTMLElement>(":scope > img[data-text-alignment]").forEach((img) => {
 		const align = img.getAttribute("data-text-alignment");

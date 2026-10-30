@@ -127,6 +127,7 @@ pub fn layout_of(doc: &Document) -> Layout {
         font: normal.font,
         size: normal.size,
         comments: Vec::new(),
+        styles: Vec::new(),
     }
 }
 

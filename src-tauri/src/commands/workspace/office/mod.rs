@@ -13,6 +13,7 @@ pub mod proof;
 pub mod sheet_tools;
 pub mod sheets;
 pub mod slides;
+pub mod styles;
 
 /// Keeps a saved Office file in the workspace's version history: what was there before (so an update can be undone even the first
 /// time) and what was written. A file outside the workspace, or of another kind, is left alone; history is never a reason to fail a save.

@@ -1,5 +1,7 @@
 // Office documents: what a file holds, and what the editor was given from it
 
+import type { StyleIn, StyleOut } from "@/features/office/documents/lib/documentStyles";
+
 // How a document sits on paper: written into the file with the text
 export interface OfficeLayout {
 	width: number;
@@ -23,6 +25,8 @@ export interface OfficeLayout {
 	// The font and size (points) of the file's ordinary text; empty and 0 when unknown
 	font?: string;
 	size?: number;
+	// Paragraph styles made or changed in the editor, written into the file's styles
+	styles?: StyleIn[];
 }
 
 export interface OfficeInspect {
@@ -55,6 +59,8 @@ export interface Imported {
 	lists: Record<string, { abs: number; format: string; text: string; start: number; restart: boolean }>;
 	title: string;
 	inspect: OfficeInspect;
+	// The paragraph styles the file has that the Styles gallery should offer
+	styles?: StyleOut[];
 	// The page set-up the file has
 	layout: OfficeLayout;
 	// The file as it was read, kept by the backend so that drawing or saving brings back what the editor does not hold

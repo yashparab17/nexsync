@@ -26,6 +26,7 @@ import {
 	Search,
 	SpellCheck,
 	Accessibility,
+	SquarePlus,
 	ListTodo,
 	Lock,
 	Braces,
@@ -64,6 +65,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { type StyleDef } from "@/features/office/documents/lib/documentStyles";
 import { RESTRICTIONS, type Restriction } from "@/features/office/documents/lib/documentRestrict";
 import { Big, Choice, ColorButton, Gallery, GridPicker, Group, MenuItem, MenuTitle, Row, Rows, Sep, Small } from "@/features/office/shared/Ribbon";
 import { type CaseKind, FONTS, HIGHLIGHTS, MARGINS, PALETTE, PAPER, SIZES, STYLES, type MarginName, type PageSetup, type PaperName, type StyleId } from "@/features/office/documents/lib/documentFormat";
@@ -74,6 +76,9 @@ type Actions = ReturnType<typeof useDocumentActions>;
 
 const SYMBOLS = ["©", "®", "™", "§", "¶", "†", "‡", "•", "…", "–", "—", "°", "±", "×", "÷", "≠", "≤", "≥", "≈", "∞", "√", "∑", "π", "Ω", "µ", "€", "£", "¥", "¢", "←", "→", "↑", "↓", "✓", "✗", "★"];
 const LINE_SPACING = [1, 1.15, 1.5, 2, 2.5, 3];
+
+// A style of the document drawn the way it will look (the size kept small so that it fits)
+const previewOf = (d: StyleDef): React.CSSProperties => ({ fontFamily: d.font, fontSize: Math.max(11, Math.min(17, d.size)), fontWeight: d.bold ? 700 : 400, fontStyle: d.italic ? "italic" : "normal", textDecoration: d.underline ? "underline" : "none", color: d.color || undefined });
 
 // A look in the Styles gallery, drawn the way it will look
 const previews: Record<StyleId, React.ReactNode> = {
@@ -104,6 +109,8 @@ export interface RibbonProps {
 	review: { suggesting: boolean; count: number; toggle: () => void; accept: () => void; reject: () => void; acceptAll: () => void; rejectAll: () => void; next: () => void; previous: () => void };
 	openCompare: () => void;
 	openAccessibility: () => void;
+	// The document's own styles, beside the gallery's
+	styles: StyleDef[];
 	copyOutline: () => void;
 	makeTask: () => void;
 	taskMade: boolean;
@@ -197,10 +204,13 @@ export default function DocumentRibbon(p: RibbonProps) {
 					</Rows>
 				</Group>
 				<Group label="Styles">
-					<Gallery label="Styles" items={STYLES.map((s) => ({ id: s.id, label: s.label, preview: previews[s.id] }))} current={fmt.style} onPick={(id) => !ro && a.style(id as StyleId)} width={78} className="w-[330px]" />
+					<Gallery label="Styles" items={[...STYLES.map((s) => ({ id: s.id as string, label: s.label as string, preview: previews[s.id] })), ...p.styles.map((d) => ({ id: d.id, label: d.name, preview: <span style={previewOf(d)}>AaBbCc</span> }))]} current={fmt.style} onPick={(id) => !ro && a.style(id)} width={78} className="w-[330px]" />
 				</Group>
 				<Group label="Style">
 					<Big icon={Brush} label="Update Style" title="Give the look at the caret to every paragraph in the same style" disabled={ro} onPress={a.updateStyle} />
+					<Rows>
+						<Small icon={SquarePlus} label="New Style" title="Make a style of the look at the caret, and give it to the paragraph" disabled={ro} menu={<TextForm label="Name" button="Create" onSubmit={a.createStyle} />} />
+					</Rows>
 				</Group>
 				<Group label="Editing">
 					<Rows>

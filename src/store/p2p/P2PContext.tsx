@@ -179,7 +179,7 @@ interface P2PContextType {
 	network: p2p.NetworkStatus; // Whether the relay is reachable, and why not
 }
 
-const P2PContext = createContext<P2PContextType | null>(null);
+export const P2PContext = createContext<P2PContextType | null>(null);
 
 const stripLeadingSlash = (path: string) => (path.startsWith("/") ? path.slice(1) : path);
 

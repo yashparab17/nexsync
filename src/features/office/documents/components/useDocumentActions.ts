@@ -6,6 +6,7 @@ import { changeCase, type CaseKind, DEFAULT_FONT, DEFAULT_SIZE, HIGHLIGHTS, poin
 import { headingsOf, textOfBlocks, type BlockLike } from "@/features/office/documents/lib/documentFind";
 import { equationText, indexEntries, withFormula, type Formula } from "@/features/office/documents/lib/documentReferences";
 import { cropImage, drawShape, type CropMode, type ShapeKind } from "@/features/office/documents/lib/documentObjects";
+import { applyToRuns, blockPropsOf, fromCaret, idFromName, isBuiltInWordId, WORD_ID, type StyleDef } from "@/features/office/documents/lib/documentStyles";
 import { nextCaption, TOC, TOC_TITLE, sortTable, tocBlocks, type TableContent } from "@/features/office/documents/lib/documentTools";
 import { documentSchema } from "@/features/office/documents/lib/documentSchema";
 
@@ -21,7 +22,8 @@ export interface Fmt {
 	color: string;
 	highlight: string;
 	align: "left" | "center" | "right" | "justify";
-	style: StyleId;
+	// A look of the gallery (normal, h1...) or the id of a style of the document
+	style: string;
 	list: "bullet" | "number" | "check" | null;
 	canNest: boolean;
 	canUnnest: boolean;
@@ -48,13 +50,25 @@ function paint(e: Editor, b: AnyBlock, def: Record<string, unknown>) {
 	e.updateBlock(b.id, { content: (b.content as { type?: string; styles?: object }[]).map((r) => (r.type === "text" ? { ...r, styles: { ...r.styles, ...def } } : r)) } as never);
 }
 
+// The look of a style of the document put on the text of a block
+function restyle(e: Editor, b: AnyBlock, def: StyleDef) {
+	if (!Array.isArray(b.content)) return;
+	e.updateBlock(b.id, { content: (b.content as { type?: string; styles?: Record<string, unknown> }[]).map((r) => (r.type === "text" ? { ...r, styles: applyToRuns(r.styles ?? {}, def) } : r)) } as never);
+}
+
+// The gallery entry the block is in: one of the document's own styles when it has its id, otherwise the look its type gives
+function styleName(block: { type: string; props?: { level?: number; styleId?: unknown } }, sheet?: Y.Map<StyleDef>): string {
+	const id = block.props?.styleId;
+	return typeof id === "string" && id && sheet?.has(id) && !isBuiltInWordId(id) ? id : styleOf(block);
+}
+
 const sup = (n: number) => [...String(n)].map((c) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[Number(c)]).join("");
 
 const LISTS = { bullet: "bulletListItem", number: "numberedListItem", check: "checkListItem" } as const;
 
 // What the ribbon shows about the text the caret is in, kept up to date as the selection and the text change, and the things the
 // ribbon does to it
-export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<string, unknown>>) {
+export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<string, unknown>>, sheet?: Y.Map<StyleDef>) {
 	const [fmt, setFmt] = useState<Fmt>(NONE);
 	// The look picked up by Format Painter, waiting for a selection to paint
 	const [painter, setPainter] = useState<Record<string, unknown> | null>(null);
@@ -75,7 +89,7 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 				color: typeof s.textColor === "string" && s.textColor !== "default" ? s.textColor : "",
 				highlight: typeof s.backgroundColor === "string" && s.backgroundColor !== "default" ? s.backgroundColor : "",
 				align: ((block.props?.textAlignment as Fmt["align"]) ?? "left") || "left",
-				style: styleOf(block as { type: string; props?: { level?: number } }),
+				style: styleName(block as { type: string; props?: { level?: number; styleId?: unknown } }, sheet),
 				list: type === "bulletListItem" ? "bullet" : type === "numberedListItem" ? "number" : type === "checkListItem" ? "check" : null,
 				canNest: editor.canNestBlock(),
 				canUnnest: editor.canUnnestBlock(),
@@ -89,7 +103,7 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 		} catch {
 			// The editor is between states (being mounted or rebuilt)
 		}
-	}, [editor]);
+	}, [editor, sheet]);
 
 	useEffect(() => {
 		if (!editor) return;
@@ -136,15 +150,35 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 		// A list kind switches the blocks to it, or back to plain paragraphs when they already are that kind
 		list: (kind: keyof typeof LISTS) => act((e) => targets(e).forEach((b) => e.updateBlock(b.id, { type: b.type === LISTS[kind] ? "paragraph" : LISTS[kind] } as never))),
 		indent: (dir: 1 | -1) => act((e) => (dir === 1 ? e.nestBlock() : e.unnestBlock())),
-		style: (id: StyleId) => {
-			const spec = STYLES.find((s) => s.id === id)?.block;
+		// A look of the gallery, or a style of the document: its id goes on the paragraph and its look on the text
+		style: (id: string) => {
+			const own = sheet?.get(id);
+			if (own && !isBuiltInWordId(id)) {
+				act((e) =>
+					targets(e).forEach((b) => {
+						e.updateBlock(b.id, { props: blockPropsOf(own) } as never);
+						restyle(e, e.getBlock(b.id) as unknown as AnyBlock, own);
+					}),
+				);
+				return;
+			}
+			const spec = STYLES.find((s) => s.id === id)?.block as { type: string; props?: object } | undefined;
 			if (spec)
 				act((e) => {
-					targets(e).forEach((b) => e.updateBlock(b.id, spec as never));
+					targets(e).forEach((b) => e.updateBlock(b.id, { ...spec, props: { ...spec.props, styleId: WORD_ID[id as StyleId] } } as never));
 					const def = defs?.get(id);
 					if (def) targets(e).forEach((b) => paint(e, e.getBlock(b.id) as unknown as AnyBlock, def));
 				});
 		},
+		// A new style of the document from the look at the caret, given to the paragraphs the selection touches
+		createStyle: (name: string) =>
+			act((e) => {
+				if (!sheet || !name.trim()) return;
+				const block = e.getTextCursorPosition().block as unknown as AnyBlock;
+				const id = idFromName(name, sheet.keys());
+				sheet.set(id, fromCaret(name, id, { font: fmt.font, size: fmt.size, bold: fmt.bold, italic: fmt.italic, underline: fmt.underline, color: fmt.color }, block.props ?? {}));
+				targets(e).forEach((b) => e.updateBlock(b.id, { props: { styleId: id } } as never));
+			}),
 		undo: () => act((e) => e.undo()),
 		redo: () => act((e) => e.redo()),
 		insertTable: (rows: number, cols: number) =>
@@ -251,6 +285,28 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 		// Takes the look at the caret as the definition of the style the caret is in, and gives it to every block of that style
 		updateStyle: () =>
 			act((e) => {
+				const block = e.getTextCursorPosition().block as unknown as AnyBlock;
+				const look = { font: fmt.font, size: fmt.size, bold: fmt.bold, italic: fmt.italic, underline: fmt.underline, color: fmt.color };
+				const own = sheet?.get(fmt.style);
+				// A style of the document (of the file, or made here): its definition becomes the look at the caret, for every paragraph that has it
+				if (sheet && own && !isBuiltInWordId(fmt.style)) {
+					const def: StyleDef = { ...fromCaret(own.name, own.id, look, block.props ?? {}), basedOn: own.basedOn };
+					sheet.set(own.id, def);
+					const walkOwn = (list: AnyBlock[]) => {
+						for (const b of list) {
+							if (b.props?.styleId === own.id) {
+								e.updateBlock(b.id, { props: blockPropsOf(def) } as never);
+								restyle(e, e.getBlock(b.id) as unknown as AnyBlock, def);
+							}
+							if (b.children?.length) walkOwn(b.children);
+						}
+					};
+					walkOwn(e.document as unknown as AnyBlock[]);
+					return;
+				}
+				// A look of the gallery that is a Word style (Heading 1...) is changed in the file too
+				const word = WORD_ID[fmt.style as StyleId];
+				if (sheet && word) sheet.set(word, fromCaret(STYLES.find((s) => s.id === fmt.style)?.label ?? word, word, look, block.props ?? {}));
 				if (!defs) return;
 				const s = e.getActiveStyles() as Record<string, unknown>;
 				const def = Object.fromEntries(["fontFamily", "fontSize", "textColor", "bold", "italic"].filter((k) => s[k]).map((k) => [k, s[k]]));

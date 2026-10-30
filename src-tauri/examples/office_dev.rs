@@ -70,7 +70,7 @@ fn call(cmd: &str, a: &Value) -> Result<Value, String> {
         "deck_edit_shape" => Ok(json!(deck::edit_shape(&s("shape"), &serde_json::from_value(a["edit"].clone()).map_err(|e| e.to_string())?)?)),
         "office_export_html" => {
             let layout: Option<office::Layout> = serde_json::from_value(a["layout"].clone()).ok();
-            let bytes = office::export(&s("ext"), &s("html"), &s("title"), &s("author"), layout.as_ref())?;
+            let bytes = office::export_with(&s("ext"), &s("html"), &s("title"), &s("author"), layout.as_ref(), a.get("sourceId").and_then(Value::as_str))?;
             if let Some(path) = a.get("path").and_then(Value::as_str) {
                 std::fs::write(path, &bytes).map_err(|e| e.to_string())?;
             }
