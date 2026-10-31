@@ -46,4 +46,26 @@ describe("the version bump", () => {
 		expect(run().status).toBe(1);
 		expect(read("package.json")).toBe(real("package.json"));
 	});
+
+	it("--release --local commits the four files and tags, with nothing else changed, and refuses when other files are changed", () => {
+		const git = (...a: string[]) => spawnSync("git", a, { cwd: dir, encoding: "utf8" });
+		git("init", "-q");
+		git("config", "user.email", "t@example.com");
+		git("config", "user.name", "T");
+		git("add", "-A");
+		git("commit", "-q", "-m", "start");
+		// A change to one of the four files is the change the script makes itself: it must not count as "other"
+		const ok = run("9.8.7", "--release", "--local");
+		expect(ok.status, ok.stderr + ok.stdout).toBe(0);
+		expect(git("tag").stdout.trim()).toBe("v9.8.7");
+		expect(git("log", "--format=%s", "-1").stdout.trim()).toBe("Version 9.8.7");
+		expect(git("status", "--porcelain").stdout.trim()).toBe("");
+		// Another changed file stops it
+		writeFileSync(path.join(dir, "stray.txt"), "x");
+		git("add", "stray.txt");
+		const refused = run("9.8.8", "--release", "--local");
+		expect(refused.status).toBe(1);
+		expect(refused.stderr).toContain("stray.txt");
+		expect(git("tag").stdout.trim()).toBe("v9.8.7");
+	});
 });
