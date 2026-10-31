@@ -154,12 +154,31 @@ export const smartQuotesPlugin = new Plugin({
 // The editor's HTML as the file writers read it: a block that starts a page gets `page-break-before`, and a picture, which the editor
 // aligns with an attribute of its own, is put in a paragraph with that alignment
 export function forFile(html: string): string {
-	if (!html.includes("data-page-break-before") && !html.includes("<img") && !html.includes("data-style-id") && !html.includes("data-note") && !html.includes("data-section-break")) return html;
+	if (!html.includes("data-page-break-before") && !html.includes("<img") && !html.includes("data-style-id") && !html.includes("data-note") && !html.includes("data-section-break") && !html.includes("data-char-style") && !html.includes("data-table-style")) return html;
 	const d = new DOMParser().parseFromString(html, "text/html");
 	// A reference to a footnote or endnote goes as its marker (see `documentNotes`)
 	d.body.querySelectorAll<HTMLElement>("[data-note]").forEach((el) => {
 		const p = parseNoteValue(el.dataset.note ?? "");
 		el.replaceWith(d.createTextNode(p ? `${OPEN}${p.id}${CLOSE}` : ""));
+	});
+	// Words in a character style are wrapped in markers: the style's id between two of them, the words, and a third (read in `notes.rs`, with the notes)
+	d.body.querySelectorAll<HTMLElement>("[data-char-style]").forEach((el) => {
+		const id = el.dataset.charStyle ?? "";
+		if (!id || /[\uE000-\uE00A]/.test(id)) return el.replaceWith(...Array.from(el.childNodes));
+		el.prepend(d.createTextNode(`\uE006${id}\uE007`));
+		el.append(d.createTextNode("\uE008"));
+	});
+	// A table in a table style carries its id at the start of its first cell (put first of the paragraph's markers, so that it stands last of them)
+	const styled = new Set<Element>();
+	d.body.querySelectorAll<HTMLElement>("span[data-table-style]").forEach((el) => {
+		const id = el.dataset.tableStyle ?? "";
+		const cell = el.closest("td, th");
+		if (id && !/[\uE000-\uE00A]/.test(id) && cell && !styled.has(cell)) {
+			styled.add(cell);
+			const target = cell.querySelector("p") ?? cell;
+			target.insertBefore(d.createTextNode(`\uE009${id}\uE00A`), target.firstChild);
+		}
+		el.replaceWith(...Array.from(el.childNodes));
 	});
 	// A paragraph that starts a section carries its page set-up the same way (put first, so that the style's marker, put after, stands first)
 	d.body.querySelectorAll<HTMLElement>("[data-section-break]").forEach((el) => {

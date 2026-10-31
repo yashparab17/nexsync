@@ -88,6 +88,11 @@ pub struct Imported {
 pub struct Layout {
     /// The notes the editor holds; `None` from a client that does not know notes, which leaves the document's notes as they are
     pub notes: Option<Vec<super::notes::NoteIn>>,
+    /// How footnotes and endnotes are numbered: decimal, lowerRoman, upperRoman, lowerLetter or upperLetter; empty leaves the document's
+    pub footnote_format: String,
+    pub endnote_format: String,
+    /// The editor knows character styles: the ranges it sent are all there are, so one the file had on text that carries none is taken off
+    pub char_markers: bool,
     /// The page in points, already turned on its side when it is landscape
     pub width: f32,
     pub height: f32,
@@ -184,7 +189,7 @@ pub fn add_comments(doc: &mut wordcraft_doc::Document, comments: &[CommentIn]) -
     placed
 }
 
-fn line_block(text: &str, page_number: bool, align: wordcraft_doc::Align) -> std::sync::Arc<wordcraft_doc::Block> {
+pub fn line_block(text: &str, page_number: bool, align: wordcraft_doc::Align) -> std::sync::Arc<wordcraft_doc::Block> {
     let mut p = wordcraft_doc::Paragraph::with_text(text, wordcraft_doc::CharProps::default());
     p.props.align = Some(align);
     if page_number {
@@ -202,6 +207,12 @@ fn line_block(text: &str, page_number: bool, align: wordcraft_doc::Align) -> std
 pub fn apply_layout(doc: &mut wordcraft_doc::Document, l: &Layout) {
     use wordcraft_doc::{Align, PartKind};
     let ok = |v: f32, lo: f32, hi: f32| v.is_finite() && v >= lo && v <= hi;
+    if let Some(f) = super::notes::format_of(&l.footnote_format) {
+        doc.settings.footnote_format = f;
+    }
+    if let Some(f) = super::notes::format_of(&l.endnote_format) {
+        doc.settings.endnote_format = f;
+    }
     let s = &mut doc.last_section;
     if ok(l.width, 72.0, 2000.0) && ok(l.height, 72.0, 2000.0) {
         s.page_w = l.width;
@@ -536,8 +547,9 @@ fn build_document(html: &str, title: &str, author: &str, layout: Option<&Layout>
     let mut edited = wordcraft_formats::import("html", page.as_bytes()).ok_or("The document could not be read.")??;
     // The style each paragraph was given in the editor (see `styles`)
     let chosen = super::styles::take_markers(&mut edited);
-    let (note_at, note_ids) = super::notes::take_markers(&mut edited);
+    let (note_at, note_ids, char_ranges) = super::notes::take_markers(&mut edited);
     let breaks = super::sections::take_markers(&mut edited);
+    let table_styles = super::styles::take_table_markers(&mut edited);
     let original = source.and_then(super::merge::get);
     let mut doc = match &original {
         Some(o) => super::merge::merge(o, edited),
@@ -557,6 +569,8 @@ fn build_document(html: &str, title: &str, author: &str, layout: Option<&Layout>
         super::styles::apply(&mut doc, &l.styles);
     }
     super::styles::settle(&mut doc, &chosen);
+    super::styles::settle_tables(&mut doc, &table_styles);
+    super::styles::settle_chars(&mut doc, &char_ranges, layout.is_some_and(|l| l.char_markers));
     super::sections::settle(&mut doc, &breaks);
     super::notes::settle(&mut doc, &note_at, &note_ids, layout.and_then(|l| l.notes.as_deref()));
     Ok(doc)
@@ -578,7 +592,8 @@ pub fn export_with(ext: &str, html: &str, title: &str, author: &str, layout: Opt
     }
     catch_unwind(AssertUnwindSafe(|| -> Result<Vec<u8>, String> {
         let doc = build_document(html, title, author, layout, source)?;
-        write_document(&doc, &ext, false, false)
+        // A PDF of a document with comments prints them in balloons beside the page
+        write_document(&doc, &ext, false, ext == "pdf" && !doc.comments.is_empty())
     }))
     .map_err(|_| "The file could not be written safely.".to_string())?
 }
@@ -1045,6 +1060,87 @@ mod tests {
         super::super::notes::NoteIn { id, end, text: text.into() }
     }
 
+    fn hexed(t: &str) -> String {
+        format!("={}", t.bytes().map(|b| format!("{b:02x}")).collect::<String>())
+    }
+
+    #[test]
+    fn a_section_can_have_its_own_header_and_footer() {
+        let spec = format!("next|p||1|{}|{}", hexed("Chapter 2"), hexed("Confidential"));
+        let html = format!("<p>One</p><p>Two</p>{}<p>Four</p>", section_start(&spec, "Three"));
+        let bytes = export("docx", &html, "T", "", None).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert_eq!(body.matches("<w:headerReference").count(), 1, "only the second section has a header: {body}");
+        assert_eq!(body.matches("<w:footerReference").count(), 1);
+        let all: String = (1..=4).filter_map(|n| std::panic::catch_unwind(|| part(&bytes, &format!("word/header{n}.xml"))).ok()).collect();
+        assert!(all.contains("Chapter 2"), "{all}");
+        // It comes back with the text in the section's set-up; saved again unchanged it adds no second header
+        let opened = import("h.docx", &bytes, None).unwrap();
+        let back = opened.blocks.iter().find_map(|b| b["props"]["sectionBreak"].as_str().map(str::to_string)).unwrap();
+        assert!(back.contains(&hexed("Chapter 2")) && back.contains(&hexed("Confidential")), "{back}");
+        let same = format!("<p>One</p><p>Two</p>{}<p>Four</p>", section_start(&back, "Three"));
+        let again = export_with("docx", &same, "T", "", None, opened.source_id.as_deref()).unwrap();
+        assert_eq!(part(&again, "word/document.xml").matches("<w:headerReference").count(), 1);
+        // A new text replaces it, and "=" alone takes it away
+        let newer = back.replace(&hexed("Chapter 2"), &hexed("Chapter Two"));
+        let changed = export_with("docx", &format!("<p>One</p><p>Two</p>{}<p>Four</p>", section_start(&newer, "Three")), "T", "", None, opened.source_id.as_deref()).unwrap();
+        let text: String = (1..=4).filter_map(|n| std::panic::catch_unwind(|| part(&changed, &format!("word/header{n}.xml"))).ok()).collect();
+        assert!(text.contains("Chapter Two"), "{text}");
+        let cleared = back.replace(&hexed("Chapter 2"), "=");
+        let none = export_with("docx", &format!("<p>One</p><p>Two</p>{}<p>Four</p>", section_start(&cleared, "Three")), "T", "", None, opened.source_id.as_deref()).unwrap();
+        assert_eq!(part(&none, "word/document.xml").matches("<w:headerReference").count(), 0);
+    }
+
+    #[test]
+    fn a_character_style_is_written_on_its_words_read_back_and_taken_off_when_the_editor_no_longer_has_it() {
+        use super::super::styles::StyleIn;
+        let strong = StyleIn { id: "Strong2".into(), name: "Strong 2".into(), kind: "character".into(), bold: true, color: "#c00000".into(), ..Default::default() };
+        let wrap = |text: &str| format!("<p>Some {}Strong2{}{text}{} here</p>", '\u{E006}', '\u{E007}', '\u{E008}');
+        let layout = Layout { styles: vec![strong], char_markers: true, ..Default::default() };
+        let bytes = export("docx", &wrap("marked words"), "T", "", Some(&layout)).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert_eq!(body.matches("<w:rStyle w:val=\"Strong2\"/>").count(), 1, "{body}");
+        assert!(!body.contains('\u{E006}') && !body.contains('\u{E008}'));
+        // Only the marked words are in the style: the run holds them and nothing around them
+        let run_start = body.find("<w:rStyle").unwrap();
+        let run = &body[run_start..body[run_start..].find("</w:r>").unwrap() + run_start];
+        assert!(run.contains("marked words") && !run.contains("Some") && !run.contains("here"), "{run}");
+        let opened = import("c.docx", &bytes, None).unwrap();
+        assert!(opened.styles.iter().any(|s| s.id == "Strong2" && s.kind == "character" && s.bold), "{:?}", opened.styles);
+        let all = json(&opened);
+        assert!(all.contains("\"charStyle\":\"Strong2\""), "{all}");
+        // The same text without the markers, from an editor that knows character styles: the style is gone from the file
+        let plain = "<p>Some marked words here</p>";
+        let off = export_with("docx", plain, "T", "", Some(&Layout { char_markers: true, ..Default::default() }), opened.source_id.as_deref()).unwrap();
+        assert_eq!(part(&off, "word/document.xml").matches("w:rStyle").count(), 0);
+        // And from an editor that does not know them, it stays
+        let kept = export_with("docx", plain, "T", "", None, opened.source_id.as_deref()).unwrap();
+        assert_eq!(part(&kept, "word/document.xml").matches("<w:rStyle w:val=\"Strong2\"/>").count(), 1);
+    }
+
+    #[test]
+    fn a_table_style_is_made_applied_written_and_read_back_with_its_fills() {
+        use super::super::styles::{StyleIn, TableLook};
+        let look = TableLook { header_fill: "#d9e2f3".into(), header_bold: true, band_fill: "#f2f2f2".into(), ..Default::default() };
+        let style = StyleIn { id: "Plan".into(), name: "Plan".into(), kind: "table".into(), table: Some(look), ..Default::default() };
+        let html = format!("<table><tbody><tr><td>{}Plan{}Head</td><td>B</td></tr><tr><td>1</td><td>2</td></tr></tbody></table>", '\u{E009}', '\u{E00A}');
+        let bytes = export("docx", &html, "T", "", Some(&Layout { styles: vec![style], ..Default::default() })).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert!(body.contains("<w:tblStyle w:val=\"Plan\"/>"), "{body}");
+        assert!(!body.contains('\u{E009}') && body.contains("Head"));
+        let opened = import("t.docx", &bytes, None).unwrap();
+        let st = opened.styles.iter().find(|s| s.id == "Plan").expect("the table style is in the file");
+        assert_eq!(st.kind, "table");
+        let t = st.table.as_ref().unwrap();
+        assert_eq!((t.header_fill.as_str(), t.band_fill.as_str(), t.header_bold), ("#d9e2f3", "#f2f2f2", true));
+        let table = opened.blocks.iter().find(|b| b["type"] == "table").unwrap();
+        assert!(table.to_string().contains("\"tableStyle\":\"Plan\""), "{table}");
+        // Taking the style off
+        let none = format!("<table><tbody><tr><td>{}none{}Head</td><td>B</td></tr></tbody></table>", '\u{E009}', '\u{E00A}');
+        let off = export_with("docx", &none, "T", "", None, opened.source_id.as_deref()).unwrap();
+        assert!(!part(&off, "word/document.xml").contains("<w:tblStyle w:val=\"Plan\"/>"));
+    }
+
     #[test]
     fn a_footnote_added_in_the_editor_is_a_real_footnote_in_the_docx_and_comes_back_as_one() {
         let mark = super::super::notes::marker(1_000_001);
@@ -1085,6 +1181,59 @@ mod tests {
         // A client that does not know notes leaves them alone
         let d = export_with("docx", gone, "T", "", None, opened.source_id.as_deref()).unwrap();
         assert_eq!(part(&d, "word/document.xml").matches("<w:footnoteReference").count(), 1);
+    }
+
+    #[test]
+    fn a_footnote_in_a_table_cell_is_kept_and_comes_back_in_the_cell() {
+        let mark = super::super::notes::marker(1_000_003);
+        let html = format!("<p>Before</p><table><tbody><tr><td>Plain</td><td>A figure{mark}</td></tr></tbody></table>");
+        let bytes = export("docx", &html, "T", "", Some(&with_notes(vec![note(1_000_003, false, "Source of the figure")]))).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert_eq!(body.matches("<w:footnoteReference").count(), 1, "{body}");
+        assert!(body.find("<w:tbl>").unwrap() < body.find("<w:footnoteReference").unwrap(), "the reference is inside the table");
+        assert!(part(&bytes, "word/footnotes.xml").contains("Source of the figure"));
+        let back = import("t.docx", &bytes, None).unwrap();
+        assert_eq!(back.notes.len(), 1);
+        let table = back.blocks.iter().find(|b| b["type"] == "table").unwrap().to_string();
+        assert!(table.contains(&super::super::notes::marker(back.notes[0].id)), "{table}");
+        // Opened and saved with no change, the file's table keeps its note; with the reference taken out, it goes
+        let id = back.notes[0].id;
+        let same = format!("<p>Before</p><table><tbody><tr><td>Plain</td><td>A figure{}</td></tr></tbody></table>", super::super::notes::marker(id));
+        let a = export_with("docx", &same, "T", "", Some(&with_notes(vec![note(id, false, "Source of the figure")])), back.source_id.as_deref()).unwrap();
+        assert_eq!(part(&a, "word/document.xml").matches("<w:footnoteReference").count(), 1);
+        let gone = "<p>Before</p><table><tbody><tr><td>Plain</td><td>A figure</td></tr></tbody></table>";
+        let b = export_with("docx", gone, "T", "", Some(&with_notes(vec![])), back.source_id.as_deref()).unwrap();
+        assert_eq!(part(&b, "word/document.xml").matches("<w:footnoteReference").count(), 0);
+    }
+
+    #[test]
+    fn a_pdf_of_a_document_with_comments_prints_them_beside_the_page() {
+        let comment = CommentIn { quote: "Plain words".into(), author: "Ana".into(), text: "Check this".into(), ..Default::default() };
+        let with = Layout { comments: vec![comment], ..Default::default() };
+        let html = "<p>Plain words here.</p>";
+        let a = export("pdf", html, "T", "", Some(&with)).unwrap();
+        let b = export("pdf", html, "T", "", None).unwrap();
+        assert!(a.starts_with(b"%PDF") && b.starts_with(b"%PDF"));
+        assert_ne!(a, b, "the balloon is drawn");
+    }
+
+    #[test]
+    fn a_note_keeps_bold_and_italic_in_its_words_and_notes_can_be_numbered_in_letters() {
+        let mark = super::super::notes::marker(1_000_004);
+        let html = format!("<p>Claim{mark}</p>");
+        let words = r"See **the report** and *page 4*, a \* star and a \\ slash";
+        let layout = Layout { notes: Some(vec![note(1_000_004, false, words)]), footnote_format: "lowerLetter".into(), ..Default::default() };
+        let bytes = export("docx", &html, "T", "", Some(&layout)).unwrap();
+        let notes = part(&bytes, "word/footnotes.xml");
+        assert!(notes.contains("<w:b/>") && notes.contains("<w:i/>"), "{notes}");
+        assert!(notes.contains("the report") && !notes.contains("**"), "the marks are not in the text: {notes}");
+        let settings = part(&bytes, "word/settings.xml");
+        assert!(settings.contains("<w:footnotePr>") && settings.contains("w:val=\"lowerLetter\""), "{settings}");
+        // And back, as the same words, with the number format in the page set-up
+        let back = import("n.docx", &bytes, None).unwrap();
+        assert_eq!(back.notes[0].text, words);
+        assert_eq!(back.layout.footnote_format, "lowerLetter");
+        assert_eq!(back.layout.endnote_format, "lowerRoman");
     }
 
     #[test]

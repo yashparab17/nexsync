@@ -966,6 +966,10 @@ export function officeImport(path: string, rel: string, password?: string | null
 	return invoke("office_import", { path, rel, password: password ?? null });
 }
 // The lines of a kept version of a document (a paragraph, or a table row with tabs between its cells), for Compare
+// The lines of another document of the workspace, for Compare
+export function officeFileLines(path: string, relPath: string): Promise<string[]> {
+	return invoke("office_file_lines", { path, relPath });
+}
 export function officeVersionLines(path: string, id: number, ext: string): Promise<string[]> {
 	return invoke("office_version_lines", { path, id, ext });
 }

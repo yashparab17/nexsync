@@ -50,6 +50,21 @@ pub fn office_version_lines(app_handle: tauri::AppHandle, path: String, id: i64,
     lines_of(&format!("v.{ext}"), &bytes)
 }
 
+/// The lines of another document of the workspace (a path in it), to compare with the open one. A file over the size the editor opens is refused.
+#[tauri::command(async)]
+pub fn office_file_lines(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<Vec<String>, String> {
+    validate_allowed_root(&app_handle, &path)?;
+    let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
+    if !target.is_file() {
+        return Err(format!("File not found: /{rel_path}"));
+    }
+    if target.metadata().map(|m| m.len()).unwrap_or(0) > 64 * 1024 * 1024 {
+        return Err("That file is too large to compare.".into());
+    }
+    let bytes = std::fs::read(&target).map_err(|e| e.to_string())?;
+    lines_of(&rel_path, &bytes)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

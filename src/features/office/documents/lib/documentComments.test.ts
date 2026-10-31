@@ -27,6 +27,24 @@ describe("document comment anchors", () => {
 	});
 });
 
+describe("a comment on words that are edited inside", () => {
+	const anchor = makeDocAnchor(docOf([["a", "Say hello brave old world today"]]), 6, 27)!; // "hello brave old world"
+	it("stays on what is between the start and the end of its words", () => {
+		const edited = docOf([["a", "Say hello very brave big old world today"]]);
+		const at = locateDocAnchor(edited, anchor);
+		expect(at.state).toBe("changed");
+		expect(at.state === "changed" && "Say hello very brave big old world today".slice(at.from - 2, at.to - 2)).toBe("hello very brave big old world");
+	});
+	it("is orphaned when the block lost the start or the end", () => {
+		expect(locateDocAnchor(docOf([["a", "Say goodbye brave old planet today"]]), anchor).state).toBe("orphaned");
+		expect(locateDocAnchor(docOf([["a", "Say hello brave old"]]), anchor).state).toBe("orphaned");
+	});
+	it("does not stretch over a whole long block when the end is far away", () => {
+		const far = `Say hello ${"x".repeat(300)} world today`;
+		expect(locateDocAnchor(docOf([["a", far]]), anchor).state).toBe("orphaned");
+	});
+});
+
 describe("the comment after or before the current one", () => {
 	const items = [{ id: "b", from: 40 }, { id: "a", from: 10 }, { id: "c", from: 90 }];
 	it("goes from one to the next by place in the text, and round at the ends", () => {

@@ -99,3 +99,24 @@ describe("a paragraph that starts a section", () => {
 	});
 });
 
+describe("character and table styles for the file", () => {
+	it("wraps words in a character style in markers", () => {
+		const out = forFile('<p>Some <span data-char-style="Strong2">marked words</span> here</p>');
+		expect(out).toBe("<p>Some <span data-char-style=\"Strong2\">Strong2marked words</span> here</p>");
+	});
+
+	it("puts a table style at the start of the first cell, after the paragraph markers that go there", () => {
+		const out = forFile('<table><tbody><tr><td><p data-style-id="Callout"><span data-table-style="Plan">He</span><span data-table-style="Plan">ad</span></p></td><td><p>B</p></td></tr></tbody></table>');
+		expect(out).toContain("\uE009Plan\uE00A");
+		// The style marker of the paragraph is put by the same function after it, so it stands first in the text
+		expect(out.indexOf("\uE000Callout\uE001")).toBeLessThan(out.indexOf("\uE009Plan\uE00A"));
+		// One marker for the table however many pieces of text carry the mark, and the marks themselves do not go
+		expect(out.match(/\uE009/g)).toHaveLength(1);
+		expect(out).not.toContain("data-table-style");
+	});
+
+	it("leaves a style id that holds a marker character out", () => {
+		expect(forFile('<p><span data-char-style="Bad">x</span></p>')).toBe("<p>x</p>");
+	});
+});
+

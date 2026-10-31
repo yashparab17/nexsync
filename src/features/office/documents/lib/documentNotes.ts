@@ -15,6 +15,35 @@ export interface NoteWire {
 	text: string;
 }
 
+// How the numbers of notes are written: the names the file uses, and what each looks like
+export const NOTE_FORMATS = [
+	{ id: "decimal", label: "1, 2, 3", css: "decimal" },
+	{ id: "lowerLetter", label: "a, b, c", css: "lower-alpha" },
+	{ id: "upperLetter", label: "A, B, C", css: "upper-alpha" },
+	{ id: "lowerRoman", label: "i, ii, iii", css: "lower-roman" },
+	{ id: "upperRoman", label: "I, II, III", css: "upper-roman" },
+] as const;
+export type NoteFormat = (typeof NOTE_FORMATS)[number]["id"];
+export interface NoteFormats {
+	foot: NoteFormat;
+	end: NoteFormat;
+}
+export const DEFAULT_FORMATS: NoteFormats = { foot: "decimal", end: "lowerRoman" };
+
+export function parseFormats(text: string | undefined): NoteFormats {
+	try {
+		const v = JSON.parse(text ?? "null") as Partial<NoteFormats> | null;
+		const ok = (x: unknown): x is NoteFormat => NOTE_FORMATS.some((f) => f.id === x);
+		return { foot: ok(v?.foot) ? v.foot : DEFAULT_FORMATS.foot, end: ok(v?.end) ? v.end : DEFAULT_FORMATS.end };
+	} catch {
+		return DEFAULT_FORMATS;
+	}
+}
+
+// CSS that numbers the references the way the document says (the editor draws each reference's number from a counter)
+export const noteCss = (f: NoteFormats): string =>
+	`.doc-body .doc-note::before{content:counter(nx-foot,${NOTE_FORMATS.find((x) => x.id === f.foot)?.css ?? "decimal"})}\n.doc-body .doc-endnote::before{content:counter(nx-end,${NOTE_FORMATS.find((x) => x.id === f.end)?.css ?? "lower-roman"})}`;
+
 export const OPEN = "";
 export const CLOSE = "";
 

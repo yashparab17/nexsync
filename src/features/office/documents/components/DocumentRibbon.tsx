@@ -67,6 +67,8 @@ import {
 import { useRef, useState } from "react";
 import { autoCorrectOn, setAutoCorrect } from "@/features/office/documents/lib/documentTools";
 
+import { NewStyleForm, NewTableStyleForm } from "@/features/office/documents/components/StyleForms";
+import { WORD_ID } from "@/features/office/documents/lib/documentStyles";
 import { parseSection } from "@/features/office/documents/lib/documentSections";
 import { type StyleDef } from "@/features/office/documents/lib/documentStyles";
 import { RESTRICTIONS, type Restriction } from "@/features/office/documents/lib/documentRestrict";
@@ -79,6 +81,9 @@ type Actions = ReturnType<typeof useDocumentActions>;
 
 const SYMBOLS = ["©", "®", "™", "§", "¶", "†", "‡", "•", "…", "–", "—", "°", "±", "×", "÷", "≠", "≤", "≥", "≈", "∞", "√", "∑", "π", "Ω", "µ", "€", "£", "¥", "¢", "←", "→", "↑", "↓", "✓", "✗", "★"];
 const LINE_SPACING = [1, 1.15, 1.5, 2, 2.5, 3];
+
+// The id a paragraph's style goes by in the file, for a style of the gallery or of the document
+const styleIdOf = (id: string) => (id in WORD_ID ? WORD_ID[id as StyleId] : id);
 
 // A style of the document drawn the way it will look (the size kept small so that it fits)
 const previewOf = (d: StyleDef): React.CSSProperties => ({ fontFamily: d.font, fontSize: Math.max(11, Math.min(17, d.size)), fontWeight: d.bold ? 700 : 400, fontStyle: d.italic ? "italic" : "normal", textDecoration: d.underline ? "underline" : "none", color: d.color || undefined });
@@ -112,8 +117,12 @@ export interface RibbonProps {
 	review: { suggesting: boolean; count: number; toggle: () => void; accept: () => void; reject: () => void; acceptAll: () => void; rejectAll: () => void; next: () => void; previous: () => void };
 	openCompare: () => void;
 	openAccessibility: () => void;
-	// The document's own styles, beside the gallery's
+	openChanges: () => void;
+	openSectionHeader: () => void;
+	// The document's own styles, beside the gallery's: of paragraphs, of letters and of tables
 	styles: StyleDef[];
+	charStyles: StyleDef[];
+	tableStyles: StyleDef[];
 	copyOutline: () => void;
 	makeTask: () => void;
 	taskMade: boolean;
@@ -209,12 +218,12 @@ export default function DocumentRibbon(p: RibbonProps) {
 					</Rows>
 				</Group>
 				<Group label="Styles">
-					<Gallery label="Styles" items={[...STYLES.map((s) => ({ id: s.id as string, label: s.label as string, preview: previews[s.id] })), ...p.styles.map((d) => ({ id: d.id, label: d.name, preview: <span style={previewOf(d)}>AaBbCc</span> }))]} current={fmt.style} onPick={(id) => !ro && a.style(id)} width={78} className="w-[330px]" />
+					<Gallery label="Styles" items={[...STYLES.map((s) => ({ id: s.id as string, label: s.label as string, preview: previews[s.id] })), ...p.styles.map((d) => ({ id: d.id, label: d.name, preview: <span style={previewOf(d)}>AaBbCc</span> })), ...p.charStyles.map((d) => ({ id: d.id, label: `${d.name} (letters)`, preview: <span style={previewOf(d)}>abc</span> }))]} current={fmt.style} onPick={(id) => !ro && (p.charStyles.some((d) => d.id === id) ? a.applyCharStyle(id) : a.style(id))} width={78} className="w-[330px]" />
 				</Group>
 				<Group label="Style">
 					<Big icon={Brush} label="Update Style" title="Give the look at the caret to every paragraph in the same style" disabled={ro} onPress={a.updateStyle} />
 					<Rows>
-						<Small icon={SquarePlus} label="New Style" title="Make a style of the look at the caret, and give it to the paragraph" disabled={ro} menu={<TextForm label="Name" button="Create" onSubmit={a.createStyle} />} />
+						<Small icon={SquarePlus} label="New Style" title="Make a style of the look at the caret, and give it to the paragraph" disabled={ro} menu={<NewStyleForm styles={p.styles} current={styleIdOf(fmt.style)} onSubmit={a.createStyle} />} />
 					</Rows>
 				</Group>
 				<Group label="Editing">
@@ -239,6 +248,23 @@ export default function DocumentRibbon(p: RibbonProps) {
 					<Rows>
 						<Small icon={TableIcon} label="Sort A to Z" title="By the column the caret is in" disabled={ro || !fmt.inTable} onPress={() => a.sortTable(true)} />
 						<Small icon={TableIcon} label="Sort Z to A" disabled={ro || !fmt.inTable} onPress={() => a.sortTable(false)} />
+						<Small
+							icon={TableIcon}
+							label="Table Style"
+							title="The fills of the header row and every second row, written to the file as a table style"
+							disabled={ro || !fmt.inTable}
+							menu={
+								<>
+									<MenuTitle>Table style</MenuTitle>
+									<MenuItem label="None" checked={!fmt.tableStyle || fmt.tableStyle === "none"} onPress={() => a.applyTableStyle("none")} />
+									{p.tableStyles.map((t) => (
+										<MenuItem key={t.id} label={t.name} checked={fmt.tableStyle === t.id} onPress={() => a.applyTableStyle(t.id)} />
+									))}
+									<MenuTitle>New table style</MenuTitle>
+									<NewTableStyleForm onSubmit={a.createTableStyle} />
+								</>
+							}
+						/>
 						<Small icon={TableIcon} label="Banded Rows" title="Shade every other row, shown in the editor and not written to the file" active={!!p.page.banded} disabled={ro} onPress={() => p.setPage({ banded: !p.page.banded })} />
 					</Rows>
 					<Rows>
@@ -509,6 +535,7 @@ export default function DocumentRibbon(p: RibbonProps) {
 									{([1, 2, 3] as const).map((n) => (
 										<MenuItem key={n} label={n === 1 ? "One" : n === 2 ? "Two" : "Three"} checked={section.columns === n} onPress={() => a.setSection({ columns: n })} />
 									))}
+									<MenuItem label="Header & Footer…" onPress={p.openSectionHeader} />
 									<MenuTitle>Starts</MenuTitle>
 									<MenuItem label="On a new page" checked={!section.continuous} onPress={() => a.setSection({ continuous: false })} />
 									<MenuItem label="Continuous" checked={section.continuous} onPress={() => a.setSection({ continuous: true })} />
@@ -581,6 +608,7 @@ export default function DocumentRibbon(p: RibbonProps) {
 						<Small icon={ChevronRight} label={p.review.count ? `Next (${p.review.count})` : "Next"} disabled={!p.review.count} onPress={p.review.next} />
 					</Rows>
 					<Rows>
+						<Small icon={ListTodo} label="Changes" title="List every change with who made it" onPress={p.openChanges} />
 						<Small icon={Check} label="Accept All" disabled={p.readOnly || !p.review.count} onPress={p.review.acceptAll} />
 						<Small icon={XIcon} label="Reject All" disabled={p.readOnly || !p.review.count} onPress={p.review.rejectAll} />
 					</Rows>

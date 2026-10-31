@@ -8,7 +8,7 @@ import { equationText, indexEntries, withFormula, type Formula } from "@/feature
 import { cropImage, drawShape, type CropMode, type ShapeKind } from "@/features/office/documents/lib/documentObjects";
 import { formatSection, NEW_SECTION, sectionStart, type SectionSpec } from "@/features/office/documents/lib/documentSections";
 import { nextNoteId, noteValue, REF_TEXT, type NoteDef } from "@/features/office/documents/lib/documentNotes";
-import { applyToRuns, blockPropsOf, fromCaret, idFromName, isBuiltInWordId, WORD_ID, type StyleDef } from "@/features/office/documents/lib/documentStyles";
+import { applyToRuns, blockPropsOf, characterFrom, charMarks, fromCaret, tableFrom, type TableLook, idFromName, inherit, isBuiltInWordId, WORD_ID, type StyleDef } from "@/features/office/documents/lib/documentStyles";
 import { nextCaption, TOC, TOC_TITLE, sortTable, tocBlocks, type TableContent } from "@/features/office/documents/lib/documentTools";
 import { documentSchema } from "@/features/office/documents/lib/documentSchema";
 
@@ -33,11 +33,13 @@ export interface Fmt {
 	inTable: boolean;
 	headerRow: boolean;
 	inPicture: boolean;
+	// The table style of the table the caret is in, or empty
+	tableStyle: string;
 	// The page set-up of the section the caret is in when a break started it, else empty (the first section, which the page set-up is)
 	section: string;
 }
 
-const NONE: Fmt = { bold: false, italic: false, underline: false, strike: false, font: DEFAULT_FONT, size: DEFAULT_SIZE, color: "", highlight: "", align: "left", style: "normal", list: null, canNest: false, canUnnest: false, hasSelection: false, inTable: false, headerRow: false, inPicture: false, section: "" };
+const NONE: Fmt = { bold: false, italic: false, underline: false, strike: false, font: DEFAULT_FONT, size: DEFAULT_SIZE, color: "", highlight: "", align: "left", style: "normal", list: null, canNest: false, canUnnest: false, hasSelection: false, inTable: false, headerRow: false, inPicture: false, tableStyle: "", section: "" };
 
 type AnyBlock = { id: string; type: string; props?: Record<string, unknown>; content?: unknown; children?: AnyBlock[] };
 
@@ -52,6 +54,27 @@ function targets(editor: Editor): AnyBlock[] {
 function paint(e: Editor, b: AnyBlock, def: Record<string, unknown>) {
 	if (!Array.isArray(b.content) || Object.keys(def).length === 0) return;
 	e.updateBlock(b.id, { content: (b.content as { type?: string; styles?: object }[]).map((r) => (r.type === "text" ? { ...r, styles: { ...r.styles, ...def } } : r)) } as never);
+}
+
+// The table style of a table: the mark on the text of its first cell
+function firstCell(content: unknown): { items: { type?: string; styles?: Record<string, unknown> }[]; wrap: (items: unknown[]) => unknown } | null {
+	const t = content as { rows?: { cells: unknown[] }[] } | undefined;
+	const cell = t?.rows?.[0]?.cells?.[0];
+	if (Array.isArray(cell)) return { items: cell, wrap: (items) => items };
+	const inner = (cell as { content?: unknown[] } | undefined)?.content;
+	return Array.isArray(inner) ? { items: inner as { type?: string; styles?: Record<string, unknown> }[], wrap: (items) => ({ ...(cell as object), content: items }) } : null;
+}
+function tableStyleOf(content: unknown): string {
+	const v = firstCell(content)?.items.find((i) => i.type === "text")?.styles?.tableStyle;
+	return typeof v === "string" ? v : "";
+}
+// The table with its style set ("none" says there is none, which takes a style the file had off it)
+function withTableStyle(content: unknown, id: string): unknown {
+	const t = content as { rows: { cells: unknown[] }[] };
+	const cell = firstCell(content);
+	if (!cell) return content;
+	const items = cell.items.map((i) => (i.type === "text" ? { ...i, styles: { ...(i.styles ?? {}), tableStyle: id } } : i));
+	return { ...t, rows: t.rows.map((r, ri) => (ri === 0 ? { ...r, cells: r.cells.map((c, ci) => (ci === 0 ? cell.wrap(items) : c)) } : r)) };
 }
 
 // The look of a style of the document put on the text of a block
@@ -98,6 +121,7 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 				hasSelection: editor.getSelectedText().length > 0,
 				inTable: type === "table",
 				inPicture: type === "image",
+				tableStyle: type === "table" ? tableStyleOf(block.content) : "",
 				section: (() => {
 					const found = sectionStart(editor.document as unknown as AnyBlock[], block.id);
 					return found ? formatSection(found.spec) : "";
@@ -177,13 +201,47 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 				});
 		},
 		// A new style of the document from the look at the caret, given to the paragraphs the selection touches
-		createStyle: (name: string) =>
+		createStyle: (name: string, kind: "paragraph" | "character" = "paragraph", basedOn?: string) =>
 			act((e) => {
 				if (!sheet || !name.trim()) return;
+				if (kind === "character") {
+					const id = idFromName(name, sheet.keys());
+					const def = characterFrom(name, id, { font: fmt.font, size: fmt.size, bold: fmt.bold, italic: fmt.italic, underline: fmt.underline, color: fmt.color });
+					sheet.set(id, def);
+					const { on, off } = charMarks(def);
+					e.addStyles(on as never);
+					if (off.length) e.removeStyles(Object.fromEntries(off.map((k) => [k, true])) as never);
+					return;
+				}
 				const block = e.getTextCursorPosition().block as unknown as AnyBlock;
 				const id = idFromName(name, sheet.keys());
-				sheet.set(id, fromCaret(name, id, { font: fmt.font, size: fmt.size, bold: fmt.bold, italic: fmt.italic, underline: fmt.underline, color: fmt.color }, block.props ?? {}));
+				sheet.set(id, fromCaret(name, id, { font: fmt.font, size: fmt.size, bold: fmt.bold, italic: fmt.italic, underline: fmt.underline, color: fmt.color }, block.props ?? {}, basedOn));
 				targets(e).forEach((b) => e.updateBlock(b.id, { props: { styleId: id } } as never));
+			}),
+		// A style of letters on the selected words; its look goes on as marks, and the marks of a look that is off come away
+		applyCharStyle: (id: string) =>
+			act((e) => {
+				const def = sheet?.get(id);
+				if (!def) return;
+				const { on, off } = charMarks(def);
+				e.addStyles(on as never);
+				if (off.length) e.removeStyles(Object.fromEntries(off.map((k) => [k, true])) as never);
+			}),
+		// Takes the style of letters off the selected words (the look it gave stays as formatting)
+		clearCharStyle: () => act((e) => e.removeStyles({ charStyle: "" } as never)),
+		// A table style on the table the caret is in ("none" takes the style off)
+		applyTableStyle: (id: string) =>
+			act((e) => {
+				const b = e.getTextCursorPosition().block as unknown as AnyBlock;
+				if (b.type === "table") e.updateBlock(b.id, { content: withTableStyle(b.content, id) } as never);
+			}),
+		createTableStyle: (name: string, look: TableLook) =>
+			act((e) => {
+				if (!sheet || !name.trim()) return;
+				const id = idFromName(name, sheet.keys());
+				sheet.set(id, tableFrom(name, id, look));
+				const b = e.getTextCursorPosition().block as unknown as AnyBlock;
+				if (b.type === "table") e.updateBlock(b.id, { content: withTableStyle(b.content, id) } as never);
 			}),
 		undo: () => act((e) => e.undo()),
 		redo: () => act((e) => e.redo()),
@@ -321,12 +379,16 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 				// A style of the document (of the file, or made here): its definition becomes the look at the caret, for every paragraph that has it
 				if (sheet && own && !isBuiltInWordId(fmt.style)) {
 					const def: StyleDef = { ...fromCaret(own.name, own.id, look, block.props ?? {}), basedOn: own.basedOn };
-					sheet.set(own.id, def);
+					// The styles based on it follow the fields they had not changed
+					const followers = inherit([...sheet.values()], own, def);
+					const changed = new Map<string, StyleDef>([[own.id, def], ...followers.map((f) => [f.id, f] as [string, StyleDef])]);
+					changed.forEach((d, id) => sheet.set(id, d));
 					const walkOwn = (list: AnyBlock[]) => {
 						for (const b of list) {
-							if (b.props?.styleId === own.id) {
-								e.updateBlock(b.id, { props: blockPropsOf(def) } as never);
-								restyle(e, e.getBlock(b.id) as unknown as AnyBlock, def);
+							const d = typeof b.props?.styleId === "string" ? changed.get(b.props.styleId) : undefined;
+							if (d) {
+								e.updateBlock(b.id, { props: blockPropsOf(d) } as never);
+								restyle(e, e.getBlock(b.id) as unknown as AnyBlock, d);
 							}
 							if (b.children?.length) walkOwn(b.children);
 						}
@@ -351,14 +413,17 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 			}),
 		// Text that stands for a value and can be brought up to date with Update Fields
 		insertField: (kind: string, value: string) => act((e) => e.insertInlineContent([{ type: "text", text: value, styles: { field: kind } }] as never)),
-		updateFields: (values: Record<string, string>) =>
-			act((e) => {
+		// `quiet`: from the automatic update, which must not take the focus from wherever the person is
+		updateFields: (values: Record<string, string>, quiet = false) =>
+			(quiet ? (fn: (e: Editor) => void) => editor && fn(editor) : act)((e) => {
 				let n = 0;
 				const walk = (list: AnyBlock[]) => {
 					for (const b of list) {
 						if (Array.isArray(b.content) && (b.content as { styles?: { field?: string } }[]).some((r) => r.styles?.field)) {
+							const before = n;
 							const next = (b.content as { type?: string; text?: string; styles?: { field?: string } }[]).map((r) => (r.styles?.field && values[r.styles.field] !== undefined && r.text !== values[r.styles.field] ? (n++, { ...r, text: values[r.styles.field] }) : r));
-							e.updateBlock(b.id, { content: next } as never);
+							// Only a block with a field that is out of date is written, so that a field that is right does no work and starts no change
+							if (n > before) e.updateBlock(b.id, { content: next } as never);
 						}
 						if (b.children?.length) walk(b.children);
 					}

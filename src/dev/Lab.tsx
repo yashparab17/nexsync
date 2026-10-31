@@ -145,7 +145,7 @@ export default function Lab({ which }: { which: string }) {
 	if (fileParam && !opened) return <p className="p-6">Opening…</p>;
 	if (which !== "documents") return <p className="p-6">The lab has no “{which}” yet.</p>;
 	return (
-		<P2PContext.Provider value={{ publishDataChange: () => {} } as never}><LabChat><div style={{ height: new URLSearchParams(location.search).get("h") ?? "100vh" }}>
+		<P2PContext.Provider value={{ publishDataChange: () => {}, setMyPresence: () => {} } as never}><LabChat><div style={{ height: new URLSearchParams(location.search).get("h") ?? "100vh" }}>
 			<DocumentWorkspace canComment
 				collab={collab}
 				fileLayout={(opened as unknown as { layout?: never } | null)?.layout}

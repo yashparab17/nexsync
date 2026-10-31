@@ -87,13 +87,16 @@ mod keep_tests {
 }
 
 /// The page set-up of the file's last section as the editor's page and header settings show it
+/// The text of a header or footer part, its lines joined, without the page number fields
+pub fn part_text(doc: &Document, id: Option<u32>) -> String {
+    id.and_then(|i| doc.parts.get(&i))
+        .map(|p| p.blocks.iter().map(|b| part_block_text(b)).filter(|t| !t.trim().is_empty()).collect::<Vec<_>>().join(" ").trim().to_string())
+        .unwrap_or_default()
+}
+
 pub fn layout_of(doc: &Document) -> Layout {
     let s = &doc.last_section;
-    let part_text = |id: Option<u32>| -> String {
-        id.and_then(|i| doc.parts.get(&i))
-            .map(|p| p.blocks.iter().map(|b| part_block_text(b)).filter(|t| !t.trim().is_empty()).collect::<Vec<_>>().join(" ").trim().to_string())
-            .unwrap_or_default()
-    };
+    let part_text = |id: Option<u32>| -> String { part_text(doc, id) };
     let footer_has_page = s
         .footers
         .default
@@ -129,6 +132,9 @@ pub fn layout_of(doc: &Document) -> Layout {
         comments: Vec::new(),
         styles: Vec::new(),
         notes: None,
+        char_markers: false,
+        footnote_format: super::notes::name_of(doc.settings.footnote_format).into(),
+        endnote_format: super::notes::name_of(doc.settings.endnote_format).into(),
     }
 }
 

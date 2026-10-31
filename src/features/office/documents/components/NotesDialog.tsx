@@ -10,10 +10,23 @@ export interface NoteRow {
 	text: string;
 }
 
+import { NOTE_FORMATS, type NoteFormat, type NoteFormats } from "@/features/office/documents/lib/documentNotes";
+
+// A note's number written in a format (up to 26 in letters, past that the number)
+function numberOf(n: number, f: NoteFormat): string {
+	if (f === "decimal") return String(n);
+	if (f === "lowerLetter" || f === "upperLetter") {
+		const l = n >= 1 && n <= 26 ? String.fromCharCode(96 + n) : String(n);
+		return f === "upperLetter" ? l.toUpperCase() : l;
+	}
+	const r = roman(n);
+	return f === "upperRoman" ? r.toUpperCase() : r;
+}
+
 const roman = (n: number) => ["", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii", "xiii", "xiv", "xv", "xvi", "xvii", "xviii", "xix", "xx"][n] ?? String(n);
 
 // The footnotes and endnotes in the order of the text, each with its number as the page shows it and its words to change
-export default function NotesDialog({ rows, readOnly, onEdit, onClose }: { rows: NoteRow[]; readOnly: boolean; onEdit: (id: number, text: string) => void; onClose: () => void }) {
+export default function NotesDialog({ rows, readOnly, formats, onFormats, onEdit, onClose }: { rows: NoteRow[]; readOnly: boolean; formats: NoteFormats; onFormats: (f: NoteFormats) => void; onEdit: (id: number, text: string) => void; onClose: () => void }) {
 	const [text, setText] = useState(() => Object.fromEntries(rows.map((r) => [r.id, r.text])));
 	let foot = 0;
 	let end = 0;
@@ -26,7 +39,7 @@ export default function NotesDialog({ rows, readOnly, onEdit, onClose }: { rows:
 				) : (
 					<ul className="max-h-80 space-y-2 overflow-y-auto">
 						{rows.map((r) => {
-							const label = r.end ? roman(++end) : String(++foot);
+							const label = numberOf(r.end ? ++end : ++foot, r.end ? formats.end : formats.foot);
 							return (
 								<li key={r.id} className="flex items-start gap-2">
 									<span className="w-10 shrink-0 pt-1 text-right text-muted-foreground">{r.end ? `${label}.` : `${label}.`}</span>
@@ -45,6 +58,31 @@ export default function NotesDialog({ rows, readOnly, onEdit, onClose }: { rows:
 							);
 						})}
 					</ul>
+				)}
+				<p className="text-[13px] text-muted-foreground">Use **bold** and *italic* in a note's words.</p>
+				{!readOnly && (
+					<div className="flex flex-wrap items-center gap-3">
+						<label className="flex items-center gap-2">
+							Footnotes
+							<select aria-label="Footnote numbers" value={formats.foot} onChange={(e) => onFormats({ ...formats, foot: e.target.value as NoteFormat })} className="h-8 border bg-background px-2">
+								{NOTE_FORMATS.map((f) => (
+									<option key={f.id} value={f.id}>
+										{f.label}
+									</option>
+								))}
+							</select>
+						</label>
+						<label className="flex items-center gap-2">
+							Endnotes
+							<select aria-label="Endnote numbers" value={formats.end} onChange={(e) => onFormats({ ...formats, end: e.target.value as NoteFormat })} className="h-8 border bg-background px-2">
+								{NOTE_FORMATS.map((f) => (
+									<option key={f.id} value={f.id}>
+										{f.label}
+									</option>
+								))}
+							</select>
+						</label>
+					</div>
 				)}
 				<DialogFooter>
 					<Button onPress={onClose}>Close</Button>

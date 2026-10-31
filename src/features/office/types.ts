@@ -30,6 +30,10 @@ export interface OfficeLayout {
 	styles?: StyleIn[];
 	// The notes the text refers to; leaving it out leaves the file's own notes as they are
 	notes?: NoteWire[];
+	// How footnotes and endnotes are numbered, and whether the editor knows character styles
+	footnoteFormat?: string;
+	endnoteFormat?: string;
+	charMarkers?: boolean;
 }
 
 export interface OfficeInspect {

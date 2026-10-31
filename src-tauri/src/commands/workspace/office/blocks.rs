@@ -96,7 +96,7 @@ fn section_starts(doc: &Document) -> HashMap<usize, (bool, &'static str, String)
         };
         let brk = k > 0 && s.start != SectionStart::Continuous;
         if (k > 0 || !valign.is_empty()) && start <= *end {
-            out.insert(start, (brk, valign, if k > 0 { super::sections::spec_of(s) } else { String::new() }));
+            out.insert(start, (brk, valign, if k > 0 { super::sections::spec_of(doc, s) } else { String::new() }));
         }
         start = end + 1;
     }
@@ -249,6 +249,12 @@ impl Conv<'_> {
         if !r.font.is_empty() {
             self.font(&r.font);
             s.insert("fontFamily".into(), json!(r.font));
+        }
+        // A letter style the text is in, so the editor can show and change it
+        if let Some(cs) = props.style.as_deref() {
+            if self.doc.styles.styles.iter().any(|e| e.id == cs && e.kind == wordcraft_doc::StyleKind::Character) {
+                s.insert("charStyle".into(), json!(cs));
+            }
         }
         (s, r.link.clone(), r.hidden)
     }
@@ -481,11 +487,11 @@ impl Conv<'_> {
                         let mut buf = String::new();
                         for ch in text.chars() {
                             match ch {
-                                OBJ => {
-                                    if let Some(InlineObject::Field { result, .. }) = objects.next() {
-                                        buf.push_str(result);
-                                    }
-                                }
+                                OBJ => match objects.next() {
+                                    Some(InlineObject::Field { result, .. }) => buf.push_str(result),
+                                    Some(InlineObject::NoteRef { id, .. }) if !hidden => buf.push_str(&super::notes::marker(*id)),
+                                    _ => {}
+                                },
                                 PAGE_BREAK | COLUMN_BREAK | '\n' => buf.push('\n'),
                                 c if hidden || (c.is_control() && c != '\t') => {}
                                 c => buf.push(c),
@@ -504,7 +510,19 @@ impl Conv<'_> {
             }
             rows.push(json!({ "cells": cells }));
         }
-        json!({ "type": "table", "content": { "type": "tableContent", "columnWidths": widths, "rows": rows } })
+        let mut block = json!({ "type": "table", "content": { "type": "tableContent", "columnWidths": widths, "rows": rows } });
+        // The table style, when the file has one by that id that is a table style
+        if let Some(ts) = t.props.style.as_deref() {
+            if self.doc.styles.styles.iter().any(|e| e.id == ts && e.kind == wordcraft_doc::StyleKind::Table && !e.default) {
+                // A table node has no place for a property of its own, so the editor holds the style as a mark on the first cell's text
+                if let Some(items) = block["content"]["rows"][0]["cells"][0]["content"].as_array_mut() {
+                    for item in items.iter_mut().filter(|i| i["type"] == "text") {
+                        item["styles"]["tableStyle"] = json!(ts);
+                    }
+                }
+            }
+        }
+        block
     }
 }
 

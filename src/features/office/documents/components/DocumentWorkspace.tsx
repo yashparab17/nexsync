@@ -19,9 +19,14 @@ import PrintView from "@/features/office/documents/components/PrintView";
 import ProofingDialog from "@/features/office/documents/components/ProofingDialog";
 import CompareDialog from "@/features/office/documents/components/CompareDialog";
 import { documentOutline } from "@/features/office/documents/lib/documentOutline";
+import { useReportLine } from "@/hooks/usePresence";
+import SectionHeaderDialog from "@/features/office/documents/components/SectionHeaderDialog";
+import { parseSection } from "@/features/office/documents/lib/documentSections";
+import ChangesDialog from "@/features/office/documents/components/ChangesDialog";
 import NotesDialog from "@/features/office/documents/components/NotesDialog";
+import { noteCss, parseFormats, type NoteFormats } from "@/features/office/documents/lib/documentNotes";
 import { notesToSend, referencesIn, withReferences, type NoteDef, type NoteWire } from "@/features/office/documents/lib/documentNotes";
-import { editedStyles, fromFile, galleryStyles, type StyleDef, type StyleIn, type StyleOut } from "@/features/office/documents/lib/documentStyles";
+import { characterStyles, editedStyles, fromFile, galleryStyles, tableStyleCss, tableStyles, type StyleDef, type StyleIn, type StyleOut } from "@/features/office/documents/lib/documentStyles";
 import { access, isRestriction, type Restriction } from "@/features/office/documents/lib/documentRestrict";
 import { useChat } from "@/store/chat/ChatContext";
 import AccessibilityDialog from "@/features/office/documents/components/AccessibilityDialog";
@@ -94,6 +99,11 @@ export interface Layout {
 	valign: string;
 	// Paragraph styles made or changed in the editor, to write into the file's styles
 	styles?: StyleIn[];
+	// The editor knows character styles (see `notes.rs`)
+	charMarkers?: boolean;
+	// How footnotes and endnotes are numbered
+	footnoteFormat?: string;
+	endnoteFormat?: string;
 	// The notes the text refers to
 	notes?: NoteWire[];
 	// Comments to write into the file as its own comments
@@ -127,7 +137,7 @@ interface Props {
 	sourceId?: string | null;
 	// Reads the file again, for putting it back in place of the shared copy; null when it could not be read (the page says why)
 	// Where the file is, for its version history
-	history?: { workspacePath: string; rel: string };
+	history?: { workspacePath: string; rel: string; others?: { name: string; rel: string }[] };
 	canComment?: boolean;
 	// The paragraph styles the file has, for the Styles gallery
 	styles?: StyleOut[];
@@ -338,6 +348,19 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 			clearTimeout(timer);
 		};
 	}, [editor, meta, mounted]);
+	// How the notes are numbered: shared, started from the file's own, and sent with the text
+	const [noteFormats, setNoteFormatsState] = useState<NoteFormats>(() => parseFormats(meta.get("noteFormats")));
+	useEffect(() => {
+		const read = () => setNoteFormatsState(parseFormats(meta.get("noteFormats")));
+		read();
+		meta.observe(read);
+		return () => meta.unobserve(read);
+	}, [meta]);
+	useEffect(() => {
+		if (!collab.synced || !fileLayout || meta.has("noteFormats")) return;
+		const f = fileLayout as { footnoteFormat?: string; endnoteFormat?: string };
+		meta.set("noteFormats", JSON.stringify(parseFormats(JSON.stringify({ foot: f.footnoteFormat, end: f.endnoteFormat }))));
+	}, [collab.synced, fileLayout, meta]);
 	// Choosing a paper size, margins or orientation replaces the page a file came with
 	// A file's own page set-up is where the settings start, the first time anyone opens it
 	useEffect(() => {
@@ -387,7 +410,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 			// The clipboard is not available in this window; nothing was copied
 		}
 	};
-	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | "sources" | "merge" | "compare" | "accessibility" | "notes" | null>(null);
+	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | "sources" | "merge" | "compare" | "accessibility" | "notes" | "changes" | "sectionHeader" | null>(null);
 	// Puts the file back in place of the shared copy, for everyone: the text as the file has it now, with its spacing, page set-up and
 	// header and footer
 	const reload = async () => {
@@ -573,6 +596,8 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 	const [printPages, setPrintPages] = useState(1);
 	const pages = mode === "print" ? printPages : paged ? flowPages : pageCount(bodyHeight, box);
 	const [pageAt, setPageAt] = useState(1);
+	// Others see which page this person is on, beside their name in the header
+	useReportLine(pageAt);
 	const onScroll = () => {
 		const el = scroller.current;
 		if (el) setPageAt(Math.min(pages, Math.max(1, Math.floor((el.scrollTop / ((zoom / 100) * (heightPx + PAGE_GAP))) + 0.5) + 1)));
@@ -663,6 +688,24 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 		};
 	}, [readOnly]);
 
+	// Fields that stand for a value (the title, the date, the word count) are brought up to date a moment after the text stops changing. The page
+	// count and the author are left to Update All Fields: each person's device would write its own, and they could differ.
+	useEffect(() => {
+		if (readOnly) return;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const off = editor.onChange(() => {
+			clearTimeout(timer);
+			timer = setTimeout(() => {
+				const text = editor.prosemirrorState.doc.textBetween(0, editor.prosemirrorState.doc.content.size, "\n", "\n");
+				actions.current.updateFields({ title, date: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }), words: String(countText(text).words) }, true);
+			}, 2500);
+		});
+		return () => {
+			off?.();
+			clearTimeout(timer);
+		};
+	}, [editor, readOnly, title]);
+
 	const doFind = (backwards: boolean) => {
 		if (!find?.query) return;
 		// The browser's search is literal, so a pattern is looked for as the first text it matches
@@ -706,7 +749,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 
 	// The notes to send: the ones the text refers to. A document made before notes were kept this way, from a file, leaves the file's notes alone.
 	const notesNow = (): NoteWire[] | undefined => (sourceId && doc.getMap<string>("docmeta").get("notesKnown") !== "1" ? undefined : notesToSend(editor.document as never, new Map([...noteMap.entries()].map(([k, v]) => [Number(k), v]))));
-	const layout = { ...layoutOf(page, hf), styles: editedStyles(styleList), notes: useMemo(notesNow, [bodyHeight, a.fmt, noteTick, sourceId]) }; // eslint-disable-line react-hooks/exhaustive-deps
+	const layout = { ...layoutOf(page, hf), styles: editedStyles(styleList), charMarkers: true, footnoteFormat: noteFormats.foot, endnoteFormat: noteFormats.end, notes: useMemo(notesNow, [bodyHeight, a.fmt, noteTick, sourceId]) }; // eslint-disable-line react-hooks/exhaustive-deps
 	const accent = ACCENTS.word.color;
 	const columnsCss = { ...(page.columns > 1 ? { columnCount: page.columns, columnGap: "0.5in" } : {}), "--doc-w": `${(box.width - box.left - box.right) * PX_PER_PT}px` } as React.CSSProperties;
 
@@ -749,10 +792,10 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 							</label>
 							<label className="mb-2 flex items-center gap-2 text-sm">
 								<input type="checkbox" checked={withComments} onChange={(e) => setWithComments(e.target.checked)} />
-								Include the open comments (comments in .docx, at the end in the others)
+								Include the open comments (.docx comments, PDF balloons, at the end in the others)
 							</label>
 							{FORMATS.map((f) => (
-								<button key={f.ext} type="button" onClick={() => void onSaveCopy(f.ext, html() + (withComments && f.ext !== "docx" ? comments.appendix() : ""), withComments && f.ext === "docx" ? { ...layout, comments: comments.list(anonymous) } : layout, anonymous)} className="block w-full border px-4 py-3 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+								<button key={f.ext} type="button" onClick={() => void onSaveCopy(f.ext, html() + (withComments && f.ext !== "docx" && f.ext !== "pdf" ? comments.appendix() : ""), withComments && (f.ext === "docx" || f.ext === "pdf") ? { ...layout, comments: comments.list(anonymous) } : layout, anonymous)} className="block w-full border px-4 py-3 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
 									{f.label}
 								</button>
 							))}
@@ -851,7 +894,11 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					review={review}
 					openCompare={() => setDialog("compare")}
 					openAccessibility={() => setDialog("accessibility")}
+					openChanges={() => setDialog("changes")}
+					openSectionHeader={() => setDialog("sectionHeader")}
 					styles={galleryStyles(styleList)}
+					charStyles={characterStyles(styleList)}
+					tableStyles={tableStyles(styleList)}
 					restrict={{ value: restriction, canSet: isAdmin && !baseReadOnly, set: (r) => settings.set("restrict", r) }}
 					copyOutline={() => void copyOutline()}
 					makeTask={() => void makeTask()}
@@ -1052,7 +1099,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					}}
 				/>
 			)}
-			{dialog === "compare" && history && <CompareDialog workspacePath={history.workspacePath} rel={history.rel} lines={() => textOfBlocks(editor.document as never).split(String.fromCharCode(10))} onClose={() => setDialog(null)} />}
+			{dialog === "compare" && history && <CompareDialog workspacePath={history.workspacePath} rel={history.rel} others={history.others ?? []} lines={() => textOfBlocks(editor.document as never).split(String.fromCharCode(10))} onClose={() => setDialog(null)} />}
 			{dialog === "accessibility" && (
 				<AccessibilityDialog
 					blocks={() => editor.document as unknown as BlockLike[]}
@@ -1064,6 +1111,9 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					onClose={() => setDialog(null)}
 				/>
 			)}
+			<style>{`${tableStyleCss(styleList)}\n${noteCss(noteFormats)}`}</style>
+			{dialog === "sectionHeader" && parseSection(a.fmt.section) && <SectionHeaderDialog spec={parseSection(a.fmt.section)!} onApply={(header, footer) => a.setSection({ header, footer })} onClose={() => setDialog(null)} />}
+			{dialog === "changes" && <ChangesDialog changes={review.changes} readOnly={readOnly} onGo={(c) => { setDialog(null); review.goTo(c); }} onResolve={review.resolveOne} onClose={() => setDialog(null)} />}
 			{dialog === "notes" && (
 				<NotesDialog
 					rows={referencesIn(editor.document as never).flatMap((r) => {
@@ -1071,6 +1121,8 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 						return d ? [{ id: r.id, end: r.end, text: d.text }] : [];
 					})}
 					readOnly={readOnly}
+					formats={noteFormats}
+					onFormats={(f) => meta.set("noteFormats", JSON.stringify(f))}
 					onEdit={a.editNote}
 					onClose={() => setDialog(null)}
 				/>

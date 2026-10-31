@@ -339,7 +339,7 @@ export default function DocumentsPage() {
 						<DocumentWorkspace
 							canComment={canComment}
 							key={selected}
-							history={{ workspacePath, rel: selected }}
+							history={{ workspacePath, rel: selected, others: (docs ?? []).filter((d) => d.rel !== selected) }}
 							collab={collab}
 							initialBlocks={state.imported!.blocks}
 							lists={state.imported!.lists}

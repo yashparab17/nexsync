@@ -4,8 +4,8 @@ import { formatSection, NEW_SECTION, parseSection, sectionCount, sectionStart } 
 
 describe("sections in the editor", () => {
 	it("reads and writes a section's set-up", () => {
-		expect(parseSection("next|l|36,36,36,36|2")).toEqual({ continuous: false, landscape: true, margins: [36, 36, 36, 36], columns: 2 });
-		expect(parseSection("cont|p||1")).toEqual({ continuous: true, landscape: false, margins: null, columns: 1 });
+		expect(parseSection("next|l|36,36,36,36|2")).toEqual({ continuous: false, landscape: true, margins: [36, 36, 36, 36], columns: 2, header: null, footer: null });
+		expect(parseSection("cont|p||1")).toEqual({ continuous: true, landscape: false, margins: null, columns: 1, header: null, footer: null });
 		expect(formatSection(parseSection("cont|p||3")!)).toBe("cont|p||3");
 		expect(formatSection({ ...NEW_SECTION, margins: [72, 108, 72, 108] })).toBe("next|p|72,108,72,108|1");
 		for (const bad of ["", "x|p||1", "next|q||1", "next|p||4", "next|p|1,2,3|1", "next|p|a,b,c,d|1", "next|p|-1,0,0,0|1"]) expect(parseSection(bad)).toBeNull();
@@ -22,7 +22,18 @@ describe("sections in the editor", () => {
 		expect(sectionStart(top, "a")).toBeNull();
 		expect(sectionStart(top, "b")?.block.id).toBe("b");
 		expect(sectionStart(top, "c1")?.block.id).toBe("b");
-		expect(sectionStart(top, "e")?.spec).toEqual({ continuous: true, landscape: false, margins: null, columns: 2 });
+		expect(sectionStart(top, "e")?.spec).toEqual({ continuous: true, landscape: false, margins: null, columns: 2, header: null, footer: null });
 		expect(sectionCount(top)).toBe(3);
+	});
+
+	it("carries a section's header and footer text as hex, including text with separators, and leaves them when there are none", () => {
+		const spec = { ...NEW_SECTION, header: "Chapter 2 | Draft", footer: "" };
+		const text = formatSection(spec);
+		expect(text).not.toContain("Chapter");
+		expect(text.split("|").length).toBe(6);
+		expect(parseSection(text)).toEqual(spec);
+		expect(parseSection(formatSection({ ...NEW_SECTION, header: "Chäpter ✓", footer: "Page foot" }))).toMatchObject({ header: "Chäpter ✓", footer: "Page foot" });
+		expect(formatSection(NEW_SECTION)).toBe("next|p||1");
+		expect(parseSection("next|p||1|=zz|")).toMatchObject({ header: null });
 	});
 });

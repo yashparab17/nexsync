@@ -5,9 +5,9 @@
 fn main() {
     #[cfg(target_os = "linux")]
     {
-        // Fix WebKitGTK hardware acceleration / GBM buffer bug on Linux
-        if std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").is_err() {
-            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        // WebKitGTK's web process crashes on some graphics set-ups; see `linux_graphics_env`
+        for (name, value) in nexsync_lib::linux_graphics_env(&|k| std::env::var(k).ok()) {
+            std::env::set_var(name, value);
         }
     }
 

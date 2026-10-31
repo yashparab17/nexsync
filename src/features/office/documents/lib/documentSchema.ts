@@ -4,6 +4,7 @@
 
 import { BlockNoteSchema, createStyleSpec, defaultBlockSpecs, defaultStyleSpecs } from "@blocknote/core";
 
+import { colorOf } from "@/lib/collabColor";
 import { pointsOf } from "@/features/office/documents/lib/documentFormat";
 import { lineFactor } from "@/features/office/documents/lib/fontMetrics";
 
@@ -87,24 +88,64 @@ const note = createStyleSpec(
 	},
 );
 
+// Text in a character style: one mark whose value is the style's id; the look of the style is put on the text as marks of its own, the way every
+// look is held in the editor. In the file it is a run in that character style.
+const charStyle = createStyleSpec(
+	{ type: "charStyle", propSchema: "string" },
+	{
+		render: (value) => {
+			const dom = document.createElement("span");
+			dom.dataset.charStyle = value;
+			return { dom, contentDOM: dom };
+		},
+		toExternalHTML: (value) => {
+			const dom = document.createElement("span");
+			dom.dataset.charStyle = value;
+			return { dom, contentDOM: dom };
+		},
+		parse: (el) => el.dataset.charStyle || undefined,
+	},
+);
+
+// The table style a table is in: a mark on the text of its first cell (a table has no property of its own in the editor), whose value is the
+// style's id. In the file it is the table's style.
+const tableStyleMark = createStyleSpec(
+	{ type: "tableStyle", propSchema: "string" },
+	{
+		render: (value) => {
+			const dom = document.createElement("span");
+			dom.dataset.tableStyle = value;
+			return { dom, contentDOM: dom };
+		},
+		toExternalHTML: (value) => {
+			const dom = document.createElement("span");
+			dom.dataset.tableStyle = value;
+			return { dom, contentDOM: dom };
+		},
+		parse: (el) => el.dataset.tableStyle || undefined,
+	},
+);
+
 // A tracked change: text somebody inserted or deleted while suggesting, and who and when ("author|date"). It stays in the text,
 // drawn in colour, until it is accepted or rejected (see `documentReview`). In the file it is Word's w:ins or w:del.
 function change(type: "insertion" | "deletion") {
 	const tag = type === "insertion" ? "ins" : "del";
-	const draw = (value: string) => {
+	// In the editor each person's changes are in their own colour (the one their cursor has); the file gets the plain element
+	const draw = (value: string, own = true) => {
 		const i = value.indexOf("|");
 		const dom = document.createElement(tag);
 		dom.className = `doc-${tag}`;
 		dom.dataset.author = i < 0 ? value : value.slice(0, i);
 		dom.dataset.date = i < 0 ? "" : value.slice(i + 1);
+		if (own && dom.dataset.author) dom.style.color = colorOf(dom.dataset.author);
 		dom.title = `${type === "insertion" ? "Inserted" : "Deleted"} by ${dom.dataset.author}`;
 		return { dom, contentDOM: dom };
 	};
 	return createStyleSpec(
 		{ type, propSchema: "string" },
 		{
-			render: draw,
-			toExternalHTML: draw,
+			render: (value) => draw(value),
+			toExternalHTML: (value) => draw(value, false),
 			parse: (el) => (el.tagName === tag.toUpperCase() ? `${el.dataset.author ?? ""}|${el.dataset.date ?? ""}` : undefined),
 		},
 	);
@@ -184,5 +225,5 @@ const blockSpecs = {
 };
 
 // The font goes before the size, so a run's size is drawn inside its font: its line is then as tall as that font at that size, as in Word
-export const documentSchema = BlockNoteSchema.create({ blockSpecs, styleSpecs: { ...defaultStyleSpecs, field, note, insertion: change("insertion"), deletion: change("deletion"), fontFamily, fontSize, textColor: colourSpec("textColor", "color"), backgroundColor: colourSpec("backgroundColor", "backgroundColor") } });
+export const documentSchema = BlockNoteSchema.create({ blockSpecs, styleSpecs: { ...defaultStyleSpecs, field, note, charStyle, tableStyle: tableStyleMark, insertion: change("insertion"), deletion: change("deletion"), fontFamily, fontSize, textColor: colourSpec("textColor", "color"), backgroundColor: colourSpec("backgroundColor", "backgroundColor") } });
 export type DocumentEditorType = typeof documentSchema.BlockNoteEditor;

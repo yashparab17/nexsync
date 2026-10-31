@@ -48,6 +48,21 @@ pub struct StyleIn {
     pub space_after: Option<f32>,
     /// A multiple of single spacing (1.15), or, below zero, exactly that many points
     pub line_spacing: Option<f32>,
+    /// "character" for a style of the letters, "table" for a style of tables; empty for a style of paragraphs
+    pub kind: String,
+    /// What a table style gives
+    pub table: Option<TableLook>,
+}
+
+/// What a table style gives, as the editor draws and sets it: the fill of the header row (and its bold text), of the odd rows and of every cell
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct TableLook {
+    pub header_fill: String,
+    pub header_color: String,
+    pub header_bold: bool,
+    pub band_fill: String,
+    pub fill: String,
 }
 
 /// A paragraph style of a file as the gallery shows it
@@ -72,6 +87,9 @@ pub struct StyleOut {
     pub outline: u8,
     /// Some paragraph of the document has it
     pub used: bool,
+    /// "paragraph", "character" or "table"
+    pub kind: String,
+    pub table: Option<TableLook>,
 }
 
 fn used_styles(blocks: &[Arc<Block>], out: &mut std::collections::BTreeSet<String>) {
@@ -81,8 +99,14 @@ fn used_styles(blocks: &[Arc<Block>], out: &mut std::collections::BTreeSet<Strin
                 if let Some(s) = &p.props.style {
                     out.insert(s.clone());
                 }
+                out.extend(p.runs.iter().filter_map(|r| r.props.style.clone()));
             }
-            Block::Table(t) => t.rows.iter().for_each(|r| r.cells.iter().for_each(|c| used_styles(&c.blocks, out))),
+            Block::Table(t) => {
+                if let Some(s) = &t.props.style {
+                    out.insert(s.clone());
+                }
+                t.rows.iter().for_each(|r| r.cells.iter().for_each(|c| used_styles(&c.blocks, out)));
+            }
         }
     }
 }
@@ -94,18 +118,58 @@ fn hex(c: &TextColor) -> String {
     }
 }
 
-/// The paragraph styles a file has that the gallery should offer: those a paragraph uses, those the file shows in its own gallery, and
-/// those somebody made, but not the ones the gallery has already
+/// The table look a table style gives: its own fields, else those of the style it is based on
+fn table_look(doc: &Document, id: &str) -> TableLook {
+    let mut look = TableLook::default();
+    let mut at = Some(id.to_string());
+    for _ in 0..20 {
+        let Some(cur) = at else { break };
+        let Some(st) = doc.styles.styles.iter().find(|e| e.id == cur) else { break };
+        if let Some(t) = &st.table {
+            let color = |c: &Option<Rgb>| c.map(|Rgb(r, g, b)| format!("#{r:02x}{g:02x}{b:02x}")).unwrap_or_default();
+            if look.header_fill.is_empty() {
+                look.header_fill = color(&t.header_fill);
+            }
+            if look.band_fill.is_empty() && t.band_size.is_some_and(|n| n > 0) {
+                look.band_fill = color(&t.band_fill);
+            }
+            if look.fill.is_empty() {
+                look.fill = color(&t.fill);
+            }
+            if look.header_color.is_empty() {
+                look.header_color = match &t.header_chr.color {
+                    Some(c) => hex(c),
+                    None => String::new(),
+                };
+            }
+            look.header_bold |= t.header_chr.bold == Some(true);
+        }
+        at = st.based_on.clone();
+    }
+    look
+}
+
+/// The styles a file has that the gallery should offer: paragraph, character and table styles that something uses, that the file shows in its
+/// own gallery, or that somebody made; but not the ones the gallery has already, nor the character style Word links to each heading
 pub fn styles_of(doc: &Document) -> Vec<StyleOut> {
     let mut used = std::collections::BTreeSet::new();
     used_styles(&doc.body, &mut used);
     doc.styles
         .styles
         .iter()
-        .filter(|s| s.kind == StyleKind::Paragraph && !s.hidden && !s.id.is_empty() && !IN_GALLERY.contains(&s.id.as_str()) && (used.contains(&s.id) || s.quick || !s.builtin))
+        .filter(|s| {
+            let kind_ok = match s.kind {
+                StyleKind::Paragraph => true,
+                StyleKind::Character => s.linked.is_none(),
+                StyleKind::Table => true,
+                StyleKind::Numbering => false,
+            };
+            kind_ok && !s.hidden && !s.default && !s.id.is_empty() && !IN_GALLERY.contains(&s.id.as_str()) && (used.contains(&s.id) || s.quick || !s.builtin)
+        })
         .map(|s| {
             let p = doc.styles.resolve_para(&ParaProps { style: Some(s.id.clone()), ..Default::default() });
-            let c = doc.styles.resolve_char(Some(&s.id), &CharProps::default());
+            // A character style is resolved as the style of a run; a paragraph or table style as the style of the text of a paragraph
+            let c = if s.kind == StyleKind::Character { doc.styles.resolve_char(None, &CharProps { style: Some(s.id.clone()), ..Default::default() }) } else { doc.styles.resolve_char(Some(&s.id), &CharProps::default()) };
             StyleOut {
                 id: s.id.clone(),
                 name: if s.name.is_empty() { s.id.clone() } else { s.name.clone() },
@@ -131,6 +195,13 @@ pub fn styles_of(doc: &Document) -> Vec<StyleOut> {
                 },
                 outline: p.outline_level.map_or(0, |l| l + 1),
                 used: used.contains(&s.id),
+                kind: match s.kind {
+                    StyleKind::Character => "character",
+                    StyleKind::Table => "table",
+                    _ => "paragraph",
+                }
+                .to_string(),
+                table: (s.kind == StyleKind::Table).then(|| table_look(doc, &s.id)),
             }
         })
         .collect()
@@ -145,10 +216,87 @@ fn parse_color(s: &str) -> Option<Rgb> {
     Some(Rgb((n >> 16) as u8, (n >> 8) as u8, n as u8))
 }
 
+/// A style of the letters: the look of the text it is given (no paragraph properties)
+fn apply_character(doc: &mut Document, s: &StyleIn) {
+    let at = doc.styles.styles.iter().position(|e| e.id == s.id);
+    if at.is_some_and(|i| doc.styles.styles[i].kind != StyleKind::Character) {
+        return;
+    }
+    let mut st = at.map(|i| doc.styles.styles[i].clone()).unwrap_or_else(|| Style { id: s.id.clone(), kind: StyleKind::Character, quick: true, ..Default::default() });
+    st.name = if s.name.trim().is_empty() { s.id.clone() } else { s.name.trim().chars().take(80).collect() };
+    if !s.font.is_empty() {
+        st.chr.font = Some(s.font.clone());
+    }
+    if let Some(size) = s.size.filter(|z| *z > 0.0) {
+        st.chr.size = Some(size);
+    }
+    st.chr.bold = Some(s.bold);
+    st.chr.italic = Some(s.italic);
+    st.chr.underline = Some(if s.underline { Underline::Single } else { Underline::None });
+    if let Some(c) = parse_color(&s.color) {
+        st.chr.color = Some(TextColor::Rgb(c));
+    }
+    match at {
+        Some(i) => doc.styles.styles[i] = st,
+        None => doc.styles.styles.push(st),
+    }
+}
+
+/// A style of tables: the fill of the header row (bold, in a colour) and of every second row
+fn apply_table(doc: &mut Document, s: &StyleIn) {
+    use wordcraft_doc::styles::TableStyleParts;
+    let Some(look) = &s.table else { return };
+    let at = doc.styles.styles.iter().position(|e| e.id == s.id);
+    if at.is_some_and(|i| doc.styles.styles[i].kind != StyleKind::Table) {
+        return;
+    }
+    let mut st = at.map(|i| doc.styles.styles[i].clone()).unwrap_or_else(|| Style { id: s.id.clone(), kind: StyleKind::Table, quick: true, ..Default::default() });
+    st.name = if s.name.trim().is_empty() { s.id.clone() } else { s.name.trim().chars().take(80).collect() };
+    let mut parts = st.table.take().unwrap_or_default();
+    // A style the file made keeps what this does not say (its borders, its other regions); the fills and the header text are set here
+    let none_if_empty = |h: &str| parse_color(h);
+    parts.header_fill = none_if_empty(&look.header_fill);
+    parts.fill = none_if_empty(&look.fill);
+    parts.band_fill = none_if_empty(&look.band_fill);
+    parts.band_size = Some(u32::from(parts.band_fill.is_some()));
+    parts.header_chr.bold = look.header_bold.then_some(true);
+    parts.header_chr.color = parse_color(&look.header_color).map(TextColor::Rgb);
+    let _: &TableStyleParts = &parts;
+    st.table = Some(parts);
+    match at {
+        Some(i) => doc.styles.styles[i] = st,
+        None => doc.styles.styles.push(st),
+    }
+}
+
+/// Whether `from` is `id`, or is based (through any number of styles) on it: a style that would be based on itself
+fn chain_has(doc: &Document, from: &str, id: &str) -> bool {
+    let mut at = Some(from.to_string());
+    for _ in 0..40 {
+        let Some(cur) = at else { return false };
+        if cur == id {
+            return true;
+        }
+        at = doc.styles.styles.iter().find(|e| e.id == cur).and_then(|e| e.based_on.clone());
+    }
+    true
+}
+
 /// Writes the styles made or changed in the editor into the document's styles: one with an id the file has is changed in the fields given, any
 /// other is added (shown in the file's own gallery)
 pub fn apply(doc: &mut Document, styles: &[StyleIn]) {
     for s in styles.iter().filter(|s| !s.id.trim().is_empty() && s.id.len() <= 80 && !s.id.contains(char::is_whitespace)) {
+        match s.kind.as_str() {
+            "character" => {
+                apply_character(doc, s);
+                continue;
+            }
+            "table" => {
+                apply_table(doc, s);
+                continue;
+            }
+            _ => {}
+        }
         let at = doc.styles.styles.iter().position(|e| e.id == s.id);
         let mut st = at.map(|i| doc.styles.styles[i].clone()).unwrap_or_else(|| Style {
             id: s.id.clone(),
@@ -165,37 +313,53 @@ pub fn apply(doc: &mut Document, styles: &[StyleIn]) {
         // A new style starts from Normal; a changed one keeps what it started from
         if at.is_none() || !s.based_on.is_empty() {
             let base = if s.based_on.is_empty() { "Normal" } else { s.based_on.as_str() };
-            if base != s.id && doc.styles.styles.iter().any(|e| e.id == base) {
+            if base != s.id && doc.styles.styles.iter().any(|e| e.id == base) && !chain_has(doc, base, &s.id) {
                 st.based_on = Some(base.to_string());
             }
         }
+        // What the style it is based on gives: a field that is the same is not written, so the style follows the base when the base changes
+        // (a style that is based on nothing, or on a style that is itself based on this one, writes every field)
+        let base_look = st.based_on.clone().filter(|b| !chain_has(doc, b, &s.id)).map(|b| {
+            (doc.styles.resolve_char(Some(&b), &CharProps::default()), doc.styles.resolve_para(&ParaProps { style: Some(b.clone()), ..Default::default() }))
+        });
+        let (bc, bp) = match &base_look {
+            Some((c, p)) => (Some(c), Some(p)),
+            None => (None, None),
+        };
+        let differs = |v: bool, base: Option<bool>| base.is_none_or(|b| b != v);
+        // A field the editor sent is written when it is not what the base gives; one it left out stays as the style had it
         if !s.font.is_empty() {
-            st.chr.font = Some(s.font.clone());
+            st.chr.font = bc.is_none_or(|b| b.font != s.font).then(|| s.font.clone());
         }
-        if let Some(size) = s.size.filter(|z| *z > 0.0) {
-            st.chr.size = Some(size);
+        if let Some(z) = s.size.filter(|z| *z > 0.0) {
+            st.chr.size = bc.is_none_or(|b| (b.size - z).abs() > 0.01).then_some(z);
         }
-        st.chr.bold = Some(s.bold);
-        st.chr.italic = Some(s.italic);
-        st.chr.underline = Some(if s.underline { Underline::Single } else { Underline::None });
+        st.chr.bold = differs(s.bold, bc.map(|b| b.bold)).then_some(s.bold);
+        st.chr.italic = differs(s.italic, bc.map(|b| b.italic)).then_some(s.italic);
+        st.chr.underline = differs(s.underline, bc.map(|b| b.underline != Underline::None)).then_some(if s.underline { Underline::Single } else { Underline::None });
         if let Some(c) = parse_color(&s.color) {
-            st.chr.color = Some(TextColor::Rgb(c));
+            st.chr.color = bc.is_none_or(|b| hex(&b.color) != hex(&TextColor::Rgb(c))).then_some(TextColor::Rgb(c));
         }
-        st.para.align = match s.align.as_str() {
+        let align = match s.align.as_str() {
             "left" => Some(Align::Left),
             "center" => Some(Align::Center),
             "right" => Some(Align::Right),
             "justify" => Some(Align::Justify),
-            _ => st.para.align,
+            _ => None,
         };
+        if let Some(a) = align {
+            st.para.align = bp.is_none_or(|b| b.align != a).then_some(a);
+        }
+        let num_differs = |v: f32, base: Option<f32>| base.is_none_or(|b| (b - v).abs() > 0.01);
         if let Some(v) = s.space_before.filter(|v| *v >= 0.0) {
-            st.para.space_before = Some(v);
+            st.para.space_before = num_differs(v, bp.map(|b| b.space_before)).then_some(v);
         }
         if let Some(v) = s.space_after.filter(|v| *v >= 0.0) {
-            st.para.space_after = Some(v);
+            st.para.space_after = num_differs(v, bp.map(|b| b.space_after)).then_some(v);
         }
-        if let Some(l) = s.line_spacing.filter(|l| *l != 0.0) {
-            st.para.line_spacing = Some(if l < 0.0 { LineSpacing::Exactly(-l) } else { LineSpacing::Multiple(l) });
+        let line = s.line_spacing.filter(|l| *l != 0.0).map(|l| if l < 0.0 { LineSpacing::Exactly(-l) } else { LineSpacing::Multiple(l) });
+        if let Some(l) = line {
+            st.para.line_spacing = bp.is_none_or(|b| b.line_spacing != l).then_some(l);
         }
         match at {
             Some(i) => doc.styles.styles[i] = st,
@@ -277,6 +441,105 @@ pub fn settle(doc: &mut Document, chosen: &[(usize, String, Option<String>)]) {
     }
 }
 
+// ---- Letters and tables --------------------------------------------------------------------------------------------------------------------
+//
+// A range of text in a character style is wrapped in the editor's HTML as `U+E006 id U+E007 ... U+E008`. A table in a table style carries
+// `U+E009 id U+E00A` at the start of its first cell. Both are taken off right after the HTML is read; the styles go on the finished document.
+
+const TABLE_OPEN: char = '\u{E009}';
+const TABLE_CLOSE: char = '\u{E00A}';
+
+/// Takes `a..b` (bytes) out of a paragraph's text, and out of its runs
+fn cut(p: &mut Paragraph, a: usize, b: usize) {
+    p.text.drain(a..b);
+    let mut at = 0;
+    for r in &mut p.runs {
+        let (from, to) = (at, at + r.len);
+        at = to;
+        r.len -= to.min(b).saturating_sub(from.max(a));
+    }
+    p.runs.retain(|r| r.len > 0);
+    p.rev = wordcraft_doc::para::next_rev();
+}
+
+/// Every paragraph of the body and of its table cells, with its place
+fn paragraphs_mut(doc: &mut Document, f: &mut dyn FnMut(super::notes::Place, &mut Paragraph)) {
+    for (i, b) in doc.body.iter_mut().enumerate() {
+        match Arc::make_mut(b) {
+            Block::Para(p) => f((i, None), p),
+            Block::Table(t) => {
+                for (r, row) in t.rows.iter_mut().enumerate() {
+                    for (c, cell) in row.cells.iter_mut().enumerate() {
+                        for (k, cb) in cell.blocks.iter_mut().enumerate() {
+                            if let Block::Para(p) = Arc::make_mut(cb) {
+                                f((i, Some((r, c, k))), p);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Puts the character styles on the finished document. `authoritative`: the editor knows character styles (its markers are all there are), so
+/// a style the file had on text that carries no marker is taken off.
+pub fn settle_chars(doc: &mut Document, found: &[super::notes::CharRange], authoritative: bool) {
+    let is_char = |doc: &Document, id: &str| doc.styles.styles.iter().any(|s| s.id == id && s.kind == StyleKind::Character);
+    if authoritative {
+        let ids: Vec<String> = doc.styles.styles.iter().filter(|s| s.kind == StyleKind::Character).map(|s| s.id.clone()).collect();
+        paragraphs_mut(doc, &mut |_, p| {
+            if p.runs.iter().any(|r| r.props.style.as_ref().is_some_and(|s| ids.contains(s))) {
+                for r in &mut p.runs {
+                    if r.props.style.as_ref().is_some_and(|s| ids.contains(s)) {
+                        r.props.style = None;
+                    }
+                }
+                p.rev = wordcraft_doc::para::next_rev();
+            }
+        });
+    }
+    for (place, a, b, id) in found {
+        if !is_char(doc, id) {
+            continue;
+        }
+        if let Some(p) = super::notes::para_mut(doc, place) {
+            let (a, b) = ((*a).min(p.text.len()), (*b).min(p.text.len()));
+            if a < b && p.text.is_char_boundary(a) && p.text.is_char_boundary(b) {
+                let _ = p.format(a, b, &|c| c.style = Some(id.clone()));
+            }
+        }
+    }
+}
+
+/// The table styles chosen in the editor: (top-level index of the table, id), with the markers taken out of the text
+pub fn take_table_markers(doc: &mut Document) -> Vec<(usize, String)> {
+    let mut found = Vec::new();
+    paragraphs_mut(doc, &mut |place, p| {
+        if let (Some((0, 0, 0)), true) = (place.1, p.text.starts_with(TABLE_OPEN)) {
+            if let Some(end) = p.text.find(TABLE_CLOSE) {
+                found.push((place.0, p.text[TABLE_OPEN.len_utf8()..end].to_string()));
+                cut(p, 0, end + TABLE_CLOSE.len_utf8());
+            }
+        }
+    });
+    found
+}
+
+/// Gives the tables the style chosen in the editor; "none" takes the style off. A style the document does not have is not set.
+pub fn settle_tables(doc: &mut Document, found: &[(usize, String)]) {
+    for (i, id) in found {
+        let exists = doc.styles.styles.iter().any(|s| s.id == *id && s.kind == StyleKind::Table);
+        if let Some(Block::Table(t)) = doc.body.get_mut(*i).map(Arc::make_mut) {
+            if id == "none" {
+                t.props.style = None;
+            } else if exists {
+                t.props.style = Some(id.clone());
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -287,6 +550,27 @@ mod tests {
 
     fn callout() -> StyleIn {
         StyleIn { id: "Callout".into(), name: "Callout".into(), font: "Georgia".into(), size: Some(13.0), bold: true, color: "#c00000".into(), align: "center".into(), space_after: Some(12.0), line_spacing: Some(1.5), ..Default::default() }
+    }
+
+    #[test]
+    fn a_style_based_on_another_writes_only_what_it_changes_and_follows_the_base() {
+        let mut doc = doc_from("<p>Hello</p>");
+        apply(&mut doc, &[callout()]);
+        // "Warning" is the Callout look, in italic
+        let warning = StyleIn { id: "Warning".into(), name: "Warning".into(), based_on: "Callout".into(), font: "Georgia".into(), size: Some(13.0), bold: true, italic: true, color: "#c00000".into(), align: "center".into(), space_after: Some(12.0), line_spacing: Some(1.5), ..Default::default() };
+        apply(&mut doc, &[warning]);
+        let st = doc.styles.styles.iter().find(|s| s.id == "Warning").unwrap();
+        assert_eq!(st.based_on.as_deref(), Some("Callout"));
+        assert!(st.chr.font.is_none() && st.chr.size.is_none() && st.chr.color.is_none() && st.chr.bold.is_none() && st.para.align.is_none(), "only the italic is its own: {st:?}");
+        assert_eq!(st.chr.italic, Some(true));
+        // The base gets bigger and the style follows
+        apply(&mut doc, &[StyleIn { size: Some(20.0), ..callout() }]);
+        let out = styles_of(&doc);
+        let w = out.iter().find(|s| s.id == "Warning").unwrap();
+        assert_eq!((w.size, w.font.as_str(), w.italic, w.bold), (20.0, "Georgia", true, true));
+        // A style cannot be based on one that is based on it
+        apply(&mut doc, &[StyleIn { based_on: "Warning".into(), ..callout() }]);
+        assert_ne!(doc.styles.styles.iter().find(|s| s.id == "Callout").unwrap().based_on.as_deref(), Some("Warning"));
     }
 
     #[test]

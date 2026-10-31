@@ -17,6 +17,27 @@ pub mod cli {
     }
 }
 
+/// The graphics settings the app starts with on Linux, as (name, value) for the ones the person has not set themselves. WebKitGTK crashes on some
+/// computers when it opens its web process ("Could not create default EGL display"): newer Mesa and Wayland on a rolling distribution such as Arch,
+/// against the copies of those libraries an AppImage carries. The dmabuf renderer is always turned off; inside an AppImage, accelerated compositing
+/// is turned off as well, and a Wayland session that also has an X server (XWayland) is asked to use it, which does not need the Wayland EGL platform.
+pub fn linux_graphics_env(get: &dyn Fn(&str) -> Option<String>) -> Vec<(&'static str, &'static str)> {
+    let mut out = Vec::new();
+    if get("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        out.push(("WEBKIT_DISABLE_DMABUF_RENDERER", "1"));
+    }
+    let in_appimage = get("APPIMAGE").is_some() || get("APPDIR").is_some();
+    if in_appimage {
+        if get("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
+            out.push(("WEBKIT_DISABLE_COMPOSITING_MODE", "1"));
+        }
+        if get("GDK_BACKEND").is_none() && get("WAYLAND_DISPLAY").is_some() && get("DISPLAY").is_some() {
+            out.push(("GDK_BACKEND", "x11"));
+        }
+    }
+    out
+}
+
 /// Initializes plugins, registers Tauri command handlers, and runs the application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -248,6 +269,7 @@ pub fn run() {
             commands::workspace::office::sheets::sheet_save,
             commands::workspace::office::documents::office_import,
             commands::workspace::office::compare::office_version_lines,
+            commands::workspace::office::compare::office_file_lines,
             commands::workspace::office::documents::office_render,
             commands::workspace::office::documents::office_layout,
             commands::workspace::office::documents::office_page,
@@ -304,4 +326,34 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod linux_env_tests {
+    use super::linux_graphics_env;
+    use std::collections::HashMap;
+
+    fn env(pairs: &[(&str, &str)]) -> Vec<(&'static str, &'static str)> {
+        let m: HashMap<String, String> = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        linux_graphics_env(&|k| m.get(k).cloned())
+    }
+
+    #[test]
+    fn outside_an_appimage_only_the_dmabuf_renderer_is_turned_off() {
+        assert_eq!(env(&[("WAYLAND_DISPLAY", "wayland-0"), ("DISPLAY", ":0")]), vec![("WEBKIT_DISABLE_DMABUF_RENDERER", "1")]);
+    }
+
+    #[test]
+    fn inside_an_appimage_on_wayland_with_xwayland_it_also_turns_off_compositing_and_uses_x11() {
+        let got = env(&[("APPIMAGE", "/x/Nexsync.AppImage"), ("WAYLAND_DISPLAY", "wayland-0"), ("DISPLAY", ":0")]);
+        assert_eq!(got, vec![("WEBKIT_DISABLE_DMABUF_RENDERER", "1"), ("WEBKIT_DISABLE_COMPOSITING_MODE", "1"), ("GDK_BACKEND", "x11")]);
+    }
+
+    #[test]
+    fn x11_is_not_forced_without_an_x_server_or_a_wayland_session_and_a_choice_the_person_made_stands() {
+        assert!(!env(&[("APPDIR", "/tmp/.mount_x"), ("WAYLAND_DISPLAY", "wayland-0")]).contains(&("GDK_BACKEND", "x11")));
+        assert!(!env(&[("APPDIR", "/tmp/.mount_x"), ("DISPLAY", ":0")]).contains(&("GDK_BACKEND", "x11")));
+        let chosen = env(&[("APPIMAGE", "a"), ("WAYLAND_DISPLAY", "w"), ("DISPLAY", ":0"), ("GDK_BACKEND", "wayland"), ("WEBKIT_DISABLE_COMPOSITING_MODE", "0"), ("WEBKIT_DISABLE_DMABUF_RENDERER", "0")]);
+        assert!(chosen.is_empty(), "{chosen:?}");
+    }
 }

@@ -30,6 +30,9 @@ describe("saying where", () => {
 		const here = { page: "notes", item: "docs/plan.md", away: false };
 		expect(placeLabel(here)).toBe("Notes · plan.md");
 		expect(placeLabel({ ...here, away: true })).toBe("Away, last on Notes · plan.md");
+		expect(placeLabel({ page: "documents", item: "office/documents/Report.docx", away: false, line: 3 })).toBe("Documents · Report.docx · page 3");
+		expect(placeLabel({ page: "slides", item: "office/slides/Deck.pptx", away: false, line: 7 })).toBe("Slides · Deck.pptx · slide 7");
+		expect(placeLabel({ page: "notes", item: "a.md", away: false, line: 7 })).toBe("Notes · a.md");
 		expect(followPath(here)).toBe("/workspace/notes?open=docs%2Fplan.md");
 		expect(followPath({ page: "dashboard", item: null, away: false })).toBe("/workspace");
 	});

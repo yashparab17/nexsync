@@ -5,11 +5,12 @@
 //! file had it.
 //!
 //! The set-up is `kind|orientation|top,right,bottom,left|columns`: `next` or `cont`inuous, `p`ortrait or `l`andscape, the margins in points
-//! (empty: as the section had them), one to three columns.
+//! (empty: as the section had them), one to three columns. Then, when the section has them, `|header|footer`: each `=` and the text in hex (`=`
+//! alone: none), or empty to leave what the section had.
 
 use std::sync::Arc;
 
-use wordcraft_doc::{section::SectionStart, Block, Document, Paragraph, SectionProps};
+use wordcraft_doc::{section::SectionStart, Block, Document, Paragraph, PartKind, SectionProps};
 
 pub const OPEN: char = '\u{E004}';
 pub const CLOSE: char = '\u{E005}';
@@ -20,6 +21,9 @@ pub struct Spec {
     pub landscape: bool,
     pub margins: Option<[f32; 4]>,
     pub columns: u32,
+    /// The section's header and footer text: `None` leaves them as they were, `Some("")` takes them away
+    pub header: Option<String>,
+    pub footer: Option<String>,
 }
 
 pub fn parse(s: &str) -> Option<Spec> {
@@ -45,21 +49,39 @@ pub fn parse(s: &str) -> Option<Spec> {
         Some([v[0], v[1], v[2], v[3]])
     };
     let columns = it.next()?.parse::<u32>().ok().filter(|c| (1..=3).contains(c))?;
-    Some(Spec { continuous, landscape, margins, columns })
+    let header = it.next().and_then(unhex);
+    let footer = it.next().and_then(unhex);
+    Some(Spec { continuous, landscape, margins, columns, header, footer })
+}
+
+/// `=` and a text in hex, as the text; anything else (empty) is "leave it"
+fn unhex(f: &str) -> Option<String> {
+    let h = f.strip_prefix('=')?;
+    if h.len() % 2 != 0 || h.len() > 800 {
+        return None;
+    }
+    let bytes: Option<Vec<u8>> = (0..h.len()).step_by(2).map(|i| u8::from_str_radix(&h[i..i + 2], 16).ok()).collect();
+    String::from_utf8(bytes?).ok().map(|t| t.chars().filter(|c| !c.is_control()).collect())
+}
+
+fn hex(t: &str) -> String {
+    format!("={}", t.bytes().map(|b| format!("{b:02x}")).collect::<String>())
 }
 
 /// A section's set-up as the editor holds it
-pub fn spec_of(s: &SectionProps) -> String {
+pub fn spec_of(doc: &Document, s: &SectionProps) -> String {
     let r = |v: f32| (v * 10.0).round() / 10.0;
+    let (h, f) = (super::merge::part_text(doc, s.headers.default), super::merge::part_text(doc, s.footers.default));
+    let tail = if h.is_empty() && f.is_empty() { String::new() } else { format!("|{}|{}", if h.is_empty() { String::new() } else { hex(&h) }, if f.is_empty() { String::new() } else { hex(&f) }) };
     format!(
-        "{}|{}|{},{},{},{}|{}",
+        "{}|{}|{},{},{},{}|{}{tail}",
         if s.start == SectionStart::Continuous { "cont" } else { "next" },
         if s.landscape { "l" } else { "p" },
         r(s.margin_top),
         r(s.margin_right),
         r(s.margin_bottom),
         r(s.margin_left),
-        s.columns.count.clamp(1, 3)
+        s.columns.count.clamp(1, 3),
     )
 }
 
@@ -144,7 +166,30 @@ pub fn settle(doc: &mut Document, breaks: &[(usize, Spec)]) {
                 p.rev = wordcraft_doc::para::next_rev();
             }
         }
+        // The header and footer the section is to have: new parts for text that is not what it has now
+        let current = match end {
+            Some(k) => match &*doc.body[k] {
+                Block::Para(p) => p.section.as_deref().cloned().unwrap_or_default(),
+                _ => continue,
+            },
+            None => doc.last_section.clone(),
+        };
+        let make = |doc: &mut Document, want: &Option<String>, now: Option<u32>, kind: PartKind| -> Option<Option<u32>> {
+            let text = want.as_ref()?.trim().chars().take(200).collect::<String>();
+            if super::merge::part_text(doc, now) == text {
+                return None;
+            }
+            Some((!text.is_empty()).then(|| doc.add_part(kind, vec![super::documents::line_block(&text, false, wordcraft_doc::Align::Left)])))
+        };
+        let header = make(doc, &spec.header, current.headers.default, PartKind::Header);
+        let footer = make(doc, &spec.footer, current.footers.default, PartKind::Footer);
         let apply = |s: &mut SectionProps| {
+            if let Some(h) = header {
+                s.headers.default = h;
+            }
+            if let Some(f) = footer {
+                s.footers.default = f;
+            }
             // The two starts the editor offers; an even-page or odd-page start stays unless the person chose one of them
             if spec.continuous && s.start != SectionStart::Continuous {
                 s.start = SectionStart::Continuous;

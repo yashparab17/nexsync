@@ -1,8 +1,8 @@
 // Where a comment on a document sits. A document is a ProseMirror tree, not one run of text, so a comment keeps the id of its block,
 // the offsets inside that block and the words. It is found again by the block and offsets while they still hold the words, and
 // otherwise by searching for the words (nearest to where they were), as notes do (see features/chat/lib/anchors.ts).
-// ponytail: offsets are numbers, not Yjs relative positions, so words edited inside a comment lose it (it shows as orphaned);
-// upgrade to y-prosemirror relative positions if that matters.
+// Words edited inside a comment's words keep it: it stays on what lies between the start and the end of them (state "changed"); it is orphaned
+// only when the block lost either end.
 
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
@@ -68,6 +68,18 @@ export function locateDocAnchor(doc: Pm, anchor: Anchor): Placement {
 	const q = anchor.quote;
 	const home = f && blocks.find((b) => b.id === f.block);
 	if (home && f && t && home.text.slice(f.at, t.at) === q && q) return { state: "on", from: home.start + f.at, to: home.start + t.at };
+	// Words were edited inside the comment's words: the block is still there and still has the start and the end of them, so the comment stays on
+	// what lies between (a comment on a phrase keeps its place when one word of the phrase is changed)
+	if (home && f && q.length >= 6) {
+		const k = Math.min(5, Math.floor(q.length / 3));
+		const [pre, suf] = [q.slice(0, k), q.slice(-k)];
+		let start: number | null = null;
+		for (let i = home.text.indexOf(pre); i >= 0; i = home.text.indexOf(pre, i + 1)) if (start === null || Math.abs(i - f.at) < Math.abs(start - f.at)) start = i;
+		if (start !== null) {
+			const end = home.text.indexOf(suf, start + k);
+			if (end >= 0 && end + k - start <= q.length * 3 + 20) return { state: "changed", from: home.start + start, to: home.start + end + k };
+		}
+	}
 	// The words moved or the block was replaced: look for them, nearest to where they were
 	if (q) {
 		const near = home ? home.start + (f?.at ?? 0) : 0;

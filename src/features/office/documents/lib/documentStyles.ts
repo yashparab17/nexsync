@@ -25,6 +25,21 @@ export interface StyleDef {
 	lineSpacing: number;
 	// Made or changed in this editor, so it goes into the file on save
 	edited?: boolean;
+	// A style of paragraphs (the default), of letters, or of tables
+	kind?: StyleKind;
+	// What a table style gives
+	table?: TableLook;
+}
+
+export type StyleKind = "paragraph" | "character" | "table";
+
+// The fills of a table style: the header row (and its text), every second row, and every cell; #rrggbb or empty for none
+export interface TableLook {
+	headerFill: string;
+	headerColor: string;
+	headerBold: boolean;
+	bandFill: string;
+	fill: string;
 }
 
 // What the backend sends for a style of the file (`StyleOut`)
@@ -44,6 +59,8 @@ export interface StyleOut {
 	lineSpacing: number;
 	outline: number;
 	used: boolean;
+	kind?: StyleKind;
+	table?: TableLook | null;
 }
 
 // What the backend takes for a style to write into the file (`StyleIn`)
@@ -61,6 +78,8 @@ export interface StyleIn {
 	spaceBefore: number;
 	spaceAfter: number;
 	lineSpacing: number;
+	kind: "" | "character" | "table";
+	table: TableLook | null;
 }
 
 const ALIGNS = ["left", "center", "right", "justify"] as const;
@@ -80,6 +99,8 @@ export function fromFile(o: StyleOut): StyleDef {
 		spaceBefore: o.spaceBefore,
 		spaceAfter: o.spaceAfter,
 		lineSpacing: o.lineSpacing,
+		...(o.kind && o.kind !== "paragraph" ? { kind: o.kind } : {}),
+		...(o.table ? { table: o.table } : {}),
 	};
 }
 
@@ -97,6 +118,8 @@ export const toStyleIn = (d: StyleDef): StyleIn => ({
 	spaceBefore: d.spaceBefore,
 	spaceAfter: d.spaceAfter,
 	lineSpacing: d.lineSpacing,
+	kind: d.kind === "character" || d.kind === "table" ? d.kind : "",
+	table: d.table ?? null,
 });
 
 // The Word style each built-in look of the gallery is, so that the paragraph says so (the file's Heading 2 is "Heading2"); the plain looks say nothing
@@ -138,12 +161,14 @@ export function fromCaret(
 	id: string,
 	look: { font: string; size: number; bold: boolean; italic: boolean; underline: boolean; color: string },
 	block: { textAlignment?: unknown; spaceBefore?: unknown; spaceAfter?: unknown; lineSpacing?: unknown },
+	basedOn?: string,
 ): StyleDef {
 	const num = (v: unknown, none: number) => (typeof v === "number" && v !== none ? v : none);
 	const align = (ALIGNS as readonly string[]).includes(String(block.textAlignment)) ? (block.textAlignment as StyleDef["align"]) : "left";
 	return {
 		id,
 		name: name.trim() || id,
+		...(basedOn ? { basedOn } : {}),
 		font: look.font,
 		size: look.size,
 		bold: look.bold,
@@ -159,8 +184,80 @@ export function fromCaret(
 	};
 }
 
+const LOOK_FIELDS = ["font", "size", "bold", "italic", "underline", "color", "align", "spaceBefore", "spaceAfter", "lineSpacing"] as const;
+
+// The styles that follow a style that was changed: one based on it (at any depth) takes the new value of each field it still had the old
+// value of, and keeps the fields it set itself. Returned changed, and marked as such so that they go to the file.
+export function inherit(all: StyleDef[], before: StyleDef, after: StyleDef): StyleDef[] {
+	const out: StyleDef[] = [];
+	const queue = [{ old: before, now: after }];
+	for (let guard = 0; queue.length && guard < 200; guard++) {
+		const { old, now } = queue.shift()!;
+		for (const d of all.filter((x) => x.basedOn === old.id && x.id !== old.id)) {
+			const next: StyleDef = { ...d, edited: true };
+			let moved = false;
+			for (const f of LOOK_FIELDS) {
+				if (old[f] !== now[f] && d[f] === old[f]) {
+					(next as unknown as Record<string, unknown>)[f] = now[f];
+					moved = true;
+				}
+			}
+			if (moved && !out.some((o) => o.id === d.id)) {
+				out.push(next);
+				queue.push({ old: d, now: next });
+			}
+		}
+	}
+	return out;
+}
+
 // The styles to send with the text: the ones made or changed here
 export const editedStyles = (all: Iterable<StyleDef>): StyleIn[] => [...all].filter((d) => d.edited).map(toStyleIn);
 
 // The styles the gallery offers beside the built-in ones, by name
-export const galleryStyles = (all: Iterable<StyleDef>): StyleDef[] => [...all].filter((d) => !isBuiltInWordId(d.id)).sort((a, b) => a.name.localeCompare(b.name));
+const byName = (a: StyleDef, b: StyleDef) => a.name.localeCompare(b.name);
+const kindOf = (d: StyleDef): StyleKind => d.kind ?? "paragraph";
+export const galleryStyles = (all: Iterable<StyleDef>): StyleDef[] => [...all].filter((d) => kindOf(d) === "paragraph" && !isBuiltInWordId(d.id)).sort(byName);
+// The styles of letters, which go on the selected words
+export const characterStyles = (all: Iterable<StyleDef>): StyleDef[] => [...all].filter((d) => kindOf(d) === "character").sort(byName);
+// The styles of tables
+export const tableStyles = (all: Iterable<StyleDef>): StyleDef[] => [...all].filter((d) => kindOf(d) === "table").sort(byName);
+
+// A style of letters made from the look of the selected words
+export function characterFrom(name: string, id: string, look: { font: string; size: number; bold: boolean; italic: boolean; underline: boolean; color: string }): StyleDef {
+	return { id, name: name.trim() || id, kind: "character", ...look, align: "left", spaceBefore: 0, spaceAfter: 0, lineSpacing: 1, edited: true };
+}
+
+// A style of tables from the fills chosen for it
+export function tableFrom(name: string, id: string, table: TableLook): StyleDef {
+	return { id, name: name.trim() || id, kind: "table", table, font: "", size: 0, bold: false, italic: false, underline: false, color: "", align: "left", spaceBefore: 0, spaceAfter: 0, lineSpacing: 1, edited: true };
+}
+
+// The marks that put a character style's look on words: its id, and each part of the look (a look that is off takes the mark away)
+export function charMarks(d: StyleDef): { on: Record<string, unknown>; off: string[] } {
+	const on: Record<string, unknown> = { charStyle: d.id };
+	const off: string[] = [];
+	if (d.font) on.fontFamily = d.font;
+	if (d.size > 0) on.fontSize = `${d.size}pt`;
+	for (const k of ["bold", "italic", "underline"] as const) (d[k] ? (on[k] = true) : off.push(k));
+	if (d.color) on.textColor = d.color;
+	return { on, off };
+}
+
+// CSS that draws the table styles the document has on the tables that use them: the header row, the odd rows, every cell
+export function tableStyleCss(all: Iterable<StyleDef>, escape: (id: string) => string = (id) => id.replace(/[^A-Za-z0-9_-]/g, (c) => `\\${c}`)): string {
+	const hex = (c: string) => (/^#[0-9a-f]{6}$/i.test(c) ? c : "");
+	return tableStyles(all)
+		.map((d) => {
+			const t = d.table;
+			if (!t) return "";
+			const base = `.bn-block-content[data-content-type="table"]:has([data-table-style="${escape(d.id)}"])`;
+			const rules: string[] = [];
+			if (hex(t.fill)) rules.push(`${base} :is(td,th){background-color:${t.fill}}`);
+			if (hex(t.bandFill)) rules.push(`${base} tr:nth-child(even) :is(td,th){background-color:${t.bandFill}}`);
+			if (hex(t.headerFill) || t.headerBold || hex(t.headerColor)) rules.push(`${base} tr:first-child :is(td,th){${hex(t.headerFill) ? `background-color:${t.headerFill};` : ""}${t.headerBold ? "font-weight:700;" : ""}${hex(t.headerColor) ? `color:${t.headerColor};` : ""}}`);
+			return rules.join("\n");
+		})
+		.filter(Boolean)
+		.join("\n");
+}

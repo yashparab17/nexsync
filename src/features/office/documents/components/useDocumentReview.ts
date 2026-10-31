@@ -49,9 +49,22 @@ export function useDocumentReview(editor: DocumentEditorType, store: ReviewStore
 	const resolve = (list: Change[], accept: boolean) => {
 		if (list.length) resolveChanges(editor.prosemirrorView, list, accept, store);
 	};
+	// One change by itself, found again in the text as it is now
+	const live = (c: Change) => changesOf(editor.prosemirrorState.doc).find((x) => x.kind === c.kind && x.from === c.from);
 	return {
 		suggesting,
+		changes,
 		count: changes.length,
+		goTo: (c: Change) => {
+			const view = editor.prosemirrorView;
+			const now = live(c) ?? c;
+			view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, Math.min(now.from, view.state.doc.content.size), Math.min(now.to, view.state.doc.content.size))).scrollIntoView());
+			view.focus();
+		},
+		resolveOne: (c: Change, accept: boolean) => {
+			const now = live(c);
+			if (now) resolve([now], accept);
+		},
 		toggle: () => {
 			store.suggesting = !store.suggesting;
 			setSuggesting(store.suggesting);

@@ -112,6 +112,19 @@ Sets the version in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.loc
 
 The app looks for a newer signed build by itself about eight seconds after it starts (a small card offers **Update & restart**, **Later** or **Skip this version**; a failed check says nothing), and again from **Settings → Updates & About → Check for updates**, on the update channel chosen there. It checks GitHub Releases, shows the release notes under "What's new", downloads it, and relaunches. The **update channel** there is Stable (the newest published release) or Beta (a pre-release you point testers at by running the **Point the beta channel** workflow with the pre-release tag; tags with a dash, such as `v0.2.0-beta.1`, are published as pre-releases). The notes come from the release body, so edit the draft release before publishing it. Releases are signed with a minisign keypair (the public half lives in `src-tauri/tauri.conf.json`); `release.yml` needs `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` set as repo secrets to produce a release the updater will trust. Windows signing imports the certificate from `WINDOWS_CERTIFICATE` and `WINDOWS_CERTIFICATE_PASSWORD`, and macOS signing and notarization use the `APPLE_*` secrets. Neither has been run yet, because no certificate is configured, so builds are unsigned for now.
 
+### Linux
+
+The release has an `.AppImage` and a `.deb`. Make the AppImage runnable with `chmod +x Nexsync_*.AppImage`, then run it.
+
+On a distribution with newer graphics libraries than the AppImage was built against (Arch, for one), the web view can crash at start with `Could not create default EGL display: EGL_BAD_PARAMETER`. The app now turns off WebKit's dmabuf renderer and, inside an AppImage, its accelerated compositing, and on a Wayland session with XWayland it asks GTK to use X11 (`linux_graphics_env` in `src-tauri/src/lib.rs`; a setting you have made yourself is never changed). If it still crashes, try each on its own:
+
+```bash
+GDK_BACKEND=x11 ./Nexsync_*.AppImage
+WEBKIT_DISABLE_COMPOSITING_MODE=1 ./Nexsync_*.AppImage
+```
+
+The other way round the AppImage is to build the app against your own WebKitGTK: install `webkit2gtk-4.1`, `base-devel`, `gtk3`, `libayatana-appindicator`, `librsvg` and `xdotool` with `pacman`, then `pnpm install` and `pnpm tauri build --no-bundle` (the binary is in `src-tauri/target/release/`).
+
 ## Command line
 
 `nexsync-cli` is the document engines without a window, for scripts and CI. From `src-tauri`:

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { markReferences, nextNoteId, noteValue, notesToSend, parseNoteValue, referencesIn, withReferences, type NoteDef } from "@/features/office/documents/lib/documentNotes";
+import { DEFAULT_FORMATS, markReferences, noteCss, parseFormats, nextNoteId, noteValue, notesToSend, parseNoteValue, referencesIn, withReferences, type NoteDef } from "@/features/office/documents/lib/documentNotes";
 
 const m = (id: number) => `${id}`;
 
@@ -35,4 +35,12 @@ describe("footnotes and endnotes in the editor", () => {
 		const html = '<p>See<span data-note="f12">*</span> this<span data-note="bad">*</span></p>';
 		expect(markReferences(html)).toBe(`<p>See${m(12)} this</p>`);
 	});
+
+	it("reads the number formats of notes, falls back to the usual ones, and gives the CSS that draws them", () => {
+		expect(parseFormats(JSON.stringify({ foot: "lowerLetter", end: "upperRoman" }))).toEqual({ foot: "lowerLetter", end: "upperRoman" });
+		expect(parseFormats(undefined)).toEqual(DEFAULT_FORMATS);
+		expect(parseFormats('{"foot":"klingon"}')).toEqual(DEFAULT_FORMATS);
+		expect(noteCss({ foot: "lowerLetter", end: "upperRoman" })).toBe(".doc-body .doc-note::before{content:counter(nx-foot,lower-alpha)}\n.doc-body .doc-endnote::before{content:counter(nx-end,upper-roman)}");
+	});
 });
+

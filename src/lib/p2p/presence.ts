@@ -10,7 +10,7 @@ export interface Presence {
 	item: string | null; // The file path, card id or task id open on that page
 	away: boolean; // No input for a while
 	typing?: string; // The chat channel being typed in, for a few seconds at a time
-	line?: number; // In the editor: the line the cursor is on; in Slides: the slide being shown. Someone following arrives at the same place
+	line?: number; // In the editor: the line the cursor is on; in Slides: the slide being shown; in Documents: the page in view. Someone following arrives at the same place
 }
 
 export interface PeerPresence extends Presence {
@@ -55,7 +55,9 @@ const name = (page: string) => page.charAt(0).toUpperCase() + page.slice(1);
 
 // "Notes · plan.md", or "Away" when idle
 export function placeLabel(p: Presence): string {
-	const where = p.item ? `${name(p.page)} · ${p.item.split("/").pop()}` : name(p.page);
+	// In a document the line is the page they are on, and in a deck the slide
+	const at = p.item && p.line ? (p.page === "documents" ? ` · page ${p.line}` : p.page === "slides" ? ` · slide ${p.line}` : "") : "";
+	const where = p.item ? `${name(p.page)} · ${p.item.split("/").pop()}${at}` : name(p.page);
 	return p.away ? `Away, last on ${where}` : where;
 }
 
