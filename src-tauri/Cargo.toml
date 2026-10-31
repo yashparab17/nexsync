@@ -1,6 +1,6 @@
 [package]
 name = "nexsync"
-version = "0.9.1"
+version = "0.9.2"
 description = "Local-first peer-to-peer workspace for notes, tasks and code"
 authors = ["Yash Parab", "Dhruv Dinda"]
 license = "MIT"
