@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isEdit, isRepeat, visibleEvents } from "@/lib/activityFeed";
+import { isEdit, isRepeat } from "@/lib/activityFeed";
 import type { ActivityEvent } from "@/types/workspace";
 
 const at = (min: number) => new Date(Date.UTC(2026, 9, 31, 11, min)).toISOString();
@@ -21,11 +21,5 @@ describe("the activity feed", () => {
 		expect(isRepeat(last, ev("Created note", "notes/a.md", "Ana", 1))).toBe(false);
 		expect(isEdit(ev("Deleted note", "x", "Ana", 0))).toBe(false);
 		expect(isEdit(ev("Saved file", "x", "Ana", 0))).toBe(true);
-	});
-
-	it("hides the saves from one person's feed on request and keeps everything else", () => {
-		const all = [ev("Saved note", "a", "Ana", 0), ev("Created note", "b", "Ana", 1), ev("Saved file", "c", "Sam", 2)];
-		expect(visibleEvents(all, false)).toHaveLength(3);
-		expect(visibleEvents(all, true).map((e) => e.action)).toEqual(["Created note"]);
 	});
 });

@@ -1428,7 +1428,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			setRejoinFailed(true);
 			// A host that is not there is waited for; any other answer (removed, different version) is not something retrying fixes
 			if (/reach|timed out|in time/i.test(reason)) {
-				if (!hostUnreachableRef.current) notifyRef.current("The host is offline. This copy reconnects by itself when they open Nexsync.");
+				if (!hostUnreachableRef.current) notifyRef.current("The host is offline. Try again from Collaborate when they are back.");
 				setHostUnreachable(true);
 			} else {
 				notifyRef.current(`Couldn't reconnect to the host. ${reason}`);
@@ -1439,13 +1439,6 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			setIsJoining(false);
 		}
 	}, []);
-
-	// While the host is away, look for them again every so often
-	useEffect(() => {
-		if (!hostUnreachable || selfName === null) return;
-		const timer = setInterval(() => void reconnectToHost(), 30_000);
-		return () => clearInterval(timer);
-	}, [hostUnreachable, selfName, reconnectToHost]);
 
 	// Another workspace has another host
 	useEffect(() => {

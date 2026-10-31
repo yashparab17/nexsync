@@ -173,11 +173,11 @@ export default function P2PConnectDialog({
 						"warning",
 						<>
 							<p>
-								{hostName ?? "The host"} is offline. Your copy keeps working, and this device checks again every 30 seconds.
+								{hostName ?? "The host"} is offline. Your copy keeps working. Try again when they are back.
 							</p>
 							<Button variant="outline" size="sm" onPress={handleRetry}>
 								<RefreshCw data-icon="inline-start" className="size-3.5" />
-								Try Now
+								Try Again
 							</Button>
 						</>,
 					)}
