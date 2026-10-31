@@ -1,6 +1,7 @@
 // Sets the app's version in the four places it lives, so that none is forgotten (the updater offers a build only when its version is higher than
 // the installed one):
 //   node scripts/bump-version.mjs 0.9.1            changes package.json, src-tauri/Cargo.toml, src-tauri/Cargo.lock and src-tauri/tauri.conf.json
+//   --notes "What changed"                         writes RELEASE_NOTES.md, which the app shows as "What's new" for this version
 //   node scripts/bump-version.mjs 0.9.1 --release  (with --local: stops before pushing) also commits them as "Version 0.9.1", tags v0.9.1 and pushes the commit and the tag, which
 //                                                  makes GitHub build, sign and draft the release (see .github/workflows/release.yml)
 // The version is three numbers (0.9.1): Windows installers cannot carry words such as -beta in it. A tag with a dash (v0.9.1-1) is a pre-release.
@@ -14,8 +15,12 @@ import { fileURLToPath } from "node:url";
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
 const root = args.includes("--root") ? path.resolve(args[args.indexOf("--root") + 1]) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const version = args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--root");
+const notes = args.includes("--notes") ? args[args.indexOf("--notes") + 1] : null;
+const version = args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--root" && args[i - 1] !== "--notes");
 
+// The notes of the release: GitHub builds the update file from this at build time, so they must be here before the tag is pushed (editing the release
+// on GitHub afterwards changes the release page, not what the app shows)
+const NOTES_FILE = "RELEASE_NOTES.md";
 const FILES = ["package.json", "src-tauri/Cargo.toml", "src-tauri/Cargo.lock", "src-tauri/tauri.conf.json"];
 
 function fail(message) {
@@ -40,7 +45,9 @@ const before = FILES.map((f) => readFileSync(path.join(root, f), "utf8"));
 const current = /"version":\s*"([^"]+)"/.exec(before[0])?.[1];
 const after = FILES.map((f, i) => bumped(f, before[i]));
 FILES.forEach((f, i) => writeFileSync(path.join(root, f), after[i]));
-console.log(`Version ${current} -> ${version} in ${FILES.join(", ")}`);
+if (notes !== null) writeFileSync(path.join(root, NOTES_FILE), `${notes.trim()}
+`);
+console.log(`Version ${current} -> ${version} in ${FILES.join(", ")}${notes !== null ? ` and the notes in ${NOTES_FILE}` : ""}`);
 
 if (!flag("--release")) {
 	console.log(`Next: commit, then  git tag v${version}  and  git push origin v${version}  (or run this again with --release).`);
@@ -52,9 +59,9 @@ const git = (...a) => execFileSync("git", a, { cwd: root, stdio: "inherit" });
 const out = (...a) => execFileSync("git", a, { cwd: root, encoding: "utf8" });
 // Only the four files may have changed, or the release would carry half-finished work
 const dirty = out("status", "--porcelain").split("\n").filter(Boolean).map((l) => l.slice(3).replace(/\\/g, "/"));
-const other = dirty.filter((f) => !FILES.includes(f));
+const other = dirty.filter((f) => !FILES.includes(f) && !(notes !== null && f === NOTES_FILE));
 if (other.length) fail(`Not releasing: these files have changes that are not committed:\n  ${other.join("\n  ")}\nCommit or put them away first.`);
-git("add", ...FILES);
+git("add", ...FILES, ...(notes !== null ? [NOTES_FILE] : []));
 git("commit", "-m", `Version ${version}`);
 git("tag", `v${version}`);
 if (flag("--local")) {

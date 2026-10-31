@@ -68,4 +68,18 @@ describe("the version bump", () => {
 		expect(refused.stderr).toContain("stray.txt");
 		expect(git("tag").stdout.trim()).toBe("v9.8.7");
 	});
+
+	it("--notes writes the notes file and commits it with the release", () => {
+		const git = (...a: string[]) => spawnSync("git", a, { cwd: dir, encoding: "utf8" });
+		git("init", "-q");
+		git("config", "user.email", "t@example.com");
+		git("config", "user.name", "T");
+		git("add", "-A");
+		git("commit", "-q", "-m", "start");
+		const r = run("9.8.7", "--notes", "Fixed chat order.", "--release", "--local");
+		expect(r.status, r.stderr + r.stdout).toBe(0);
+		expect(read("RELEASE_NOTES.md").trim()).toBe("Fixed chat order.");
+		expect(git("show", "--name-only", "--format=", "HEAD").stdout).toContain("RELEASE_NOTES.md");
+		expect(git("status", "--porcelain").stdout.trim()).toBe("");
+	});
 });

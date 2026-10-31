@@ -70,6 +70,14 @@ jobs:
                   $conf.bundle | Add-Member -NotePropertyName windows -NotePropertyValue $windows -Force
                   $conf | ConvertTo-Json -Depth 20 | Set-Content src-tauri/tauri.conf.json
 
+            # The notes come from the repository, so the update file the app reads holds them (editing the draft afterwards does not change it)
+            - name: Read the release notes
+              id: notes
+              shell: bash
+              run: |
+                  if [ -s RELEASE_NOTES.md ]; then body="$(cat RELEASE_NOTES.md)"; else body="Bug fixes and improvements."; fi
+                  { echo "body<<NOTES_END"; echo "$body"; echo "NOTES_END"; } >> "$GITHUB_OUTPUT"
+
             - name: Build and publish release
               uses: tauri-apps/tauri-action@v0
               env:
@@ -95,6 +103,6 @@ jobs:
                   releaseDraft: true
                   # A tag with a dash, such as v0.7.0-beta.1, is a pre-release: stable users are not offered it
                   prerelease: ${{ contains(github.ref_name, '-') }}
-                  # Shown in the app as "What's new" when this release is installed as an update; edit before publishing
-                  releaseBody: "Edit these release notes before publishing the draft. They appear in the app under Settings > Updates."
+                  # Shown in the app as "What's new" when this release is installed as an update (RELEASE_NOTES.md at the tag)
+                  releaseBody: ${{ steps.notes.outputs.body }}
                   includeUpdaterJson: true

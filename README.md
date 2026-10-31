@@ -103,10 +103,10 @@ CI is split into two workflows:
 ### Making a release
 
 ```bash
-pnpm bump 0.9.1 --release
+pnpm bump 0.9.1 --notes "What changed, in a line or two" --release
 ```
 
-Sets the version in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and `src-tauri/tauri.conf.json` (the updater offers a build only when its version is higher), commits them as "Version 0.9.1", tags `v0.9.1` and pushes both, which makes `release.yml` build, sign and draft the release. It refuses if other files have uncommitted changes. Without `--release` it only changes the four files. The version is three numbers; Windows installers cannot carry words such as `-beta` in it. When the build is done, open the draft under Releases, edit its notes (the app shows them as "What's new") and publish it: the updater only sees published releases.
+Sets the version in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and `src-tauri/tauri.conf.json` (the updater offers a build only when its version is higher), commits them as "Version 0.9.1", tags `v0.9.1` and pushes both, which makes `release.yml` build, sign and draft the release. It refuses if other files have uncommitted changes. Without `--release` it only changes the four files. The version is three numbers; Windows installers cannot carry words such as `-beta` in it. `--notes` writes `RELEASE_NOTES.md`, which the build puts in the update file the app reads: the app shows it as "What's new". Editing the release on GitHub afterwards changes only the release page, not what the app shows. When the build is done, open the draft under Releases and publish it: the updater only sees published releases.
 
 ### Auto-updates
 
