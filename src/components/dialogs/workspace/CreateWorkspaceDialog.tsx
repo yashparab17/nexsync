@@ -30,6 +30,12 @@ interface CreateWorkspaceDialogProps {
 	children: ReactNode;
 }
 
+// The folder the workspace will be made in, written with the separator the chosen folder uses (E:\Work\name, not E:\Work/name)
+export function previewPath(folder: string, name: string): string {
+	const sep = folder.includes("\\") ? "\\" : "/";
+	return `${folder.replace(/[\\/]+$/, "")}${sep}${name}`.replace(/[\\/]+/g, sep);
+}
+
 // Dialog modal for creating a new local workspace
 export default function CreateWorkspaceDialog({
 	children,
@@ -114,7 +120,7 @@ export default function CreateWorkspaceDialog({
 					<div className="flex min-w-0 flex-col gap-5">
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="workspace-name">Name</Label>
-							<Input id="workspace-name" autoComplete="off" autoFocus placeholder="MSc research" value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} aria-invalid={!!nameProblem} aria-describedby={nameProblem ? "workspace-name-problem" : undefined} />
+							<Input id="workspace-name" autoComplete="off" autoFocus placeholder="e.g. Thesis project" value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} aria-invalid={!!nameProblem} aria-describedby={nameProblem ? "workspace-name-problem" : undefined} />
 							{nameProblem && (
 								<p id="workspace-name-problem" role="alert" className="text-xs text-destructive">
 									{nameProblem}
@@ -124,7 +130,7 @@ export default function CreateWorkspaceDialog({
 
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="description">Description <span className="font-normal text-muted-foreground">(optional)</span></Label>
-							<Textarea id="description" autoComplete="off" placeholder="What is this workspace for?" value={description} onChange={(e) => setDescription(e.target.value)} />
+							<Textarea id="description" autoComplete="off" placeholder="e.g. Notes, code and tasks for our group" value={description} onChange={(e) => setDescription(e.target.value)} />
 						</div>
 
 						<div className="flex flex-col gap-2">
@@ -153,7 +159,7 @@ export default function CreateWorkspaceDialog({
 								<span className="line-clamp-2 min-w-0 text-xl font-semibold [overflow-wrap:anywhere]">{workspaceName.trim() || "Workspace name"}</span>
 							</span>
 							<span className="line-clamp-2 min-w-0 text-muted-foreground [overflow-wrap:anywhere]">{description.trim() || "No description yet."}</span>
-							<span className="mt-auto truncate font-mono text-xs text-muted-foreground">{workspacePath.replace(/[\\/]+$/, "")}/{workspaceName.trim() || "…"}</span>
+							<span className="mt-auto truncate font-mono text-xs text-muted-foreground">{previewPath(workspacePath, workspaceName.trim() || "…")}</span>
 						</div>
 					</div>
 				</div>

@@ -10,7 +10,7 @@ import { Dialog, DialogTrigger, DialogHeading, DialogFooter } from "@/components
 
 import { open } from "@tauri-apps/plugin-dialog";
 import { documentDir } from "@tauri-apps/api/path";
-import { createWorkspace, importWorkspace, loadConfig } from "@/lib/tauri";
+import { createWorkspace, defaultDisplayName, importWorkspace, loadConfig } from "@/lib/tauri";
 import { cleanPath, errorText } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
@@ -29,7 +29,7 @@ export default function JoinWorkspaceDialog({
 
 	const [ticket, setTicket] = useState("");
 	const [workspaceParentPath, setWorkspaceParentPath] = useState("");
-	const [userName, setUserName] = useState("Collaborator");
+	const [userName, setUserName] = useState("");
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -38,7 +38,8 @@ export default function JoinWorkspaceDialog({
 	// Prefill the name saved in Settings
 	useEffect(() => {
 		loadConfig()
-			.then((c) => c.display_name && setUserName(c.display_name))
+			.then((c) => c.display_name || defaultDisplayName())
+			.then(setUserName)
 			.catch(() => {});
 	}, []);
 
@@ -82,13 +83,13 @@ export default function JoinWorkspaceDialog({
 
 			// 1. Dial the host and prove we hold its invite (or wait for it to allow our 6-digit code)
 			const usingCode = p2p.isShortCode(cleanTicket);
-			if (usingCode) setStatusMessage("Waiting for the host to allow you…");
+			if (usingCode) setStatusMessage("Waiting for the host…");
 			const { workspaceName, peerId } = await (usingCode ? joinWithCode : joinWithTicket)(
 				cleanTicket,
 				userName.trim() || "Collaborator",
 			);
 
-			setStatusMessage(`Connected to ${workspaceName}! Setting up your copy…`);
+			setStatusMessage(`Connected to ${workspaceName}. Setting up…`);
 
 			// 2. Determine target workspace path
 			const sanitizedName = (workspaceName || "synced-workspace").replace(/[^\w\s-]/gi, "");
@@ -100,7 +101,7 @@ export default function JoinWorkspaceDialog({
 			try {
 				wsInfo = await createWorkspace({
 					name: sanitizedName,
-					description: `Shared workspace from a collaborator`,
+					description: `Shared workspace`,
 					path: parentPath,
 				});
 			} catch {
@@ -114,15 +115,15 @@ export default function JoinWorkspaceDialog({
 			await requestWorkspaceSnapshot(peerId, wsInfo.path);
 
 			setIsSuccess(true);
-			setStatusMessage("Workspace ready! Opening…");
+			setStatusMessage("Ready. Opening…");
 
 			// 4. Navigate to dashboard
 			setTimeout(() => {
 				navigate("/workspace/dashboard");
 			}, 600);
 		} catch (err: unknown) {
-			console.error("Join workspace failed:", err);
-			setError(errorText(err, "Couldn't join the workspace. Check that the host is online."));
+			console.error("Join failed:", err);
+			setError(errorText(err, "Couldn't join. Is the host online?"));
 			setStatusMessage(null);
 		} finally {
 			setIsProcessing(false);
@@ -138,15 +139,15 @@ export default function JoinWorkspaceDialog({
 
 				<p className="flex items-center gap-2 text-sm text-muted-foreground">
 					<Lock className="size-4 shrink-0 text-primary" />
-					The connection is end-to-end encrypted. No server sees your files.
+					Encrypted end to end.
 				</p>
 
 				{error && <p className="border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
 
 				<div className="flex flex-col gap-5">
 					<div className="flex flex-col gap-2">
-						<Label htmlFor="join-ticket">Invite or 6-digit code</Label>
-						<Textarea id="join-ticket" placeholder="Paste the invite, or type the 6-digit code" value={ticket} onChange={(e) => setTicket(e.target.value)} rows={3} className="font-mono text-xs break-all" autoFocus />
+						<Label htmlFor="join-ticket">Invite or code</Label>
+						<Textarea id="join-ticket" placeholder="Paste an invite or type a code" value={ticket} onChange={(e) => setTicket(e.target.value)} rows={3} className="font-mono text-xs break-all" autoFocus />
 					</div>
 
 					<div className="flex flex-col gap-2">
@@ -162,7 +163,7 @@ export default function JoinWorkspaceDialog({
 
 					<div className="flex flex-col gap-2">
 						<Label htmlFor="join-name">Your name</Label>
-						<Input id="join-name" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Alice" />
+						<Input id="join-name" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Your name" />
 					</div>
 				</div>
 
@@ -181,7 +182,7 @@ export default function JoinWorkspaceDialog({
 						) : isSuccess ? (
 							<><Check className="size-4" />Connected</>
 						) : (
-							<><Globe className="size-4" />Join workspace</>
+							<><Globe className="size-4" />Join</>
 						)}
 					</Button>
 				</DialogFooter>

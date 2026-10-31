@@ -392,7 +392,12 @@ pub fn merge(conn: &Connection, entries: Vec<Entry>, ctx: &Ctx) -> Result<Merged
 /// Writes an entry of this device: builds it, signs it with the device key and stores it. The caller sends it on.
 pub fn post(conn: &Connection, kind: &str, channel: &str, parent: &str, body: &str, name: &str, now: u64, role_of: &dyn Fn(&str) -> Option<Role>) -> Result<Entry, String> {
     let Some(me) = signing::device_key() else { return Err("This device has no key yet.".into()) };
-    let mut e = Entry { id: uuid::Uuid::new_v4().to_string(), kind: kind.into(), channel: channel.into(), parent: parent.into(), author: me.clone(), name: name.trim().to_string(), ts: now, body: body.into(), sig: String::new() };
+    // Messages are ordered by their time, and two devices' clocks differ: a message written after another was read must not be placed before it
+    // because this clock is a little behind. So it is stamped after the newest entry of the channel this device holds, as far as the clock
+    // limit for entries allows.
+    let newest: Option<i64> = conn.query_row("SELECT MAX(ts) FROM log_entries WHERE channel = ?1", [channel], |r| r.get(0)).map_err(err)?;
+    let ts = newest.map_or(now, |n| now.max(u64::try_from(n).unwrap_or(0).saturating_add(1))).min(now.saturating_add(MAX_AHEAD_MS));
+    let mut e = Entry { id: uuid::Uuid::new_v4().to_string(), kind: kind.into(), channel: channel.into(), parent: parent.into(), author: me.clone(), name: name.trim().to_string(), ts, body: body.into(), sig: String::new() };
     let Some((_, sig)) = signing::sign_bytes(&e.payload()) else { return Err("This device has no key yet.".into()) };
     e.sig = sig;
     let ctx = Ctx { me: &me, now, role_of };
@@ -907,5 +912,25 @@ mod tests {
         let viewer: HashMap<String, Role> = [(me, Role::Viewer)].into_iter().collect();
         let role_of = move |k: &str| viewer.get(k).copied();
         assert!(post(&conn, "message", "general", "", "no", "Yash", 5_000, &role_of).is_err());
+    }
+
+    #[test]
+    fn a_message_written_after_one_was_read_is_placed_after_it_even_when_this_clock_is_behind() {
+        signing::init_for_tests();
+        let conn = db();
+        let me = signing::device_key().unwrap();
+        let table: HashMap<String, Role> = [(me.clone(), Role::Editor)].into_iter().collect();
+        let role_of = move |k: &str| table.get(k).copied();
+        // A friend's message, from a clock a minute ahead of ours, has been received
+        let friend = Entry { id: "friend-1".into(), kind: "message".into(), channel: "general".into(), parent: String::new(), author: "friend".into(), name: "User".into(), ts: 100_000 + 60_000, body: "Test".into(), sig: String::new() };
+        store(&conn, &friend).unwrap();
+        let mine = post(&conn, "message", "general", "", "Test", "Yash", 100_000, &role_of).unwrap();
+        assert!(mine.ts > friend.ts, "{} should be after {}", mine.ts, friend.ts);
+        // A clock that is ahead is not held back: the time is the time
+        let later = post(&conn, "message", "general", "", "Later", "Yash", 500_000, &role_of).unwrap();
+        assert_eq!(later.ts, 500_000);
+        // Another channel is not affected by this one
+        let other = post(&conn, "message", "random", "", "Hi", "Yash", 100_000, &role_of).unwrap();
+        assert_eq!(other.ts, 100_000);
     }
 }

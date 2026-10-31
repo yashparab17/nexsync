@@ -150,9 +150,9 @@ export default function P2PConnectDialog({
 	];
 
 	const roles = [
-		{ id: "Editor", title: "Can edit", text: "Changes files, notes and tasks with you." },
-		{ id: "Commenter", title: "Can comment", text: "Reads everything and joins the chat and comment threads, but changes nothing." },
-		{ id: "Viewer", title: "Can view", text: "Reads everything, changes nothing." },
+		{ id: "Editor", title: "Can edit", text: "Edits files, notes and tasks." },
+		{ id: "Commenter", title: "Can comment", text: "Reads and comments only." },
+		{ id: "Viewer", title: "Can view", text: "Reads only." },
 	];
 
 	// A notice above the tabs; the tone says how serious it is
@@ -173,7 +173,7 @@ export default function P2PConnectDialog({
 						"warning",
 						<>
 							<p>
-								{hostName ?? "The host"} is not online, or has closed Nexsync. This workspace is hosted from their device, so nobody else can connect you to it. Your copy keeps working, and this device looks for them again every 30 seconds.
+								{hostName ?? "The host"} is offline. Your copy keeps working, and this device checks again every 30 seconds.
 							</p>
 							<Button variant="outline" size="sm" onPress={handleRetry}>
 								<RefreshCw data-icon="inline-start" className="size-3.5" />
@@ -183,15 +183,15 @@ export default function P2PConnectDialog({
 					)}
 
 				{network.online && hostName !== null && link === "members" &&
-					notice("info", <p>{hostName} is offline. You are working with the other members who are online, and your changes reach {hostName} when they are back. Settings, roles and invites can only be changed while the host is connected.</p>)}
+					notice("info", <p>{hostName} is offline. You are working with the online members, and {hostName} gets your changes later. Settings, roles and invites need the host.</p>)}
 
 				{!network.online &&
 					notice(
 						"warning",
 						<>
-							<p>Nexsync cannot reach the service that connects you to people on other networks. Check your internet, then try again.</p>
+							<p>Can't reach the service that connects other networks. Check your internet.</p>
 							{network.detail && <p className="font-mono text-xs opacity-80">Details: {network.detail}</p>}
-							<p className="text-muted-foreground">On a college or office network a firewall may be blocking it. Try a phone hotspot or a VPN, or ask IT to allow *.relay.n0.iroh.link.</p>
+							<p className="text-muted-foreground">On a college or office network, try a hotspot or VPN, or ask IT to allow *.relay.n0.iroh.link.</p>
 							<Button variant="outline" size="sm" onPress={handleRetry}>
 								<RefreshCw data-icon="inline-start" className="size-3.5" />
 								Retry Connection
@@ -263,14 +263,14 @@ export default function P2PConnectDialog({
 												{isGenerating ? <RefreshCw className="size-4 animate-spin motion-reduce:animate-none" /> : <KeyRound className="size-4 text-primary" />}
 												6-digit code
 											</span>
-											<span className="text-sm text-muted-foreground">Quickest. Read it out loud or type it in a chat. It stops working after 2 minutes, and you approve each person.</span>
+											<span className="text-sm text-muted-foreground">Quickest. Works for 2 minutes; you approve each person.</span>
 										</button>
 										<button type="button" onClick={handleGenerateInvite} disabled={isGenerating} className="flex flex-col items-start gap-1 border p-3 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
 											<span className="flex items-center gap-2 text-sm font-semibold">
 												<Link2 className="size-4 text-primary" />
 												Invite link
 											</span>
-											<span className="text-sm text-muted-foreground">A long invite to paste into a message. Lasts as long as you choose, so people can join later.</span>
+											<span className="text-sm text-muted-foreground">A long invite to paste. Works until it expires or you stop it.</span>
 										</button>
 									</div>
 									<button type="button" aria-expanded={showOptions} onClick={() => setShowOptions((o) => !o)} className="text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:text-foreground">
@@ -300,14 +300,14 @@ export default function P2PConnectDialog({
 
 						{shortCode && (
 							<div className="space-y-4 border bg-muted/40 p-5 text-center">
-								<p className="text-sm text-muted-foreground">Tell {hostRole === "Viewer" ? "the person you are inviting" : "your collaborator"} this code</p>
+								<p className="text-sm text-muted-foreground">Share this code</p>
 								<div className="text-5xl tabular-nums font-bold tracking-[0.25em] text-primary select-all" aria-label={`Code ${shortCode.code.split("").join(" ")}`}>
 									{shortCode.code.slice(0, 3)} {shortCode.code.slice(3)}
 								</div>
 								<p className="text-sm text-muted-foreground" aria-live="off">
-									Works for {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")} more. You will be asked to allow them when they use it.
+									Valid for {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}. You approve each person.
 								</p>
-								{!shortCode.relayConnected && <p className="text-sm text-warning">Nexsync could not reach the service that connects you to other networks, so only people on your local network can join.</p>}
+								{!shortCode.relayConnected && <p className="text-sm text-warning">Only people on your network can join: the connecting service is out of reach.</p>}
 								<div className="flex justify-center gap-2">
 									<Button variant="secondary" onPress={() => copy(shortCode.code, "code")}>
 										{copiedKey === "code" ? <Check data-icon="inline-start" className="size-4 text-success" /> : <Copy data-icon="inline-start" className="size-4" />}
@@ -323,7 +323,7 @@ export default function P2PConnectDialog({
 						{invite && (
 							<div className="space-y-4 border bg-muted/40 p-5">
 								<div className="flex items-center justify-between gap-3">
-									<p className="text-sm text-muted-foreground">Send this invite to your collaborator</p>
+									<p className="text-sm text-muted-foreground">Send this invite</p>
 									<Button variant="secondary" size="sm" onPress={() => copy(invite.ticket)}>
 										{copiedKey === "copied" ? <Check data-icon="inline-start" className="size-4 text-success" /> : <Copy data-icon="inline-start" className="size-4" />}
 										{copiedKey === "copied" ? "Copied" : "Copy Invite"}
@@ -334,7 +334,7 @@ export default function P2PConnectDialog({
 									{invite.expiresAt ? `Works until ${new Date(invite.expiresAt).toLocaleString()}` : "Works until you stop it"}
 									{invite.singleUse ? ", for one person." : "."}
 								</p>
-								{!invite.relayConnected && notice("warning", <p>Nexsync could not reach the service that connects you to other networks, so only people on your local network can join. Check your internet and make a new invite.</p>)}
+								{!invite.relayConnected && notice("warning", <p>Only people on your network can join. Check your internet, then make a new invite.</p>)}
 								<div className="flex items-center justify-between gap-3 border-t pt-4">
 									{hasGuests ? (
 										<span className="flex items-center gap-2 text-sm font-medium text-success">
@@ -356,7 +356,7 @@ export default function P2PConnectDialog({
 										</Button>
 									</span>
 								</div>
-								<p className="text-sm text-muted-foreground">Making a new invite or pressing Stop turns this one off. People who already joined stay connected.</p>
+								<p className="text-sm text-muted-foreground">A new invite or Stop turns this one off. People already in stay connected.</p>
 							</div>
 						)}
 					</div>
@@ -378,7 +378,7 @@ export default function P2PConnectDialog({
 								className="rounded-md border border-input px-3 py-2 font-mono text-xs break-all"
 								autoFocus
 							/>
-							<p className="text-sm text-muted-foreground">Their workspace is copied into the one you have open, and kept up to date.</p>
+							<p className="text-sm text-muted-foreground">Their workspace is copied into this one.</p>
 						</div>
 						{joinSuccess ? (
 							<div role="status" className="flex items-center justify-center gap-2 p-3 text-sm font-medium text-success">
@@ -401,7 +401,7 @@ export default function P2PConnectDialog({
 							<div className="flex flex-col items-center gap-2 py-8 text-center">
 								<Radio className="size-8 text-muted-foreground/50" />
 								<p className="text-sm font-medium">No one is connected</p>
-								<p className="text-sm text-muted-foreground">Invite someone, or join a workspace with an invite you were sent.</p>
+								<p className="text-sm text-muted-foreground">Invite someone, or join with an invite.</p>
 								<div className="mt-2 flex gap-2">
 									<Button size="sm" onPress={() => setActiveTab("invite")}>
 										Invite Someone
@@ -432,7 +432,7 @@ export default function P2PConnectDialog({
 													<span className="bg-muted px-2 py-0.5 text-xs text-muted-foreground">{peer.isHost ? "Host" : peer.role}</span>
 													<span
 														className={cn("text-xs", peer.connectionType === "direct" ? "text-success" : "text-warning")}
-														title={peer.connectionType === "relay" ? "Connected through a helper server because a direct link is not possible here. Still private. Nexsync keeps trying for a direct one." : undefined}
+														title={peer.connectionType === "relay" ? "Through a relay: no direct link yet. Still private." : undefined}
 													>
 														{peer.connectionType === "direct" ? "Direct" : peer.connectionType === "relay" ? "Indirect" : "Connecting"}
 													</span>

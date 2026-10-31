@@ -32,7 +32,7 @@ export default function CompareDialog({ workspacePath, rel, lines, onClose }: { 
 		<Dialog isOpen onOpenChange={(o) => !o && onClose()} className="max-w-3xl">
 			<div className="space-y-3 text-sm">
 				<DialogHeading icon={<GitCompareArrows className="size-6" />} title="Compare with a Saved Version" />
-				{versions && versions.length === 0 && <p>This file has no saved versions yet. A version is kept each time the file is saved or updated.</p>}
+				{versions && versions.length === 0 && <p>No saved versions yet. One is kept at each save.</p>}
 				{versions && versions.length > 0 && (
 					<div className="flex items-center gap-2">
 						<select aria-label="Version" value={id ?? ""} onChange={(e) => setId(Number(e.target.value))} className="flex-1 border bg-background p-1.5">

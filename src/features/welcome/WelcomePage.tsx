@@ -27,6 +27,7 @@ const Settings = lazy(() => import("@/features/app-settings/AppSettingsPage"));
 // Tauri IPC
 import { APP_VERSION } from "@/lib/version";
 import Art from "@/components/elements/Art";
+import { readRejoin } from "@/lib/p2p/rejoin";
 import { getLastWorkspace, getRecentWorkspaces, loadConfig } from "@/lib/tauri";
 
 // Context
@@ -64,6 +65,32 @@ function editedAgo(iso: string): string {
 	return `edited ${new Date(iso).toLocaleDateString()}`;
 }
 
+// The workspaces of one group on the Welcome page, as cards
+function WorkspaceCards({ title, list, onOpen }: { title: string | null; list: WorkspaceInfo[]; onOpen: (ws: WorkspaceInfo) => void }) {
+	return (
+		<div className="flex flex-col gap-3">
+			{title && <h3 className="font-mono text-xs text-muted-foreground">{title}</h3>}
+			<ul className="grid grid-cols-[repeat(auto-fill,minmax(20rem,1fr))] gap-4">
+				{list.map((ws) => (
+					<li key={ws.id}>
+						<button type="button" onClick={() => onOpen(ws)} className="frame flex h-full min-h-44 w-full flex-col gap-3 bg-muted/40 p-6 text-left transition-colors hover:bg-muted">
+							<span className="flex min-w-0 items-center gap-3">
+								<WorkspaceIconView id={ws.id} name={ws.name} className="size-10 text-xl" />
+								<span className="line-clamp-2 min-w-0 text-xl font-semibold [overflow-wrap:anywhere]">{ws.name}</span>
+							</span>
+							{ws.description && <span className="line-clamp-2 text-muted-foreground">{ws.description}</span>}
+							<span className="mt-auto flex flex-col gap-1 font-mono text-xs text-muted-foreground">
+								<span className="truncate">{ws.path}</span>
+								<span>{editedAgo(ws.updated_at)}</span>
+							</span>
+						</button>
+					</li>
+				))}
+			</ul>
+		</div>
+	);
+}
+
 // Welcome landing page with recent workspaces and quick actions
 export default function Welcome() {
 	// Hooks
@@ -93,6 +120,10 @@ export default function Welcome() {
 	// The folder icon opens while anything on its button is hovered or focused, not only the icon
 	const [importHot, setImportHot] = useState(false);
 	const [settingsOpen, setSettingsOpen] = useState(false);
+
+	// The workspaces this device made, and the ones it joined (it keeps where to find their host)
+	const joined = recentWorkspaces.filter((ws) => readRejoin(ws.id) !== null);
+	const own = recentWorkspaces.filter((ws) => readRejoin(ws.id) === null);
 
 	// Load recent workspaces on mount
 	useEffect(() => {
@@ -169,29 +200,10 @@ export default function Welcome() {
 									<Art name="welcome" className="h-44 w-72 max-w-full shrink-0" />
 									<p>No workspaces yet. Create one, or join a teammate with their ticket.</p>
 								</div>
-							:	<ul className="grid grid-cols-[repeat(auto-fill,minmax(20rem,1fr))] gap-4">
-									{recentWorkspaces.map((ws) => {
-										return (
-											<li key={ws.id}>
-												<button
-													type="button"
-													onClick={() => handleOpenWorkspace(ws)}
-													className={`frame flex h-full min-h-44 w-full flex-col gap-3 bg-muted/40 p-6 text-left transition-colors hover:bg-muted`}
-												>
-													<span className="flex min-w-0 items-center gap-3">
-														<WorkspaceIconView id={ws.id} name={ws.name} className="size-10 text-xl" />
-														<span className="line-clamp-2 min-w-0 text-xl font-semibold [overflow-wrap:anywhere]">{ws.name}</span>
-													</span>
-													{ws.description && <span className="line-clamp-2 text-muted-foreground">{ws.description}</span>}
-													<span className="mt-auto flex flex-col gap-1 font-mono text-xs text-muted-foreground">
-														<span className="truncate">{ws.path}</span>
-														<span>{editedAgo(ws.updated_at)}</span>
-													</span>
-												</button>
-											</li>
-										);
-									})}
-								</ul>
+							:	<div className="flex flex-col gap-8">
+									{own.length > 0 && <WorkspaceCards title={joined.length > 0 ? `Yours / ${own.length}` : null} list={own} onOpen={handleOpenWorkspace} />}
+									{joined.length > 0 && <WorkspaceCards title={`Shared with you / ${joined.length}`} list={joined} onOpen={handleOpenWorkspace} />}
+								</div>
 							}
 						</section>
 					</div>

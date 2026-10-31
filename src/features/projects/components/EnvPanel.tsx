@@ -30,7 +30,7 @@ export default function EnvPanel({ path, project, vars, canEdit, onChanged }: { 
 	return (
 		<Panel title="Environment Variables" icon={<KeyRound />} hint={vars.length ? `${vars.length - missing} of ${vars.length} set` : undefined} flush={vars.length > 0}>
 			{vars.length === 0 ? (
-				<p className="text-sm text-muted-foreground">No .env.example in this project. Its names, and what each is for, would be listed here. Values stay on each device, in .env or the credential store.</p>
+				<p className="text-sm text-muted-foreground">No .env.example. Its names would be listed here; values stay on each device.</p>
 			) : (
 				<ul className="divide-y">
 					{vars.map((v) => (

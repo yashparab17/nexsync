@@ -58,7 +58,7 @@ export default function NoteSidePanel({ workspacePath, current, notes, text, onO
 	const rowClass = "flex w-full cursor-pointer items-center gap-1 truncate px-2 py-1 text-left text-xs hover:bg-muted";
 
 	return (
-		<aside aria-label="Outline and links" className="w-64 shrink-0 space-y-5 overflow-y-auto border-l p-3">
+		<aside aria-label="Outline and links" className="w-64 shrink-0 space-y-5 overflow-y-auto p-3">
 			<Section icon={<ListTree className="size-3" />} title="Outline">
 				{headings.length === 0
 					? empty("Headings you write with # appear here.")

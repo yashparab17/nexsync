@@ -16,13 +16,16 @@ const MAX_DATA = 18_000;
 
 const key = (id: string) => `nexsync-icon:${id}`;
 
+// One or two characters, or an emoji sequence of up to eight (a profession or a family is several joined by invisible characters)
+const isGlyph = (g: string) => [...g].length >= 1 && ([...g].length <= 2 || ([...g].length <= 8 && /^\p{Extended_Pictographic}/u.test(g)));
+
 export function parseIcon(text: string | null): WorkspaceIcon | null {
 	if (!text) return null;
 	try {
 		const v = JSON.parse(text) as Partial<WorkspaceIcon> & Record<string, unknown>;
 		if (v.kind === "image" && typeof v.data === "string" && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v.data) && v.data.length <= MAX_DATA) return { kind: "image", data: v.data };
 		const color = typeof v.color === "string" && PALETTE.includes(v.color.toLowerCase()) ? v.color.toLowerCase() : undefined;
-		if (v.kind === "glyph" && typeof v.glyph === "string" && [...v.glyph].length >= 1 && [...v.glyph].length <= 2) return color ? { kind: "glyph", glyph: v.glyph, color } : { kind: "glyph", glyph: v.glyph };
+		if (v.kind === "glyph" && typeof v.glyph === "string" && isGlyph(v.glyph)) return color ? { kind: "glyph", glyph: v.glyph, color } : { kind: "glyph", glyph: v.glyph };
 		if (v.kind === "letter" && color) return { kind: "letter", color };
 	} catch {
 		/* not an icon */

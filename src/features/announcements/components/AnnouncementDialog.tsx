@@ -154,7 +154,7 @@ export default function AnnouncementDialog({ existing, people, pinnedCount, onCl
 										</label>
 									))}
 							</div>
-							<p className="text-[13px] text-muted-foreground">Everyone's device holds the text; the audience decides who is shown it and asked to say Got it.</p>
+							<p className="text-[13px] text-muted-foreground">Everyone's device holds the text; the audience decides who is asked to say Got it.</p>
 						</div>
 					)}
 				</div>
@@ -172,7 +172,7 @@ export default function AnnouncementDialog({ existing, people, pinnedCount, onCl
 					<div className="space-y-1 sm:col-span-2">
 						<Label htmlFor="ann-erase">Erase for Good At</Label>
 						<Input id="ann-erase" type="datetime-local" value={expires} onChange={(e) => setExpires(e.target.value)} />
-						<p className="text-[13px] text-muted-foreground">Optional. Every device erases it then, including those that were off. Copies people exported or a changed app can keep it.</p>
+						<p className="text-[13px] text-muted-foreground">Optional. Every device erases it then, even if it was off.</p>
 					</div>
 				</div>
 				<label className="flex items-center gap-2 text-sm">

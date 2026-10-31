@@ -173,7 +173,7 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 			{reviewing && board && (
 				<Dialog isOpen onOpenChange={(open) => !open && setReviewing(null)} className="sm:max-w-xl">
 					<div className="flex max-h-[75vh] min-h-0 flex-col gap-4">
-						<DialogHeading icon={<GitMerge className="size-6" />} title={`Merge ${board.name}?`} description={<>This is what merging would change on the real board. All of it is merged together, or none of it.</>} />
+						<DialogHeading icon={<GitMerge className="size-6" />} title={`Merge ${board.name}?`} description={<>What merging would change on the real board, all together or not at all.</>} />
 						{error && (
 							<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
 								{error}

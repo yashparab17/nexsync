@@ -215,7 +215,7 @@ export default function SheetDialogs({ kind, onClose, f, selectionText, activeCo
 			<TableIcon className="size-6" />,
 			"Summarise by a Column",
 			<>
-				<p className="text-muted-foreground">Groups the rows of the table (first row as headings) and puts the answer on a new sheet.</p>
+				<p className="text-muted-foreground">Groups the table's rows (first row is the heading) onto a new sheet.</p>
 				<Label text="Group by">
 					<select aria-label="Group by" className={field} value={by} onChange={(e) => setBy(Number(e.target.value))}>
 						{names.map((n) => (
@@ -324,7 +324,7 @@ export default function SheetDialogs({ kind, onClose, f, selectionText, activeCo
 			<Target className="size-6" />,
 			"Data Table",
 			<>
-				<p className="text-muted-foreground">Select a column of input values first. For each one, the input cell is set to it and the formula cell's answer is written in the column beside it.</p>
+				<p className="text-muted-foreground">Select a column of inputs first. Each is put in the input cell and the answer is written beside it.</p>
 				<input aria-label="Input cell" className={field} placeholder="Input cell, such as B2" value={setCellText} onChange={(e) => setSetCellText(e.target.value)} />
 				<input aria-label="Formula cell" className={field} placeholder="Formula cell, such as D2" value={change} onChange={(e) => setChange(e.target.value)} />
 			</>,
@@ -383,7 +383,7 @@ export default function SheetDialogs({ kind, onClose, f, selectionText, activeCo
 		<Filter className="size-6" />,
 		"Filter",
 		<>
-			<p className="text-muted-foreground">Shows only the rows whose value in the selected column is ticked. The first row is the heading.</p>
+			<p className="text-muted-foreground">Shows only rows whose value in the selected column is ticked.</p>
 			<ul className="max-h-52 space-y-1 overflow-auto">
 				{values.map((v) => (
 					<li key={v}>

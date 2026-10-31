@@ -13,6 +13,7 @@ import Art from "@/components/elements/Art";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/store/chat/ChatContext";
 import { useNotifications } from "@/store/notifications/NotificationContext";
+import { readPopupsMuted, savePopupsMuted } from "@/lib/popupPrefs";
 
 const time = (at: number) => {
 	const day = new Date(at).toDateString() === new Date().toDateString();
@@ -32,6 +33,7 @@ export default function NotificationBell() {
 	const chat = useChat();
 	const navigate = useNavigate();
 	const [open, setOpen] = useState(false);
+	const [muted, setMuted] = useState(readPopupsMuted);
 
 	const unread = chat.active ? chat.inboxUnread : session.unread;
 	const empty = chat.active ? chat.inbox.length === 0 : session.items.length === 0;
@@ -59,6 +61,18 @@ export default function NotificationBell() {
 						<div className="flex h-12 items-center justify-between border-b px-4">
 							<span className="text-sm font-semibold">Inbox</span>
 							<span className="flex items-center gap-3">
+								<button
+									type="button"
+									aria-pressed={muted}
+									title="Notices still arrive here; only the pop-ups stop"
+									onClick={() => {
+										savePopupsMuted(!muted);
+										setMuted(!muted);
+									}}
+									className="cursor-pointer text-[13px] text-muted-foreground hover:text-foreground"
+								>
+									{muted ? "Unmute Pop-ups" : "Mute Pop-ups"}
+								</button>
 								{chat.active && unread > 0 && (
 									<button type="button" onClick={() => chat.markInboxRead()} className="cursor-pointer text-[13px] text-muted-foreground hover:text-foreground">
 										Mark All Read
@@ -74,7 +88,7 @@ export default function NotificationBell() {
 						{empty ? (
 							<div className="flex flex-col items-center gap-3 p-6 text-center">
 								<Art name="caught-up" className="h-28 w-40" />
-								<p className="text-sm text-muted-foreground">Nothing yet. Mentions, replies, new collaborators and assigned tasks show up here, and stay until you clear them.</p>
+								<p className="text-sm text-muted-foreground">Nothing yet. Mentions, replies, new people and assigned tasks appear here.</p>
 							</div>
 						) : chat.active ? (
 							<ul className="max-h-96 overflow-y-auto">

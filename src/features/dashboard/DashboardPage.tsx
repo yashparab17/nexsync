@@ -11,6 +11,7 @@ import { Page, PageBody, Panel } from "@/components/layout/Page";
 import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
 import Art from "@/components/elements/Art";
 import { DEFAULT_LAYOUT, loadLayout, moveTile, saveLayout, type DashboardLayout, type TileId, type TileSize } from "@/lib/dashboardLayout";
+import { readHideEdits, saveHideEdits, visibleEvents } from "@/lib/activityFeed";
 import { formatAction } from "@/lib/insights";
 import { useRecent } from "@/lib/recentFiles";
 import { useRuns } from "@/features/projects/lib/projectRuns";
@@ -98,7 +99,9 @@ export default function DashboardPage() {
 		// A run that ends changes the answer
 	}, [workspace, finishedRuns]);
 
-	const activity = metadata?.activity.events ?? [];
+	// Saves while someone writes are many lines; each person can hide them from their own feed
+	const [hideEdits, setHideEdits] = useState(readHideEdits);
+	const activity = visibleEvents(metadata?.activity.events ?? [], hideEdits);
 	// Files opened in the Editor or Notes on this device, newest first
 	const recent = useRecent(workspace?.path);
 	const members = metadata?.members.members ?? [];
@@ -212,7 +215,24 @@ export default function DashboardPage() {
 				</Panel>
 		),
 		activity: (
-				<Panel title="Activity" flush={activity.length > 0} className="h-full">
+				<Panel
+					title="Activity"
+					flush={activity.length > 0}
+					className="h-full"
+					right={
+						<Button
+							size="sm"
+							variant="ghost"
+							aria-pressed={hideEdits}
+							onPress={() => {
+								saveHideEdits(!hideEdits);
+								setHideEdits(!hideEdits);
+							}}
+						>
+							{hideEdits ? "Show edits" : "Hide edits"}
+						</Button>
+					}
+				>
 					{activity.length === 0 ? (
 						<p className="text-sm text-muted-foreground">Nothing has changed yet. Create a note, file or task to get started.</p>
 					) : (

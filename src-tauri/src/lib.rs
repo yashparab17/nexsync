@@ -62,6 +62,7 @@ pub fn run() {
             
             // Allowed roots configuration
             commands::config::load_config_cmd,
+            commands::config::default_display_name,
             commands::config::save_config_cmd,
             commands::config::validate_allowed_root_cmd,
             

@@ -234,12 +234,12 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 									value={name}
 									maxLength={NAME_LIMIT}
 									onChange={(e) => setName(e.target.value)}
-									placeholder="Collaborator"
+									placeholder="Your name"
 									aria-label="Display name"
 									disabled={saved === null}
 								/>
 								<div className="flex justify-between text-xs text-muted-foreground">
-									<span>Leave it empty to appear as “Collaborator”.</span>
+									<span>Empty: your computer's name is used.</span>
 									<span className="tabular-nums">
 										{name.length}/{NAME_LIMIT}
 									</span>
@@ -249,7 +249,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						<div className="space-y-2">
 							<p className="text-sm font-medium">Your colour</p>
 							<ColorSwatches value={profile.color} onChange={(color) => changeProfile({ ...profile, color: color ?? undefined })} />
-							<p className="text-[13px] text-muted-foreground">Colours your avatar and your cursor in shared notes. You were given one at random the first time; change it whenever you like.</p>
+							<p className="text-[13px] text-muted-foreground">Colours your avatar and cursor. Change it whenever you like.</p>
 						</div>
 						<div className="space-y-2">
 							<p className="text-sm font-medium">Your picture</p>
@@ -285,7 +285,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 									{pictureError}
 								</p>
 							)}
-							<p className="text-[13px] text-muted-foreground">Shown to the members of every workspace you are in. It is shrunk to a small square first.</p>
+							<p className="text-[13px] text-muted-foreground">Shown to members of every workspace, shrunk to a small square.</p>
 						</div>
 					</SectionCard>
 

@@ -46,6 +46,7 @@ import {
 	exportTaskRecord,
 	createKanbanColumn,
 	loadConfig,
+	defaultDisplayName,
 	receiveNamedVersion,
 } from "@/lib/tauri";
 import type { Member } from "@/types/workspace";
@@ -1266,7 +1267,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			const name =
 				displayName?.trim() ||
 				(await loadConfig().catch(() => null))?.display_name.trim() ||
-				"Collaborator";
+				(await defaultDisplayName());
 			const result = await p2p.joinWithTicket(ticket.trim(), name);
 			pendingSelfNameRef.current = name;
 			pendingRejoinRef.current = { ticket: result.rejoinTicket, name, hostWorkspaceId: result.workspaceId };
@@ -1283,7 +1284,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 			const name =
 				displayName?.trim() ||
 				(await loadConfig().catch(() => null))?.display_name.trim() ||
-				"Collaborator";
+				(await defaultDisplayName());
 			const result = await p2p.joinWithCode(code, name);
 			pendingSelfNameRef.current = name;
 			pendingRejoinRef.current = { ticket: result.rejoinTicket, name, hostWorkspaceId: result.workspaceId };
@@ -1454,7 +1455,12 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 
 	const rejoinTriedRef = useRef<string | null>(null);
 	useEffect(() => {
-		if (!workspaceId || selfName === null || rejoinTriedRef.current === workspaceId) return;
+		// Going back to the Welcome page forgets the attempt, so opening the same workspace again goes back to its host again
+		if (!workspaceId) {
+			rejoinTriedRef.current = null;
+			return;
+		}
+		if (selfName === null || rejoinTriedRef.current === workspaceId) return;
 		rejoinTriedRef.current = workspaceId;
 		void reconnectToHost();
 	}, [workspaceId, selfName, reconnectToHost]);

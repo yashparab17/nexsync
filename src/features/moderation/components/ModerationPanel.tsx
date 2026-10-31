@@ -144,7 +144,7 @@ export default function ModerationPanel() {
 			)}
 			{tab === "removed" && (
 				<ul className="divide-y divide-border/60">
-					{removedPeople.length === 0 && <li className="px-1 py-6 text-center text-sm text-muted-foreground">Nobody has been removed. What a removed person wrote and changed stays, marked with a Removed badge.</li>}
+					{removedPeople.length === 0 && <li className="px-1 py-6 text-center text-sm text-muted-foreground">Nobody removed. A removed person's work stays, marked Removed.</li>}
 					{removedPeople.map((p) => (
 						<li key={p.key} className="flex flex-wrap items-center justify-between gap-3 py-3">
 							<div className="min-w-0 text-sm">

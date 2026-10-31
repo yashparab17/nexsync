@@ -64,7 +64,7 @@ export default function ConflictPanel({ conflicts, violations = [], show, canCho
 							<li key={v.rule}>{v.message}</li>
 						))}
 					</ul>
-					<p className="text-xs text-muted-foreground">Edits made at the same time were each fine on their own. Change one of the fields to fix it.</p>
+					<p className="text-xs text-muted-foreground">Both edits were fine alone. Change one field to fix it.</p>
 				</section>
 			)}
 			{conflicts.length > 0 && (

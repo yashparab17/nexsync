@@ -13,7 +13,7 @@ export default function HistoryPanel({ workspacePath, rel, readOnly }: { workspa
 	return (
 		<div className="max-w-md space-y-3 text-sm">
 			<h2 className="text-2xl font-light">Version History</h2>
-			<p>Every time the file is saved or updated from here, the version is kept. You can compare versions and put an older one back on disk.</p>
+			<p>Each save keeps a version. Compare them, or put an older one back.</p>
 			<Button variant="outline" onPress={() => setOpen(true)}>
 				<History className="size-4" /> Show Versions
 			</Button>

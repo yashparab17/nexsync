@@ -16,15 +16,14 @@ const WORDMARK = [
 ].join("\n");
 
 const TIPS = [
-	"Type > in Quick open to run any command, and : followed by a number to jump to a line.",
-	"Turn on Vim keys in Settings. Then Space f f finds files, Space e toggles the explorer and Tab cycles tabs.",
-	"Ctrl+Enter in Quick open opens a file beside the one you are working on.",
-	"Everyone in the workspace edits the same file live. Blame shows who wrote each line.",
-	"Right-click a tab or a file for more: close the others, open to the side, copy the path.",
+	"In Quick open, > runs a command and : jumps to a line.",
+	"Vim keys are in Settings.",
+	"Ctrl Enter in Quick open opens a file beside this one.",
+	"Everyone edits the same file live. Blame shows who wrote a line.",
+	"Right-click a tab or file for more.",
 ];
 
 interface EditorDashboardProps {
-	workspaceName: string;
 	recent: string[];
 	readOnly: boolean;
 	onOpen: (path: string) => void;
@@ -35,7 +34,7 @@ interface EditorDashboardProps {
 	onNotes: () => void;
 }
 
-export default function EditorDashboard({ workspaceName, recent, readOnly, onOpen, onQuickOpen, onCommands, onNewFile, onTogglePanel, onNotes }: EditorDashboardProps) {
+export default function EditorDashboard({ recent, readOnly, onOpen, onQuickOpen, onCommands, onNewFile, onTogglePanel, onNotes }: EditorDashboardProps) {
 	const actions = [
 		{ label: "Find file", keys: "Ctrl P", icon: <FileSearch className="size-4" />, run: onQuickOpen },
 		{ label: "Command palette", keys: "Ctrl Shift P", icon: <Command className="size-4" />, run: onCommands },
@@ -48,13 +47,13 @@ export default function EditorDashboard({ workspaceName, recent, readOnly, onOpe
 	return (
 		<Welcome
 			logo={WORDMARK}
-			title={workspaceName ? `${workspaceName} editor` : "Editor"}
-			intro="Open a file from the explorer, or pick one of these."
+			title="Editor"
+			intro="Pick a file, or press Ctrl P."
 			actions={actions}
 			recentTitle="Recent Files"
 			art="editor"
 			recent={recent.slice(0, 6).map((path) => ({ key: path, label: baseName(path), sub: folderOf(path), icon: <FileKindIcon name={baseName(path)} />, run: () => onOpen(path) }))}
-			recentEmpty="Files you open are listed here."
+			recentEmpty="Recent files appear here."
 			tip={tip}
 		/>
 	);

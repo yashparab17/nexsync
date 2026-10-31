@@ -27,7 +27,7 @@ export default function WorkspaceDeletedDialog() {
 	return (
 		<Dialog isOpen isDismissable={false} showCloseButton={false} onOpenChange={() => {}}>
 			<div className="space-y-4">
-				<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Workspace Deleted" description={<>The host deleted this workspace. Your copy is still on this device and nothing was removed.</>} />
+				<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Workspace Deleted" description={<>The host deleted this workspace. Your copy is still here.</>} />
 				{error && <p className="text-xs text-destructive">{error}</p>}
 				<DialogFooter>
 					<Button variant="outline" onPress={dismissWorkspaceDeleted}>

@@ -15,7 +15,7 @@ export default function AccessibilityDialog({ blocks, goTo, onClose }: { blocks:
 			<div className="space-y-3 text-sm">
 				<DialogHeading icon={<Accessibility className="size-6" />} title="Accessibility Check" />
 				{problems.length === 0 ? (
-					<p role="status">No problems found. This checks pictures, headings, tables, links and blank lines; it does not check colour contrast or reading order.</p>
+					<p role="status">No problems found. Checks pictures, headings, tables, links and blank lines, not contrast or reading order.</p>
 				) : (
 					<>
 						<p role="status" className="text-muted-foreground">

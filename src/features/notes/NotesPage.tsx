@@ -39,6 +39,7 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type { WorkspaceFile } from "@/types/workspace";
 import Loading from "@/components/Loading";
+import { useMyName } from "@/hooks/useMyName";
 
 const BOARD_DOC = "board:notes";
 // The most of a note that is shared for the cards; longer notes show the start
@@ -77,7 +78,8 @@ export default function NotesPage() {
 	const logError = useErrorLog();
 	const navigate = useNavigate();
 	const isViewer = useIsViewer();
-	const { viewersAt, selfName } = useP2P();
+	const { viewersAt } = useP2P();
+	const myName = useMyName();
 	const synced = useSyncedIn(LAYOUT.notes, LAYOUT.others);
 	const workspacePath = workspace?.path;
 
@@ -529,7 +531,7 @@ export default function NotesPage() {
 							onDelete={(path) => setDeleting(notes.find((n) => n.path === path) ?? null)}
 							viewers={(path) => viewersAt("notes", rel(path))}
 							awareness={board?.awareness}
-							userName={selfName ?? "You"}
+							userName={myName}
 							readOnly={isViewer}
 						/>
 					) : view === "graph" ? (
@@ -554,7 +556,7 @@ export default function NotesPage() {
 					) : (
 						<Welcome
 							title={notes.length === 0 ? "Start your first note" : "Notes"}
-							intro={<>Notes save themselves. Link one to another with <code className="font-mono">[[Note name]]</code>.</>}
+							intro={<>Notes save themselves. Link with <code className="font-mono">[[Name]]</code>.</>}
 							actions={[
 								...(isViewer ? [] : [{ label: "New note", keys: "Ctrl N", icon: <FilePlus className="size-4" />, run: () => { setNewTitle(""); setIsNewOpen(true); } }]),
 								{ label: "Go to a note", keys: "Ctrl O", icon: <Search className="size-4" />, run: () => { setSwitcherQuery(""); setSwitcher(true); } },

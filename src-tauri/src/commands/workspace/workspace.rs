@@ -68,7 +68,7 @@ pub fn create_workspace(app_handle: tauri::AppHandle, request: CreateWorkspaceRe
         .map(|c| c.display_name.trim().to_string())
         .ok()
         .filter(|n| !n.is_empty())
-        .unwrap_or_else(|| "User".to_string());
+        .unwrap_or_else(crate::commands::config::fallback_name);
     let members = Members {
         members: vec![Member {
             id: "owner".to_string(),

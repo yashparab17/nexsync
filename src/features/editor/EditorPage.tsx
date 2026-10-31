@@ -654,7 +654,6 @@ export default function EditorPage() {
 					<div className="relative min-h-0 flex-1">
 						{tabs.length === 0 && (
 							<EditorDashboard
-								workspaceName={workspace?.name ?? ""}
 								recent={recent}
 								readOnly={isViewer}
 								onOpen={(path) => openPath(path)}

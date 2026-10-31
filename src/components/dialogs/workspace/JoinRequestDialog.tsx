@@ -13,8 +13,7 @@ export default function JoinRequestDialog() {
 	return (
 		<Dialog isOpen isDismissable={false} showCloseButton={false} onOpenChange={() => {}}>
 			<div className="space-y-4">
-				<DialogHeading icon={<UserPlus className="size-6" />} title="Allow Someone to Join?" description={<><span className="font-semibold text-foreground">{request.name}</span> entered your code and
-						wants to join this workspace. Only allow people you expect.</>} />
+				<DialogHeading icon={<UserPlus className="size-6" />} title="Allow Someone to Join?" description={<><span className="font-semibold text-foreground">{request.name}</span> entered your code. Allow only people you expect.</>} />
 				<DialogFooter>
 					<Button variant="outline" onPress={() => resolveJoinRequest(request.requestId, false)}>
 						Deny

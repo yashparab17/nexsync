@@ -45,6 +45,7 @@ import { cn } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import Loading from "@/components/Loading";
+import { useMyName } from "@/hooks/useMyName";
 
 interface CodeTabProps {
 	// Workspace-relative path of the file, which is also the id of its shared document
@@ -67,12 +68,12 @@ interface CodeTabProps {
 // One open file in the Editor tab: a live shared document with format, find, save, problem markers and blame. The page
 // drives it through the handle and reads its state from onStatus, so one toolbar and one status line serve every file.
 const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path, active, readOnly, showBlame, onDirtyChange, onStatus, onCursor, onText, onVimMode, onVimCommand, onOpenAt }, ref) {
-	const { workspace, metadata, addActivityEvent } = useWorkspace();
-	const { selfName, shareNamedVersion } = useP2P();
+	const { workspace, addActivityEvent } = useWorkspace();
+	const { shareNamedVersion } = useP2P();
 	const logError = useErrorLog();
 	const workspacePath = workspace?.path ?? "";
 	const fileName = path.split("/").pop() ?? path;
-	const userName = selfName ?? metadata?.members.members.find((m) => m.role === "Owner")?.name ?? "You";
+	const userName = useMyName();
 
 	// The file's own document is always open (it holds the list of branches); a branch being worked on is a second one
 	const mainCollab = useCollabDoc(workspacePath, path);
@@ -547,7 +548,7 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 
 				{showBlame && (
 					<CollapsiblePane id="code.blame" defaultWidth={256} label="who wrote each line" side="right">
-					<aside className="w-64 shrink-0 space-y-4 overflow-y-auto border-l p-3 text-xs">
+					<aside className="w-64 shrink-0 space-y-4 overflow-y-auto p-3 text-xs">
 						{!blame || blame.people.length === 0 ? (
 							<p className="text-muted-foreground">Nothing to show yet. Blame appears once the file has content.</p>
 						) : (

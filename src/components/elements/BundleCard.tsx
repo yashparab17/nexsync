@@ -96,7 +96,7 @@ export default function BundleCard() {
 	return (
 		<div className="space-y-4">
 			<Art name="bundle" className="mx-auto h-36 w-44" />
-			<p className="text-sm text-muted-foreground">For a room with no network: a signed file with the member list, the chat and notices, tasks and cards, files and shared texts. Importing checks it as if it had come over a link, so a bundle from someone who was removed is refused.</p>
+			<p className="text-sm text-muted-foreground">For a room with no network: a signed file with everything shared. Importing checks it like a link, so a bundle from a removed member is refused.</p>
 			<div className="flex flex-wrap gap-2">
 				<Button variant="outline" size="sm" isDisabled={busy || !path} onPress={() => void exportBundle()}>
 					<Download className="size-3.5" />

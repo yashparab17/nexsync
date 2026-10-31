@@ -387,6 +387,28 @@ pub fn validate_allowed_root_cmd(
     }
 }
 
+/// A name for a person who has not set one in Settings: the name of the computer's user (Sam, from `sam` or `SAM`), else "Collaborator". Every
+/// place that needs a name before there is one uses this, so the same person is not "User" in one place and "Collaborator" in another.
+pub fn fallback_name() -> String {
+    let raw = std::env::var("USERNAME").or_else(|_| std::env::var("USER")).unwrap_or_default();
+    let clean: String = raw.chars().filter(|c| !c.is_control()).collect::<String>().trim().chars().take(32).collect();
+    // A system account is not a person's name
+    if clean.is_empty() || ["root", "administrator", "admin", "user", "owner", "default", "system"].contains(&clean.to_lowercase().as_str()) {
+        return "Collaborator".to_string();
+    }
+    let mut chars = clean.chars();
+    match chars.next() {
+        Some(first) if clean.chars().all(|c| !c.is_lowercase()) || clean.chars().all(|c| !c.is_uppercase()) => first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
+        _ => clean,
+    }
+}
+
+/// The name to put in a name field when Settings has none
+#[tauri::command]
+pub fn default_display_name() -> String {
+    fallback_name()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -457,5 +479,25 @@ mod tests {
             assert!(is_system_directory(std::path::Path::new("/usr/bin")));
             assert!(!is_system_directory(std::path::Path::new("/home/user/nexsynctest")));
         }
+    }
+}
+
+#[cfg(test)]
+mod name_tests {
+    use super::fallback_name;
+
+    #[test]
+    fn a_name_is_made_from_the_computers_user_and_never_from_a_system_account() {
+        std::env::set_var("USERNAME", "YASH");
+        assert_eq!(fallback_name(), "Yash");
+        std::env::set_var("USERNAME", "yashParab");
+        assert_eq!(fallback_name(), "yashParab", "a name with its own capitals is kept");
+        std::env::set_var("USERNAME", "Administrator");
+        assert_eq!(fallback_name(), "Collaborator");
+        std::env::remove_var("USERNAME");
+        std::env::set_var("USER", "sam");
+        assert_eq!(fallback_name(), "Sam");
+        std::env::remove_var("USER");
+        assert_eq!(fallback_name(), "Collaborator");
     }
 }

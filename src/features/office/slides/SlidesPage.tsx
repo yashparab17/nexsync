@@ -28,6 +28,7 @@ import { cn, errorText } from "@/lib/utils";
 import { safeUploadName, validateFileName } from "@/lib/validation";
 import { useIsViewer, useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { useMyName } from "@/hooks/useMyName";
 
 interface Deck {
 	name: string;
@@ -39,10 +40,10 @@ export default function SlidesPage() {
 	const { workspace } = useWorkspace();
 	const logError = useErrorLog();
 	const isViewer = useIsViewer();
-	const { selfName, viewersAt } = useP2P();
+	const { viewersAt } = useP2P();
 	const synced = useSyncedIn(LAYOUT.slides);
 	const workspacePath = workspace?.path ?? "";
-	const author = selfName ?? "Someone";
+	const author = useMyName();
 
 	const [decks, setDecks] = useState<Deck[] | null>(null);
 	const [query, setQuery] = useState("");
@@ -159,7 +160,7 @@ export default function SlidesPage() {
 
 			<div className="flex min-h-0 flex-1">
 				<CollapsiblePane id="slides.list" defaultWidth={224} label="the list of decks">
-					<nav aria-label="Decks" className="w-56 shrink-0 space-y-0.5 overflow-y-auto border-r bg-panel p-2">
+					<nav aria-label="Decks" className="w-56 shrink-0 space-y-0.5 overflow-y-auto bg-panel p-2">
 					{decks === null ? null : shownDecks.length === 0 ? (
 						<p className="p-3 text-sm text-muted-foreground">{decks.length === 0 ? "No decks yet. Make one, or add a .pptx file." : "No deck matches."}</p>
 					) : (

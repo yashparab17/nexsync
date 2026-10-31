@@ -37,6 +37,7 @@ import {
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { myName } from "@/lib/p2p/selfName";
 import { setWriteAuthor } from "@/lib/tauri";
+import { isRepeat } from "@/lib/activityFeed";
 
 interface WorkspaceContextType {
 	// Core state
@@ -271,6 +272,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 					target_type: targetType,
 				}),
 			};
+			// Writing saves again and again: a save of the same item just after the last one is not a new line
+			if (isRepeat(metadataRef.current?.activity.events ?? [], event)) return;
 
 			// Optimistically update React state
 			setMetadata((prev) => {

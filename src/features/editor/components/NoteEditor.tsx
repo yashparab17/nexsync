@@ -28,8 +28,8 @@ import { markdownStats, textStats } from "@/features/notes/lib/text";
 import { noteTitle, resolveLink, type NoteRef } from "@/features/notes/lib/links";
 import { wikiLinks } from "@/lib/editor/wikiLinks";
 import { useP2P } from "@/store/p2p/P2PContext";
-import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import Loading from "@/components/Loading";
+import { useMyName } from "@/hooks/useMyName";
 
 interface NoteEditorProps {
 	fileName: string;
@@ -55,9 +55,8 @@ const sameNote = (a: string, b: string) => a.replace(/\s+$/, "") === b.replace(/
 // editor and are saved as plain text.
 export default function NoteEditor({ fileName, initialContent, onSave, readOnly = false, workspacePath, docId, notes, onOpenNote, onTextChange }: NoteEditorProps) {
 	const isMarkdown = isMarkdownFile(fileName);
-	const { peers, selfName, shareNamedVersion } = useP2P();
-	const { metadata } = useWorkspace();
-	const userName = selfName ?? metadata?.members.members.find((m) => m.role === "Owner")?.name ?? "You";
+	const { peers, shareNamedVersion } = useP2P();
+	const userName = useMyName();
 	// The note's own document is always open (it holds the list of branches); a branch being worked on is a second one.
 	// Branches are for Markdown notes, which are shared text.
 	const mainCollab = useCollabDoc(workspacePath, docId);

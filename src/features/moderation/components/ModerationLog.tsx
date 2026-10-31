@@ -9,7 +9,7 @@ export default function ModerationLog() {
 	const chat = useChat();
 	const log = useMemo(() => moderationLog(chat.entries), [chat.entries]);
 	if (log.length === 0) {
-		return <p className="px-4 py-10 text-center text-sm text-muted-foreground">Nothing has been moderated. Timeouts, kicks, bans and role changes are listed here, each signed by whoever did it.</p>;
+		return <p className="px-4 py-10 text-center text-sm text-muted-foreground">Nothing moderated yet. Timeouts, kicks, bans and role changes appear here.</p>;
 	}
 	return (
 		<ul className="divide-y divide-border/60" aria-label="Moderation log">

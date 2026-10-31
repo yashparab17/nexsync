@@ -701,6 +701,11 @@ export function clearLastWorkspace(): Promise<void> {
 // ────────────────────────────
 
 // Load application security configuration
+// The name to use where Settings has none: the computer's user, else "Collaborator"
+export function defaultDisplayName(): Promise<string> {
+	return invoke<string>("default_display_name").catch(() => "Collaborator");
+}
+
 export function loadConfig(): Promise<NexsyncConfig> {
 	return invoke<NexsyncConfig>("load_config_cmd").then((c) => ({ ...c, allowed_workspace_roots: (c.allowed_workspace_roots ?? []).map(cleanPath) }));
 }

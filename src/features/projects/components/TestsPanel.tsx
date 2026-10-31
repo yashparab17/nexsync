@@ -218,7 +218,7 @@ export default function TestsPanel({ path, project, runs, tasks, canRun, onRunOn
 
 			<Panel title="Report Files" hint={files.length ? String(files.length) : undefined} flush={files.length > 0} right={<Button variant="ghost" size="icon-xs" aria-label="Look again" onPress={look}><RefreshCw className="size-3.5" /></Button>}>
 				{files.length === 0 ? (
-					<p className="text-sm text-muted-foreground">No report files found in this project. Test runs can write JUnit XML or TRX, and coverage runs lcov or Cobertura; they show up here, newest first.</p>
+					<p className="text-sm text-muted-foreground">No report files yet. JUnit XML, TRX, lcov and Cobertura show up here.</p>
 				) : (
 					<ul className="divide-y">
 						{files.map((f) => (

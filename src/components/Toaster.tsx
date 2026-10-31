@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { X } from "@/components/animate-icons";
 
 import { t } from "@/i18n";
+import { readPopupsMuted } from "@/lib/popupPrefs";
 import { useNotifications } from "@/store/notifications/NotificationContext";
 
 const SHOW_MS = 6000;
@@ -30,6 +31,8 @@ export default function Toaster() {
 		const fresh = items.filter((n) => n.id > (lastSeen.current ?? 0)).map((n) => ({ id: n.id, text: n.text }));
 		if (fresh.length === 0) return;
 		lastSeen.current = newest;
+		// Muted: the notice is in the list, and no pop-up is shown
+		if (readPopupsMuted()) return;
 		setToasts((prev) => [...fresh, ...prev].slice(0, MAX_SHOWN));
 		const ids = new Set(fresh.map((n) => n.id));
 		// Not cleared when the list changes again, or an earlier pop-up would never go away

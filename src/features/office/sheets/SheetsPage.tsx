@@ -30,6 +30,7 @@ import { cn, errorText } from "@/lib/utils";
 import { safeUploadName, validateFileName } from "@/lib/validation";
 import { useIsViewer, useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { useMyName } from "@/hooks/useMyName";
 
 interface Book {
 	name: string;
@@ -41,10 +42,10 @@ export default function SheetsPage() {
 	const { workspace } = useWorkspace();
 	const logError = useErrorLog();
 	const isViewer = useIsViewer();
-	const { selfName, viewersAt } = useP2P();
+	const { viewersAt } = useP2P();
 	const synced = useSyncedIn(LAYOUT.sheets);
 	const workspacePath = workspace?.path ?? "";
-	const author = selfName ?? "Someone";
+	const author = useMyName();
 
 	const [books, setBooks] = useState<Book[] | null>(null);
 	const [query, setQuery] = useState("");
@@ -154,7 +155,7 @@ export default function SheetsPage() {
 
 			<div className="flex min-h-0 flex-1">
 				<CollapsiblePane id="sheets.list" defaultWidth={224} label="the list of workbooks">
-					<nav aria-label="Workbooks" className="w-56 shrink-0 space-y-0.5 overflow-y-auto border-r bg-panel p-2">
+					<nav aria-label="Workbooks" className="w-56 shrink-0 space-y-0.5 overflow-y-auto bg-panel p-2">
 					{books === null ? null : shownBooks.length === 0 ? (
 						<p className="p-3 text-sm text-muted-foreground">{books.length === 0 ? "No workbooks yet. Make one, or add an .xlsx, .xls, .ods or .csv file." : "No workbook matches."}</p>
 					) : (

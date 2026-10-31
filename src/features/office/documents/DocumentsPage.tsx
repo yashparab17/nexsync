@@ -33,6 +33,7 @@ import { useCanComment, useIsViewer, useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { Imported } from "@/features/office/types";
 import { setFontFactors } from "@/features/office/documents/lib/fontMetrics";
+import { useMyName } from "@/hooks/useMyName";
 
 interface Doc {
 	name: string;
@@ -47,10 +48,10 @@ export default function DocumentsPage() {
 	const logError = useErrorLog();
 	const isViewer = useIsViewer();
 	const canComment = useCanComment();
-	const { selfName, viewersAt } = useP2P();
+	const { viewersAt } = useP2P();
 	const synced = useSyncedIn(LAYOUT.documents);
 	const workspacePath = workspace?.path ?? "";
-	const author = selfName ?? "Someone";
+	const author = useMyName();
 
 	const [docs, setDocs] = useState<Doc[] | null>(null);
 	const [query, setQuery] = useState("");
@@ -274,7 +275,7 @@ export default function DocumentsPage() {
 
 			<div className="flex min-h-0 flex-1">
 				<CollapsiblePane id="documents.list" defaultWidth={224} label="the list of documents">
-					<nav aria-label="Documents" className="w-56 shrink-0 space-y-0.5 overflow-y-auto border-r bg-panel p-2">
+					<nav aria-label="Documents" className="w-56 shrink-0 space-y-0.5 overflow-y-auto bg-panel p-2">
 					{docs === null ? null : shown.length === 0 ? (
 						<p className="p-3 text-sm text-muted-foreground">{docs.length === 0 ? "No documents yet. Make one, or add a .docx, .doc, .odt or .rtf file." : "No document matches."}</p>
 					) : (

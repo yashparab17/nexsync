@@ -65,7 +65,7 @@ export default function HeldEdits({ onlyReview = false }: { onlyReview?: boolean
 		return (
 			<div className="flex flex-col items-center gap-3 px-1 py-6 text-center">
 				<Art name="approval" className="h-32 w-44" />
-				<p className="text-sm text-muted-foreground">Nothing is held. Changes and messages from a removed, timed-out or unknown device would wait here for you to accept or discard them.</p>
+				<p className="text-sm text-muted-foreground">Nothing is held. Changes from removed, timed-out or unknown devices wait here.</p>
 			</div>
 		);
 	}

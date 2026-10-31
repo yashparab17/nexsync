@@ -629,13 +629,13 @@ export default function AssetsPage() {
 					workspacePath={workspace.path}
 					isOpen={isUploadOpen}
 					onClose={() => setIsUploadOpen(false)}
-					onUploaded={async () => {
+					onUploaded={async (names) => {
 						await loadAssets();
 						await refreshStats();
 						addActivityEvent(
 							"uploaded_asset",
-							"Uploaded new assets to workspace",
-							"assets",
+							names.length === 0 ? "Uploaded assets" : names.length === 1 ? `Uploaded asset ${names[0]}` : `Uploaded ${names.length} assets: ${names.slice(0, 3).join(", ")}${names.length > 3 ? ` and ${names.length - 3} more` : ""}`,
+							names.length === 1 ? `assets/${names[0]}` : "assets",
 							"asset",
 						);
 					}}

@@ -117,10 +117,10 @@ export default function SearchPanel({ path, project, canReplace, onOpen }: { pat
 					}
 				>
 					{groups.length === 0 ? (
-						<p className="text-sm text-muted-foreground">No match. Files that stay on this device (dependencies, build output, .env) are not searched.</p>
+						<p className="text-sm text-muted-foreground">No match. Files kept on this device are not searched.</p>
 					) : (
 						<ul className="divide-y">
-							{found.truncated && <li className="px-4 py-2 text-[13px] text-warning">Only the first 1,000 matches are listed. A replace still changes every match in the files you choose.</li>}
+							{found.truncated && <li className="px-4 py-2 text-[13px] text-warning">Only the first 1,000 matches are listed; a replace still changes every one.</li>}
 							{groups.map((g) => (
 								<li key={g.path} className="px-4 py-2">
 									<div className="flex items-center gap-2">

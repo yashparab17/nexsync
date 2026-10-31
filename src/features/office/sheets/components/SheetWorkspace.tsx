@@ -519,7 +519,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 									{opened.notes.map((n) => (
 										<p key={n} className="text-muted-foreground">{n}</p>
 									))}
-									<p className="text-muted-foreground">Charts and cell looks are saved into .xlsx copies. Pictures, pivot tables, merged cells and macros are not.</p>
+									<p className="text-muted-foreground">Charts and cell looks are saved to .xlsx copies; pictures, pivot tables, merged cells and macros are not.</p>
 								</div>
 							),
 						},
@@ -559,7 +559,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 								</div>
 							),
 						},
-						{ id: "close", label: "Close", icon: X, panel: <p className="text-sm text-muted-foreground">Choose the workbook tab to go back to the cells. Closing is done from the list of workbooks.</p> },
+						{ id: "close", label: "Close", icon: X, panel: <p className="text-sm text-muted-foreground">Choose the workbook tab to return to the cells.</p> },
 						{ id: "history", label: "Version History", icon: History, panel: <HistoryPanel workspacePath={workspacePath} rel={rel} readOnly={readOnly} /> },
 					]}
 				/>

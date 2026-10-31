@@ -14,7 +14,7 @@ describe("what a document holds before it is shared", () => {
 		expect(screen.getByText("Hidden words").nextSibling?.textContent).toBe("5");
 		expect(screen.getByText("Hidden text")).toBeTruthy();
 		expect(screen.getByText("draft price 4,200")).toBeTruthy();
-		expect(screen.getByText(/stays in the file when it is shared/)).toBeTruthy();
+		expect(screen.getByText(/kept when the file is shared/)).toBeTruthy();
 	});
 
 	it("says nothing about hidden text when there is none", () => {

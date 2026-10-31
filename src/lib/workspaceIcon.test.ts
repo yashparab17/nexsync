@@ -7,6 +7,9 @@ describe("workspace icon", () => {
 		expect(parseIcon('{"kind":"glyph","glyph":"🚀"}')).toEqual({ kind: "glyph", glyph: "🚀" });
 		expect(parseIcon('{"kind":"glyph","glyph":"A"}')).toEqual({ kind: "glyph", glyph: "A" });
 		expect(parseIcon('{"kind":"glyph","glyph":"toolong"}')).toBeNull();
+		// An emoji made of several joined ones is an emoji; the same number of plain letters is not
+		expect(parseIcon('{"kind":"glyph","glyph":"👨‍💻"}')).toEqual({ kind: "glyph", glyph: "👨‍💻" });
+		expect(parseIcon('{"kind":"glyph","glyph":"abcdef"}')).toBeNull();
 		expect(parseIcon('{"kind":"image","data":"data:image/png;base64,AAAA"}')?.kind).toBe("image");
 		// A picture address that is not a picture, or that carries script, is refused
 		expect(parseIcon('{"kind":"image","data":"javascript:alert(1)"}')).toBeNull();

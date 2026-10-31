@@ -604,7 +604,7 @@ export default function DocumentRibbon(p: RibbonProps) {
 					/>
 				</Group>
 				<Group label="Inspect">
-					<Big icon={Braces} label={p.outlineCopied ? "Copied" : "Copy Outline"} title="Copy the headings, tables, pictures, links, changes and comments as JSON, for a script or an assistant" onPress={p.copyOutline} />
+					<Big icon={Braces} label={p.outlineCopied ? "Copied" : "Copy Outline"} title="Copy the document's structure as JSON" onPress={p.copyOutline} />
 				</Group>
 			</>
 		);

@@ -741,7 +741,7 @@ function KeptHere({ scan, heavy, held, hazards, secrets, canAct, onIgnore, onAll
 			{!scan ? (
 				<p className="text-sm text-muted-foreground">Looking...</p>
 			) : none ? (
-				<p className="text-sm text-muted-foreground">Nothing to check. Dependencies, build output and .env files already stay on this device, and nothing here looks like a secret, is too big or has a name another system cannot hold.</p>
+				<p className="text-sm text-muted-foreground">Nothing to check. Dependencies, build output and .env files stay on this device.</p>
 			) : (
 				<div className="divide-y">
 					{open.length > 0 && (

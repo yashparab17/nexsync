@@ -110,7 +110,7 @@ export default function TeamPanel({
 
 			<Panel title="Shared Failures" hint={failures.length ? String(failures.length) : undefined} className="@4xl:col-span-2" flush={failures.length > 0}>
 				{failures.length === 0 ? (
-					<p className="text-sm text-muted-foreground">When a task fails for someone, they can share its output and their tools here, with Share Failure on the Output tab.</p>
+					<p className="text-sm text-muted-foreground">When a task fails, share its output with Share Failure on the Output tab.</p>
 				) : (
 					<ul className="divide-y">
 						{failures.slice(0, 20).map((f) => {

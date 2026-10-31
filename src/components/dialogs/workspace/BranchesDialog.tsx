@@ -120,7 +120,7 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 				{review ? (
 					<div className="flex min-h-0 flex-1 flex-col gap-3">
 						{review === "missing" ? (
-							<p className="text-sm text-muted-foreground">This branch has not reached this device yet. It arrives when you are connected to the person who made it.</p>
+							<p className="text-sm text-muted-foreground">This branch has not reached this device yet.</p>
 						) : (
 							<>
 								<div className="flex flex-wrap items-center justify-between gap-2">

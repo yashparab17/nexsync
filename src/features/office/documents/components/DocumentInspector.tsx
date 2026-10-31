@@ -25,7 +25,7 @@ export default function DocumentInspector({ inspect, inline = false }: { inspect
 				<section>
 					<h3 className="mb-1 text-[13px] font-semibold text-muted-foreground">Names in the file</h3>
 					<p>{inspect.people.join(", ")}</p>
-					<p className="mt-1 text-[13px] text-muted-foreground">These stay in the file when it is shared. Exporting without a name leaves them out of the new file.</p>
+					<p className="mt-1 text-[13px] text-muted-foreground">These stay in the file when shared. Exporting without a name drops them from the copy.</p>
 				</section>
 			)}
 			{(inspect.hidden?.length ?? 0) > 0 && (
@@ -38,7 +38,7 @@ export default function DocumentInspector({ inspect, inline = false }: { inspect
 							</li>
 						))}
 					</ul>
-					<p className="mt-1 text-[13px] text-muted-foreground">The file marks this text as hidden. The editor does not show it, and it stays in the file when it is shared.</p>
+					<p className="mt-1 text-[13px] text-muted-foreground">Hidden in the file: not shown here, and kept when the file is shared.</p>
 				</section>
 			)}
 			{inspect.macros && (
@@ -69,7 +69,7 @@ export default function DocumentInspector({ inspect, inline = false }: { inspect
 							<li key={f}>{f}</li>
 						))}
 					</ul>
-					<p className="mt-1 text-[13px] text-muted-foreground">The text is shown and printed in the font on the right, which may break lines in other places than Word does. The file keeps the font it names.</p>
+					<p className="mt-1 text-[13px] text-muted-foreground">Shown and printed in the font on the right, so lines may break differently from Word. The file keeps its own font.</p>
 				</section>
 			)}
 			{inspect.leftOut.length > 0 && (

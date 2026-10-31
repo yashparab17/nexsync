@@ -127,7 +127,7 @@ export default function AnnouncementCard({ a, role, people, onEdit, onPin }: Pro
 								</li>
 							))}
 						</ul>
-						<p className="mt-2 text-[13px] text-muted-foreground">Counted per device, not per person. An answer from someone who was offline arrives when they next link to a device that is linked to this one.</p>
+						<p className="mt-2 text-[13px] text-muted-foreground">Counted per device, not per person. Offline answers arrive when that device links again.</p>
 					</details>
 				</AnimateIcon>
 			)}

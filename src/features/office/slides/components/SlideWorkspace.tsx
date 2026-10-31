@@ -427,7 +427,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 				{opened.notes.length > 0 && <p className="border-b bg-muted/40 px-3 py-1 text-[13px] text-muted-foreground">{opened.notes.join(" ")}</p>}
 				<div className="flex min-h-0 flex-1">
 					<CollapsiblePane id="slides.thumbs" defaultWidth={176} label="the slide list">
-					<ol aria-label="Slides" className="w-44 shrink-0 space-y-2 overflow-y-auto border-r bg-[#f3f2f1] p-2 dark:bg-neutral-800">
+					<ol aria-label="Slides" className="w-44 shrink-0 space-y-2 overflow-y-auto bg-[#f3f2f1] p-2 dark:bg-neutral-800">
 						{keys.map((k, i) => (
 							<li key={k}>
 								<Thumb doc={doc} k={k} baseId={baseId} reregister={reregister} current={k === key} number={i + 1} onPick={() => setActiveKey(k)} version={version} />

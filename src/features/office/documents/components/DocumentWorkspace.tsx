@@ -742,7 +742,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					panel: (
 						<div className="max-w-md space-y-2">
 							<h2 className="mb-3 text-2xl font-light">Save a Copy</h2>
-							<p className="mb-3 text-sm text-muted-foreground">A copy goes where you choose and does not change the file in the workspace. It is laid out for the page set on the Layout tab.</p>
+							<p className="mb-3 text-sm text-muted-foreground">A copy goes where you choose, laid out for the Layout tab's page.</p>
 							<label className="mb-2 flex items-center gap-2 text-sm">
 								<input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
 								Leave my name out of the file
@@ -767,7 +767,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 						<div className="max-w-md space-y-3 text-sm">
 							<h2 className="text-2xl font-light">Update the File</h2>
 							<p>Replaces <b>{name}</b> in the workspace with what the document holds now. Everyone gets the new file.</p>
-							<p className="text-muted-foreground">Named styles, footnotes, fields, comments and anything the editor does not show are not in the new file.</p>
+							<p className="text-muted-foreground">Comments and anything the editor does not show are not in the new file.</p>
 							<Button isDisabled={!canUpdateFile || readOnly} onPress={() => setDialog("update")}>
 								Replace the File…
 							</Button>
@@ -785,7 +785,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 							<p>
 								Puts <b>{name}</b> back as the file has it now, in place of what the document holds, for everyone who has it open. Use it to see the file as it is, or to start again from it.
 							</p>
-							<p className="text-muted-foreground">Changes made in the document since it was opened from the file are replaced. Undo brings them back.</p>
+							<p className="text-muted-foreground">Changes since the file was opened are replaced. Undo brings them back.</p>
 							<Button isDisabled={readOnly || !!seeding} onPress={() => setDialog("reload")}>
 								Reload from File…
 							</Button>
@@ -799,12 +799,12 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					panel: (
 						<div className="max-w-md space-y-3 text-sm">
 							<h2 className="text-2xl font-light">Print</h2>
-							<p className="text-muted-foreground">Prints the page as it is shown, with the margins, header and footer of the Layout tab.</p>
+							<p className="text-muted-foreground">Prints the page as shown, with the Layout tab's margins, header and footer.</p>
 							<Button onPress={() => window.print()}>Print…</Button>
 						</div>
 					),
 				},
-				{ id: "close", label: "Close", icon: X, panel: <p className="text-sm text-muted-foreground">Choose the document tab to go back to the text. Closing is done from the list of documents.</p> },
+				{ id: "close", label: "Close", icon: X, panel: <p className="text-sm text-muted-foreground">Choose the document tab to return to the text.</p> },
 						{ id: "history", label: "Version History", icon: History, panel: history ? <HistoryPanel workspacePath={history.workspacePath} rel={history.rel} readOnly={readOnly} /> : null },
 					]}
 		/>

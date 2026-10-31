@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { initialOf } from "@/components/elements/Avatar";
+import EmojiPicker from "@/components/elements/EmojiPicker";
 import ColorSwatches from "@/components/elements/ColorSwatches";
 import { Button } from "@/components/ui/button";
 import { Upload } from "@/components/animate-icons";
@@ -50,9 +51,12 @@ export default function WorkspaceIconView({ id, name, className }: { id: string 
 }
 
 // Choose a picture from the computer, an emoji, or go back to the letter
-export function IconPicker({ value, onChange, name, shared = false }: { value: Icon | null; onChange: (icon: Icon | null) => void; name: string; shared?: boolean }) {
+// `initial` is the icon when the picker was opened: Revert goes back to it
+export function IconPicker({ value, onChange, name, shared = false, initial = null }: { value: Icon | null; onChange: (icon: Icon | null) => void; name: string; shared?: boolean; initial?: Icon | null }) {
 	const file = useRef<HTMLInputElement>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [more, setMore] = useState(false);
+	const changed = JSON.stringify(value) !== JSON.stringify(initial);
 
 	return (
 		<div className="flex flex-col gap-2">
@@ -79,9 +83,9 @@ export function IconPicker({ value, onChange, name, shared = false }: { value: I
 						<Upload className="size-3.5" />
 						Choose a Picture
 					</Button>
-					{value && (
-						<Button variant="ghost" size="sm" onPress={() => onChange(null)}>
-							Use the Letter
+					{changed && (
+						<Button variant="ghost" size="sm" onPress={() => onChange(initial)}>
+							Revert
 						</Button>
 					)}
 				</div>
@@ -100,6 +104,12 @@ export function IconPicker({ value, onChange, name, shared = false }: { value: I
 					</button>
 				))}
 			</div>
+			<div>
+				<Button variant="ghost" size="sm" aria-expanded={more} onPress={() => setMore(!more)}>
+					{more ? "Fewer emoji" : "All emoji"}
+				</Button>
+			</div>
+			{more && <EmojiPicker value={value?.kind === "glyph" ? value.glyph : null} onPick={(glyph) => onChange(value?.kind === "glyph" && value.color ? { kind: "glyph", glyph, color: value.color } : { kind: "glyph", glyph })} />}
 			{value?.kind !== "image" && (
 				<ColorSwatches
 					value={value?.color ?? null}

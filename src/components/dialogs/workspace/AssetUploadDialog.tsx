@@ -14,7 +14,8 @@ interface AssetUploadDialogProps {
 	workspacePath: string;
 	isOpen: boolean;
 	onClose: () => void;
-	onUploaded: () => void;
+	// The names the files were saved under
+	onUploaded: (names: string[]) => void;
 }
 
 interface Picked {
@@ -57,15 +58,17 @@ export default function AssetUploadDialog({ workspacePath, isOpen, onClose, onUp
 		setError(null);
 		try {
 			let uploaded = 0;
+			const names: string[] = [];
 			for (const { file } of picked) {
 				const base64Data = await fileToBase64(file, percent);
 				const sanitizedName = safeUploadName(file.name);
 				await writeWorkspaceBinaryFile(workspacePath, `assets/${sanitizedName}`, base64Data);
 				uploaded++;
+				names.push(sanitizedName);
 			}
 			setSuccessCount(uploaded);
 			setTimeout(() => {
-				onUploaded();
+				onUploaded(names);
 				onClose();
 				setPicked([]);
 				setSuccessCount(null);
