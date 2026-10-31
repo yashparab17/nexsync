@@ -1,8 +1,10 @@
+import { Field } from "@/components/ui/field";
 // Items that erase themselves: a countdown badge for lists, and the control the Owner and Admins use to set or clear a time.
 // An expiry is a signed entry of the log (see announce.rs); every device, including those that were off at the time, erases the
 // item when its own clock passes it. The clock is read from each device (RESEARCH.md §8h), so a device set a day ahead erases a
 // day early.
 
+import { Notice } from "@/components/ui/notice";
 import { useMemo, useState } from "react";
 
 import { AnimateIcon, Hourglass } from "@/components/animate-icons";
@@ -10,7 +12,6 @@ import { fromLocalInput, toLocalInput } from "@/features/announcements/component
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { timeUntil } from "@/features/announcements/lib/announcements";
 import { useChat } from "@/store/chat/ChatContext";
 import { useSelfRole } from "@/store/p2p/P2PContext";
@@ -91,14 +92,13 @@ export function ExpiryControl({ entity, id, name }: { entity: Entity; id: string
 				<Dialog isOpen onOpenChange={(o) => !o && setOpen(false)} className="sm:max-w-md">
 					<div className="flex flex-col gap-4">
 						<DialogHeading icon={<Hourglass className="size-6" />} tone="warning" title="Erase for Good" description={`“${name}” will be erased for good from every device when this time comes, including devices that are off now. Copies someone exported, backups of a disk, and a device changed to ignore the notice keep it.`} />
-						<div className="space-y-1">
-							<Label htmlFor="expiry-at">Erase At</Label>
-							<Input id="expiry-at" type="datetime-local" value={value} onChange={(e) => setValue(e.target.value)} />
-						</div>
+						<Field label="Erase At" htmlFor="expiry-at">
+<Input id="expiry-at" type="datetime-local" value={value} onChange={(e) => setValue(e.target.value)} />
+</Field>
 						{error && (
-							<p role="alert" className="bg-destructive/10 p-2 text-sm text-destructive">
+							<Notice>
 								{error}
-							</p>
+							</Notice>
 						)}
 						<div className="flex justify-end gap-2">
 							{at > 0 && (

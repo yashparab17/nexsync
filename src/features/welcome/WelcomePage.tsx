@@ -1,3 +1,5 @@
+import { timeAgo } from "@/lib/utils";
+import { Caption, Kbd } from "@/components/layout/Pane";
 // React
 import { lazy, Suspense, useEffect, useState } from "react";
 
@@ -55,14 +57,8 @@ const tile = "h-auto w-full justify-start gap-4 px-5 py-4 text-left";
 
 // "edited 3h ago" from an ISO timestamp; empty when the registry has none
 function editedAgo(iso: string): string {
-	const ms = Date.now() - new Date(iso).getTime();
-	if (!iso || Number.isNaN(ms)) return "";
-	const m = Math.floor(Math.max(0, ms) / 60_000);
-	if (m < 1) return "edited just now";
-	if (m < 60) return `edited ${m}m ago`;
-	if (m < 1440) return `edited ${Math.floor(m / 60)}h ago`;
-	if (m < 10080) return `edited ${Math.floor(m / 1440)}d ago`;
-	return `edited ${new Date(iso).toLocaleDateString()}`;
+	const ago = timeAgo(iso);
+	return ago ? `edited ${ago}` : "";
 }
 
 // The workspaces of one group on the Welcome page, as cards
@@ -170,7 +166,7 @@ export default function Welcome() {
 				<div className="flex items-center gap-3">
 					<img src={isDark ? logo_white : logo_black} alt="" className="size-9" />
 					<span className="text-xl font-bold">Nexsync</span>
-					<span className="font-mono text-xs text-muted-foreground">v{APP_VERSION}</span>
+					<Caption className="text-xs">v{APP_VERSION}</Caption>
 				</div>
 				<div className="flex items-center gap-1">
 					
@@ -252,7 +248,7 @@ export default function Welcome() {
 								{shortcuts.map(([keys, what]) => (
 									<div key={what} className="flex items-center justify-between gap-4">
 										<dt>{what}</dt>
-										<dd><kbd className="border bg-card px-2 py-0.5 font-mono text-xs">{keys}</kbd></dd>
+										<dd><Kbd>{keys}</Kbd></dd>
 									</div>
 								))}
 							</dl>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GLYPHS, getIcon, iconFromEntries, parseIcon, setIcon } from "@/lib/workspaceIcon";
+import { getIcon, iconFromEntries, parseIcon, setIcon } from "@/lib/workspaceIcon";
 
 describe("workspace icon", () => {
 	it("reads a picture, an emoji or a letter, and nothing else", () => {
@@ -19,8 +19,8 @@ describe("workspace icon", () => {
 	});
 
 	it("keeps an icon per workspace and forgets it when cleared", () => {
-		setIcon("w1", { kind: "glyph", glyph: GLYPHS[0] });
-		expect(getIcon("w1")).toEqual({ kind: "glyph", glyph: GLYPHS[0] });
+		setIcon("w1", { kind: "glyph", glyph: "🚀" });
+		expect(getIcon("w1")).toEqual({ kind: "glyph", glyph: "🚀" });
 		expect(getIcon("w2")).toBeNull();
 		setIcon("w1", null);
 		expect(getIcon("w1")).toBeNull();

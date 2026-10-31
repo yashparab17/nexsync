@@ -1,7 +1,10 @@
+import { Caption } from "@/components/layout/Pane";
 // Projects: the folders under projects/, what kind each is, the recipe the team shares for it, and what this device does with it:
 // run its tasks (after approving each command), watch their output and problems, keep the environment, and see when the
 // dependencies the team changed need installing.
 
+import { Notice } from "@/components/ui/notice";
+import { IconButton } from "@/components/ui/icon-button";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -375,9 +378,9 @@ export default function ProjectsPage() {
 						{held.holding ? `Resume Incoming${held.count ? ` (${held.count})` : ""}` : "Pause Incoming"}
 					</Button></span>
 				)}
-				<Button variant="ghost" size="icon-sm" aria-label="Look again" onPress={() => void load()}>
+				<IconButton label="Look again" onPress={() => void load()}>
 					<RefreshCw className="size-4" />
-				</Button>
+				</IconButton>
 				{!isViewer && (
 					<Button size="sm" onPress={() => setCreating(true)}>
 						<FolderPlus className="size-4" />
@@ -432,10 +435,10 @@ export default function ProjectsPage() {
 										<header className="flex h-10 shrink-0 items-center gap-3 border-b px-3">
 											<Terminal className="size-4 text-muted-foreground" />
 											<span className="min-w-0 flex-1 truncate text-sm font-medium">{term.label}</span>
-											<span className="font-mono text-[13px] text-muted-foreground">{term.exited === undefined ? "running" : `ended${term.exited ? ` with code ${term.exited}` : ""}`}</span>
-											<Button variant="ghost" size="icon-xs" aria-label="Close the terminal" onPress={() => setTerminals((all) => all.filter((x) => x.key !== term.key))}>
+											<Caption>{term.exited === undefined ? "running" : `ended${term.exited ? ` with code ${term.exited}` : ""}`}</Caption>
+											<IconButton size="xs" label="Close the terminal" onPress={() => setTerminals((all) => all.filter((x) => x.key !== term.key))}>
 												<X className="size-3.5" />
-											</Button>
+											</IconButton>
 										</header>
 										<div className="min-h-0 flex-1">
 											<TerminalView workspacePath={path} dir={term.dir} command={term.command} visible onExit={(code) => setTerminals((all) => all.map((x) => (x.key === term.key ? { ...x, exited: code } : x)))} onFailed={(m) => setNotice({ ok: false, text: m })} />
@@ -500,7 +503,7 @@ export default function ProjectsPage() {
 										<Banner className="@4xl:col-span-2">
 											<span className="min-w-0 flex-1">
 												{deps.state === "changed" ? "The dependencies changed since you last installed them here." : "The dependencies are not installed on this device yet."}{" "}
-												<span className="font-mono text-[13px] text-muted-foreground">{deps.files.join(", ")}</span>
+												<Caption>{deps.files.join(", ")}</Caption>
 											</span>
 											{tasks.some((t) => t.id === "install") && !isViewer && (
 												<Button size="sm" onPress={() => void runTask(tasks.find((t) => t.id === "install")!)}>
@@ -529,9 +532,9 @@ export default function ProjectsPage() {
 												)}
 											</div>
 											{project.recipeError && (
-												<p role="alert" className="bg-destructive/10 p-2 text-destructive">
+												<Notice>
 													The recipe in this folder cannot be used: {project.recipeError}
-												</p>
+												</Notice>
 											)}
 											{!project.scratch && (
 												<div className="flex flex-wrap items-center gap-2">
@@ -598,9 +601,9 @@ export default function ProjectsPage() {
 																	</Button>
 																))}
 															{projectId && !isViewer && !live && !t.interactive && (
-																<Button variant="ghost" size="icon-xs" aria-label={`Run ${t.label} in a terminal`} onPress={() => void runInTerminal(t)}>
+																<IconButton size="xs" label={`Run ${t.label} in a terminal`} onPress={() => void runInTerminal(t)}>
 																	<Terminal className="size-3.5" />
-																</Button>
+																</IconButton>
 															)}
 														</li>
 													);
@@ -609,7 +612,7 @@ export default function ProjectsPage() {
 										)}
 									</Panel>
 
-									<Panel title="Tools on This Device" hint={doctor?.managers.length ? doctor.managers.join(", ") : undefined} right={tools.length > 0 && <Button variant="ghost" size="icon-xs" aria-label="Check again" onPress={check}><RefreshCw className="size-3.5" /></Button>} flush={tools.length > 0}>
+									<Panel title="Tools on This Device" hint={doctor?.managers.length ? doctor.managers.join(", ") : undefined} right={tools.length > 0 && <IconButton size="xs" label="Check again" onPress={check}><RefreshCw className="size-3.5" /></IconButton>} flush={tools.length > 0}>
 										{tools.length === 0 ? (
 											<p className="text-sm text-muted-foreground">This project names no tools.</p>
 										) : !doctor ? (

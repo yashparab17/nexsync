@@ -1,3 +1,4 @@
+import { IconButton } from "@/components/ui/icon-button";
 import { useState } from "react";
 
 import { ExternalLink, Play, RefreshCw } from "@/components/animate-icons";
@@ -65,12 +66,12 @@ export default function PreviewPane({ ports, running, startLabel, onStart, onOpe
 						</button>
 					))}
 				</div>
-				<Button variant="ghost" size="icon-sm" aria-label="Reload" onPress={() => setReload((n) => n + 1)}>
+				<IconButton label="Reload" onPress={() => setReload((n) => n + 1)}>
 					<RefreshCw className="size-4" />
-				</Button>
-				<Button variant="ghost" size="icon-sm" aria-label="Open in the browser" onPress={() => onOpenUrl(url)}>
+				</IconButton>
+				<IconButton label="Open in the browser" onPress={() => onOpenUrl(url)}>
 					<ExternalLink className="size-4" />
-				</Button>
+				</IconButton>
 			</div>
 			<div className="flex min-h-96 flex-1 justify-center overflow-auto bg-muted/40">
 				<iframe

@@ -1,6 +1,7 @@
 // Chat: channels on the left, the conversation in the middle, the people on the right, in the manner of Discord and Fluxer.
 // Messages are entries of the signed log (see src/lib/chat); this page only reads them and writes new ones.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -17,7 +18,6 @@ import MessageList from "@/features/chat/components/MessageList";
 import { AnimateIcon, Bell, BellOff, Download, Hash, Moon, Timer, Users } from "@/components/animate-icons";
 import { EmptyState, Page } from "@/components/layout/Page";
 import Toolbar, { ToolbarSelect, ToolbarTitle } from "@/components/layout/Toolbar";
-import { Button } from "@/components/ui/button";
 import Avatar from "@/components/elements/Avatar";
 import { buildMessages, type Channel, channelMarkdown, GENERAL, lateIds, replyCounts, slugify, threadRoot, type Message } from "@/features/chat/lib/entries";
 import { exportNote } from "@/lib/export";
@@ -296,9 +296,9 @@ export default function ChatPage() {
 						{channel.topic && <span className="hidden min-w-0 flex-1 truncate border-l pl-3 font-mono text-[13px] text-muted-foreground @3xl:block">{channel.topic}</span>}
 						<span className="flex-1" />
 						<div className="flex flex-wrap items-center justify-end gap-1">
-						<Button variant="ghost" size="icon-sm" aria-label={muted[channel.id] ? "Unmute channel" : "Mute channel"} onPress={() => chat.setMuted(channel.id, !muted[channel.id])} className="text-muted-foreground">
+						<IconButton label={muted[channel.id] ? "Unmute channel" : "Mute channel"} onPress={() => chat.setMuted(channel.id, !muted[channel.id])} className="text-muted-foreground">
 							{muted[channel.id] ? <BellOff className="size-4" /> : <Bell className="size-4" />}
-						</Button>
+						</IconButton>
 						{dmWith ? null : isAdmin ? (
 							<AnimateIcon animateOnHover asChild>
 								<label className="flex items-center gap-2 text-muted-foreground" title="Slow mode: how long people below Admin wait between messages">
@@ -320,30 +320,23 @@ export default function ChatPage() {
 								</span>
 							)
 						)}
-						<Button variant="ghost" size="icon-sm" aria-label="Export channel as Markdown" onPress={() => void exportChannel()} className="text-muted-foreground">
+						<IconButton label="Export channel as Markdown" onPress={() => void exportChannel()} className="text-muted-foreground">
 							<Download className="size-4" />
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label={chat.dnd ? "Turn off Do not disturb" : "Turn on Do not disturb"}
-							aria-pressed={chat.dnd}
-							onPress={() => chat.setDnd(!chat.dnd)}
-							className={chat.dnd ? "text-warning" : "text-muted-foreground"}
-						>
+						</IconButton>
+						<IconButton label={chat.dnd ? "Turn off Do not disturb" : "Turn on Do not disturb"} pressed={chat.dnd} onPress={() => chat.setDnd(!chat.dnd)} className={chat.dnd ? "text-warning" : "text-muted-foreground"}>
 							<Moon className="size-4" />
-						</Button>
-						<Button variant="ghost" size="icon-sm" aria-label={showMembers ? "Hide members" : "Show members"} aria-pressed={showMembers} onPress={() => setShowMembers((v) => !v)} className={cn("hidden @4xl:inline-flex", showMembers ? "text-foreground" : "text-muted-foreground")}>
+						</IconButton>
+						<IconButton label={showMembers ? "Hide members" : "Show members"} pressed={showMembers} onPress={() => setShowMembers((v) => !v)} className={cn("hidden @4xl:inline-flex", showMembers ? "text-foreground" : "text-muted-foreground")}>
 							<Users className="size-4" />
-						</Button>
+						</IconButton>
 						</div>
 					</Toolbar>
 					{notice && (
 						<p role="status" className="flex h-8 shrink-0 items-center justify-between gap-4 bg-muted px-4 text-[13px]">
 							{notice}
-							<Button variant="ghost" size="icon-xs" aria-label="Dismiss" onPress={() => setNotice(null)}>
+							<IconButton size="xs" label="Dismiss" onPress={() => setNotice(null)}>
 								<X className="size-3.5" />
-							</Button>
+							</IconButton>
 						</p>
 					)}
 					{messages.length === 0 ? (

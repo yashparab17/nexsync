@@ -1,3 +1,4 @@
+import { IconButton } from "@/components/ui/icon-button";
 import { X } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
@@ -28,9 +29,9 @@ export default function TransferTray() {
 							</span>
 							<span className="flex shrink-0 items-center gap-1 text-muted-foreground">
 								{percent}%
-								<Button variant="ghost" size="icon-xs" aria-label={`Cancel ${t.relPath}`} onPress={() => cancelTransfers(t.relPath)}>
+								<IconButton size="xs" label={`Cancel ${t.relPath}`} onPress={() => cancelTransfers(t.relPath)}>
 									<X className="size-3" />
-								</Button>
+								</IconButton>
 							</span>
 						</div>
 						<div className="h-1 w-full bg-muted">

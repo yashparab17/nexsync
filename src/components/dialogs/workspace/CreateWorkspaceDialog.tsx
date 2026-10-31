@@ -1,4 +1,6 @@
+import { Field } from "@/components/ui/field";
 // React
+import { FieldError } from "@/components/ui/notice";
 import { validateWorkspaceName } from "@/lib/validation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -117,7 +119,7 @@ export default function CreateWorkspaceDialog({
 					<DialogHeading icon={<FolderPlus className="size-6" />} title="Create a Workspace" />
 
 					{/* The card as it will appear on the Welcome screen; its name, description and icon are edited right here */}
-					<div className="flex min-w-0 flex-col gap-3 border border-primary bg-card p-4">
+					<div className="flex min-w-0 flex-col gap-3 bg-card p-4">
 						<div className="flex min-w-0 items-center gap-3">
 							<button type="button" aria-expanded={pickIcon} aria-label="Change the icon" title="Change the icon" onClick={() => setPickIcon(!pickIcon)} className="shrink-0 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring">
 								<IconView icon={icon} name={workspaceName} className="size-12 text-2xl" />
@@ -130,24 +132,23 @@ export default function CreateWorkspaceDialog({
 							</div>
 						</div>
 						{nameProblem && (
-							<p id="workspace-name-problem" role="alert" className="text-xs text-destructive">
+							<FieldError id="workspace-name-problem">
 								{nameProblem}
-							</p>
+							</FieldError>
 						)}
 						{pickIcon && <IconPicker value={icon} onChange={setIconChoice} name={workspaceName} bare />}
 						<span className="truncate font-mono text-xs text-muted-foreground">{previewPath(workspacePath, workspaceName.trim() || "…")}</span>
 					</div>
 
-					<div className="flex flex-col gap-1">
-						<Label htmlFor="workspace-location">Save in</Label>
-						<div className="flex gap-2">
+					<Field label="Save in" htmlFor="workspace-location">
+<div className="flex gap-2">
 							<Input id="workspace-location" readOnly value={workspacePath} className="font-mono text-xs" />
 							<Button variant="outline" onPress={pickFolder} aria-label="Choose a folder">
 								<FolderOpen className="size-4" />
 								Browse
 							</Button>
 						</div>
-					</div>
+</Field>
 
 					{error && <p className="text-sm text-destructive">{error}</p>}
 

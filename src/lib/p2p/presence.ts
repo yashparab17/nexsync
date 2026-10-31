@@ -1,3 +1,4 @@
+import { readFlag, saveFlag } from "@/lib/storage";
 // Who is where in a workspace: the message each device sends, and the words and links built from it
 
 import type { ProbeResult } from "@/lib/p2p/transport";
@@ -115,18 +116,6 @@ export function skewText(ms: number): string {
 // A setting for this device: join and leave toasts off
 const QUIET_KEY = "nexsync.quietPresence";
 
-export function readQuiet(): boolean {
-	try {
-		return localStorage.getItem(QUIET_KEY) === "1";
-	} catch {
-		return false;
-	}
-}
+export const readQuiet = (): boolean => readFlag(QUIET_KEY);
 
-export function saveQuiet(on: boolean) {
-	try {
-		localStorage.setItem(QUIET_KEY, on ? "1" : "0");
-	} catch {
-		// The setting then lasts until the app closes, which is acceptable
-	}
-}
+export const saveQuiet = (on: boolean) => saveFlag(QUIET_KEY, on);

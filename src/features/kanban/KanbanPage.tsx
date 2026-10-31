@@ -1,3 +1,6 @@
+import { Caption } from "@/components/layout/Pane";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { IconButton } from "@/components/ui/icon-button";
 import { MAX_TITLE } from "@/lib/validation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, AlertTriangle, ArrowRight, CheckSquare, Pencil } from "@/components/animate-icons";
@@ -516,7 +519,7 @@ export default function KanbanPage() {
 
 			{allTags.length > 0 && (
 				<Toolbar variant="sub" className="gap-2 overflow-x-auto">
-					<span className="font-mono text-[13px] text-muted-foreground">tags</span>
+					<Caption>tags</Caption>
 					{allTags.map((tag) => (
 						<TagChip key={tag} tag={tag} active={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)} />
 					))}
@@ -567,27 +570,16 @@ export default function KanbanPage() {
 
 									{canChange && (
 										<div className="flex items-center gap-1">
-											<Button
-												variant="ghost"
-												size="icon-xs"
-												onPress={() => setDeletingColId(col.id)}
-												aria-label="Delete column"
-												className="opacity-0 transition-opacity focus-visible:opacity-100 group-hover/col:opacity-100"
-											>
+											<IconButton size="xs" onPress={() => setDeletingColId(col.id)} label="Delete column" className="opacity-0 transition-opacity focus-visible:opacity-100 group-hover/col:opacity-100">
 												<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
-											</Button>
-											<Button
-												variant="ghost"
-												size="icon-xs"
-												onPress={() => {
+											</IconButton>
+											<IconButton size="xs" onPress={() => {
 													setCardTitle("");
 													setCardDesc("");
 													openNewCard(col.id);
-												}}
-												aria-label="Add card"
-											>
+												}} label="Add card">
 												<Plus className="size-3.5" />
-											</Button>
+											</IconButton>
 										</div>
 									)}
 								</div>
@@ -662,23 +654,12 @@ export default function KanbanPage() {
 													<PresenceDots names={viewersAt("kanban", card.id)} doing="editing this card" />
 													{canChange && (
 														<div className="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100">
-															<Button
-																variant="ghost"
-																size="icon-xs"
-																onPress={() => handleOpenEditCard(card)}
-																data-nav
-																aria-label="Edit card"
-															>
+															<IconButton size="xs" onPress={() => handleOpenEditCard(card)} data-nav label="Edit card">
 																<Pencil className="size-3" />
-															</Button>
-															<Button
-																variant="ghost"
-																size="icon-xs"
-																onPress={() => setDeletingCardId(card.id)}
-																aria-label="Delete card"
-															>
+															</IconButton>
+															<IconButton size="xs" onPress={() => setDeletingCardId(card.id)} label="Delete card">
 																<Trash2 className="size-3 text-destructive" />
-															</Button>
+															</IconButton>
 														</div>
 													)}
 												</div>
@@ -950,57 +931,23 @@ export default function KanbanPage() {
 
 			{/* Delete column Confirmation Modal */}
 			{deletingColId && (
-				<Dialog
-					isOpen={!!deletingColId}
-					onOpenChange={(open) => !open && setDeletingColId(null)}
-				>
-					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Column" description={<>Are you sure you want to delete this column and all of its
-								cards? This action cannot be undone.</>} />
-
-						<DialogFooter>
-							<Button variant="outline" onPress={() => setDeletingColId(null)}>
-								Cancel
-							</Button>
-							<Button variant="destructive" onPress={handleDeleteColumn}>
-								Delete Column
-							</Button>
-						</DialogFooter>
-					</div>
-				</Dialog>
+				<ConfirmDialog isOpen={!!deletingColId} onOpenChange={(open) => !open && setDeletingColId(null)} icon={<Trash2 className="size-6" />} title="Delete Column" description={<>Are you sure you want to delete this column and all of its
+								cards? This action cannot be undone.</>} confirmLabel="Delete Column" onConfirm={handleDeleteColumn} onCancel={() => setDeletingColId(null)} />
 			)}
 
 			{/* Delete card Confirmation Modal */}
 			{deletingCardId && (
-				<Dialog
-					isOpen={!!deletingCardId}
-					onOpenChange={(open) => {
+				<ConfirmDialog isOpen={!!deletingCardId} onOpenChange={(open) => {
 						if (!open) {
 							setDeletingCardId(null);
 							setEraseCard(false);
 						}
-					}}
-				>
-					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Card" description={<>Are you sure you want to delete this card?</>} />
-						<EraseOption checked={eraseCard} onChange={setEraseCard} what="the card" />
-
-						<DialogFooter>
-							<Button
-								variant="outline"
-								onPress={() => {
+					}} icon={<Trash2 className="size-6" />} title="Delete Card" description={<>Are you sure you want to delete this card?</>} confirmLabel={eraseCard ? "Erase Card" : "Delete Card"} onConfirm={handleDeleteCard} onCancel={() => {
 									setDeletingCardId(null);
 									setEraseCard(false);
-								}}
-							>
-								Cancel
-							</Button>
-							<Button variant="destructive" onPress={handleDeleteCard}>
-								{eraseCard ? "Erase Card" : "Delete Card"}
-							</Button>
-						</DialogFooter>
-					</div>
-				</Dialog>
+								}}>
+<EraseOption checked={eraseCard} onChange={setEraseCard} what="the card" />
+</ConfirmDialog>
 			)}
 		</div>
 	);

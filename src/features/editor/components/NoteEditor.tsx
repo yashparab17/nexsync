@@ -1,9 +1,11 @@
+import { IconButton } from "@/components/ui/icon-button";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { Check, Download, Eye, FileText, GitBranch, History, MessageSquareDiff, PanelRight, Type, Users } from "@/components/animate-icons";
 
 import CodeEditor from "@/features/editor/components/CodeEditor";
 import RichTextEditor from "@/features/editor/components/RichTextEditor";
+import { Popover } from "@/components/ui/popover";
 import MarkdownPreview from "@/components/elements/MarkdownPreview";
 import CollapsiblePane from "@/components/layout/CollapsiblePane";
 import NoteSidePanel from "@/features/editor/components/NoteSidePanel";
@@ -239,54 +241,44 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 					{workspacePath && docId && (
 						<>
 							{isMarkdown && collab && !readOnly && !branch && (
-								<Button
-									variant="ghost"
-									size="icon-xs"
-									aria-label="Suggest edit"
-									onPress={() => {
+								<IconButton size="xs" label="Suggest edit" onPress={() => {
 										const { from, to } = viewRef.current?.state.selection.main ?? { from: 0, to: 0 };
 										setSuggesting({ from, to });
-									}}
-								>
+									}}>
 									<MessageSquareDiff className="size-4" />
-								</Button>
+								</IconButton>
 							)}
 							{isMarkdown && mainCollab && (
-								<Button variant="ghost" size="icon-xs" aria-label="Branches" onPress={() => setBranchesOpen(true)}>
+								<IconButton size="xs" label="Branches" onPress={() => setBranchesOpen(true)}>
 									<GitBranch className="size-4" />
-								</Button>
+								</IconButton>
 							)}
 							{isMarkdown && (
-								<Button variant="ghost" size="icon-xs" aria-label={previewOpen ? "Hide the preview" : "Show the preview"} aria-pressed={previewOpen} onPress={() => setPreviewOpen((open) => !open)}>
+								<IconButton size="xs" label={previewOpen ? "Hide the preview" : "Show the preview"} pressed={previewOpen} onPress={() => setPreviewOpen((open) => !open)}>
 									<Eye className="size-4" />
-								</Button>
+								</IconButton>
 							)}
 							<ExpiryControl entity="file" id={docId} name={fileName} />
-							<Button variant="ghost" size="icon-xs" aria-label="History" onPress={() => setHistoryOpen(true)}>
+							<IconButton size="xs" label="History" onPress={() => setHistoryOpen(true)}>
 								<History className="size-4" />
-							</Button>
+							</IconButton>
 							<div className="relative">
-								<Button variant="ghost" size="icon-xs" aria-label="Export" onPress={() => setExportMenu((open) => !open)} aria-expanded={exportMenu}>
+								<IconButton size="xs" label="Export" onPress={() => setExportMenu((open) => !open)} aria-expanded={exportMenu}>
 									<Download className="size-4" />
-								</Button>
-								{exportMenu && (
-									<>
-										<button type="button" aria-label="Close export menu" className="fixed inset-0 z-10 cursor-default" onClick={() => setExportMenu(false)} />
-										<div className="absolute right-0 z-20 mt-1 w-44 border bg-popover p-1 ring-1 ring-foreground/10">
-											<Button variant="ghost" size="sm" className="w-full justify-start" onPress={() => void runExport("md")}>
-												Markdown (.md)
-											</Button>
-											<Button variant="ghost" size="sm" className="w-full justify-start" onPress={() => void runExport("pdf")}>
-												PDF Document
-											</Button>
-										</div>
-									</>
-								)}
+								</IconButton>
+								<Popover open={exportMenu} onClose={() => setExportMenu(false)} label="Export menu" className="w-44 p-1">
+									<Button variant="ghost" size="sm" className="w-full justify-start" onPress={() => void runExport("md")}>
+										Markdown (.md)
+									</Button>
+									<Button variant="ghost" size="sm" className="w-full justify-start" onPress={() => void runExport("pdf")}>
+										PDF Document
+									</Button>
+								</Popover>
 							</div>
 							{notes && onOpenNote && (
-								<Button variant="ghost" size="icon-xs" aria-label="Outline and links" aria-pressed={panelOpen} onPress={() => setPanelOpen((open) => !open)}>
+								<IconButton size="xs" label="Outline and links" pressed={panelOpen} onPress={() => setPanelOpen((open) => !open)}>
 									<PanelRight className="size-4" />
-								</Button>
+								</IconButton>
 							)}
 						</>
 					)}

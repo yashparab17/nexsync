@@ -2,6 +2,7 @@
 // in the same record since, undoing could overwrite their work, so those are listed for a person to decide one by one. Text in
 // notes and code is never undone here; it opens in the catch-up review, where each change is undone by hand.
 
+import { Notice } from "@/components/ui/notice";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Undo2 } from "@/components/animate-icons";
 
@@ -83,9 +84,9 @@ export default function UndoMemberDialog({ member, onClose }: { member: Member; 
 			<div className="flex max-h-[75vh] min-h-0 flex-col gap-4">
 				<DialogHeading icon={<Undo2 className="size-6" />} title={`Undo Changes by ${member.name}`} />
 				{error && (
-					<p role="alert" className="bg-destructive/10 p-2 text-sm text-destructive">
+					<Notice>
 						{error}
-					</p>
+					</Notice>
 				)}
 				{changes === null ? (
 					<p className="text-sm text-muted-foreground">Looking through what this device recorded…</p>

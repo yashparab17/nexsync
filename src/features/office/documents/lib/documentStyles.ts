@@ -40,6 +40,11 @@ export interface TableLook {
 	headerBold: boolean;
 	bandFill: string;
 	fill: string;
+	// The lines between the cells: a colour and a width in points (0 or absent leaves them, negative takes them away), and bold text in the first column and the last row
+	borderColor?: string;
+	borderWidth?: number;
+	firstColBold?: boolean;
+	totalBold?: boolean;
 }
 
 // What the backend sends for a style of the file (`StyleOut`)
@@ -256,6 +261,9 @@ export function tableStyleCss(all: Iterable<StyleDef>, escape: (id: string) => s
 			if (hex(t.fill)) rules.push(`${base} :is(td,th){background-color:${t.fill}}`);
 			if (hex(t.bandFill)) rules.push(`${base} tr:nth-child(even) :is(td,th){background-color:${t.bandFill}}`);
 			if (hex(t.headerFill) || t.headerBold || hex(t.headerColor)) rules.push(`${base} tr:first-child :is(td,th){${hex(t.headerFill) ? `background-color:${t.headerFill};` : ""}${t.headerBold ? "font-weight:700;" : ""}${hex(t.headerColor) ? `color:${t.headerColor};` : ""}}`);
+			if (t.borderWidth && t.borderWidth > 0) rules.push(`${base} :is(td,th){border:${Math.min(t.borderWidth, 12)}px solid ${hex(t.borderColor ?? "") || "currentColor"}}`);
+			if (t.firstColBold) rules.push(`${base} tr :is(td,th):first-child{font-weight:700}`);
+			if (t.totalBold) rules.push(`${base} tr:last-child :is(td,th){font-weight:700}`);
 			return rules.join("\n");
 		})
 		.filter(Boolean)

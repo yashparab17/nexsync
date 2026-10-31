@@ -16,8 +16,16 @@ describe("workspace headers", () => {
 	it("keep the Office pages' search and new buttons in the list pane", () => {
 		for (const f of pages.filter((p) => /office[\/](documents|sheets|slides)[\/]\w+Page\.tsx$/.test(p))) {
 			const text = readFileSync(f, "utf8");
-			expect(text, f).toMatch(/<Toolbar variant="header">/);
+			expect(text, f).toMatch(/<PaneHeader /);
 			expect(text, f).not.toMatch(/<Toolbar>\s*$/m);
 		}
+	});
+
+	it("use the shared pieces instead of styling them again", () => {
+		const all = walk("src").filter((f) => !/components[\/]ui[\/]/.test(f));
+		const text = (f: string) => readFileSync(f, "utf8");
+		// Icon-only buttons are IconButton; error boxes and field errors are Notice and FieldError
+		expect(all.filter((f) => /<Button[^>]*size="icon-(xs|sm)"/.test(text(f)))).toEqual([]);
+		expect(all.filter((f) => /<p role="alert" className="[^"]*(bg-destructive\/10|text-xs text-destructive)/.test(text(f)))).toEqual([]);
 	});
 });

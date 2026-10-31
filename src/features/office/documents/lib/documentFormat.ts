@@ -59,11 +59,11 @@ export interface PageSetup {
 	valign: "top" | "center" | "bottom" | "justify";
 	// The page as a file has it, when that is not one of the paper sizes and margins above (points); the paper and margins win once chosen
 	custom?: PageBox;
-	// Text drawn across each page in the editor (not written to the file)
+	// Text drawn across each page, written to the file as its watermark
 	watermark?: string;
-	// A number beside each line of text in the editor (not written to the file)
+	// A number beside each line of text (written to the file)
 	lineNumbers?: boolean;
-	// Editor-only looks: break words at line ends, a border inside each page, shaded alternate table rows
+	// Break words at line ends and a border round each page (both written to the file), and shaded alternate table rows (editor only)
 	hyphenate?: boolean;
 	border?: boolean;
 	banded?: boolean;
@@ -96,8 +96,8 @@ const validBox = (b: unknown): b is PageBox => {
 };
 
 // The page set-up and header settings a file starts with, from what the backend read in it
-export function setupFromLayout(l: { width: number; height: number; landscape: boolean; top: number; right: number; bottom: number; left: number; columns: number; header: string; footer: string; pageNumbers: boolean; valign?: string; firstHeader?: string; firstFooter?: string; evenHeader?: string; evenFooter?: string }): { page: PageSetup; hf: HeaderFooter } {
-	const page = readPage({ landscape: l.landscape, columns: l.columns, valign: l.valign, custom: { width: l.width, height: l.height, top: l.top, right: l.right, bottom: l.bottom, left: l.left } });
+export function setupFromLayout(l: { width: number; height: number; landscape: boolean; top: number; right: number; bottom: number; left: number; columns: number; header: string; footer: string; pageNumbers: boolean; valign?: string; firstHeader?: string; firstFooter?: string; evenHeader?: string; evenFooter?: string; watermark?: string; pageBorder?: boolean; lineNumbers?: boolean; hyphenate?: boolean }): { page: PageSetup; hf: HeaderFooter } {
+	const page = readPage({ watermark: l.watermark, border: l.pageBorder, lineNumbers: l.lineNumbers, hyphenate: l.hyphenate, landscape: l.landscape, columns: l.columns, valign: l.valign, custom: { width: l.width, height: l.height, top: l.top, right: l.right, bottom: l.bottom, left: l.left } });
 	return { page, hf: readHeaderFooter({ header: l.header, footer: l.footer, pageNumbers: l.pageNumbers, firstHeader: l.firstHeader, firstFooter: l.firstFooter, evenHeader: l.evenHeader, evenFooter: l.evenFooter }) };
 }
 

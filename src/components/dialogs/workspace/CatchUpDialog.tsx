@@ -1,3 +1,4 @@
+import { Notice } from "@/components/ui/notice";
 import { useMemo, useState } from "react";
 import { Check, ChevronRight, ChevronDown, History, ShieldCheck, Undo2 } from "@/components/animate-icons";
 
@@ -131,9 +132,9 @@ export default function CatchUpDialog({ workspacePath, entries, lookups, members
 				<DialogHeading icon={<History className="size-6" />} title="Catch Up" />
 
 				{error && (
-					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+					<Notice framed size="sm">
 						{error}
-					</p>
+					</Notice>
 				)}
 
 				{entries.length === 0 ? (

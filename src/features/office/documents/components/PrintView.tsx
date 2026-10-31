@@ -3,6 +3,7 @@
 // part, and each page is drawn only when it comes into view, so a long file opens at once. It is read-only and laid out again shortly after
 // anyone changes the text; "Edit Layout" is where the typing happens.
 
+import { Notice } from "@/components/ui/notice";
 import { useEffect, useRef, useState } from "react";
 
 import Loading from "@/components/Loading";
@@ -63,11 +64,11 @@ export default function PrintView({ getHtml, subscribe, title, layout, sourceId,
 			.catch((e) => setError(errorText(e, "A page could not be drawn.")));
 	};
 
-	if (error && !list) return <p role="alert" className="m-6 max-w-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>;
+	if (error && !list) return <Notice className="m-6 max-w-md p-3">{error}</Notice>;
 	if (!list) return <Loading className="h-48" />;
 	return (
 		<div className="flex flex-wrap justify-center gap-4 p-6" style={{ zoom: zoom / 100 }} aria-label="Pages">
-			{error && <p role="alert" className="w-full bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
+			{error && <Notice className="w-full">{error}</Notice>}
 			{list.sizes.map(([w, h], i) => (
 				<Page key={i} index={i} width={w * PX} height={h * PX} image={images[i]?.png} fresh={images[i]?.session === list.session} session={list.session} onVisible={() => draw(i)} total={list.sizes.length} />
 			))}

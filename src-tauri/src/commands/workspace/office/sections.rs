@@ -4,9 +4,11 @@
 //! break gets the set-up. A file's own sections come to the editor the same way, so a section the person did not change is left exactly as the
 //! file had it.
 //!
-//! The set-up is `kind|orientation|top,right,bottom,left|columns`: `next` or `cont`inuous, `p`ortrait or `l`andscape, the margins in points
-//! (empty: as the section had them), one to three columns. Then, when the section has them, `|header|footer`: each `=` and the text in hex (`=`
-//! alone: none), or empty to leave what the section had.
+//! The set-up is `kind|orientation|top,right,bottom,left|columns`: `next`, `cont`inuous, `even` or `odd` page start, `p`ortrait or `l`andscape,
+//! the margins in points (empty: as the section had them), one to three columns. Then, when the section has them, `|header|footer`: each `=`
+//! and the text in hex (`=` alone: none), or empty to leave what the section had. After those come `key=value` pieces: `num=` a number the
+//! section's page numbers start at (or `c` to carry on from the section before), and `fh`, `ff`, `eh`, `ef`, the header and footer of the first
+//! page and of even pages, each in hex as above.
 
 use std::sync::Arc;
 
@@ -17,20 +19,41 @@ pub const CLOSE: char = '\u{E005}';
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Spec {
-    pub continuous: bool,
+    pub start: SectionStart,
     pub landscape: bool,
     pub margins: Option<[f32; 4]>,
     pub columns: u32,
     /// The section's header and footer text: `None` leaves them as they were, `Some("")` takes them away
     pub header: Option<String>,
     pub footer: Option<String>,
+    pub num: Numbering,
+    pub first_header: Option<String>,
+    pub first_footer: Option<String>,
+    pub even_header: Option<String>,
+    pub even_footer: Option<String>,
+}
+
+/// What the section does with page numbers
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub enum Numbering {
+    #[default]
+    Leave,
+    Continue,
+    At(u32),
+}
+
+/// The starts the editor offers; a file's start of a new column is shown as a new page
+fn kind_of(s: SectionStart) -> SectionStart {
+    if s == SectionStart::NextColumn { SectionStart::NextPage } else { s }
 }
 
 pub fn parse(s: &str) -> Option<Spec> {
     let mut it = s.split('|');
-    let continuous = match it.next()? {
-        "next" => false,
-        "cont" => true,
+    let start = match it.next()? {
+        "next" => SectionStart::NextPage,
+        "cont" => SectionStart::Continuous,
+        "even" => SectionStart::EvenPage,
+        "odd" => SectionStart::OddPage,
         _ => return None,
     };
     let landscape = match it.next()? {
@@ -51,7 +74,20 @@ pub fn parse(s: &str) -> Option<Spec> {
     let columns = it.next()?.parse::<u32>().ok().filter(|c| (1..=3).contains(c))?;
     let header = it.next().and_then(unhex);
     let footer = it.next().and_then(unhex);
-    Some(Spec { continuous, landscape, margins, columns, header, footer })
+    let mut spec = Spec { start, landscape, margins, columns, header, footer, num: Numbering::Leave, first_header: None, first_footer: None, even_header: None, even_footer: None };
+    for piece in it {
+        let Some((key, value)) = piece.split_once('=') else { continue };
+        let text = || unhex(&format!("={value}"));
+        match key {
+            "num" => spec.num = if value == "c" { Numbering::Continue } else { value.parse::<u32>().ok().filter(|n| (1..=100_000).contains(n)).map_or(Numbering::Leave, Numbering::At) },
+            "fh" => spec.first_header = text(),
+            "ff" => spec.first_footer = text(),
+            "eh" => spec.even_header = text(),
+            "ef" => spec.even_footer = text(),
+            _ => {}
+        }
+    }
+    Some(spec)
 }
 
 /// `=` and a text in hex, as the text; anything else (empty) is "leave it"
@@ -71,11 +107,29 @@ fn hex(t: &str) -> String {
 /// A section's set-up as the editor holds it
 pub fn spec_of(doc: &Document, s: &SectionProps) -> String {
     let r = |v: f32| (v * 10.0).round() / 10.0;
-    let (h, f) = (super::merge::part_text(doc, s.headers.default), super::merge::part_text(doc, s.footers.default));
-    let tail = if h.is_empty() && f.is_empty() { String::new() } else { format!("|{}|{}", if h.is_empty() { String::new() } else { hex(&h) }, if f.is_empty() { String::new() } else { hex(&f) }) };
+    let text = |id: Option<u32>| super::merge::part_text(doc, id);
+    let opt = |t: String| if t.is_empty() { String::new() } else { hex(&t) };
+    let (h, f) = (text(s.headers.default), text(s.footers.default));
+    let mut extras = Vec::new();
+    if let Some(n) = s.page_num_start {
+        extras.push(format!("num={n}"));
+    }
+    for (key, id) in [("fh", s.headers.first), ("ff", s.footers.first), ("eh", s.headers.even), ("ef", s.footers.even)] {
+        let t = text(id);
+        if !t.is_empty() {
+            extras.push(format!("{key}={}", &hex(&t)[1..]));
+        }
+    }
+    let tail = if h.is_empty() && f.is_empty() && extras.is_empty() { String::new() } else { format!("|{}|{}", opt(h), opt(f)) };
+    let extras = extras.iter().map(|e| format!("|{e}")).collect::<String>();
     format!(
-        "{}|{}|{},{},{},{}|{}{tail}",
-        if s.start == SectionStart::Continuous { "cont" } else { "next" },
+        "{}|{}|{},{},{},{}|{}{tail}{extras}",
+        match kind_of(s.start) {
+            SectionStart::Continuous => "cont",
+            SectionStart::EvenPage => "even",
+            SectionStart::OddPage => "odd",
+            _ => "next",
+        },
         if s.landscape { "l" } else { "p" },
         r(s.margin_top),
         r(s.margin_right),
@@ -183,6 +237,14 @@ pub fn settle(doc: &mut Document, breaks: &[(usize, Spec)]) {
         };
         let header = make(doc, &spec.header, current.headers.default, PartKind::Header);
         let footer = make(doc, &spec.footer, current.footers.default, PartKind::Footer);
+        let first_header = make(doc, &spec.first_header, current.headers.first, PartKind::Header);
+        let first_footer = make(doc, &spec.first_footer, current.footers.first, PartKind::Footer);
+        let even_header = make(doc, &spec.even_header, current.headers.even, PartKind::Header);
+        let even_footer = make(doc, &spec.even_footer, current.footers.even, PartKind::Footer);
+        let settings_even = even_header.is_some_and(|h| h.is_some()) || even_footer.is_some_and(|f| f.is_some());
+        if settings_even {
+            doc.settings.even_odd_headers = true;
+        }
         let apply = |s: &mut SectionProps| {
             if let Some(h) = header {
                 s.headers.default = h;
@@ -190,11 +252,29 @@ pub fn settle(doc: &mut Document, breaks: &[(usize, Spec)]) {
             if let Some(f) = footer {
                 s.footers.default = f;
             }
-            // The two starts the editor offers; an even-page or odd-page start stays unless the person chose one of them
-            if spec.continuous && s.start != SectionStart::Continuous {
-                s.start = SectionStart::Continuous;
-            } else if !spec.continuous && s.start == SectionStart::Continuous {
-                s.start = SectionStart::NextPage;
+            if let Some(v) = first_header {
+                s.headers.first = v;
+            }
+            if let Some(v) = first_footer {
+                s.footers.first = v;
+            }
+            if s.headers.first.is_some() || s.footers.first.is_some() {
+                s.title_page = true;
+            }
+            if let Some(v) = even_header {
+                s.headers.even = v;
+            }
+            if let Some(v) = even_footer {
+                s.footers.even = v;
+            }
+            // The starts the editor offers: a file's start of a new column is shown as a new page and left as it is until one is chosen
+            if kind_of(s.start) != spec.start {
+                s.start = spec.start;
+            }
+            match spec.num {
+                Numbering::Leave => {}
+                Numbering::Continue => s.page_num_start = None,
+                Numbering::At(n) => s.page_num_start = Some(n),
             }
             if s.landscape != spec.landscape {
                 std::mem::swap(&mut s.page_w, &mut s.page_h);

@@ -1,3 +1,5 @@
+import { Caption } from "@/components/layout/Pane";
+import { IconButton } from "@/components/ui/icon-button";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 
@@ -110,9 +112,9 @@ export default function RunOutput({ workspacePath, project, runs, onRerun, onOpe
 								className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted"
 							>
 								<span className="min-w-0 flex-1 truncate">{h.task}</span>
-								<span className="font-mono text-[13px] text-muted-foreground">
+								<Caption>
 									{h.stopped ? "stopped" : h.code === 0 ? "finished" : `code ${h.code ?? "none"}`} · {(h.durationMs / 1000).toFixed(1)}s · {new Date(h.started).toLocaleString()}
-								</span>
+								</Caption>
 							</button>
 						</li>
 					))}
@@ -126,10 +128,10 @@ export default function RunOutput({ workspacePath, project, runs, onRerun, onOpe
 					<div className="flex flex-wrap items-center gap-2">
 						<span className="min-w-0 truncate text-sm font-medium">{merged ? "All running tasks together" : earlier ? `${earlier.title} (earlier run)` : run?.task}</span>
 						{run && !earlier && (
-							<span className="font-mono text-[13px] text-muted-foreground">
+							<Caption>
 								{stateText(run)}
 								{run.restarts > 0 && `, restarted ${run.restarts}`}
-							</span>
+							</Caption>
 						)}
 						{run &&
 							!earlier &&
@@ -149,14 +151,10 @@ export default function RunOutput({ workspacePath, project, runs, onRerun, onOpe
 							))}
 						<span className="flex-1" />
 						<ToolbarSearch label="Filter the output" value={filter} onChange={setFilter} placeholder="Filter" className="w-40" />
-						<Button variant="ghost" size="icon-xs" aria-label="Copy the output" onPress={() => void navigator.clipboard?.writeText(text()).then(() => flash("Copied."))}>
+						<IconButton size="xs" label="Copy the output" onPress={() => void navigator.clipboard?.writeText(text()).then(() => flash("Copied."))}>
 							<Copy className="size-3.5" />
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon-xs"
-							aria-label="Save the output"
-							onPress={() =>
+						</IconButton>
+						<IconButton size="xs" label="Save the output" onPress={() =>
 								void save({ title: "Save the output", defaultPath: `${run?.task ?? "output"}.txt`, filters: [{ name: "Text", extensions: ["txt"] }] })
 									.then(async (dest) => {
 										if (!dest) return;
@@ -164,10 +162,9 @@ export default function RunOutput({ workspacePath, project, runs, onRerun, onOpe
 										flash("Saved.");
 									})
 									.catch((e) => flash(errorText(e, "Could not save.")))
-							}
-						>
+							}>
 							<Download className="size-3.5" />
-						</Button>
+						</IconButton>
 						{run && !earlier && run.status !== "done" && (
 							<Button variant="outline" size="xs" onPress={() => void projectTaskStop(run.runId)}>
 								<X className="size-3" />
@@ -185,9 +182,9 @@ export default function RunOutput({ workspacePath, project, runs, onRerun, onOpe
 										Share Failure
 									</Button>
 								)}
-								<Button variant="ghost" size="icon-xs" aria-label="Remove this run" onPress={() => forgetRun(run.runId)}>
+								<IconButton size="xs" label="Remove this run" onPress={() => forgetRun(run.runId)}>
 									<Trash2 className="size-3.5" />
-								</Button>
+								</IconButton>
 							</>
 						)}
 						{run && !earlier && run.status === "running" && <RefreshCw className="size-3.5 animate-spin text-muted-foreground" aria-hidden />}

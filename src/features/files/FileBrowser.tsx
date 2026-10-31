@@ -1,3 +1,6 @@
+import { Field } from "@/components/ui/field";
+import { FieldError } from "@/components/ui/notice";
+import { IconButton } from "@/components/ui/icon-button";
 import { LAYOUT } from "@/lib/workspaceLayout";
 // React
 import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
@@ -15,11 +18,10 @@ import { ChevronRight, ChevronUp, ExternalLink, FilePlus, FolderPlus, History, L
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
 import FileKindIcon, { FolderKindIcon } from "@/features/editor/components/FileKindIcon";
-import { cn } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 // Context
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -53,9 +55,7 @@ import Loading from "@/components/Loading";
 // Formats a byte count into a human-readable size string
 function formatSize(bytes: number): string {
 	if (bytes === 0) return "Empty";
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	return formatBytes(bytes);
 }
 
 // Formats an ISO-8601 timestamp as a locale date and time
@@ -495,9 +495,9 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 			{notice.node}
 			{/* Toolbar */}
 			<Toolbar>
-				<Button variant="ghost" size="icon-xs" aria-label="Up one folder" className="ml-1" isDisabled={atRoot} onPress={() => navigateToDir(parentDir)}>
+				<IconButton size="xs" label="Up one folder" className="ml-1" isDisabled={atRoot} onPress={() => navigateToDir(parentDir)}>
 					<ChevronUp className="size-4 -rotate-90" />
-				</Button>
+				</IconButton>
 				<nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden font-mono text-xs" aria-label="Breadcrumb">
 					{crumbs.map((crumb, i) => (
 						<div key={crumb.dir} className="flex min-w-0 items-center gap-0.5">
@@ -526,9 +526,9 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 						{ value: "grid", label: <LayoutGrid className="size-4" />, title: "Tile view" },
 					]}
 				/>
-				<Button variant="ghost" size="icon-xs" onPress={() => void loadEntries()} aria-label="Refresh files" isDisabled={isLoading}>
+				<IconButton size="xs" onPress={() => void loadEntries()} label="Refresh files" isDisabled={isLoading}>
 					<RefreshCw className={cn("size-4", isLoading && "animate-spin")} />
-				</Button>
+				</IconButton>
 				{!isViewer && (
 					<>
 						<Button variant="outline" size="sm" onPress={() => openCreateDialog("folder")}>
@@ -674,9 +674,8 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 								void handleNameSubmit();
 							}}
 						>
-							<div className="space-y-2">
-								<Label htmlFor="item-name">Name</Label>
-								<Input
+							<Field label="Name" htmlFor="item-name">
+<Input
 									id="item-name"
 									value={nameDialog.value}
 									onChange={(e) =>
@@ -698,11 +697,11 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 									autoFocus
 								/>
 								{(validateFileName(nameDialog.value) ?? nameError) && (
-									<p role="alert" className="text-xs text-destructive">
+									<FieldError>
 										{validateFileName(nameDialog.value) ?? nameError}
-									</p>
+									</FieldError>
 								)}
-							</div>
+</Field>
 
 							<DialogFooter className="mt-6">
 								<DialogClose variant="outline">

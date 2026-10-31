@@ -9,7 +9,6 @@ import { PALETTE } from "@/lib/collabColor";
 // A picture; an emoji on a colour (the name's own when none is chosen); or the first letter of the name on a chosen colour
 export type WorkspaceIcon = { kind: "image"; data: string } | { kind: "glyph"; glyph: string; color?: string } | { kind: "letter"; color: string };
 
-export const GLYPHS = ["📓", "🧪", "🚀", "💡", "🎯", "📚", "🛠️", "🌱", "🎨", "🔬", "🧩", "⚡"];
 // A picture is drawn at 96 pixels (64 if it is still too big), so that it fits in one entry of the log
 export const ICON_PIXELS = 96;
 const MAX_DATA = 18_000;

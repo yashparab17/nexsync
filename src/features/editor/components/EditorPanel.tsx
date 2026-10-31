@@ -1,11 +1,12 @@
+import { Caption, EmptyNote } from "@/components/layout/Pane";
 // The panel under the editor: command output, and the problems found in the open file.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { forwardRef } from "react";
 import { AlertTriangle, Play, Terminal, X } from "@/components/animate-icons";
 
 import RunPanel from "@/features/editor/components/RunPanel";
 import TerminalPanel, { type TerminalPanelHandle } from "@/features/editor/components/TerminalPanel";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export type PanelTab = "terminal" | "output" | "problems";
@@ -48,9 +49,9 @@ export default forwardRef<TerminalPanelHandle, EditorPanelProps>(function Editor
 					))}
 				</div>
 				<span className="flex-1" />
-				<Button variant="ghost" size="icon-xs" aria-label="Close panel" onPress={onClose}>
+				<IconButton size="xs" label="Close panel" onPress={onClose}>
 					<X className="size-4" />
-				</Button>
+				</IconButton>
 			</div>
 			<div className="min-h-0 flex-1">
 				{/* Terminals stay mounted, so their shells survive switching tabs and hiding the panel */}
@@ -60,7 +61,7 @@ export default forwardRef<TerminalPanelHandle, EditorPanelProps>(function Editor
 				{tab === "output" ? (
 					<RunPanel workspacePath={workspacePath} activePath={activePath} />
 				) : tab === "terminal" ? null : problemLines.length === 0 ? (
-					<p className="p-4 text-sm text-muted-foreground">{activePath ? "No problems found in this file." : "Open a file to see its problems."}</p>
+					<EmptyNote className="p-4">{activePath ? "No problems found in this file." : "Open a file to see its problems."}</EmptyNote>
 				) : (
 					<ul className="h-full overflow-y-auto py-1">
 						{problemLines.map((line) => (
@@ -68,9 +69,9 @@ export default forwardRef<TerminalPanelHandle, EditorPanelProps>(function Editor
 								<button type="button" onClick={() => onGoToLine(line)} className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm hover:bg-muted">
 									<AlertTriangle className="size-4 shrink-0 text-destructive" />
 									<span>Syntax error</span>
-									<span className="font-mono text-xs text-muted-foreground">
+									<Caption className="text-xs">
 										{activePath}:{line}
-									</span>
+									</Caption>
 								</button>
 							</li>
 						))}

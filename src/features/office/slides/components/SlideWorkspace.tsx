@@ -1,3 +1,4 @@
+import { Notice } from "@/components/ui/notice";
 import CollapsiblePane from "@/components/layout/CollapsiblePane";
 // A deck open for editing: the title bar, tabs and ribbon of a presentation program around the slide list, the slide and its notes.
 // The slides are drawn by the backend from the deck's pieces; the frames over them select, move and resize shapes, and everyone with
@@ -21,7 +22,7 @@ import { colorOf } from "@/lib/collabColor";
 import { addShape, addSlide, arrange, deleteSlide, duplicateSlide, getBase, moveSlide, nextShapeId, notesOf, readSlide, readSlides, removeShape, seed, setBase, setShape, setSlideMeta, slideKeys, slideOrder, textOf, transitionOf, type ShapeJson, type SlideJson, type Xfrm } from "@/features/office/slides/lib/deck";
 import { deckAddPicture, deckEditShape, deckEditSlide, deckLayouts, deckNewShape, deckNewSlide, deckRegister, deckSave, type ShapeEdit, type SlideEdit } from "@/lib/tauri";
 import { useSlideImage } from "@/features/office/slides/lib/useSlideImage";
-import { cn, errorText } from "@/lib/utils";
+import { cn, errorText, formatBytes } from "@/lib/utils";
 
 const LOCAL = "local-edit";
 const TABS: RibbonTab[] = [
@@ -242,7 +243,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 			const dest = await save({ title: "Save a copy", defaultPath: `${stem}.pptx`, filters: [{ name: "PowerPoint", extensions: ["pptx"] }] });
 			if (!dest) return;
 			const size = await deckSave(workspacePath, dest, base, readSlides(doc));
-			flash(true, `Saved a copy (${Math.max(1, Math.round(size / 1024))} KB).`);
+			flash(true, `Saved a copy (${formatBytes(size)}).`);
 		} catch (err) {
 			flash(false, errorText(err, "The copy could not be saved."));
 		}
@@ -420,9 +421,9 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 			<input ref={picker} type="file" accept="image/png,image/jpeg,image/gif" className="hidden" onChange={(e) => { void addPicture(e.target.files?.[0]); e.target.value = ""; }} />
 			<div className="flex h-full min-h-0 flex-col">
 				{notice && (
-					<p role={notice.ok ? "status" : "alert"} className={cn("px-3 py-1.5 text-sm", notice.ok ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive")}>
+					<Notice tone={notice.ok ? "success" : "error"} className="px-3 py-1.5">
 						{notice.text}
-					</p>
+					</Notice>
 				)}
 				{opened.notes.length > 0 && <p className="border-b bg-muted/40 px-3 py-1 text-[13px] text-muted-foreground">{opened.notes.join(" ")}</p>}
 				<div className="flex min-h-0 flex-1">
@@ -455,9 +456,9 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 									onEditing={setTyping}
 								/>
 							) : drawError ? (
-								<p role="alert" className="max-w-md bg-destructive/10 p-3 text-sm text-destructive">
+								<Notice className="max-w-md p-3">
 									{drawError}
-								</p>
+								</Notice>
 							) : (
 								<Loading className="h-48" />
 							)}

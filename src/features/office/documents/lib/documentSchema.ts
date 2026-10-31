@@ -107,6 +107,33 @@ const charStyle = createStyleSpec(
 	},
 );
 
+// A content control: the words of a form field, with its set-up as the value (see `documentControls`). In the file it is Word's content control.
+const contentControl = createStyleSpec(
+	{ type: "contentControl", propSchema: "string" },
+	{
+		render: (value) => {
+			const dom = document.createElement("span");
+			dom.dataset.control = value;
+			dom.className = value.startsWith("eq|") ? "doc-equation" : "doc-control";
+			const title = value.split("|")[1] ?? "";
+			if (title && /^[0-9a-f]*$/i.test(title)) {
+				try {
+					dom.title = new TextDecoder().decode(Uint8Array.from(title.match(/../g) ?? [], (x) => Number.parseInt(x, 16)));
+				} catch {
+					// No tooltip
+				}
+			}
+			return { dom, contentDOM: dom };
+		},
+		toExternalHTML: (value) => {
+			const dom = document.createElement("span");
+			dom.dataset.control = value;
+			return { dom, contentDOM: dom };
+		},
+		parse: (el) => el.dataset.control || undefined,
+	},
+);
+
 // The table style a table is in: a mark on the text of its first cell (a table has no property of its own in the editor), whose value is the
 // style's id. In the file it is the table's style.
 const tableStyleMark = createStyleSpec(
@@ -225,5 +252,5 @@ const blockSpecs = {
 };
 
 // The font goes before the size, so a run's size is drawn inside its font: its line is then as tall as that font at that size, as in Word
-export const documentSchema = BlockNoteSchema.create({ blockSpecs, styleSpecs: { ...defaultStyleSpecs, field, note, charStyle, tableStyle: tableStyleMark, insertion: change("insertion"), deletion: change("deletion"), fontFamily, fontSize, textColor: colourSpec("textColor", "color"), backgroundColor: colourSpec("backgroundColor", "backgroundColor") } });
+export const documentSchema = BlockNoteSchema.create({ blockSpecs, styleSpecs: { ...defaultStyleSpecs, field, note, charStyle, contentControl, tableStyle: tableStyleMark, insertion: change("insertion"), deletion: change("deletion"), fontFamily, fontSize, textColor: colourSpec("textColor", "color"), backgroundColor: colourSpec("backgroundColor", "backgroundColor") } });
 export type DocumentEditorType = typeof documentSchema.BlockNoteEditor;

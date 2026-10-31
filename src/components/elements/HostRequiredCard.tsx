@@ -1,5 +1,6 @@
 // Settings: whether guests may work in this workspace while its host is offline. The host and Admins choose.
 
+import { FieldError } from "@/components/ui/notice";
 import { useState } from "react";
 
 import { Radio } from "@/components/animate-icons";
@@ -28,9 +29,9 @@ export default function HostRequiredCard() {
 	return (
 		<SectionCard id="collaboration" title="Host Availability" icon={<Radio className="size-5" />}>
 				{error && (
-					<p role="alert" className="text-xs text-destructive">
+					<FieldError>
 						{error}
-					</p>
+					</FieldError>
 				)}
 				<label className="flex cursor-pointer items-start gap-3 text-sm">
 					<input type="checkbox" checked={requireHost} disabled={!canChange} onChange={(e) => void change(e.target.checked)} />

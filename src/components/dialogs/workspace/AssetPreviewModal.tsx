@@ -1,3 +1,4 @@
+import { IconButton } from "@/components/ui/icon-button";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Check, ChevronRight, Copy, Download, FileText, Film, Headphones, History, Image as ImageIcon, Maximize2, Minimize2, Pencil, RefreshCw, Sparkles, Trash2, Volume2, X } from "@/components/animate-icons";
@@ -188,19 +189,19 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 					</Button>
 				)}
 				{onHistory && (
-					<Button variant="ghost" size="icon-xs" className={iconButton} aria-label="File history" onPress={() => onHistory(asset)}>
+					<IconButton size="xs" className={iconButton} label="File history" onPress={() => onHistory(asset)}>
 						<History className="size-4" />
-					</Button>
+					</IconButton>
 				)}
 				{onRename && (
-					<Button variant="ghost" size="icon-xs" className={iconButton} aria-label="Rename" onPress={() => onRename(asset)}>
+					<IconButton size="xs" className={iconButton} label="Rename" onPress={() => onRename(asset)}>
 						<Pencil className="size-4" />
-					</Button>
+					</IconButton>
 				)}
 				{onDelete && (
-					<Button variant="ghost" size="icon-xs" className={cn(iconButton, "text-destructive")} aria-label="Delete" onPress={() => onDelete(asset)}>
+					<IconButton size="xs" className={cn(iconButton, "text-destructive")} label="Delete" onPress={() => onDelete(asset)}>
 						<Trash2 className="size-4" />
-					</Button>
+					</IconButton>
 				)}
 			</div>
 
@@ -270,20 +271,20 @@ export default function AssetPreviewModal({ asset, workspacePath, isOpen, onClos
 					</div>
 					{position && position.total > 1 && (
 						<div className="flex items-center gap-1">
-							<Button variant="ghost" size="icon-xs" aria-label="Previous asset" onPress={() => onStep?.(-1)}>
+							<IconButton size="xs" label="Previous asset" onPress={() => onStep?.(-1)}>
 								<ChevronRight className="size-4 rotate-180" />
-							</Button>
+							</IconButton>
 							<span className="font-mono text-xs tabular-nums text-muted-foreground" aria-live="polite">
 								{position.index + 1} / {position.total}
 							</span>
-							<Button variant="ghost" size="icon-xs" aria-label="Next asset" onPress={() => onStep?.(1)}>
+							<IconButton size="xs" label="Next asset" onPress={() => onStep?.(1)}>
 								<ChevronRight className="size-4" />
-							</Button>
+							</IconButton>
 						</div>
 					)}
-					<Button variant="ghost" size="icon-xs" onPress={onClose} aria-label="Close preview">
+					<IconButton size="xs" onPress={onClose} label="Close preview">
 						<X className="size-4" />
-					</Button>
+					</IconButton>
 				</div>
 
 				<div className={cn("flex min-h-0 flex-1", adaptive ? "flex-row" : "flex-col")}>

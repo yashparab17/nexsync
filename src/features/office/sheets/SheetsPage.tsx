@@ -1,3 +1,6 @@
+import { EmptyNote, PaneHeader, listRow } from "@/components/layout/Pane";
+import { FieldError, Notice } from "@/components/ui/notice";
+import { IconButton } from "@/components/ui/icon-button";
 import { SHEET_TEMPLATES } from "@/features/office/shared/templates";
 import { useNewParam } from "@/hooks/useNewParam";
 import { useSyncedIn } from "@/hooks/useSyncedIn";
@@ -12,7 +15,6 @@ import CollapsiblePane, { LIST_WIDTH } from "@/components/layout/CollapsiblePane
 import PresenceDots from "@/components/elements/PresenceDots";
 import { EmptyState, Page } from "@/components/layout/Page";
 import SheetWorkspace from "@/features/office/sheets/components/SheetWorkspace";
-import Toolbar, { ToolbarSearch } from "@/components/layout/Toolbar";
 import Loading from "@/components/Loading";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -26,7 +28,7 @@ import { LAYOUT, isIn, placeIn } from "@/lib/workspaceLayout";
 import { isSpreadsheet } from "@/lib/editor/languages";
 import type { SheetIn } from "@/features/office/sheets/lib/sheet";
 import { searchWorkspaceFiles, sheetOpen, sheetSave, writeWorkspaceBinaryFile } from "@/lib/tauri";
-import { cn, errorText } from "@/lib/utils";
+import { errorText } from "@/lib/utils";
 import { safeUploadName, validateFileName } from "@/lib/validation";
 import { useIsViewer, useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -127,8 +129,7 @@ export default function SheetsPage() {
 			<div className="flex min-h-0 flex-1">
 				<CollapsiblePane id="sheets.list" defaultWidth={LIST_WIDTH} label="the list of workbooks">
 					<div className="flex shrink-0 flex-col bg-panel">
-					<Toolbar variant="header">
-						<ToolbarSearch label="Search workbooks" value={query} onChange={setQuery} placeholder="Search" className="min-w-0 flex-1" />
+					<PaneHeader label="Search workbooks" value={query} onChange={setQuery} placeholder="Search">
 						{!isViewer && (
 							<>
 								<input
@@ -142,21 +143,21 @@ export default function SheetsPage() {
 								if (f) void addFile(f);
 								}}
 								/>
-								<Button variant="ghost" size="icon-xs" aria-label="Add a file" onPress={() => fileInput.current?.click()}>
+								<IconButton size="xs" label="Add a file" onPress={() => fileInput.current?.click()}>
 									<Upload className="size-4" />
-								</Button>
-								<Button size="icon-xs" aria-label="New workbook" onPress={() => setCreating(true)}>
+								</IconButton>
+								<IconButton size="xs" label="New workbook" onPress={() => setCreating(true)}>
 									<FilePlus className="size-4" />
-								</Button>
+								</IconButton>
 							</>
 						)}
-					</Toolbar>
+					</PaneHeader>
 					<nav aria-label="Workbooks" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5">
 					{books === null ? null : shownBooks.length === 0 ? (
-						<p className="p-3 text-sm text-muted-foreground">{books.length === 0 ? "No workbooks yet. Make one, or add an .xlsx, .xls, .ods or .csv file." : "No workbook matches."}</p>
+						<EmptyNote>{books.length === 0 ? "No workbooks yet. Make one, or add an .xlsx, .xls, .ods or .csv file." : "No workbook matches."}</EmptyNote>
 					) : (
 						shownBooks.map((b) => (
-							<button key={b.rel} type="button" aria-current={b.rel === selected} onClick={() => setSelected(b.rel)} className={cn("flex w-full min-w-0 items-center gap-2 px-3 py-1.5 text-left text-[13px] outline-none hover:bg-muted focus-visible:bg-muted", b.rel === selected && "bg-muted")}>
+							<button key={b.rel} type="button" aria-current={b.rel === selected} onClick={() => setSelected(b.rel)} className={listRow(b.rel === selected)}>
 																<span className="min-w-0 flex-1 truncate">{b.name}</span>
 								<PresenceDots names={viewersAt("sheets", b.rel)} />
 							</button>
@@ -168,9 +169,9 @@ export default function SheetsPage() {
 
 				<main className="flex min-h-0 min-w-0 flex-1 flex-col">
 					{notice && (
-						<p role={notice.ok ? "status" : "alert"} className={cn("px-3 py-2 text-sm", notice.ok ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive")}>
+						<Notice tone={notice.ok ? "success" : "error"} className="px-3 py-2">
 							{notice.text}
-						</p>
+						</Notice>
 					)}
 					{!selected ? (
 						<EmptyState art="sheets" title="Sheets">
@@ -179,9 +180,9 @@ export default function SheetsPage() {
 					) : !opened ? (
 						<Loading className="h-48" />
 					) : "error" in opened ? (
-						<p role="alert" className="m-6 max-w-md bg-destructive/10 p-3 text-sm text-destructive">
+						<Notice className="m-6 max-w-md p-3">
 							{opened.error}
-						</p>
+						</Notice>
 					) : collab ? (
 						<SheetWorkspace key={selected} collab={collab} opened={opened} name={selected.split("/").pop() ?? ""} rel={selected} workspacePath={workspacePath} author={author} readOnly={isViewer} />
 					) : (
@@ -208,7 +209,7 @@ export default function SheetsPage() {
 							</option>
 						))}
 					</select>
-					{newName && validateFileName(newName) && <p role="alert" className="text-xs text-destructive">{validateFileName(newName)}</p>}
+					{newName && validateFileName(newName) && <FieldError>{validateFileName(newName)}</FieldError>}
 						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setCreating(false)}>
 								Cancel

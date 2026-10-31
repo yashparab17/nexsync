@@ -1,13 +1,13 @@
 // The channels down the left of the chat, like Discord's: a # and a name, bold with a count when there is something unread.
 // A side panel: the panel colour, a 48px header like the Notes list, and rows whose icons play when the row is hovered.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useState } from "react";
 import { Plus } from "lucide-react";
 
 import NewChannelDialog from "@/features/chat/components/NewChannelDialog";
 import { AnimateIcon, BellOff, Hash } from "@/components/animate-icons";
 import Avatar from "@/components/elements/Avatar";
-import { Button } from "@/components/ui/button";
 import Toolbar from "@/components/layout/Toolbar";
 import type { Channel } from "@/features/chat/lib/entries";
 import { cn } from "@/lib/utils";
@@ -46,9 +46,9 @@ export default function ChannelList({ channels, active, unread, muted, canCreate
 			<Toolbar variant="header" className="justify-between">
 				<h2 className="px-1 text-sm font-semibold">Channels</h2>
 				{canCreate && (
-					<Button variant="ghost" size="icon-sm" aria-label="New channel" onPress={() => setCreating(true)}>
+					<IconButton label="New channel" onPress={() => setCreating(true)}>
 						<Plus className="size-4" />
-					</Button>
+					</IconButton>
 				)}
 			</Toolbar>
 			<nav className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-2">

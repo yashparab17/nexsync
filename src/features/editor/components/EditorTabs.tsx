@@ -1,3 +1,4 @@
+import { Caption } from "@/components/layout/Pane";
 // The row of open files, in the manner of VS Code and NvChad's bufferline: file icon, name, a dot when unsaved and a
 // close button; middle-click closes, tabs can be dragged into a new order, and a right-click menu has the rest.
 
@@ -91,7 +92,7 @@ export default function EditorTabs({ tabs, active, side, dirty, onSelect, onClos
 						>
 							<FileKindIcon name={name} />
 							<span className={cn(isActive && "font-medium", side === path && "underline decoration-primary decoration-2 underline-offset-4")}>{shownName}</span>
-							{duplicated.has(name) && <span className="font-mono text-xs text-muted-foreground">{folderOf(path).split("/").pop()}</span>}
+							{duplicated.has(name) && <Caption className="text-xs">{folderOf(path).split("/").pop()}</Caption>}
 						</button>
 						<button
 							type="button"

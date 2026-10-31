@@ -1,3 +1,4 @@
+import { Notice } from "@/components/ui/notice";
 import { useCallback, useEffect, useState } from "react";
 import * as Y from "yjs";
 import { GitBranch, GitMerge } from "@/components/animate-icons";
@@ -111,9 +112,9 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 				<DialogHeading icon={<GitBranch className="size-6" />} title={`Branches of ${fileName}`} />
 
 				{error && (
-					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+					<Notice framed size="sm">
 						{error}
-					</p>
+					</Notice>
 				)}
 				{done && <p className="p-2 text-xs text-success">{done}</p>}
 

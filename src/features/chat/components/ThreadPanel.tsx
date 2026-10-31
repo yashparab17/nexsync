@@ -1,11 +1,11 @@
 // The replies to one message, in a panel beside the channel, with their own box to answer in.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useState } from "react";
 import { X } from "lucide-react";
 
 import Composer from "@/features/chat/components/Composer";
 import Toolbar from "@/components/layout/Toolbar";
-import { Button } from "@/components/ui/button";
 import Attachment from "@/features/chat/components/Attachment";
 import RichText from "@/features/chat/components/RichText";
 import Avatar from "@/components/elements/Avatar";
@@ -49,9 +49,9 @@ export default function ThreadPanel({ root, replies, channelName, people, me, ca
 		<aside aria-label="Thread" className="flex w-72 shrink-0 flex-col @4xl:w-80 border-l bg-panel">
 			<Toolbar variant="header" className="gap-2">
 				<h2 className="min-w-0 flex-1 truncate px-1 text-sm font-semibold">Thread in #{channelName}</h2>
-				<Button variant="ghost" size="icon-sm" aria-label="Close thread" onPress={onClose}>
+				<IconButton label="Close thread" onPress={onClose}>
 					<X className="size-4" />
-				</Button>
+				</IconButton>
 			</Toolbar>
 			<ul className="min-h-0 flex-1 overflow-y-auto py-2">
 				{show(root)}

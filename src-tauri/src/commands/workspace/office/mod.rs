@@ -2,6 +2,8 @@
 //! `documents` (Word-style files and PDF), `sheets` and `sheet_tools` (workbooks), `slides` (decks), `proof` (spelling and grammar).
 
 pub mod blocks;
+pub mod controls;
+pub mod wrap;
 pub mod compare;
 pub mod documents;
 pub mod fonts;

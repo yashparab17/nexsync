@@ -1,4 +1,3 @@
-import SidebarQuick from "@/features/shell/components/SidebarQuick";
 // React
 import { AnimateIcon, Code2, FileText, Monitor, Table, Files, Network, FolderClose, FolderTree, ListTodo, MessageSquareText, Megaphone, StickyNote } from "@/components/animate-icons";
 import { useCallback, useState, type ElementType } from "react";
@@ -23,7 +22,6 @@ import PresenceDots from "@/components/elements/PresenceDots";
 import { pageOf } from "@/lib/p2p/presence";
 import { useP2P, useSelfRole } from "@/store/p2p/P2PContext";
 import { waitingForMe } from "@/features/announcements/lib/announcements";
-import WorkspaceIconView from "@/components/elements/WorkspaceIcon";
 import { useChat } from "@/store/chat/ChatContext";
 
 // Context
@@ -246,7 +244,7 @@ function UserCard({ showLabels }: { showLabels: boolean }) {
 
 // `expanded` is the drawer on small windows: full width with labels, and `onNavigate` closes it after a choice
 export default function WorkspaceSidebar({ expanded = false, onNavigate }: { expanded?: boolean; onNavigate?: () => void }) {
-	const { workspace, clearWorkspace } = useWorkspace();
+	const { clearWorkspace } = useWorkspace();
 	const navigate = useNavigate();
 	// How wide the sidebar is when open, remembered on this device; groups with a label can be folded away
 	const [width, setWidth] = usePanelSize("sidebar", DEFAULT_WIDTH, MIN_OPEN, 380);
@@ -288,7 +286,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 			className={cn("glide flex h-full shrink-0 flex-col overflow-hidden bg-sidebar", expanded && "w-64 border-r")}
 		>
 			{/* Workspace identity */}
-			<div className={cn("flex h-12 shrink-0 items-center gap-2", "justify-start pl-[14px] pr-2")}>
+			<div className={cn("flex h-12 shrink-0 items-center gap-2", "justify-between pl-[14px] pr-[14px]")}>
 				<Button
 					variant="ghost"
 					size="icon"
@@ -298,17 +296,17 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 					<ArrowLeft className="size-5" />
 				</Button>
 
-				<WorkspaceIconView id={workspace?.id} name={workspace?.name ?? ""} className={cn("size-6 text-sm", !showLabels && "hidden")} />
-				<p className={cn("min-w-0 flex-1 truncate font-semibold whitespace-nowrap", showLabels ? "block" : "hidden")}>{workspace?.name}</p>
-					{!expanded && showLabels && <button
+				{!expanded && showLabels && (
+					<button
 						type="button"
 						onClick={() => setCollapsed("sidebar", !collapsed)}
-						aria-label={collapsed ? "Expand the sidebar" : "Collapse the sidebar"}
-						title={collapsed ? "Expand the sidebar" : "Collapse the sidebar to icons"}
-						className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-foreground outline-none hover:bg-muted focus-visible:bg-muted"
+						aria-label="Collapse the sidebar"
+						title="Collapse the sidebar to icons"
+						className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-md text-foreground outline-none hover:bg-muted focus-visible:bg-muted"
 					>
-						{collapsed ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
-					</button>}
+						<PanelLeftClose className="size-5" aria-hidden />
+					</button>
+				)}
 			</div>
 
 				{!expanded && !showLabels && (
@@ -318,20 +316,16 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 						onClick={() => setCollapsed("sidebar", !collapsed)}
 						aria-label={collapsed ? "Expand the sidebar" : "Collapse the sidebar"}
 						title={collapsed ? "Expand the sidebar" : "Collapse the sidebar to icons"}
-						className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-foreground outline-none hover:bg-muted focus-visible:bg-muted"
+						className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-md text-foreground outline-none hover:bg-muted focus-visible:bg-muted"
 					>
-						{collapsed ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
+						<PanelLeftOpen className="size-5" aria-hidden />
 					</button>
 					</div>
 				)}
-			{showLabels && (
-				<div className="px-3 pt-1">
-					<SidebarQuick onNavigate={onNavigate} />
-				</div>
-			)}
+			
 
 			{/* Main Navigation */}
-			<nav aria-label={t("nav.main")} className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden", showLabels ? "gap-4 p-3" : "gap-2 p-3")}>
+			<nav aria-label={t("nav.main")} className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", showLabels ? "gap-4 p-3" : "gap-2 p-3")}>
 				{navGroups.map((group, i) => {
 					const open = !group.label || !showLabels || !folded.includes(group.id);
 					return (

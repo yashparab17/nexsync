@@ -1,9 +1,13 @@
+import { EmptyNote, PaneHeader } from "@/components/layout/Pane";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FieldError } from "@/components/ui/notice";
+import { IconButton } from "@/components/ui/icon-button";
 import { LAYOUT } from "@/lib/workspaceLayout";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
 import { dropSummary, importDropped } from "@/lib/dropImport";
 import Welcome from "@/components/elements/Welcome";
-import Toolbar, { ToolbarSearch } from "@/components/layout/Toolbar";
+import Toolbar from "@/components/layout/Toolbar";
 import { useNavigate } from "react-router-dom";
 import { CalendarPlus, FilePlus, FileText, LayoutGrid, Network, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "@/components/animate-icons";
 
@@ -34,7 +38,7 @@ import { readPins, writePins } from "@/features/notes/lib/pins";
 import { validateFileName } from "@/lib/validation";
 import { buildEdges, type Point } from "@/features/notes/lib/graph";
 import { createWorkspaceFile, deleteWorkspaceItem, listWorkspaceFiles, readWorkspaceFile, renameWorkspaceItem, renameYjsDoc, writeWorkspaceFile } from "@/lib/tauri";
-import { cn } from "@/lib/utils";
+import { cn, timeAgo } from "@/lib/utils";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P, useIsViewer } from "@/store/p2p/P2PContext";
 import type { WorkspaceFile } from "@/types/workspace";
@@ -49,20 +53,6 @@ type View = "note" | "board" | "graph";
 const rel = (path: string) => path.replace(/^\/+/, "");
 const NO_DIRTY = new Set<string>();
 
-// "3 min ago", "Yesterday", "12 Mar"
-function ago(iso: string): string {
-	const then = new Date(iso).getTime();
-	if (!Number.isFinite(then)) return "";
-	const mins = Math.round((Date.now() - then) / 60000);
-	if (mins < 1) return "Just now";
-	if (mins < 60) return `${mins} min ago`;
-	const hours = Math.round(mins / 60);
-	if (hours < 24) return `${hours} h ago`;
-	const days = Math.round(hours / 24);
-	if (days === 1) return "Yesterday";
-	if (days < 7) return `${days} days ago`;
-	return new Date(then).toLocaleDateString(undefined, { day: "numeric", month: "short" });
-}
 
 const today = () => {
 	const d = new Date();
@@ -409,7 +399,7 @@ export default function NotesPage() {
 	}, [isViewer, toggleList]);
 
 	const switcherItems = useMemo(
-		() => [...infos].sort((a, b) => (modified.get(b.path) ?? "").localeCompare(modified.get(a.path) ?? "")).map((n) => ({ id: n.path, label: noteTitle(n.name), detail: ago(modified.get(n.path) ?? ""), group: "Recent", icon: <FileText className="size-4" /> })),
+		() => [...infos].sort((a, b) => (modified.get(b.path) ?? "").localeCompare(modified.get(a.path) ?? "")).map((n) => ({ id: n.path, label: noteTitle(n.name), detail: timeAgo(modified.get(n.path) ?? ""), group: "Recent", icon: <FileText className="size-4" /> })),
 		[infos, modified],
 	);
 
@@ -435,7 +425,7 @@ export default function NotesPage() {
 						<span className="min-w-0 flex-1 truncate text-sm font-medium">{noteTitle(n.name)}</span>
 						<PresenceDots names={people} doing="reading" />
 						{pins.includes(n.path) && <Pin className="size-3.5 shrink-0 text-primary" aria-label="Pinned" />}
-						<span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{ago(modified.get(n.path) ?? "")}</span>
+						<span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{timeAgo(modified.get(n.path) ?? "")}</span>
 					</span>
 					<span className="flex items-center gap-2 text-xs text-muted-foreground">
 						<span className="min-w-0 flex-1 truncate">{snippet || "No additional text"}</span>
@@ -461,34 +451,28 @@ export default function NotesPage() {
 			{/* Notes list */}
 			<CollapsiblePane id="notes.list" defaultWidth={LIST_WIDTH} label="the notes list">
 					<aside aria-label="Notes list" className="flex shrink-0 flex-col bg-panel">
-						<Toolbar variant="header">
-							<ToolbarSearch label="Search notes" placeholder="Search" value={query} onChange={setQuery} className="min-w-0 flex-1" />
+						<PaneHeader label="Search notes" placeholder="Search" value={query} onChange={setQuery}>
 							{!isViewer && (
 								<>
-									<Button variant="ghost" size="icon-xs" aria-label="Open today's note" onPress={openToday}>
+									<IconButton size="xs" label="Open today's note" onPress={openToday}>
 										<CalendarPlus className="size-4" />
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon-xs"
-										aria-label="New note"
-										onPress={() => {
+									</IconButton>
+									<IconButton size="xs" label="New note" onPress={() => {
 											setNewTitle("");
 											setIsNewOpen(true);
-										}}
-									>
+										}}>
 										<Plus className="size-4" />
-									</Button>
+									</IconButton>
 								</>
 							)}
-						</Toolbar>
+						</PaneHeader>
 						<div className="min-h-0 flex-1 overflow-y-auto">
 							{loading ? (
 								<Loading fill />
 							) : notes.length === 0 ? (
-								<p className="p-4 text-sm text-muted-foreground">No notes yet. Make one with the plus above, or press Ctrl+N.</p>
+								<EmptyNote className="p-4">No notes yet. Make one with the plus above, or press Ctrl+N.</EmptyNote>
 							) : shown.length === 0 ? (
-								<p className="p-4 text-sm text-muted-foreground">No note mentions “{query}”.</p>
+								<EmptyNote className="p-4">No note mentions “{query}”.</EmptyNote>
 							) : (
 								<>
 									{pinned.length > 0 && (
@@ -618,7 +602,7 @@ export default function NotesPage() {
 					>
 						<DialogHeading icon={<Plus className="size-6" />} title="New Note" />
 						<Input aria-label="Note title" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Title" aria-invalid={!!validateFileName(newTitle)} autoFocus />
-						{validateFileName(newTitle) && <p role="alert" className="text-xs text-destructive">{validateFileName(newTitle)}</p>}
+						{validateFileName(newTitle) && <FieldError>{validateFileName(newTitle)}</FieldError>}
 						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setIsNewOpen(false)} isDisabled={submitting}>
 								Cancel
@@ -642,7 +626,7 @@ export default function NotesPage() {
 					>
 						<DialogHeading icon={<Pencil className="size-6" />} title="Rename Note" description={<>{renaming.note.name}</>} />
 						<Input aria-label="New name" value={renaming.value} onChange={(e) => setRenaming({ ...renaming, value: e.target.value })} aria-invalid={!!validateFileName(renaming.value)} autoFocus />
-						{(validateFileName(renaming.value) ?? renameError) && <p role="alert" className="text-xs text-destructive">{validateFileName(renaming.value) ?? renameError}</p>}
+						{(validateFileName(renaming.value) ?? renameError) && <FieldError>{validateFileName(renaming.value) ?? renameError}</FieldError>}
 						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setRenaming(null)}>
 								Cancel
@@ -654,19 +638,7 @@ export default function NotesPage() {
 			)}
 
 			{deleting && (
-				<Dialog isOpen onOpenChange={(open) => !open && setDeleting(null)}>
-					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Note" description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can restore it from there.</>} />
-						<DialogFooter className="mt-2">
-							<Button variant="outline" onPress={() => setDeleting(null)}>
-								Cancel
-							</Button>
-							<Button variant="destructive" onPress={handleDelete}>
-								Delete
-							</Button>
-						</DialogFooter>
-					</div>
-				</Dialog>
+				<ConfirmDialog isOpen onOpenChange={(open) => !open && setDeleting(null)} icon={<Trash2 className="size-6" />} title="Delete Note" description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can restore it from there.</>} confirmLabel="Delete" onConfirm={handleDelete} onCancel={() => setDeleting(null)} />
 			)}
 		</div>
 	);

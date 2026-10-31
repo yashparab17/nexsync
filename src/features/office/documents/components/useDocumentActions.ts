@@ -6,6 +6,7 @@ import { changeCase, type CaseKind, DEFAULT_FONT, DEFAULT_SIZE, HIGHLIGHTS, poin
 import { headingsOf, textOfBlocks, type BlockLike } from "@/features/office/documents/lib/documentFind";
 import { equationText, indexEntries, withFormula, type Formula } from "@/features/office/documents/lib/documentReferences";
 import { cropImage, drawShape, type CropMode, type ShapeKind } from "@/features/office/documents/lib/documentObjects";
+import { equationSpec } from "@/features/office/documents/lib/documentControls";
 import { formatSection, NEW_SECTION, sectionStart, type SectionSpec } from "@/features/office/documents/lib/documentSections";
 import { nextNoteId, noteValue, REF_TEXT, type NoteDef } from "@/features/office/documents/lib/documentNotes";
 import { applyToRuns, blockPropsOf, characterFrom, charMarks, fromCaret, tableFrom, type TableLook, idFromName, inherit, isBuiltInWordId, WORD_ID, type StyleDef } from "@/features/office/documents/lib/documentStyles";
@@ -310,10 +311,10 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 				e.insertBlocks([{ type: "paragraph", props: { pageBreakBefore: true }, content: [] } as never], at, "after");
 			}),
 		// A new section starts here: an empty paragraph that begins it, on a new page or continuing the page
-		sectionBreak: (continuous: boolean) =>
+		sectionBreak: (start: SectionSpec["start"]) =>
 			act((e) => {
 				const at = e.getTextCursorPosition().block;
-				e.insertBlocks([{ type: "paragraph", props: { sectionBreak: formatSection({ ...NEW_SECTION, continuous }) }, content: [] } as never], at, "after");
+				e.insertBlocks([{ type: "paragraph", props: { sectionBreak: formatSection({ ...NEW_SECTION, start }) }, content: [] } as never], at, "after");
 				// The caret goes into the new section, so its set-up is what the ribbon shows
 				const first = e.getNextBlock(at);
 				if (first) e.setTextCursorPosition(first, "start");
@@ -336,7 +337,7 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 				const at = e.getTextCursorPosition().block;
 				e.insertBlocks([{ type: "table", content: { type: "tableContent", rows: [{ cells: ["Text box"] }] } } as never], at, "after");
 			}),
-		insertEquation: (src: string) => act((e) => e.insertInlineContent([{ type: "text", text: equationText(src), styles: { italic: true } }] as never)),
+		insertEquation: (src: string) => act((e) => e.insertInlineContent([{ type: "text", text: equationText(src), styles: { italic: true, contentControl: equationSpec(src) } }] as never)),
 		// Text in a grey box that a teammate replaces
 		formField: () => act((e) => e.insertInlineContent([{ type: "text", text: "[Click here to enter text]", styles: { backgroundColor: "#d9d9d9" } }] as never)),
 		// The picture the caret is in: its width, alignment and the description for people who cannot see it
@@ -435,7 +436,7 @@ export function useDocumentActions(editor: Editor | null, defs?: Y.Map<Record<st
 		insertShape: (kind: ShapeKind, color: string) =>
 			act((e) => {
 				const url = drawShape(kind, color);
-				if (url) e.insertBlocks([{ type: "image", props: { url, name: kind, caption: "", previewWidth: kind === "line" ? 240 : 200 } } as never], e.getTextCursorPosition().block, "after");
+				if (url) e.insertBlocks([{ type: "image", props: { url, name: `\uE010${kind}|${color}\uE011Shape`, caption: "", previewWidth: kind === "line" ? 240 : 200 } } as never], e.getTextCursorPosition().block, "after");
 			}),
 		// The picture the caret is in, cropped
 		cropPicture: async (mode: CropMode) => {

@@ -2,6 +2,7 @@
 // changed too), then merge it. Merging is the same field-by-field merge a collaborator's copy gets, so what only one
 // side changed is kept, and what both changed is kept as a conflict for a person to choose.
 
+import { Notice } from "@/components/ui/notice";
 import { useCallback, useEffect, useState } from "react";
 import { Trash2, FilePen, GitMerge } from "@/components/animate-icons";
 
@@ -154,9 +155,9 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 				<DialogHeading icon={<FilePen className="size-6" />} title={`Drafts of "${record.title}"`} />
 
 				{error && (
-					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+					<Notice framed size="sm">
 						{error}
-					</p>
+					</Notice>
 				)}
 
 				{!active || !form ? (

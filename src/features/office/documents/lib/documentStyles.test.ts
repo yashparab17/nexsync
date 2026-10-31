@@ -92,5 +92,13 @@ describe("styles based on other styles, and styles of letters and tables", () =>
 		// A colour that is not a colour is left out, so a style from a file cannot put anything else in the sheet
 		expect(tableStyleCss([tableFrom("Bad", "Bad", { headerFill: "red;}body{display:none", headerColor: "", headerBold: false, bandFill: "", fill: "" })], (id) => id)).toBe("");
 	});
-});
 
+	it("draws the lines and the bold first column and last row of a table style", () => {
+		const css = tableStyleCss([tableFrom("Grid", "Grid", { headerFill: "", headerColor: "", headerBold: false, bandFill: "", fill: "", borderColor: "#7f7f7f", borderWidth: 1, firstColBold: true, totalBold: true })]);
+		expect(css).toContain("border:1px solid #7f7f7f");
+		expect(css).toContain("first-child{font-weight:700}");
+		expect(css).toContain("tr:last-child");
+		// A colour that is not one is not put in the page
+		expect(tableStyleCss([tableFrom("Bad", "Bad", { headerFill: "", headerColor: "", headerBold: false, bandFill: "", fill: "", borderColor: "red;}body{display:none", borderWidth: 1 })])).not.toContain("display:none");
+	});
+});

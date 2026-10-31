@@ -1,6 +1,8 @@
+import { Caption } from "@/components/layout/Pane";
 // The comment threads of the open file, down the right of the editor: each shows the words it is about (and says when they
 // moved, changed or were deleted), the conversation, a reply box, and Resolve or Reopen.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useState } from "react";
 import { X } from "lucide-react";
 
@@ -10,7 +12,6 @@ import type { Proposal } from "@/lib/proposals";
 import RichText from "@/features/chat/components/RichText";
 import { AnimateIcon, Bell, BellRing, Check, CornerUpLeft, Pencil, RotateCcw, Trash2 } from "@/components/animate-icons";
 import Toolbar from "@/components/layout/Toolbar";
-import { Button } from "@/components/ui/button";
 import Avatar from "@/components/elements/Avatar";
 import { MessageSquareText } from "@/components/animate-icons";
 import { decodeMentions, type Person } from "@/features/chat/lib/mentions";
@@ -53,19 +54,12 @@ export default function CommentsPanel(props: CommentsPanelProps) {
 			<Toolbar variant="header" className="gap-2">
 				<MessageSquareText className="size-5 text-primary" />
 				<h2 className="flex-1 text-sm font-semibold">Comments</h2>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-pressed={props.following}
-					aria-label={props.following ? "Stop following this file" : "Follow this file"}
-					onPress={() => props.onFollow(!props.following)}
-					className={props.following ? "text-primary" : "text-muted-foreground"}
-				>
+				<IconButton pressed={props.following} label={props.following ? "Stop following this file" : "Follow this file"} onPress={() => props.onFollow(!props.following)} className={props.following ? "text-primary" : "text-muted-foreground"}>
 					{props.following ? <BellRing className="size-4" /> : <Bell className="size-4" />}
-				</Button>
-				<Button variant="ghost" size="icon-sm" aria-label="Close comments" onPress={props.onClose} className="text-muted-foreground">
+				</IconButton>
+				<IconButton label="Close comments" onPress={props.onClose} className="text-muted-foreground">
 					<X className="size-4" />
-				</Button>
+				</IconButton>
 			</Toolbar>
 			<div role="tablist" aria-label="Which comments" className="flex shrink-0 gap-1 px-3 pb-2">
 				{(
@@ -141,7 +135,7 @@ function ThreadCard({ thread, placement, active, people, me, removed, canComment
 							<div className="flex items-baseline gap-2">
 								<span className="truncate text-sm font-semibold">{c.name}</span>
 								{removed?.has(c.author) && <span className="rounded-sm bg-destructive/15 px-1 font-mono text-[13px] text-destructive">Removed</span>}
-								<span className="font-mono text-[13px] text-muted-foreground">{when(c.ts)}</span>
+								<Caption>{when(c.ts)}</Caption>
 							</div>
 							{c.deleted ? (
 								<p className="text-sm text-muted-foreground italic">Comment deleted</p>
@@ -181,22 +175,16 @@ function ThreadCard({ thread, placement, active, people, me, removed, canComment
 							{!c.deleted && editing !== c.id && canComment && (c.author === me || isAdmin) && (
 								<div className="mt-1 hidden gap-2 group-hover:flex group-focus-within:flex">
 									{c.author === me && (
-										<Button
-											variant="ghost"
-											size="icon-xs"
-											aria-label="Edit comment"
-											onPress={() => {
+										<IconButton size="xs" label="Edit comment" onPress={() => {
 												setEditing(c.id);
 												setEditText(decodeMentions(c.text, people));
-											}}
-											className="text-muted-foreground"
-										>
+											}} className="text-muted-foreground">
 											<Pencil className="size-3.5" />
-										</Button>
+										</IconButton>
 									)}
-									<Button variant="ghost" size="icon-xs" aria-label="Delete comment" onPress={() => void onDelete(c)} className="text-muted-foreground hover:text-destructive">
+									<IconButton size="xs" label="Delete comment" onPress={() => void onDelete(c)} className="text-muted-foreground hover:text-destructive">
 										<Trash2 className="size-3.5" />
-									</Button>
+									</IconButton>
 								</div>
 							)}
 						</div>
@@ -227,9 +215,9 @@ function ThreadCard({ thread, placement, active, people, me, removed, canComment
 								}}
 								className="min-h-8 flex-1 resize-none rounded-md bg-input px-2 py-1 text-sm outline-none placeholder:text-muted-foreground"
 							/>
-							<Button variant="ghost" size="icon-sm" aria-label="Send reply" isDisabled={!text.trim() || busy} onPress={() => void reply()} className="text-primary">
+							<IconButton label="Send reply" isDisabled={!text.trim() || busy} onPress={() => void reply()} className="text-primary">
 								<CornerUpLeft className="size-4" />
-							</Button>
+							</IconButton>
 						</div>
 					)}
 					<AnimateIcon animateOnHover asChild>

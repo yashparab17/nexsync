@@ -1,6 +1,7 @@
 // One terminal: an xterm.js emulator wired to a shell running in a pseudo-terminal on this device. The emulator and its
 // add-ons load the first time a terminal is opened.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Terminal as XTerm, ITheme } from "@xterm/xterm";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -8,7 +9,6 @@ import type { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 
 import { Search, X } from "@/components/animate-icons";
-import { Button } from "@/components/ui/button";
 import { useEditorPrefs } from "@/lib/editorPrefs";
 import { closeTerminal, onTerminalData, onTerminalExit, openTerminal, resizeTerminal, writeTerminal } from "@/lib/tauri";
 import { useThemeContext } from "@/store/ThemeContext";
@@ -239,18 +239,13 @@ const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function Term
 						}}
 						className="h-7 w-44 bg-transparent px-2 font-mono text-xs outline-none focus-visible:shadow-[inset_0_-2px_0_var(--primary)]"
 					/>
-					<Button
-						variant="ghost"
-						size="icon-xs"
-						aria-label="Close find"
-						onPress={() => {
+					<IconButton size="xs" label="Close find" onPress={() => {
 							setSearching(false);
 							search.current?.clearDecorations();
 							term.current?.focus();
-						}}
-					>
+						}}>
 						<X className="size-3.5" />
-					</Button>
+					</IconButton>
 				</div>
 			)}
 		</div>

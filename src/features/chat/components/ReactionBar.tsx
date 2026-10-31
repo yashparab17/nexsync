@@ -1,7 +1,7 @@
 // Emoji under a comment: the ones already given, with who gave them, and a small picker to add more.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { SmilePlus } from "@/components/animate-icons";
 
 import { EMOJI } from "@/features/chat/components/MessageList";
@@ -54,9 +54,9 @@ export default function ReactionBar({ reactions, me, canReact, onReact }: Reacti
 						</button>
 					))
 				) : (
-					<Button variant="ghost" size="icon-xs" aria-label="Add reaction" onPress={() => setPicking(true)} className="size-6 text-muted-foreground">
+					<IconButton size="xs" label="Add reaction" onPress={() => setPicking(true)} className="size-6 text-muted-foreground">
 						<SmilePlus className="size-3.5" />
-					</Button>
+					</IconButton>
 				))}
 		</div>
 	);

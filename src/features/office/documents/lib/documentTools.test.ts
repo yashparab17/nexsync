@@ -118,5 +118,16 @@ describe("character and table styles for the file", () => {
 	it("leaves a style id that holds a marker character out", () => {
 		expect(forFile('<p><span data-char-style="Bad">x</span></p>')).toBe("<p>x</p>");
 	});
-});
 
+	it("says which side text runs round a picture, in its alt text", () => {
+		const out = forFile('<img src="x.png" alt="Sunset" data-wrap="left"><img src="y.png" data-wrap="none">');
+		expect(out).toContain("alt=\"leftSunset\"");
+		expect(out).not.toContain("none");
+	});
+
+	it("wraps the words of a content control and an equation in markers", () => {
+		const out = forFile('<p>A <span data-control="check|||">x</span> and <span data-control="eq|6162">a/b</span></p>');
+		expect(out).toContain("check|||x".replace("", ""));
+		expect(out).toContain("eq|6162a/b");
+	});
+});

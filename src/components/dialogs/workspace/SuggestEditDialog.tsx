@@ -1,10 +1,11 @@
+import { Field } from "@/components/ui/field";
+import { Notice } from "@/components/ui/notice";
 import { useState } from "react";
 import { Pencil } from "@/components/animate-icons";
 import * as Y from "yjs";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogHeading } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MAX_PROPOSAL_TEXT, propose } from "@/lib/proposals";
 
@@ -38,14 +39,13 @@ export default function SuggestEditDialog({ doc, userName, from, to, onClose }: 
 			<div className="flex flex-col gap-4">
 				<DialogHeading icon={<Pencil className="size-6" />} title="Suggest an Edit" />
 				{original && <pre className="max-h-32 overflow-auto border bg-muted/40 p-2 text-xs whitespace-pre-wrap">{original}</pre>}
-				<div className="space-y-1">
-					<Label htmlFor="suggested-text">{from === to ? "Add" : "Replace with"}</Label>
-					<Textarea id="suggested-text" autoFocus value={text} maxLength={MAX_PROPOSAL_TEXT} onChange={(e) => setText(e.target.value)} placeholder="Replacement" className="min-h-24 border-input px-2" />
-				</div>
+				<Field label={<>{from === to ? "Add" : "Replace with"}</>} htmlFor="suggested-text">
+<Textarea id="suggested-text" autoFocus value={text} maxLength={MAX_PROPOSAL_TEXT} onChange={(e) => setText(e.target.value)} placeholder="Replacement" className="min-h-24 border-input px-2" />
+</Field>
 				{error && (
-					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+					<Notice framed size="sm">
 						{error}
-					</p>
+					</Notice>
 				)}
 				<div className="flex justify-end gap-2">
 					<Button variant="ghost" onPress={onClose}>

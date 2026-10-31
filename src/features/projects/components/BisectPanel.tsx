@@ -1,3 +1,4 @@
+import { Notice } from "@/components/ui/notice";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 
@@ -80,9 +81,9 @@ export default function BisectPanel({ path, project, taskId, taskLabel, since, o
 					</p>
 				)}
 				{error && (
-					<p role="alert" className="bg-destructive/10 p-2 text-destructive">
+					<Notice>
 						{error}
-					</p>
+					</Notice>
 				)}
 				{result && result.outcome !== "found" && <p className="text-muted-foreground">{SAYS[result.outcome]}</p>}
 				{c && (

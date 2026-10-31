@@ -1,3 +1,5 @@
+import { Notice } from "@/components/ui/notice";
+import { IconButton } from "@/components/ui/icon-button";
 import { useState } from "react";
 
 import { Check, KeyRound, Trash2 } from "@/components/animate-icons";
@@ -47,9 +49,9 @@ export default function EnvPanel({ path, project, vars, canEdit, onChanged }: { 
 											{v.state === "missing" ? "Set" : "Change"}
 										</Button>
 										{v.state !== "missing" && (
-											<Button variant="ghost" size="icon-xs" aria-label={`Remove ${v.name} from this device`} onPress={() => void run(() => projectEnvClear(path, project, v.name))}>
+											<IconButton size="xs" label={`Remove ${v.name} from this device`} onPress={() => void run(() => projectEnvClear(path, project, v.name))}>
 												<Trash2 className="size-3.5" />
-											</Button>
+											</IconButton>
 										)}
 									</>
 								)}
@@ -80,9 +82,9 @@ export default function EnvPanel({ path, project, vars, canEdit, onChanged }: { 
 				</ul>
 			)}
 			{error && (
-				<p role="alert" className="m-4 bg-destructive/10 p-2 text-sm text-destructive">
+				<Notice className="m-4">
 					{error}
-				</p>
+				</Notice>
 			)}
 		</Panel>
 	);

@@ -1,3 +1,4 @@
+import { Caption } from "@/components/layout/Pane";
 // The Moderation panel of the Members screen: what waits for a second person, who is banned, and the edits held for review.
 // Only the Owner and Admins see it.
 
@@ -98,7 +99,7 @@ export default function ModerationPanel() {
 									Approve
 								</Button>
 							)}
-							{p.byKey === chat.me && <span className="font-mono text-[13px] text-muted-foreground">Asked by you</span>}
+							{p.byKey === chat.me && <Caption>Asked by you</Caption>}
 						</li>
 					))}
 				</ul>
@@ -136,7 +137,7 @@ export default function ModerationPanel() {
 									Unban
 								</Button>
 							) : (
-								<span className="font-mono text-[13px] text-muted-foreground">Only the Owner can unban</span>
+								<Caption>Only the Owner can unban</Caption>
 							)}
 						</li>
 					))}

@@ -1,3 +1,5 @@
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { IconButton } from "@/components/ui/icon-button";
 import { MAX_WORKSPACE_NAME } from "@/lib/validation";
 import { useState } from "react";
 import { Activity, Trash2, Crown, KeyRound, MessageSquareText, Pencil, Shield, ShieldAlert, ShieldCheck, UserCheck, UserPlus, Plus } from "@/components/animate-icons";
@@ -376,77 +378,46 @@ export default function MembersPage() {
 
 											{member.deviceId && !isYou && (
 												<span title="Check whether this member can be reached from here without the host">
-													<Button
-														variant="ghost"
-														size="icon-xs"
-														onPress={() => void runProbe(member)}
-														isDisabled={probes[member.id] === "running"}
-														aria-label={`Check whether ${member.name} can be reached directly`}
-													>
+													<IconButton size="xs" onPress={() => void runProbe(member)} isDisabled={probes[member.id] === "running"} label={`Check whether ${member.name} can be reached directly`}>
 														<Activity className="size-3.5 text-muted-foreground hover:text-foreground" />
-													</Button>
+													</IconButton>
 												</span>
 											)}
 											{isJoinedCopy && isYou && (
-												<Button
-													variant="ghost"
-													size="icon-xs"
-													onPress={() => {
+												<IconButton size="xs" onPress={() => {
 														setRenameValue(member.name);
 														setRenameError(null);
 														setRenameOpen(true);
-													}}
-													aria-label="Change my name in this workspace"
-												>
+													}} label="Change my name in this workspace">
 													<Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
-												</Button>
+												</IconButton>
 											)}
 											{canEdit && (
 												<div className="flex items-center gap-1">
-													<Button
-														variant="ghost"
-														size="icon-xs"
-														onPress={() => {
+													<IconButton size="xs" onPress={() => {
 															setEditingMember(member);
 															setEditName(member.name);
 															setEditRole(member.role);
-														}}
-														aria-label="Edit member"
-													>
+														}} label="Edit member">
 														<Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
-													</Button>
+													</IconButton>
 													{!isOwner && !isJoinedCopy && isOnline && member.deviceId && (
-	<Button
-		variant="ghost"
-		size="icon-xs"
-		onPress={() => {
+	<IconButton size="xs" onPress={() => {
 			setHandoffError(null);
 			setHostTarget(member);
-		}}
-		aria-label="Make Host"
-	>
+		}} label="Make Host">
 		<Crown className="size-3.5 text-muted-foreground hover:text-warning" />
-	</Button>
+	</IconButton>
 )}
 {member.deviceId && !isYou && canModerate(selfRole, member.role) ? (
-														<Button
-															variant="ghost"
-															size="icon-xs"
-															onPress={() => setModerating(member)}
-															aria-label={`Moderate ${member.name}`}
-														>
+														<IconButton size="xs" onPress={() => setModerating(member)} label={`Moderate ${member.name}`}>
 															<ShieldAlert className="size-3.5 text-muted-foreground hover:text-destructive" />
-														</Button>
+														</IconButton>
 													) : (
 														!isOwner && !isJoinedCopy && (
-															<Button
-																variant="ghost"
-																size="icon-xs"
-																onPress={() => setDeletingMember(member)}
-																aria-label="Remove Member"
-															>
+															<IconButton size="xs" onPress={() => setDeletingMember(member)} label="Remove Member">
 																<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
-															</Button>
+															</IconButton>
 														)
 													)}
 												</div>
@@ -710,30 +681,11 @@ export default function MembersPage() {
 			{moderating && <ModerateDialog member={moderating} selfRole={selfRole} onClose={() => setModerating(null)} />}
 
 			{deletingMember && (
-				<Dialog
-					isOpen={!!deletingMember}
-					onOpenChange={(open) => !open && setDeletingMember(null)}
-				>
-					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Remove Collaborator" description={<>Are you sure you want to remove{" "}
+				<ConfirmDialog isOpen={!!deletingMember} onOpenChange={(open) => !open && setDeletingMember(null)} icon={<Trash2 className="size-6" />} title="Remove Collaborator" description={<>Are you sure you want to remove{" "}
 								<span className="font-semibold text-foreground">
 									{deletingMember.name}
 								</span>{" "}
-								from this workspace? They will be disconnected and cannot rejoin with an earlier invite or code.</>} />
-
-						<DialogFooter>
-							<Button
-								variant="outline"
-								onPress={() => setDeletingMember(null)}
-							>
-								Cancel
-							</Button>
-							<Button variant="destructive" onPress={handleDeleteMember}>
-								Remove
-							</Button>
-						</DialogFooter>
-					</div>
-				</Dialog>
+								from this workspace? They will be disconnected and cannot rejoin with an earlier invite or code.</>} confirmLabel="Remove" onConfirm={handleDeleteMember} onCancel={() => setDeletingMember(null)} />
 			)}
 		</Page>
 	);

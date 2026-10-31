@@ -1,3 +1,6 @@
+import { Caption } from "@/components/layout/Pane";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { IconButton } from "@/components/ui/icon-button";
 import { MAX_TITLE } from "@/lib/validation";
 import { useCallback, useEffect, useMemo, useState, type ElementType } from "react";
 import { Plus, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, } from "@/components/animate-icons";
@@ -478,7 +481,7 @@ export default function TasksPage() {
 
 			{allTags.length > 0 && (
 				<Toolbar variant="sub" className="gap-2 overflow-x-auto">
-					<span className="font-mono text-[13px] text-muted-foreground">tags</span>
+					<Caption>tags</Caption>
 					{allTags.map((tag) => (
 						<TagChip key={tag} tag={tag} active={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)} />
 					))}
@@ -568,12 +571,12 @@ export default function TasksPage() {
 										<span className={cn("font-mono text-[13px]", priorityConf.color)}>{priorityConf.label.toLowerCase()}</span>
 										{!isViewer && (
 											<span className="flex opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
-												<Button variant="ghost" size="icon-xs" onPress={() => handleOpenEdit(task)} aria-label="Edit task">
+												<IconButton size="xs" onPress={() => handleOpenEdit(task)} label="Edit task">
 													<Pencil className="size-3.5" />
-												</Button>
-												<Button variant="ghost" size="icon-xs" onPress={() => setDeletingTaskId(task.id)} aria-label="Delete task">
+												</IconButton>
+												<IconButton size="xs" onPress={() => setDeletingTaskId(task.id)} label="Delete task">
 													<Trash2 className="size-3.5 text-destructive" />
-												</Button>
+												</IconButton>
 											</span>
 										)}
 									</div>
@@ -798,36 +801,18 @@ export default function TasksPage() {
 
 			{/* Delete Confirmation Modal */}
 			{deletingTaskId && (
-				<Dialog
-					isOpen={!!deletingTaskId}
-					onOpenChange={(open) => {
+				<ConfirmDialog isOpen={!!deletingTaskId} onOpenChange={(open) => {
 						if (!open) {
 							setDeletingTaskId(null);
 							setEraseTask(false);
 						}
-					}}
-				>
-					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Task" description={<>Are you sure you want to delete this task? This action cannot be
-								undone.</>} />
-						<EraseOption checked={eraseTask} onChange={setEraseTask} what="the task" />
-
-						<DialogFooter>
-							<Button
-								variant="outline"
-								onPress={() => {
+					}} icon={<Trash2 className="size-6" />} title="Delete Task" description={<>Are you sure you want to delete this task? This action cannot be
+								undone.</>} confirmLabel={eraseTask ? "Erase Task" : "Delete Task"} onConfirm={handleDeleteTask} onCancel={() => {
 									setDeletingTaskId(null);
 									setEraseTask(false);
-								}}
-							>
-								Cancel
-							</Button>
-							<Button variant="destructive" onPress={handleDeleteTask}>
-								{eraseTask ? "Erase Task" : "Delete Task"}
-							</Button>
-						</DialogFooter>
-					</div>
-				</Dialog>
+								}}>
+<EraseOption checked={eraseTask} onChange={setEraseTask} what="the task" />
+</ConfirmDialog>
 			)}
 		</div>
 	);

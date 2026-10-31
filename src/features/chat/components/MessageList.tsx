@@ -1,8 +1,9 @@
+import { Caption } from "@/components/layout/Pane";
 // The messages of a channel, Discord-style: runs of one person's messages are grouped under a single avatar and name, days are
 // separated, a reply shows the line it answers, and hovering a message shows what can be done with it.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { AnimateIcon, CornerUpLeft, ListTodo, MessagesSquare, Pencil, SmilePlus, Trash2 } from "@/components/animate-icons";
 
 import Attachment from "@/features/chat/components/Attachment";
@@ -92,7 +93,7 @@ export default function MessageList({ messages, people, me, removed, canPost, is
 						{newDay && (
 							<div className="my-3 flex items-center gap-3 px-4" role="separator" aria-label={dayLabel(m.ts)}>
 								<span className="h-px flex-1 bg-foreground/15" />
-								<span className="font-mono text-[13px] text-muted-foreground">{dayLabel(m.ts)}</span>
+								<Caption>{dayLabel(m.ts)}</Caption>
 								<span className="h-px flex-1 bg-foreground/15" />
 							</div>
 						)}
@@ -232,9 +233,9 @@ export default function MessageList({ messages, people, me, removed, canPost, is
 
 function ActionButton({ label, onClick, icon, danger }: { label: string; onClick: () => void; icon: React.ReactNode; danger?: boolean }) {
 	return (
-		<Button variant="ghost" size="icon-xs" aria-label={label} onPress={onClick} className={cn("text-muted-foreground", danger ? "hover:text-destructive" : "hover:text-foreground")}>
+		<IconButton size="xs" label={label} onPress={onClick} className={cn("text-muted-foreground", danger ? "hover:text-destructive" : "hover:text-foreground")}>
 			{icon}
-		</Button>
+		</IconButton>
 	);
 }
 

@@ -1,5 +1,6 @@
 // Month view of tasks by due date; clicking a task opens it
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "@/components/animate-icons";
 
@@ -43,9 +44,9 @@ export default function TaskCalendar({ tasks, onOpen }: { tasks: Task[]; onOpen:
 					{title}
 				</h2>
 				<div className="flex items-center gap-1">
-					<Button variant="outline" size="icon-xs" aria-label="Previous month" onPress={() => shift(-1)}>
+					<IconButton size="xs" variant="outline" label="Previous month" onPress={() => shift(-1)}>
 						<ChevronLeft className="size-4" />
-					</Button>
+					</IconButton>
 					<Button
 						variant="outline"
 						size="xs"
@@ -53,9 +54,9 @@ export default function TaskCalendar({ tasks, onOpen }: { tasks: Task[]; onOpen:
 					>
 						Today
 					</Button>
-					<Button variant="outline" size="icon-xs" aria-label="Next month" onPress={() => shift(1)}>
+					<IconButton size="xs" variant="outline" label="Next month" onPress={() => shift(1)}>
 						<ChevronRight className="size-4" />
-					</Button>
+					</IconButton>
 				</div>
 			</div>
 

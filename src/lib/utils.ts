@@ -45,6 +45,19 @@ export function formatBytes(bytes: number): string {
 	return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
+// "just now", "5m ago", "3h ago", "2d ago", then the date; empty when the text is not a time
+export function timeAgo(iso: string): string {
+	const then = new Date(iso).getTime();
+	if (!iso || !Number.isFinite(then)) return "";
+	const mins = Math.floor(Math.max(0, Date.now() - then) / 60_000);
+	if (mins < 1) return "just now";
+	if (mins < 60) return `${mins}m ago`;
+	const hours = Math.floor(mins / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	return days < 7 ? `${days}d ago` : new Date(then).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
 // Extract a human-readable message from a caught value
 export function errorText(err: unknown, fallback: string): string {
 	return err instanceof Error ? err.message

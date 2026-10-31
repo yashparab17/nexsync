@@ -1,11 +1,11 @@
 // What can be done with the open file, at the right of the row of tabs.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { Columns3, Eye, GitBranch, History, MessageSquareDiff, Save, Search, Sparkles, Terminal, UsersRound, Check } from "@/components/animate-icons";
 
 import type { CodeTabHandle, CodeTabStatus } from "@/features/editor/components/codeTabTypes";
 import { Redo2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 interface EditorToolbarProps {
 	path: string | null;
@@ -24,11 +24,9 @@ interface EditorToolbarProps {
 
 function Tool({ label, shortcut, pressed, onPress, disabled, children }: { label: string; shortcut?: string; pressed?: boolean; onPress: () => void; disabled?: boolean; children: React.ReactNode }) {
 	return (
-		<Button variant={pressed ? "secondary" : "ghost"} size="icon-sm" aria-label={label} aria-pressed={pressed} isDisabled={disabled} onPress={onPress} className={cn(!pressed && "text-muted-foreground")}>
-			<span title={shortcut ? `${label} (${shortcut})` : label} className="contents">
-				{children}
-			</span>
-		</Button>
+		<IconButton label={label} shortcut={shortcut} pressed={pressed} isDisabled={disabled} onPress={onPress}>
+			{children}
+		</IconButton>
 	);
 }
 

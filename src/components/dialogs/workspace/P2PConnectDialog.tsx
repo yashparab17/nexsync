@@ -1,3 +1,4 @@
+import { IconButton } from "@/components/ui/icon-button";
 import { useEffect, useState } from "react";
 import { Check, Copy, Radio, RefreshCw, AlertTriangle, Globe, KeyRound, Link2, Lock, Sparkles, Unplug, Users } from "@/components/animate-icons";
 import Avatar from "@/components/elements/Avatar";
@@ -150,9 +151,9 @@ export default function P2PConnectDialog({
 	];
 
 	const roles = [
-		{ id: "Editor", title: "Can edit", text: "Edits files, notes and tasks." },
-		{ id: "Commenter", title: "Can comment", text: "Reads and comments only." },
-		{ id: "Viewer", title: "Can view", text: "Reads only." },
+		{ id: "Editor", title: "Edit", text: "Edits files, notes and tasks." },
+		{ id: "Commenter", title: "Comment", text: "Reads and comments only." },
+		{ id: "Viewer", title: "View", text: "Reads only." },
 	];
 
 	// A notice above the tabs; the tone says how serious it is
@@ -164,7 +165,7 @@ export default function P2PConnectDialog({
 	);
 
 	return (
-		<Dialog isOpen={open} onOpenChange={onOpenChange} className="max-w-lg">
+		<Dialog isOpen={open} onOpenChange={onOpenChange} className="sm:max-w-md">
 <div className="min-w-0 space-y-3">
 				<DialogHeading icon={<Radio className="size-6" />} title="Collaborate" />
 
@@ -218,8 +219,8 @@ export default function P2PConnectDialog({
 							aria-selected={activeTab === tab.id}
 							onClick={() => setActiveTab(tab.id)}
 							className={cn(
-								"flex flex-1 items-center justify-center gap-2 border-b-2 py-2 text-sm font-medium outline-none transition-colors focus-visible:bg-muted",
-								activeTab === tab.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+								"flex flex-1 cursor-pointer items-center justify-center gap-2 py-2 text-sm font-medium outline-none transition-colors focus-visible:bg-muted",
+								activeTab === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
 							)}
 						>
 							{tab.icon}
@@ -446,9 +447,9 @@ title={r.text}
 												<Lock className="size-3.5" />
 												Private
 											</span>
-											<Button size="icon-xs" variant="ghost" onPress={() => disconnectPeer(peer.id)} className="size-8 hover:text-destructive" aria-label={`Disconnect ${peer.name}`}>
+											<IconButton size="xs" onPress={() => disconnectPeer(peer.id)} className="size-8 hover:text-destructive" label={`Disconnect ${peer.name}`}>
 												<Unplug className="size-4" />
-											</Button>
+											</IconButton>
 										</li>
 									))}
 								</ul>

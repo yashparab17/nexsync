@@ -1,3 +1,5 @@
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FieldError } from "@/components/ui/notice";
 import { EDITOR_FOLDERS } from "@/lib/workspaceLayout";
 import { dropSummary, importDropped } from "@/lib/dropImport";
 import Toolbar from "@/components/layout/Toolbar";
@@ -760,7 +762,7 @@ export default function EditorPage() {
 							aria-invalid={!!validateFileName(newItem.value)}
 							autoFocus
 						/>
-						{(validateFileName(newItem.value) ?? itemError) && <p role="alert" className="text-xs text-destructive">{validateFileName(newItem.value) ?? itemError}</p>}
+						{(validateFileName(newItem.value) ?? itemError) && <FieldError>{validateFileName(newItem.value) ?? itemError}</FieldError>}
 						<DialogFooter>
 							<Button type="button" variant="outline" onPress={() => setNewItem(null)}>
 								Cancel
@@ -788,7 +790,7 @@ export default function EditorPage() {
 							aria-invalid={!!validateFileName(renaming.value)}
 							autoFocus
 						/>
-						{(validateFileName(renaming.value) ?? itemError) && <p role="alert" className="text-xs text-destructive">{validateFileName(renaming.value) ?? itemError}</p>}
+						{(validateFileName(renaming.value) ?? itemError) && <FieldError>{validateFileName(renaming.value) ?? itemError}</FieldError>}
 						<DialogFooter>
 							<Button type="button" variant="outline" onPress={() => setRenaming(null)}>
 								Cancel
@@ -817,20 +819,8 @@ export default function EditorPage() {
 			)}
 
 			{deleting && (
-				<Dialog isOpen onOpenChange={(open) => !open && setDeleting(null)}>
-					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title={`Delete ${deleting.is_dir ? "Folder" : "File"}`} description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can
-								restore it from there.</>} />
-						<DialogFooter>
-							<Button variant="outline" onPress={() => setDeleting(null)}>
-								Cancel
-							</Button>
-							<Button variant="destructive" onPress={() => void deleteItem()}>
-								Delete
-							</Button>
-						</DialogFooter>
-					</div>
-				</Dialog>
+				<ConfirmDialog isOpen onOpenChange={(open) => !open && setDeleting(null)} icon={<Trash2 className="size-6" />} title={`Delete ${deleting.is_dir ? "Folder" : "File"}`} description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can
+								restore it from there.</>} confirmLabel="Delete" onConfirm={() => void deleteItem()} onCancel={() => setDeleting(null)} />
 			)}
 		</div>
 	);

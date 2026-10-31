@@ -3,7 +3,7 @@ import { EditorState } from "@tiptap/pm/state";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
-import { changesOf, compareLines, markValue, newReviewStore, readMark, resolvedSetOf, staleMarksPlugin, strayMarks } from "@/features/office/documents/lib/documentReview";
+import { applyComparison, changesOf, compareLines, markValue, newReviewStore, readMark, resolvedSetOf, staleMarksPlugin, strayMarks } from "@/features/office/documents/lib/documentReview";
 
 describe("tracked change marks", () => {
 	it("keep who and when, whatever the name holds", () => {
@@ -100,5 +100,44 @@ describe("the list of resolved changes", () => {
 		Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
 		expect([sb.has("Z|d1"), sb.has("Z|d2"), sb.has("Z|d3"), sb.size()]).toEqual([true, true, false, 2]);
 		expect(told).toBe(1);
+	});
+});
+
+describe("compare written into the document", () => {
+	const schema = new Schema({
+		nodes: {
+			doc: { content: "blockContainer+" },
+			blockContainer: { content: "paragraph" },
+			paragraph: { content: "text*", group: "inline-holder" },
+			text: {},
+		},
+		marks: { insertion: { attrs: { stringValue: { default: "" } } }, deletion: { attrs: { stringValue: { default: "" } } } },
+	});
+	const docOf = (...texts: string[]) => schema.node("doc", null, texts.map((t) => schema.node("blockContainer", null, schema.node("paragraph", null, t ? [schema.text(t)] : []))));
+	const run = (before: string[], after: string[]) => {
+		const state = EditorState.create({ doc: docOf(...after) });
+		const { tr } = applyComparison(state, compareLines(before, after), "Ana", new Date("2026-11-01T10:00:00Z"));
+		return { state: state.apply(tr), changes: changesOf(state.apply(tr).doc) };
+	};
+
+	it("marks new words as inserted and puts removed ones back struck through", () => {
+		const { state, changes } = run(["The quick brown fox"], ["The slow brown fox"]);
+		expect(changes.map((c) => [c.kind, c.text.trim()]).sort()).toEqual([["deletion", "quick"], ["insertion", "slow"]]);
+		expect(changes.every((c) => c.author === "Ana")).toBe(true);
+		// Rejecting every change gives the other text, accepting every change keeps the document's
+		const reject = state.doc.textContent.replace(/slow/, "").replace(/\s+/g, " ");
+		expect(reject).toContain("quick");
+		expect(state.doc.textContent).toContain("slow");
+	});
+
+	it("marks a whole paragraph the document added, and brings back one it dropped", () => {
+		const { state, changes } = run(["Keep", "Gone", "End"], ["Keep", "End", "New"]);
+		expect(changes.map((c) => [c.kind, c.text]).sort()).toEqual([["deletion", "Gone"], ["insertion", "New"]]);
+		expect(state.doc.childCount).toBe(4);
+		expect(state.doc.child(1).textContent).toBe("Gone");
+	});
+
+	it("marks nothing when the texts are the same", () => {
+		expect(run(["One", "Two"], ["One", "Two"]).changes).toEqual([]);
 	});
 });

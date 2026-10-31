@@ -1,3 +1,7 @@
+import { EmptyNote, PaneHeader } from "@/components/layout/Pane";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FieldError, Notice } from "@/components/ui/notice";
+import { IconButton } from "@/components/ui/icon-button";
 import { DOC_TEMPLATES } from "@/features/office/shared/templates";
 import { useNewParam } from "@/hooks/useNewParam";
 import { useSyncedIn } from "@/hooks/useSyncedIn";
@@ -14,7 +18,6 @@ import DocumentWorkspace, { type Layout } from "@/features/office/documents/comp
 import CollapsiblePane, { LIST_WIDTH } from "@/components/layout/CollapsiblePane";
 import PresenceDots from "@/components/elements/PresenceDots";
 import { EmptyState, Page } from "@/components/layout/Page";
-import Toolbar, { ToolbarSearch } from "@/components/layout/Toolbar";
 import Loading from "@/components/Loading";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -27,7 +30,7 @@ import { useReportItem } from "@/hooks/usePresence";
 import { LAYOUT, isIn, placeIn } from "@/lib/workspaceLayout";
 import { isOfficeDocument } from "@/lib/editor/languages";
 import { deleteWorkspaceItem, officeExport, officeImport, renameWorkspaceItem, renameYjsDoc, searchWorkspaceFiles, writeWorkspaceBinaryFile } from "@/lib/tauri";
-import { cn, errorText } from "@/lib/utils";
+import { cn, errorText, formatBytes } from "@/lib/utils";
 import { safeUploadName, validateFileName } from "@/lib/validation";
 import { useCanComment, useIsViewer, useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -121,7 +124,7 @@ export default function DocumentsPage() {
 			const dest = await save({ title: "Save a copy", defaultPath: `${base}.${format}`, filters: [{ name: format.toUpperCase(), extensions: [format] }] });
 			if (!dest) return;
 			const size = await officeExport(workspacePath, dest, html, title, anonymous ? "" : author, layout, state?.imported?.sourceId);
-			flash(true, `Saved a copy (${Math.max(1, Math.round(size / 1024))} KB).`);
+			flash(true, `Saved a copy (${formatBytes(size)}).`);
 		} catch (err) {
 			flash(false, errorText(err, "The copy could not be saved."));
 		}
@@ -247,8 +250,7 @@ export default function DocumentsPage() {
 			<div className="flex min-h-0 flex-1">
 				<CollapsiblePane id="documents.list" defaultWidth={LIST_WIDTH} label="the list of documents">
 					<div className="flex shrink-0 flex-col bg-panel">
-					<Toolbar variant="header">
-						<ToolbarSearch label="Search documents" value={query} onChange={setQuery} placeholder="Search" className="min-w-0 flex-1" />
+					<PaneHeader label="Search documents" value={query} onChange={setQuery} placeholder="Search">
 						{!isViewer && (
 							<>
 								<input
@@ -262,18 +264,18 @@ export default function DocumentsPage() {
 								if (f) void addFile(f);
 								}}
 								/>
-								<Button variant="ghost" size="icon-xs" aria-label="Add a file" onPress={() => fileInput.current?.click()}>
+								<IconButton size="xs" label="Add a file" onPress={() => fileInput.current?.click()}>
 									<Upload className="size-4" />
-								</Button>
-								<Button size="icon-xs" aria-label="New document" onPress={() => setCreating(true)}>
+								</IconButton>
+								<IconButton size="xs" label="New document" onPress={() => setCreating(true)}>
 									<FilePlus className="size-4" />
-								</Button>
+								</IconButton>
 							</>
 						)}
-					</Toolbar>
+					</PaneHeader>
 					<nav aria-label="Documents" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5">
 					{docs === null ? null : shown.length === 0 ? (
-						<p className="p-3 text-sm text-muted-foreground">{docs.length === 0 ? "No documents yet. Make one, or add a .docx, .doc, .odt or .rtf file." : "No document matches."}</p>
+						<EmptyNote>{docs.length === 0 ? "No documents yet. Make one, or add a .docx, .doc, .odt or .rtf file." : "No document matches."}</EmptyNote>
 					) : (
 						shown.map((d) => (
 							<div key={d.rel} className={cn("group flex min-w-0 items-center hover:bg-muted", d.rel === selected && "bg-muted")}>
@@ -313,9 +315,9 @@ export default function DocumentsPage() {
 						<Loading className="h-48" />
 					) : state.error ? (
 						<div className="m-6 max-w-md space-y-3 text-sm">
-							<p role="alert" className="bg-destructive/10 p-3 text-destructive">
+							<Notice className="p-3">
 								{state.error}
-							</p>
+							</Notice>
 							{state.password && (
 								<form
 									className="flex gap-2"
@@ -372,7 +374,7 @@ export default function DocumentsPage() {
 					>
 						<DialogHeading icon={<Pencil className="size-6" />} title="Rename Document" description={<>{renaming.doc.name}</>} />
 						<Input aria-label="New name" autoFocus value={renaming.value} onChange={(e) => setRenaming({ ...renaming, value: e.target.value, error: "" })} aria-invalid={!!(validateFileName(renaming.value) ?? renaming.error)} />
-						{(validateFileName(renaming.value) ?? renaming.error) && <p role="alert" className="text-xs text-destructive">{validateFileName(renaming.value) ?? renaming.error}</p>}
+						{(validateFileName(renaming.value) ?? renaming.error) && <FieldError>{validateFileName(renaming.value) ?? renaming.error}</FieldError>}
 						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setRenaming(null)}>
 								Cancel
@@ -385,19 +387,7 @@ export default function DocumentsPage() {
 				</Dialog>
 			)}
 			{deleting && (
-				<Dialog isOpen onOpenChange={(o) => !o && setDeleting(null)}>
-					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Document" description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can restore it from there.</>} />
-						<DialogFooter className="mt-2">
-							<Button variant="outline" onPress={() => setDeleting(null)}>
-								Cancel
-							</Button>
-							<Button variant="destructive" onPress={() => void handleDelete()}>
-								Delete
-							</Button>
-						</DialogFooter>
-					</div>
-				</Dialog>
+				<ConfirmDialog isOpen onOpenChange={(o) => !o && setDeleting(null)} icon={<Trash2 className="size-6" />} title="Delete Document" description={<>Move <span className="font-semibold text-foreground">{deleting.name}</span> to the Trash? You can restore it from there.</>} confirmLabel="Delete" onConfirm={() => void handleDelete()} onCancel={() => setDeleting(null)} />
 			)}
 			{creating && (
 				<Dialog isOpen onOpenChange={(o) => !o && setCreating(false)} className="max-w-md">
@@ -417,7 +407,7 @@ export default function DocumentsPage() {
 							</option>
 						))}
 					</select>
-					{newName && validateFileName(newName) && <p role="alert" className="text-xs text-destructive">{validateFileName(newName)}</p>}
+					{newName && validateFileName(newName) && <FieldError>{validateFileName(newName)}</FieldError>}
 						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setCreating(false)}>
 								Cancel

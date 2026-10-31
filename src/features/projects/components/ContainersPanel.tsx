@@ -1,3 +1,4 @@
+import { IconButton } from "@/components/ui/icon-button";
 import { useCallback, useEffect, useState } from "react";
 
 import { AlertTriangle, Play, RefreshCw } from "@/components/animate-icons";
@@ -47,9 +48,9 @@ export default function ContainersPanel({
 			flush={!!info?.services.length}
 			right={
 				wanted && (
-					<Button variant="ghost" size="icon-xs" aria-label="Look again" onPress={look}>
+					<IconButton size="xs" label="Look again" onPress={look}>
 						<RefreshCw className="size-3.5" />
-					</Button>
+					</IconButton>
 				)
 			}
 		>

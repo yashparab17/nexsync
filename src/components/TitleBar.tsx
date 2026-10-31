@@ -64,16 +64,16 @@ export default function TitleBar() {
 	];
 
 	return (
-		<header className="relative z-[60] grid h-10 shrink-0 select-none grid-cols-[minmax(0,1fr)_minmax(0,32rem)_minmax(0,1fr)] items-center">
+		<header className="relative z-[60] grid h-11 shrink-0 select-none grid-cols-[minmax(0,1fr)_minmax(0,32rem)_minmax(0,1fr)] items-center">
 			{/* The app, then back and forward once a workspace is open */}
-			<div data-tauri-drag-region className={cn("flex h-full min-w-0 items-center gap-2", IS_MAC ? "pl-20" : "pl-3")}>
+			<div data-tauri-drag-region className={cn("flex h-full min-w-0 items-center", IS_MAC && "pl-20")}>
+				{/* The logo sits over the sidebar's back button: the same 68px column as the icon rail */}
 				{!IS_MAC && (
-					<>
-						<img src={logoBlack} alt="" draggable={false} className="pointer-events-none size-5 dark:hidden" />
-						<img src={logoWhite} alt="" draggable={false} className="pointer-events-none hidden size-5 dark:block" />
-					</>
+					<div className="pointer-events-none flex h-full w-[68px] shrink-0 items-center justify-center">
+						<img src={logoBlack} alt="" draggable={false} className="size-6 dark:hidden" />
+						<img src={logoWhite} alt="" draggable={false} className="hidden size-6 dark:block" />
+					</div>
 				)}
-				<span className="pointer-events-none mr-2 text-sm font-semibold">Nexsync</span>
 				<div id="titlebar-left" className="flex items-center gap-0.5" />
 			</div>
 			{/* The search of a workspace sits in the middle column, so it is centred on the window whatever is at either side */}

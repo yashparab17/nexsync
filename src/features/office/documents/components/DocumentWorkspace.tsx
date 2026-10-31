@@ -1,3 +1,6 @@
+import { TextSelection } from "@tiptap/pm/state";
+import { Notice } from "@/components/ui/notice";
+import { IconButton } from "@/components/ui/icon-button";
 import { BlockNoteView } from "@blocknote/mantine";
 import { withCollaboration } from "@blocknote/core/yjs";
 import { useCreateBlockNote } from "@blocknote/react";
@@ -27,9 +30,15 @@ import NotesDialog from "@/features/office/documents/components/NotesDialog";
 import { noteCss, parseFormats, type NoteFormats } from "@/features/office/documents/lib/documentNotes";
 import { notesToSend, referencesIn, withReferences, type NoteDef, type NoteWire } from "@/features/office/documents/lib/documentNotes";
 import { characterStyles, editedStyles, fromFile, galleryStyles, tableStyleCss, tableStyles, type StyleDef, type StyleIn, type StyleOut } from "@/features/office/documents/lib/documentStyles";
+import { useNotifications } from "@/store/notifications/NotificationContext";
+import { lockedSectionsPlugin, newLockStore, sectionAt, sectionRanges } from "@/features/office/documents/lib/documentLocks";
 import { access, isRestriction, type Restriction } from "@/features/office/documents/lib/documentRestrict";
 import { useChat } from "@/store/chat/ChatContext";
 import AccessibilityDialog from "@/features/office/documents/components/AccessibilityDialog";
+import ControlDialog from "@/features/office/documents/components/ControlDialog";
+import { controlAt, formatControl, setControl, toggleCheckAt } from "@/features/office/documents/lib/documentControls";
+import ApprovalsDialog from "@/features/office/documents/components/ApprovalsDialog";
+import { applyComparison } from "@/features/office/documents/lib/documentReview";
 import { useDocumentReview } from "@/features/office/documents/components/useDocumentReview";
 import { changesOf, newReviewStore, resolvedSetOf, staleMarksPlugin, suggestingPlugin } from "@/features/office/documents/lib/documentReview";
 import { useDocumentActions } from "@/features/office/documents/components/useDocumentActions";
@@ -97,6 +106,10 @@ export interface Layout {
 	evenFooter?: string;
 	pageNumbers: boolean;
 	valign: string;
+	watermark?: string;
+	pageBorder?: boolean;
+	lineNumbers?: boolean;
+	hyphenate?: boolean;
 	// Paragraph styles made or changed in the editor, to write into the file's styles
 	styles?: StyleIn[];
 	// The editor knows character styles (see `notes.rs`)
@@ -112,7 +125,7 @@ export interface Layout {
 
 export function layoutOf(setup: PageSetup, hf: HeaderFooter): Layout {
 	const b = pageBox(setup);
-	return { width: b.width, height: b.height, landscape: setup.landscape, top: b.top, right: b.right, bottom: b.bottom, left: b.left, columns: setup.columns, spacing: setup.spacing, header: hf.header, footer: hf.footer, firstHeader: hf.firstHeader ?? "", firstFooter: hf.firstFooter ?? "", evenHeader: hf.evenHeader ?? "", evenFooter: hf.evenFooter ?? "", pageNumbers: hf.pageNumbers, valign: setup.valign };
+	return { width: b.width, height: b.height, landscape: setup.landscape, top: b.top, right: b.right, bottom: b.bottom, left: b.left, columns: setup.columns, spacing: setup.spacing, header: hf.header, footer: hf.footer, firstHeader: hf.firstHeader ?? "", firstFooter: hf.firstFooter ?? "", evenHeader: hf.evenHeader ?? "", evenFooter: hf.evenFooter ?? "", pageNumbers: hf.pageNumbers, valign: setup.valign, watermark: setup.watermark ?? "", pageBorder: setup.border === true, lineNumbers: setup.lineNumbers === true, hyphenate: setup.hyphenate === true };
 }
 
 interface Props {
@@ -166,6 +179,35 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 	}, [settings]);
 	const { readOnly, canComment } = access(restriction, isAdmin, { readOnly: baseReadOnly, canComment: baseCanComment });
 	const restricted = restriction !== "none" && !isAdmin;
+	// The section the caret is in, for the lock button
+	const caretSectionKey = (): string | null => {
+		try {
+			const state = editor.prosemirrorState;
+			return sectionAt(sectionRanges(state.doc), state.selection.from)?.key ?? null;
+		} catch {
+			return null;
+		}
+	};
+	// Sections an Owner or Admin locked: the list is in the shared document, and each device refuses edits inside them
+	const lockStore = useMemo(newLockStore, []);
+	const [lockedKeys, setLockedKeys] = useState<string[]>([]);
+	useEffect(() => {
+		const read = () => {
+			try {
+				const list = JSON.parse(settings.get("lockedSections") ?? "[]");
+				setLockedKeys(Array.isArray(list) ? list.filter((k): k is string => typeof k === "string") : []);
+			} catch {
+				setLockedKeys([]);
+			}
+		};
+		read();
+		settings.observe(read);
+		return () => settings.unobserve(read);
+	}, [settings]);
+	lockStore.locked = new Set(lockedKeys);
+	lockStore.isAdmin = isAdmin;
+	const { notify } = useNotifications();
+	lockStore.onRefused = () => notify("This section is locked. Only an Owner or an Admin can change it.");
 	const commentStore = useMemo(newCommentStore, []);
 	const reviewStore = useMemo(() => newReviewStore(author, resolvedSetOf(doc.getMap<boolean>("resolvedChanges"))), [author, doc]);
 	const options = useMemo(
@@ -178,6 +220,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					() => ({ key: "pagePush", prosemirrorPlugins: [pagePushPlugin] }),
 					() => ({ key: "wordLayout", prosemirrorPlugins: [wordLayoutPlugin] }),
 					() => ({ key: "docComments", prosemirrorPlugins: [commentsPlugin(commentStore)] }),
+					() => ({ key: "docLocks", prosemirrorPlugins: [lockedSectionsPlugin(lockStore)] }),
 					() => ({ key: "docReview", prosemirrorPlugins: [suggestingPlugin(reviewStore), staleMarksPlugin(reviewStore)] }),
 					() => ({ key: "smartQuotes", prosemirrorPlugins: [smartQuotesPlugin] }),
 					() => ({ key: "listLevels", prosemirrorPlugins: [listLevelsPlugin] }),
@@ -187,6 +230,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 		[doc, collab.awareness, author],
 	);
 	const editor = useCreateBlockNote(options, [doc]);
+	const caretSectionLocked = lockedKeys.includes(caretSectionKey() ?? "");
 	const styleDefs = useMemo(() => doc.getMap<Record<string, unknown>>("styleDefs"), [doc]);
 	// The document's named styles, shared: the file's own come in when it is opened, and the ones made or changed here go back into the file
 	const sheet = useMemo(() => doc.getMap<StyleDef>("styleSheet"), [doc]);
@@ -410,7 +454,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 			// The clipboard is not available in this window; nothing was copied
 		}
 	};
-	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | "sources" | "merge" | "compare" | "accessibility" | "notes" | "changes" | "sectionHeader" | null>(null);
+	const [dialog, setDialog] = useState<"headerFooter" | "counts" | "update" | "proofing" | "reload" | "sources" | "merge" | "compare" | "accessibility" | "notes" | "changes" | "approvals" | "control" | "sectionHeader" | null>(null);
 	// Puts the file back in place of the shared copy, for everyone: the text as the file has it now, with its spacing, page set-up and
 	// header and footer
 	const reload = async () => {
@@ -895,11 +939,23 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					openCompare={() => setDialog("compare")}
 					openAccessibility={() => setDialog("accessibility")}
 					openChanges={() => setDialog("changes")}
+					openApprovals={() => setDialog("approvals")}
+					openControl={() => setDialog("control")}
 					openSectionHeader={() => setDialog("sectionHeader")}
 					styles={galleryStyles(styleList)}
 					charStyles={characterStyles(styleList)}
 					tableStyles={tableStyles(styleList)}
 					restrict={{ value: restriction, canSet: isAdmin && !baseReadOnly, set: (r) => settings.set("restrict", r) }}
+					sectionLock={{
+						canSet: isAdmin && !baseReadOnly,
+						locked: caretSectionLocked,
+						toggle: () => {
+							const key = caretSectionKey();
+							if (!key) return;
+							const next = lockedKeys.includes(key) ? lockedKeys.filter((k) => k !== key) : [...lockedKeys, key];
+							settings.set("lockedSections", JSON.stringify(next));
+						},
+					}}
 					copyOutline={() => void copyOutline()}
 					makeTask={() => void makeTask()}
 					taskMade={taskMade}
@@ -939,9 +995,9 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 			<input ref={picker} type="file" accept="image/*" className="hidden" onChange={(e) => { onImage(e.target.files?.[0]); e.target.value = ""; }} />
 			<div className="flex h-full min-h-0 flex-col">
 				{notice && (
-					<p role={notice.ok ? "status" : "alert"} className={cn("px-3 py-1.5 text-sm", notice.ok ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive")}>
+					<Notice tone={notice.ok ? "success" : "error"} className="px-3 py-1.5">
 						{notice.text}
-					</p>
+					</Notice>
 				)}
 				{find && (
 					<div role="search" className="flex flex-wrap items-center gap-2 border-b bg-muted/50 px-3 py-1.5 text-[13px]">
@@ -973,9 +1029,9 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 						</label>
 						<span className="text-muted-foreground">{find.note}</span>
 						<span className="flex-1" />
-						<Button variant="ghost" size="icon-xs" aria-label="Close find" onPress={() => setFind(null)}>
+						<IconButton size="xs" label="Close find" onPress={() => setFind(null)}>
 							<X className="size-3.5" />
-						</Button>
+						</IconButton>
 					</div>
 				)}
 				<div className="flex min-h-0 flex-1">
@@ -1020,7 +1076,21 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 							)}
 							<div className={cn("flex justify-center-safe py-6", mode === "print" && "hidden")} style={{ zoom: zoom / 100 }}>
 								<div
-									ref={pageEl} className={cn("doc-page relative shrink-0 text-black", view.marks && "doc-marks", view.dark && "doc-dark", page.dropCap && "doc-dropcap", page.hyphenate && "doc-hyphen", page.banded && "doc-banded")}
+									ref={pageEl}
+									onClick={(e) => {
+										// A check box ticks when clicked; a list or a date opens its dialog (typing in a text control is plain typing)
+										const el = (e.target as HTMLElement).closest<HTMLElement>("[data-control]");
+										if (!el || readOnly) return;
+										const kind = (el.dataset.control ?? "").split("|")[0];
+										const view = editor.prosemirrorView;
+										const pos = view.posAtDOM(el, 0);
+										if (kind === "check") toggleCheckAt(view, pos + 1);
+										else if (kind === "drop" || kind === "combo" || kind === "date") {
+											view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(pos + 1))));
+											setDialog("control");
+										}
+									}}
+									className={cn("doc-page relative shrink-0 text-black", view.marks && "doc-marks", view.dark && "doc-dark", page.dropCap && "doc-dropcap", page.hyphenate && "doc-hyphen", page.banded && "doc-banded")}
 									style={
 										{
 											width: mode === "edit" ? widthPx : Math.min(widthPx, 920),
@@ -1099,7 +1169,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					}}
 				/>
 			)}
-			{dialog === "compare" && history && <CompareDialog workspacePath={history.workspacePath} rel={history.rel} others={history.others ?? []} lines={() => textOfBlocks(editor.document as never).split(String.fromCharCode(10))} onClose={() => setDialog(null)} />}
+			{dialog === "compare" && history && <CompareDialog workspacePath={history.workspacePath} rel={history.rel} others={history.others ?? []} lines={() => textOfBlocks(editor.document as never).split(String.fromCharCode(10))} onMark={(c) => { const view = editor.prosemirrorView!; const { tr, marked } = applyComparison(view.state, c, reviewStore.author || "Reviewer"); view.dispatch(tr); return marked; }} onClose={() => setDialog(null)} />}
 			{dialog === "accessibility" && (
 				<AccessibilityDialog
 					blocks={() => editor.document as unknown as BlockLike[]}
@@ -1112,7 +1182,28 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 				/>
 			)}
 			<style>{`${tableStyleCss(styleList)}\n${noteCss(noteFormats)}`}</style>
-			{dialog === "sectionHeader" && parseSection(a.fmt.section) && <SectionHeaderDialog spec={parseSection(a.fmt.section)!} onApply={(header, footer) => a.setSection({ header, footer })} onClose={() => setDialog(null)} />}
+			{dialog === "sectionHeader" && parseSection(a.fmt.section) && <SectionHeaderDialog spec={parseSection(a.fmt.section)!} onApply={(change) => a.setSection(change)} onClose={() => setDialog(null)} />}
+			{dialog === "control" &&
+				(() => {
+					const view = editor.prosemirrorView;
+					const at = controlAt(view);
+					const text = at ? view.state.doc.textBetween(at.from, at.to) : "";
+					return (
+						<ControlDialog
+							spec={at?.spec ?? null}
+							text={text}
+							onApply={(spec, words) => {
+								if (at) return setControl(view, at, spec, words);
+								const { from, to } = view.state.selection;
+								const mark = view.state.schema.marks.contentControl.create({ stringValue: formatControl(spec) });
+								const kept = to > from && (spec.kind === "text" || spec.kind === "rich") ? view.state.doc.textBetween(from, to) : words;
+								view.dispatch(view.state.tr.replaceWith(from, to, view.state.schema.text(kept || words, [mark])));
+							}}
+							onClose={() => setDialog(null)}
+						/>
+					);
+				})()}
+			{dialog === "approvals" && history && <ApprovalsDialog path={history.rel} text={() => textOfBlocks(editor.document as never)} canAct={canComment} onClose={() => setDialog(null)} />}
 			{dialog === "changes" && <ChangesDialog changes={review.changes} readOnly={readOnly} onGo={(c) => { setDialog(null); review.goTo(c); }} onResolve={review.resolveOne} onClose={() => setDialog(null)} />}
 			{dialog === "notes" && (
 				<NotesDialog

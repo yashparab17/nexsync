@@ -1,3 +1,4 @@
+import { Notice } from "@/components/ui/notice";
 import { useEffect, useState } from "react";
 
 import { Plus } from "@/components/animate-icons";
@@ -62,9 +63,9 @@ export default function GeneratorsPanel({ path, project, onCreated }: { path: st
 	return (
 		<Panel title="Generators" hint={String(list.length)} icon={<Plus />} flush={list.length > 0}>
 			{loadError && (
-				<p role="alert" className="m-4 bg-destructive/10 p-2 text-sm text-destructive">
+				<Notice className="m-4">
 					{loadError}
-				</p>
+				</Notice>
 			)}
 			<ul className="divide-y">
 				{list.map((g) => (

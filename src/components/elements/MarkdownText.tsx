@@ -1,3 +1,4 @@
+import { Caption } from "@/components/layout/Pane";
 // Markdown from another person, shown without ever becoming HTML. The text is read into tokens and each is built as a React
 // element, so nothing in it can add markup or script to the page. Links are shown as their words and their address in mono,
 // not made clickable; pictures show their description; raw HTML shows as text.
@@ -29,7 +30,7 @@ function inline(tokens: Token[] | undefined, keyBase: string): ReactNode {
 				const link = t as Tokens.Link;
 				return (
 					<span key={key}>
-						{inline(link.tokens, key)} <span className="font-mono text-[13px] text-muted-foreground">({link.href})</span>
+						{inline(link.tokens, key)} <Caption>({link.href})</Caption>
 					</span>
 				);
 			}

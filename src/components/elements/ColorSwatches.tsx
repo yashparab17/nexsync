@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 export default function ColorSwatches({ value, onChange, label = "Colour" }: { value: string | null | undefined; onChange: (color: string | null) => void; label?: string }) {
 	return (
-		<div role="group" aria-label={label} className="flex flex-wrap items-center gap-2">
+		<div role="group" aria-label={label} className="flex flex-wrap items-center gap-1.5">
 			{PALETTE.map((c) => (
 				<button
 					key={c}
@@ -15,9 +15,9 @@ export default function ColorSwatches({ value, onChange, label = "Colour" }: { v
 					aria-pressed={value === c}
 					onClick={() => onChange(c)}
 					style={{ background: c }}
-					className={cn("flex size-6 cursor-pointer items-center justify-center rounded-full text-white outline-none focus-visible:ring-2 focus-visible:ring-foreground/40", value === c && "ring-2 ring-foreground")}
+					className={cn("flex size-5 cursor-pointer items-center justify-center rounded-full text-white outline-none focus-visible:ring-2 focus-visible:ring-foreground/40", value === c && "ring-2 ring-foreground")}
 				>
-					{value === c && <Check className="size-3.5" />}
+					{value === c && <Check className="size-3" />}
 				</button>
 			))}
 			{value && (

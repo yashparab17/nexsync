@@ -1,6 +1,8 @@
+import { Caption } from "@/components/layout/Pane";
 // One announcement: its level, title and text, who it is for, a Got it button, who has acknowledged (for the poster and
 // Admins), reactions, a discussion, and the poster's controls.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useState } from "react";
 
 import { AnimateIcon, Check, Hourglass, Megaphone, Pencil, Pin, PinOff, Trash2 } from "@/components/animate-icons";
@@ -67,17 +69,17 @@ export default function AnnouncementCard({ a, role, people, onEdit, onPin }: Pro
 					<>
 						{(mine || role === "Owner") && (
 							<>
-								<Button variant="ghost" size="icon-sm" aria-label={a.pinned ? "Unpin" : "Pin"} isDisabled={busy} onPress={() => onPin(a, !a.pinned)} className="text-muted-foreground">
+								<IconButton label={a.pinned ? "Unpin" : "Pin"} isDisabled={busy} onPress={() => onPin(a, !a.pinned)} className="text-muted-foreground">
 									{a.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
-								</Button>
-								<Button variant="ghost" size="icon-sm" aria-label="Edit" isDisabled={busy} onPress={() => onEdit(a)} className="text-muted-foreground">
+								</IconButton>
+								<IconButton label="Edit" isDisabled={busy} onPress={() => onEdit(a)} className="text-muted-foreground">
 									<Pencil className="size-4" />
-								</Button>
+								</IconButton>
 							</>
 						)}
-						<Button variant="ghost" size="icon-sm" aria-label="Withdraw" isDisabled={busy} onPress={() => void run(() => chat.withdrawAnnouncement(a.id))} className="text-muted-foreground hover:text-destructive">
+						<IconButton label="Withdraw" isDisabled={busy} onPress={() => void run(() => chat.withdrawAnnouncement(a.id))} className="text-muted-foreground hover:text-destructive">
 							<Trash2 className="size-4" />
-						</Button>
+						</IconButton>
 					</>
 				)}
 			</header>
@@ -117,7 +119,7 @@ export default function AnnouncementCard({ a, role, people, onEdit, onPin }: Pro
 								.map((k) => (
 									<li key={k.key} className="flex justify-between gap-4">
 										<span>{nameOf(k.key)}</span>
-										<span className="font-mono text-[13px] text-muted-foreground">{when(k.ts)}</span>
+										<Caption>{when(k.ts)}</Caption>
 									</li>
 								))}
 							{waiting.map((p) => (

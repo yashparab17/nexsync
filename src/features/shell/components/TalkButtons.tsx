@@ -5,7 +5,7 @@ import { Megaphone, MessageSquareText } from "@/components/animate-icons";
 import { NavLink } from "react-router-dom";
 
 import { waitingForMe } from "@/features/announcements/lib/announcements";
-import BarBadge from "@/features/shell/components/BarBadge";
+import { Badge, chosenLook, idleLook } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 import { useSelfRole } from "@/store/p2p/P2PContext";
 import { useChat } from "@/store/chat/ChatContext";
@@ -26,10 +26,10 @@ export default function TalkButtons() {
 					to={to}
 					aria-label={count > 0 ? `${label}, ${count} new` : label}
 					title={label}
-					className={({ isActive }) => cn("relative flex size-8 items-center justify-center rounded-md outline-none transition-colors hover:bg-muted focus-visible:bg-muted", isActive ? "bg-muted text-foreground" : "text-foreground")}
+					className={({ isActive }) => cn("relative flex size-9 items-center justify-center rounded-md outline-none transition-colors", isActive ? chosenLook : `${idleLook} hover:bg-muted focus-visible:bg-muted`)}
 				>
-					<Icon className="size-4" aria-hidden />
-					<BarBadge count={count} />
+					<Icon className="size-5" aria-hidden />
+					<Badge count={count} />
 				</NavLink>
 			))}
 		</>

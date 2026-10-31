@@ -1,3 +1,4 @@
+import { chosenLook, IconButton, idleLook } from "@/components/ui/icon-button";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 // React Router
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -14,6 +15,8 @@ import WorkspaceSearch from "@/features/shell/components/WorkspaceSearch";
 import NotificationBell from "@/features/shell/components/NotificationBell";
 import TalkButtons from "@/features/shell/components/TalkButtons";
 import PresenceStrip from "@/features/shell/components/PresenceStrip";
+import WorkspaceIconView from "@/components/elements/WorkspaceIcon";
+import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { connectionView, TONE_DOT } from "@/lib/p2p/connectionState";
 import { cn } from "@/lib/utils";
@@ -26,6 +29,7 @@ const SettingsPage = lazy(() => import("@/features/settings/SettingsPage"));
 // The workspace's controls, placed in the window bar through portals (see TitleBar): this renders no bar of its own
 export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOpenMenu?: () => void; menuOpen?: boolean }) {
 	const { peers, connectionStatus, network, link, hostName, hostUnreachable, syncProgress } = useP2P();
+	const { workspace } = useWorkspace();
 	const [isP2POpen, setIsP2POpen] = useState(false);
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -73,21 +77,24 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 
 	return (
 		<>
-			{/* Back and forward, after the app name in the window bar (and the menu button when the sidebar is a drawer) */}
+			{/* The workspace, then back and forward, after the app name in the window bar (and the menu button when the sidebar is a drawer) */}
 			{slots.left &&
 				createPortal(
 					<>
+						<span className="mx-1.5 h-5 w-px shrink-0 bg-border" aria-hidden />
+						<WorkspaceIconView id={workspace?.id} name={workspace?.name ?? ""} className="size-6 text-sm" />
+						<span className="mr-2 ml-1.5 max-w-[16rem] min-w-0 truncate text-sm font-semibold" title={workspace?.name}>{workspace?.name}</span>
 						{onOpenMenu && (
-							<Button variant="ghost" size="icon-sm" onPress={onOpenMenu} aria-label={t("nav.open")} aria-expanded={menuOpen} className="md:hidden">
-								<Menu className="size-4" />
-							</Button>
+							<IconButton size="md" onPress={onOpenMenu} label={t("nav.open")} aria-expanded={menuOpen} className="md:hidden">
+								<Menu className="size-5" />
+							</IconButton>
 						)}
-						<Button variant="ghost" size="icon-sm" onPress={() => navigate(-1)} isDisabled={!canBack} aria-label="Back" className="hidden sm:inline-flex">
-							<ChevronLeft className="size-4" />
-						</Button>
-						<Button variant="ghost" size="icon-sm" onPress={() => navigate(1)} isDisabled={!canForward} aria-label="Forward" className="hidden sm:inline-flex">
-							<ChevronRight className="size-4" />
-						</Button>
+						<IconButton size="md" onPress={() => navigate(-1)} isDisabled={!canBack} label="Back" className="hidden sm:inline-flex">
+							<ChevronLeft className="size-5" />
+						</IconButton>
+						<IconButton size="md" onPress={() => navigate(1)} isDisabled={!canForward} label="Forward" className="hidden sm:inline-flex">
+							<ChevronRight className="size-5" />
+						</IconButton>
 					</>,
 					slots.left,
 				)}
@@ -107,10 +114,10 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 							size={status.label ? "sm" : "icon-sm"}
 							onPress={() => setIsP2POpen(true)}
 							aria-label={`Collaborate. ${status.label ? `${status.label}. ` : ""}${status.title}`}
-							className={cn("relative", status.label && "gap-2 px-2")}
+							className={cn("relative", isP2POpen ? chosenLook : idleLook, status.label ? "h-9 gap-2 px-2" : "size-9")}
 							data-testid="connection-chip"
 						>
-							<Radio className="size-4" />
+							<Radio className="size-5" />
 							{status.label ? (
 								<span className="flex items-center gap-1.5 text-[13px]">
 									<span className={cn("size-2 shrink-0", TONE_DOT[status.tone])} aria-hidden />
@@ -122,9 +129,9 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 						</Button>
 </span>
 						<span title="Workspace settings" className="inline-flex">
-<Button variant="ghost" size="icon-sm" onPress={() => setIsSettingsOpen(true)} aria-label="Workspace settings">
-							<Settings className="size-4" />
-						</Button>
+<IconButton size="md" onPress={() => setIsSettingsOpen(true)} label="Workspace settings">
+							<Settings className="size-5" />
+						</IconButton>
 </span>
 					</>,
 					slots.right,

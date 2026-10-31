@@ -1,3 +1,6 @@
+import { EmptyNote, PaneHeader, listRow } from "@/components/layout/Pane";
+import { FieldError, Notice } from "@/components/ui/notice";
+import { IconButton } from "@/components/ui/icon-button";
 import { useNewParam } from "@/hooks/useNewParam";
 import { useSyncedIn } from "@/hooks/useSyncedIn";
 import { pushRecent } from "@/lib/recentFiles";
@@ -11,7 +14,6 @@ import CollapsiblePane, { LIST_WIDTH } from "@/components/layout/CollapsiblePane
 import PresenceDots from "@/components/elements/PresenceDots";
 import { EmptyState, Page } from "@/components/layout/Page";
 import SlideWorkspace from "@/features/office/slides/components/SlideWorkspace";
-import Toolbar, { ToolbarSearch } from "@/components/layout/Toolbar";
 import Loading from "@/components/Loading";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -24,7 +26,7 @@ import { useReportItem, useReportLine } from "@/hooks/usePresence";
 import { LAYOUT, isIn, placeIn } from "@/lib/workspaceLayout";
 import { isDeck } from "@/lib/editor/languages";
 import { deckNew, deckOpen, deckSave, searchWorkspaceFiles, writeWorkspaceBinaryFile } from "@/lib/tauri";
-import { cn, errorText } from "@/lib/utils";
+import { errorText } from "@/lib/utils";
 import { safeUploadName, validateFileName } from "@/lib/validation";
 import { useIsViewer, useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
@@ -132,8 +134,7 @@ export default function SlidesPage() {
 			<div className="flex min-h-0 flex-1">
 				<CollapsiblePane id="slides.list" defaultWidth={LIST_WIDTH} label="the list of decks">
 					<div className="flex shrink-0 flex-col bg-panel">
-					<Toolbar variant="header">
-						<ToolbarSearch label="Search decks" value={query} onChange={setQuery} placeholder="Search" className="min-w-0 flex-1" />
+					<PaneHeader label="Search decks" value={query} onChange={setQuery} placeholder="Search">
 						{!isViewer && (
 							<>
 								<input
@@ -147,21 +148,21 @@ export default function SlidesPage() {
 								if (f) void addFile(f);
 								}}
 								/>
-								<Button variant="ghost" size="icon-xs" aria-label="Add a file" onPress={() => fileInput.current?.click()}>
+								<IconButton size="xs" label="Add a file" onPress={() => fileInput.current?.click()}>
 									<Upload className="size-4" />
-								</Button>
-								<Button size="icon-xs" aria-label="New deck" onPress={() => setCreating(true)}>
+								</IconButton>
+								<IconButton size="xs" label="New deck" onPress={() => setCreating(true)}>
 									<FilePlus className="size-4" />
-								</Button>
+								</IconButton>
 							</>
 						)}
-					</Toolbar>
+					</PaneHeader>
 					<nav aria-label="Decks" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5">
 					{decks === null ? null : shownDecks.length === 0 ? (
-						<p className="p-3 text-sm text-muted-foreground">{decks.length === 0 ? "No decks yet. Make one, or add a .pptx file." : "No deck matches."}</p>
+						<EmptyNote>{decks.length === 0 ? "No decks yet. Make one, or add a .pptx file." : "No deck matches."}</EmptyNote>
 					) : (
 						shownDecks.map((d) => (
-							<button key={d.rel} type="button" aria-current={d.rel === selected} onClick={() => setSelected(d.rel)} className={cn("flex w-full min-w-0 items-center gap-2 px-3 py-1.5 text-left text-[13px] outline-none hover:bg-muted focus-visible:bg-muted", d.rel === selected && "bg-muted")}>
+							<button key={d.rel} type="button" aria-current={d.rel === selected} onClick={() => setSelected(d.rel)} className={listRow(d.rel === selected)}>
 																<span className="min-w-0 flex-1 truncate">{d.name}</span>
 								<PresenceDots names={viewersAt("slides", d.rel)} />
 							</button>
@@ -173,9 +174,9 @@ export default function SlidesPage() {
 
 				<main className="flex min-h-0 min-w-0 flex-1 flex-col">
 					{notice && (
-						<p role={notice.ok ? "status" : "alert"} className={cn("px-3 py-2 text-sm", notice.ok ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive")}>
+						<Notice tone={notice.ok ? "success" : "error"} className="px-3 py-2">
 							{notice.text}
-						</p>
+						</Notice>
 					)}
 					{!selected ? (
 						<EmptyState art="slides" title="Slides">
@@ -184,9 +185,9 @@ export default function SlidesPage() {
 					) : !opened ? (
 						<Loading className="h-48" />
 					) : "error" in opened ? (
-						<p role="alert" className="m-6 max-w-md bg-destructive/10 p-3 text-sm text-destructive">
+						<Notice className="m-6 max-w-md p-3">
 							{opened.error}
-						</p>
+						</Notice>
 					) : collab ? (
 						<SlideWorkspace key={selected} collab={collab} opened={opened} name={selected.split("/").pop() ?? ""} rel={selected} workspacePath={workspacePath} readOnly={isViewer} author={author} startAt={wanted} onSlide={setLine} />
 					) : (
@@ -206,7 +207,7 @@ export default function SlidesPage() {
 					>
 						<DialogHeading icon={<FilePlus className="size-6" />} title="New Deck" />
 						<Input aria-label="Deck name" autoFocus required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Title" aria-invalid={!!(newName && validateFileName(newName))} />
-						{newName && validateFileName(newName) && <p role="alert" className="text-xs text-destructive">{validateFileName(newName)}</p>}
+						{newName && validateFileName(newName) && <FieldError>{validateFileName(newName)}</FieldError>}
 						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setCreating(false)}>
 								Cancel

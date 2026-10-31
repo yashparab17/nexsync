@@ -959,3 +959,21 @@ select option:checked {
   font-size: 0.75rem;
   color: var(--muted-foreground);
 }
+
+/* A locked section of a document: a line down its side, so it is plain which text only an Admin can change */
+.doc-locked {
+  box-shadow: -4px 0 0 0 color-mix(in oklch, var(--warning) 70%, transparent);
+}
+
+/* A content control in a document: its words in a thin outline, so it is plain where a form field is */
+.doc-control {
+  outline: 1px dotted color-mix(in oklch, var(--primary) 70%, transparent);
+  outline-offset: 1px;
+  background: color-mix(in oklch, var(--primary) 8%, transparent);
+  cursor: pointer;
+}
+
+/* An equation in a document: a serif italic, as maths is set */
+.doc-equation {
+  font-family: "Cambria Math", "STIX Two Math", Cambria, "Times New Roman", serif;
+}

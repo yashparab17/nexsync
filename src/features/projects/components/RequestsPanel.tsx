@@ -1,3 +1,5 @@
+import { Notice } from "@/components/ui/notice";
+import { IconButton } from "@/components/ui/icon-button";
 import { useCallback, useEffect, useState } from "react";
 
 import { ExternalLink, Play, RefreshCw } from "@/components/animate-icons";
@@ -66,9 +68,9 @@ export default function RequestsPanel({ path, project, onOpenFile }: { path: str
 					</label>
 				)}
 				<span className="flex-1" />
-				<Button variant="ghost" size="icon-sm" aria-label="Look again" onPress={load}>
+				<IconButton label="Look again" onPress={load}>
 					<RefreshCw className="size-4" />
-				</Button>
+				</IconButton>
 			</div>
 			{files.map((f) => (
 				<Panel
@@ -77,9 +79,9 @@ export default function RequestsPanel({ path, project, onOpenFile }: { path: str
 					hint={String(f.requests.length)}
 					flush
 					right={
-						<Button variant="ghost" size="icon-xs" aria-label={`Open ${f.path}`} onPress={() => onOpenFile(f.path)}>
+						<IconButton size="xs" label={`Open ${f.path}`} onPress={() => onOpenFile(f.path)}>
 							<ExternalLink className="size-3.5" />
-						</Button>
+						</IconButton>
 					}
 				>
 					<ul className="divide-y">
@@ -101,9 +103,9 @@ export default function RequestsPanel({ path, project, onOpenFile }: { path: str
 									</div>
 									{shown === key && busy === key && <p className="mt-2 text-[13px] text-muted-foreground">Waiting for the answer...</p>}
 									{shown === key && a?.error && (
-										<p role="alert" className="mt-2 bg-destructive/10 p-2 text-[13px] text-destructive">
+										<Notice className="mt-2 text-[13px]">
 											{a.error}
-										</p>
+										</Notice>
 									)}
 									{a?.response && (
 										<div className="mt-2 space-y-1">

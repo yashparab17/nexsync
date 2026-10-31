@@ -1,3 +1,6 @@
+import { Caption } from "@/components/layout/Pane";
+import { Field } from "@/components/ui/field";
+import { Notice } from "@/components/ui/notice";
 import { useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -106,19 +109,17 @@ export default function NewProjectDialog({ path, existing, onClose, onCreateEmpt
 				{!creating && <ToolbarTabs label="How to start" value={mode} onChange={(m) => { setMode(m); setError(null); }} tabs={[{ key: "empty", label: "Empty Folder" }, { key: "template", label: "From a Template" }, { key: "import", label: "Import a Folder" }]} />}
 
 				{!creating && (
-					<div className="space-y-1">
-						<Label htmlFor="project-name">Name</Label>
-						<Input id="project-name" autoFocus value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder="web-app" />
+					<Field label="Name" htmlFor="project-name">
+<Input id="project-name" autoFocus value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder="web-app" />
 						{clean && problem && <p className="text-[13px] text-destructive">{problem}</p>}
-					</div>
+</Field>
 				)}
 
 				{mode === "template" && !creating && template && (
 					<div className="space-y-3">
 						<div className="grid gap-3 sm:grid-cols-2">
-							<div className="space-y-1">
-								<Label htmlFor="template">Template</Label>
-								<select id="template" value={picked} onChange={(e) => { setPicked(e.target.value); setChoices({}); }} className="h-10 w-full cursor-pointer border bg-input px-2 text-sm">
+							<Field label="Template" htmlFor="template">
+<select id="template" value={picked} onChange={(e) => { setPicked(e.target.value); setChoices({}); }} className="h-10 w-full cursor-pointer border bg-input px-2 text-sm">
 									{groups.map((g) => (
 										<optgroup key={g} label={g}>
 											{templates.filter((t) => t.group === g).map((t) => (
@@ -129,7 +130,7 @@ export default function NewProjectDialog({ path, existing, onClose, onCreateEmpt
 										</optgroup>
 									))}
 								</select>
-							</div>
+</Field>
 							{template.fields.map((f) => (
 								<div key={f.id} className="space-y-1">
 									<Label htmlFor={`f-${f.id}`}>{f.label}</Label>
@@ -181,7 +182,7 @@ export default function NewProjectDialog({ path, existing, onClose, onCreateEmpt
 														{l.path}
 														{l.folder ? "/" : ""}
 													</span>
-													<span className="font-mono text-[13px] text-muted-foreground">{l.folder ? `${l.files.toLocaleString()} files, ` : ""}{formatBytes(l.bytes)}</span>
+													<Caption>{l.folder ? `${l.files.toLocaleString()} files, ` : ""}{formatBytes(l.bytes)}</Caption>
 												</li>
 											))}
 										</ul>
@@ -224,9 +225,9 @@ export default function NewProjectDialog({ path, existing, onClose, onCreateEmpt
 				)}
 
 				{error && (
-					<p role="alert" className="bg-destructive/10 p-2 text-sm text-destructive">
+					<Notice>
 						{error}
-					</p>
+					</Notice>
 				)}
 				<div className="flex justify-end gap-2">
 					<Button variant="ghost" isDisabled={busy} onPress={onClose}>

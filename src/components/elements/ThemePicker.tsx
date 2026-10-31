@@ -1,5 +1,6 @@
 // Choosing the look: built-in themes come as pairs (a light and a dark one, applied together), and the ones made here are per mode.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useState } from "react";
 import { Check, Pencil, Plus, Trash2 } from "@/components/animate-icons";
 
@@ -77,12 +78,12 @@ function Custom({ mode, label }: { mode: ThemeMode; label: string }) {
 							</button>
 							<span className="absolute top-1/2 right-1 flex -translate-y-1/2 items-center">
 								{value === t.id && <Check className="mr-1 size-4 text-primary" />}
-								<Button variant="ghost" size="icon-xs" aria-label={`Edit ${t.name}`} onPress={() => setEditing({ theme: t })}>
+								<IconButton size="xs" label={`Edit ${t.name}`} onPress={() => setEditing({ theme: t })}>
 									<Pencil className="size-3.5" />
-								</Button>
-								<Button variant="ghost" size="icon-xs" aria-label={`Delete ${t.name}`} onPress={() => deleteCustomTheme(t.id)}>
+								</IconButton>
+								<IconButton size="xs" label={`Delete ${t.name}`} onPress={() => deleteCustomTheme(t.id)}>
 									<Trash2 className="size-3.5 text-destructive" />
-								</Button>
+								</IconButton>
 							</span>
 						</div>
 					))}

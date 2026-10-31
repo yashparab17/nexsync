@@ -1,6 +1,8 @@
+import { Field } from "@/components/ui/field";
 // Writing or editing an announcement: title, Markdown text, level, who it is for, when it shows, when it ends, and when it is
 // erased for good.
 
+import { Notice } from "@/components/ui/notice";
 import { useState } from "react";
 
 import { Megaphone } from "@/components/animate-icons";
@@ -91,14 +93,12 @@ export default function AnnouncementDialog({ existing, people, pinnedCount, onCl
 				<DialogHeading icon={<Megaphone className="size-6" />} title={existing ? "Edit Announcement" : "New Announcement"} />
 				<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1 -mx-1">
 				<SectionTitle title="Message" />
-				<div className="space-y-1">
-					<Label htmlFor="ann-title">Title</Label>
-					<Input id="ann-title" autoFocus value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
-				</div>
-				<div className="space-y-1">
-					<Label htmlFor="ann-text">Text (Markdown)</Label>
-					<Textarea id="ann-text" value={text} rows={5} maxLength={5000} onChange={(e) => setText(e.target.value)} placeholder="Message" />
-				</div>
+				<Field label="Title" htmlFor="ann-title">
+<Input id="ann-title" autoFocus value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
+</Field>
+				<Field label="Text (Markdown)" htmlFor="ann-text">
+<Textarea id="ann-text" value={text} rows={5} maxLength={5000} onChange={(e) => setText(e.target.value)} placeholder="Message" />
+</Field>
 				<div className="space-y-1">
 					<Label>Level</Label>
 					<div role="group" aria-label="Level" className="inline-flex">
@@ -161,14 +161,12 @@ export default function AnnouncementDialog({ existing, people, pinnedCount, onCl
 
 				<SectionTitle title="When" />
 				<div className="grid gap-4 sm:grid-cols-2">
-					<div className="space-y-1">
-						<Label htmlFor="ann-from">Shows From</Label>
-						<Input id="ann-from" type="datetime-local" value={notBefore} onChange={(e) => setNotBefore(e.target.value)} />
-					</div>
-					<div className="space-y-1">
-						<Label htmlFor="ann-to">Ends</Label>
-						<Input id="ann-to" type="datetime-local" value={ends} onChange={(e) => setEnds(e.target.value)} />
-					</div>
+					<Field label="Shows From" htmlFor="ann-from">
+<Input id="ann-from" type="datetime-local" value={notBefore} onChange={(e) => setNotBefore(e.target.value)} />
+</Field>
+					<Field label="Ends" htmlFor="ann-to">
+<Input id="ann-to" type="datetime-local" value={ends} onChange={(e) => setEnds(e.target.value)} />
+</Field>
 					<div className="space-y-1 sm:col-span-2">
 						<Label htmlFor="ann-erase">Erase for Good At</Label>
 						<Input id="ann-erase" type="datetime-local" value={expires} onChange={(e) => setExpires(e.target.value)} />
@@ -182,9 +180,9 @@ export default function AnnouncementDialog({ existing, people, pinnedCount, onCl
 				</div>
 
 				{error && (
-					<p role="alert" className="bg-destructive/10 p-2 text-sm text-destructive">
+					<Notice>
 						{error}
-					</p>
+					</Notice>
 				)}
 				<div className="flex justify-end gap-2">
 					<Button variant="ghost" isDisabled={busy} onPress={onClose}>

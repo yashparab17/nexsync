@@ -1,11 +1,11 @@
 // The box at the bottom of a channel: type, @ to mention someone, Enter to send, Shift+Enter for a new line.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 import { CornerUpLeft, Paperclip, SendHorizontal } from "@/components/animate-icons";
 import Avatar from "@/components/elements/Avatar";
-import { Button } from "@/components/ui/button";
 import { completeMention, mentionMatches, mentionQuery, type Person } from "@/features/chat/lib/mentions";
 import { cn } from "@/lib/utils";
 
@@ -116,9 +116,9 @@ export default function Composer({ channelName, canPost, people, reply, onCancel
 						<span className="min-w-0 flex-1 truncate">
 							Replying to <span className="font-semibold text-foreground">{reply.name}</span>: {reply.text}
 						</span>
-						<Button variant="ghost" size="icon-xs" aria-label="Cancel reply" onPress={onCancelReply}>
+						<IconButton size="xs" label="Cancel reply" onPress={onCancelReply}>
 							<X className="size-4" />
-						</Button>
+						</IconButton>
 					</div>
 				)}
 				{pending.length > 0 && (
@@ -127,9 +127,9 @@ export default function Composer({ channelName, canPost, people, reply, onCancel
 							<li key={`${f.name}${i}`} className="flex h-7 items-center gap-1 rounded-md bg-muted pr-1 pl-2 text-[13px]">
 								<Paperclip className="size-3.5" />
 								{f.name}
-								<Button variant="ghost" size="icon-xs" aria-label={`Remove ${f.name}`} onPress={() => onRemoveAttachment?.(i)}>
+								<IconButton size="xs" label={`Remove ${f.name}`} onPress={() => onRemoveAttachment?.(i)}>
 									<X className="size-3.5" />
-								</Button>
+								</IconButton>
 							</li>
 						))}
 					</ul>
@@ -148,9 +148,9 @@ export default function Composer({ channelName, canPost, people, reply, onCancel
 									e.target.value = "";
 								}}
 							/>
-							<Button variant="ghost" size="icon-sm" aria-label="Attach files" onPress={() => picker.current?.click()}>
+							<IconButton label="Attach files" onPress={() => picker.current?.click()}>
 								<Paperclip className="size-4" />
-							</Button>
+							</IconButton>
 						</>
 					)}
 					<textarea
@@ -189,9 +189,9 @@ export default function Composer({ channelName, canPost, people, reply, onCancel
 						}}
 						className="max-h-[200px] min-h-8 flex-1 resize-none bg-transparent px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:outline-none"
 					/>
-					<Button variant="ghost" size="icon-sm" aria-label="Send message" onPress={send} isDisabled={(!draft.trim() && pending.length === 0) || waiting > 0} className="text-primary">
+					<IconButton label="Send message" onPress={send} isDisabled={(!draft.trim() && pending.length === 0) || waiting > 0} className="text-primary">
 						<SendHorizontal className="size-4" />
-					</Button>
+					</IconButton>
 				</div>
 			</div>
 			<p className="mt-1 px-1 font-mono text-[13px] text-muted-foreground">{waiting > 0 ? `Slow mode: you can send again in ${waiting}s` : "Enter to send, Shift+Enter for a new line, @ to mention"}</p>

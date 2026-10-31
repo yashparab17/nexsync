@@ -1,3 +1,4 @@
+import { ShieldCheck } from "lucide-react";
 import {
 	AlignCenter,
 	AlignJustify,
@@ -118,6 +119,8 @@ export interface RibbonProps {
 	openCompare: () => void;
 	openAccessibility: () => void;
 	openChanges: () => void;
+	openApprovals: () => void;
+	openControl: () => void;
 	openSectionHeader: () => void;
 	// The document's own styles, beside the gallery's: of paragraphs, of letters and of tables
 	styles: StyleDef[];
@@ -127,6 +130,8 @@ export interface RibbonProps {
 	makeTask: () => void;
 	taskMade: boolean;
 	restrict: { value: Restriction; canSet: boolean; set: (r: Restriction) => void };
+	// Lock the section the caret is in, so only an Owner or Admin changes it
+	sectionLock: { canSet: boolean; locked: boolean; toggle: () => void };
 	outlineCopied: boolean;
 	pickImage: () => void;
 	paste: () => void;
@@ -400,6 +405,7 @@ export default function DocumentRibbon(p: RibbonProps) {
 									<MenuItem label="Word count" onPress={() => a.insertField("words", String(p.fieldValues().words))} />
 									<MenuItem label="Update all fields" onPress={() => a.updateFields({ title: p.fieldValues().title, author: p.fieldValues().author, date: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }), pages: String(p.fieldValues().pages), words: String(p.fieldValues().words) })} />
 									<MenuItem label="Text form field" onPress={a.formField} />
+									<MenuItem label="Content control…" onPress={p.openControl} />
 								</>
 							}
 						/>
@@ -481,7 +487,7 @@ export default function DocumentRibbon(p: RibbonProps) {
 					<Big
 							icon={ListOrdered}
 							label="Line Numbers"
-							title="A number beside each line, shown in the editor and not written to the file"
+							title="A number beside each line, written to the file"
 							disabled={ro}
 							active={!!p.page.lineNumbers}
 							onPress={() => p.setPage({ lineNumbers: !p.page.lineNumbers })}
@@ -508,8 +514,10 @@ export default function DocumentRibbon(p: RibbonProps) {
 						menu={
 							<>
 								<MenuTitle>Section break</MenuTitle>
-								<MenuItem label="Next Page" onPress={() => a.sectionBreak(false)} />
-								<MenuItem label="Continuous" onPress={() => a.sectionBreak(true)} />
+								<MenuItem label="Next Page" onPress={() => a.sectionBreak("next")} />
+								<MenuItem label="Continuous" onPress={() => a.sectionBreak("cont")} />
+								<MenuItem label="Even Page" onPress={() => a.sectionBreak("even")} />
+								<MenuItem label="Odd Page" onPress={() => a.sectionBreak("odd")} />
 								{section && <MenuItem label="Remove This Break" onPress={a.removeSection} />}
 							</>
 						}
@@ -537,8 +545,10 @@ export default function DocumentRibbon(p: RibbonProps) {
 									))}
 									<MenuItem label="Header & Footer…" onPress={p.openSectionHeader} />
 									<MenuTitle>Starts</MenuTitle>
-									<MenuItem label="On a new page" checked={!section.continuous} onPress={() => a.setSection({ continuous: false })} />
-									<MenuItem label="Continuous" checked={section.continuous} onPress={() => a.setSection({ continuous: true })} />
+									<MenuItem label="On a new page" checked={section.start === "next"} onPress={() => a.setSection({ start: "next" })} />
+									<MenuItem label="Continuous" checked={section.start === "cont"} onPress={() => a.setSection({ start: "cont" })} />
+									<MenuItem label="On the next even page" checked={section.start === "even"} onPress={() => a.setSection({ start: "even" })} />
+									<MenuItem label="On the next odd page" checked={section.start === "odd"} onPress={() => a.setSection({ start: "odd" })} />
 								</>
 							)
 						}
@@ -547,13 +557,13 @@ export default function DocumentRibbon(p: RibbonProps) {
 				<Group label="Page Background">
 					<Rows>
 						<Small icon={FileText} label="Drop Cap" title="Enlarge the first letter of the document, shown in the editor and not written to the file" active={!!p.page.dropCap} disabled={ro} onPress={() => p.setPage({ dropCap: !p.page.dropCap })} />
-						<Small icon={FileText} label="Page Border" title="A border inside each page, shown in the editor and not written to the file" active={!!p.page.border} disabled={ro} onPress={() => p.setPage({ border: !p.page.border })} />
-						<Small icon={FileText} label="Hyphenation" title="Break long words at the end of a line, shown in the editor" active={!!p.page.hyphenate} disabled={ro} onPress={() => p.setPage({ hyphenate: !p.page.hyphenate })} />
+						<Small icon={FileText} label="Page Border" title="A border round each page, written to the file" active={!!p.page.border} disabled={ro} onPress={() => p.setPage({ border: !p.page.border })} />
+						<Small icon={FileText} label="Hyphenation" title="Break long words at the end of a line, written to the file" active={!!p.page.hyphenate} disabled={ro} onPress={() => p.setPage({ hyphenate: !p.page.hyphenate })} />
 					</Rows>
 						<Big
 							icon={Stamp}
 							label="Watermark"
-							title="Text across each page, shown in the editor and not written to the file"
+							title="Text across each page, written to the file as its watermark"
 							disabled={ro}
 							menu={
 								<>
@@ -609,6 +619,7 @@ export default function DocumentRibbon(p: RibbonProps) {
 					</Rows>
 					<Rows>
 						<Small icon={ListTodo} label="Changes" title="List every change with who made it" onPress={p.openChanges} />
+						<Small icon={ShieldCheck} label="Approvals" title="Ask for a review, approve, and sign the document as it is" onPress={p.openApprovals} />
 						<Small icon={Check} label="Accept All" disabled={p.readOnly || !p.review.count} onPress={p.review.acceptAll} />
 						<Small icon={XIcon} label="Reject All" disabled={p.readOnly || !p.review.count} onPress={p.review.rejectAll} />
 					</Rows>
@@ -629,6 +640,14 @@ export default function DocumentRibbon(p: RibbonProps) {
 						menu={RESTRICTIONS.map(([k, l]) => (
 							<MenuItem key={k} label={l} checked={p.restrict.value === k} onPress={() => p.restrict.set(k)} />
 						))}
+					/>
+					<Big
+						icon={Lock}
+						label={p.sectionLock.locked ? "Unlock Section" : "Lock Section"}
+						title={p.sectionLock.canSet ? "Lock the section the caret is in, so only an Owner or an Admin can change its text" : "Only an Owner or an Admin can lock a section"}
+						active={p.sectionLock.locked}
+						disabled={!p.sectionLock.canSet}
+						onPress={p.sectionLock.toggle}
 					/>
 				</Group>
 				<Group label="Inspect">

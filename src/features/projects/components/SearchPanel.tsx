@@ -1,3 +1,4 @@
+import { Caption } from "@/components/layout/Pane";
 import { useMemo, useState } from "react";
 
 import { Search } from "@/components/animate-icons";
@@ -126,7 +127,7 @@ export default function SearchPanel({ path, project, canReplace, onOpen }: { pat
 									<div className="flex items-center gap-2">
 										{replacing && <input type="checkbox" aria-label={`Replace in ${g.path}`} checked={!skipped.has(g.path)} onChange={(e) => setSkipped((s) => { const n = new Set(s); if (e.target.checked) n.delete(g.path); else n.add(g.path); return n; })} />}
 										<span className="min-w-0 flex-1 truncate font-mono text-sm">{g.path}</span>
-										<span className="font-mono text-[13px] text-muted-foreground">{g.matches.length}</span>
+										<Caption>{g.matches.length}</Caption>
 									</div>
 									<ul className={cn("mt-1", skipped.has(g.path) && replacing && "opacity-50")}>
 										{g.matches.slice(0, 50).map((m, i) => (

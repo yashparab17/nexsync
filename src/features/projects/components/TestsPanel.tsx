@@ -1,3 +1,6 @@
+import { Caption } from "@/components/layout/Pane";
+import { Notice } from "@/components/ui/notice";
+import { IconButton } from "@/components/ui/icon-button";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import BisectPanel from "@/features/projects/components/BisectPanel";
@@ -110,9 +113,9 @@ export default function TestsPanel({ path, project, runs, tasks, canRun, onRunOn
 	return (
 		<div className="space-y-4">
 			{message && (
-				<p role="alert" className="bg-destructive/10 p-2 text-sm text-destructive">
+				<Notice>
 					{message}
-				</p>
+				</Notice>
 			)}
 			{testTask && impact && canRun && (
 				<Panel title="After Your Changes" hint={impact.everything ? "everything" : `${impact.tests.length} of ${impact.tests.length + impact.skipped} test files`}>
@@ -141,9 +144,9 @@ export default function TestsPanel({ path, project, runs, tasks, canRun, onRunOn
 						{shaky.slice(0, 10).map((u) => (
 							<li key={u.name} className="flex items-center gap-3 px-4 py-2">
 								<span className="min-w-0 flex-1 truncate text-sm">{u.name}</span>
-								<span className="font-mono text-[13px] text-muted-foreground">
+								<Caption>
 									failed {u.fails} of {u.runs} runs · changed {u.flips} times
-								</span>
+								</Caption>
 							</li>
 						))}
 					</ul>
@@ -216,7 +219,7 @@ export default function TestsPanel({ path, project, runs, tasks, canRun, onRunOn
 				</Panel>
 			)}
 
-			<Panel title="Report Files" hint={files.length ? String(files.length) : undefined} flush={files.length > 0} right={<Button variant="ghost" size="icon-xs" aria-label="Look again" onPress={look}><RefreshCw className="size-3.5" /></Button>}>
+			<Panel title="Report Files" hint={files.length ? String(files.length) : undefined} flush={files.length > 0} right={<IconButton size="xs" label="Look again" onPress={look}><RefreshCw className="size-3.5" /></IconButton>}>
 				{files.length === 0 ? (
 					<p className="text-sm text-muted-foreground">No report files yet. JUnit XML, TRX, lcov and Cobertura show up here.</p>
 				) : (

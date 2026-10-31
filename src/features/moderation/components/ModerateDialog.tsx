@@ -1,11 +1,12 @@
+import { Field } from "@/components/ui/field";
 // Timeout, kick or ban one member, with an optional reason and a plain statement of what each does.
 
+import { Notice } from "@/components/ui/notice";
 import { useState } from "react";
 import { ShieldAlert } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogHeading } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { canBan, MAX_REASON, TIMEOUTS } from "@/features/moderation/lib/moderation";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/store/chat/ChatContext";
@@ -70,20 +71,18 @@ export default function ModerateDialog({ member, selfRole, onClose }: ModerateDi
 					))}
 				</div>
 				{level === "timeout" && (
-					<div className="space-y-1">
-						<Label htmlFor="timeout-length">For how long</Label>
-						<select id="timeout-length" value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="h-10 w-full rounded-md bg-input px-3 text-sm outline-none">
+					<Field label="For how long" htmlFor="timeout-length">
+<select id="timeout-length" value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="h-10 w-full rounded-md bg-input px-3 text-sm outline-none">
 							{TIMEOUTS.map((t) => (
 								<option key={t.ms} value={t.ms}>
 									{t.label}
 								</option>
 							))}
 						</select>
-					</div>
+</Field>
 				)}
-				<div className="space-y-1">
-					<Label htmlFor="moderation-reason">Reason (optional)</Label>
-					<textarea
+				<Field label="Reason (optional)" htmlFor="moderation-reason">
+<textarea
 						id="moderation-reason"
 						value={reason}
 						maxLength={MAX_REASON}
@@ -95,16 +94,16 @@ export default function ModerateDialog({ member, selfRole, onClose }: ModerateDi
 					<p className="text-right font-mono text-[13px] text-muted-foreground">
 						{reason.length} / {MAX_REASON}
 					</p>
-				</div>
+</Field>
 				<p className="rounded-md bg-muted/50 p-3 text-[13px] text-muted-foreground">
 					What {member.name} wrote and changed stays in the workspace, and is marked as theirs{level === "timeout" ? "" : " with a Removed badge"}. Changes they made before they heard of this wait for an Admin to accept or discard them.
 					{needsTwo && " The two-person rule is on, so a second Admin has to approve this first."}
 					{!isOwner && level === "kick" && " The Owner's device removes them when it is online."}
 				</p>
 				{error && (
-					<p role="alert" className="bg-destructive/10 p-2 text-sm text-destructive">
+					<Notice>
 						{error}
-					</p>
+					</Notice>
 				)}
 				<div className="flex justify-end gap-2">
 					<Button variant="ghost" onPress={onClose}>

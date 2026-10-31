@@ -1,6 +1,7 @@
 // Edits to tasks and cards that were made by a device that may not write now, kept apart for an Owner or Admin to accept or
 // discard (see src-tauri/src/commands/workspace/held.rs).
 
+import { Notice } from "@/components/ui/notice";
 import { useCallback, useEffect, useState } from "react";
 import { Check, X } from "@/components/animate-icons";
 
@@ -72,9 +73,9 @@ export default function HeldEdits({ onlyReview = false }: { onlyReview?: boolean
 	return (
 		<div className="space-y-2">
 			{error && (
-				<p role="alert" className="bg-destructive/10 p-2 text-sm text-destructive">
+				<Notice>
 					{error}
-				</p>
+				</Notice>
 			)}
 			<ul className="divide-y divide-border/60">
 				{items.map((h) => (

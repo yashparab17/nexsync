@@ -1,9 +1,10 @@
+import { Field } from "@/components/ui/field";
+import { Notice } from "@/components/ui/notice";
 import { useState } from "react";
 import { Hash } from "@/components/animate-icons";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { slugify } from "@/features/chat/lib/entries";
 
 // Names a new channel. Only the Owner and Admins see this; the backend refuses anyone else's channel entry too.
@@ -37,19 +38,17 @@ export default function NewChannelDialog({ existing, onClose, onCreate }: { exis
 				}}
 			>
 				<DialogHeading icon={<Hash className="size-6" />} title="New Channel" />
-				<div className="space-y-1">
-					<Label htmlFor="channel-name">Name</Label>
-					<Input id="channel-name" autoFocus value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="release-plan" />
+				<Field label="Name" htmlFor="channel-name">
+<Input id="channel-name" autoFocus value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="release-plan" />
 					{id && <p className="font-mono text-[13px] text-muted-foreground">#{id}</p>}
-				</div>
-				<div className="space-y-1">
-					<Label htmlFor="channel-topic">Topic (optional)</Label>
-					<Input id="channel-topic" value={topic} maxLength={120} onChange={(e) => setTopic(e.target.value)} placeholder="Description" />
-				</div>
+</Field>
+				<Field label="Topic (optional)" htmlFor="channel-topic">
+<Input id="channel-topic" value={topic} maxLength={120} onChange={(e) => setTopic(e.target.value)} placeholder="Description" />
+</Field>
 				{error && (
-					<p role="alert" className="bg-destructive/10 p-2 text-sm text-destructive">
+					<Notice>
 						{error}
-					</p>
+					</Notice>
 				)}
 				<div className="flex justify-end gap-2">
 					<Button variant="ghost" onPress={onClose}>

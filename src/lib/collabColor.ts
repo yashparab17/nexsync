@@ -4,7 +4,8 @@
 // A colour is never worked out from a name. A person picks one (Settings, Profile) or is given one at random the first time, and
 // it is shared into each workspace with their picture (src/lib/profile.ts). Someone whose device has not shared one yet shows in
 // a neutral grey.
-export const PALETTE = ["#d22d64", "#ad38d5", "#cf3a2c", "#b15825", "#896e1d", "#1c823e", "#1e7b8e", "#5a64dc"];
+// Round the colour wheel, red to pink; every one reads with white on it
+export const PALETTE = ["#cf3a2c", "#b15825", "#896e1d", "#5f7f12", "#1c823e", "#0b7a55", "#1e7b8e", "#0369a1", "#2b6fd6", "#5a64dc", "#7c3aed", "#ad38d5", "#c026d3", "#d22d64"];
 
 // White initials read on it (6:1)
 export const NEUTRAL = "#5c6370";

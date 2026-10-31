@@ -1,3 +1,4 @@
+import { EmptyNote } from "@/components/layout/Pane";
 import { useEffect, useState } from "react";
 
 import { isBinaryFile, isDocumentFile } from "@/lib/editor/languages";
@@ -41,8 +42,8 @@ export default function FilePreview({ workspacePath, path }: { workspacePath: st
 		};
 	}, [workspacePath, path, key]);
 
-	if (text === null) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>;
-	if (text === "") return <p className="p-4 text-sm text-muted-foreground">No preview.</p>;
+	if (text === null) return <EmptyNote className="p-4">Loading…</EmptyNote>;
+	if (text === "") return <EmptyNote className="p-4">No preview.</EmptyNote>;
 	const lines = text.split("\n");
 	return (
 		<pre aria-label={`Preview of ${baseName(path)}`} className="h-full overflow-auto p-3 font-mono text-xs leading-5">

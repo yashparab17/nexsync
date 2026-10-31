@@ -1,12 +1,13 @@
+import { Caption } from "@/components/layout/Pane";
 // Reads a PDF in the page itself. Web views often refuse to show a PDF inside a frame, so the pages are drawn here, one
 // canvas each, and only the ones near the screen are drawn.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
 import { Minus, Plus } from "@/components/animate-icons";
 import Loading from "@/components/Loading";
-import { Button } from "@/components/ui/button";
 import { base64Bytes, loadPdfjs } from "@/features/assets/lib/previews";
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
@@ -155,19 +156,19 @@ export default function PdfViewer({ base64, name, pins, placing, draft, onPlace,
 	return (
 		<div className="flex h-full min-h-0 w-full flex-col">
 			<div className="flex shrink-0 items-center gap-2 border-b bg-card/60 px-3 py-2 text-sm">
-				<span className="font-mono text-xs text-muted-foreground">
+				<Caption className="text-xs">
 					{doc.numPages} {doc.numPages === 1 ? "page" : "pages"}
-				</span>
+				</Caption>
 				<span className="flex-1" />
-				<Button variant="ghost" size="icon-xs" aria-label="Zoom out" isDisabled={zoom === 0} onPress={() => setZoom((z) => Math.max(0, z - 1))}>
+				<IconButton size="xs" label="Zoom out" isDisabled={zoom === 0} onPress={() => setZoom((z) => Math.max(0, z - 1))}>
 					<Minus className="size-4" />
-				</Button>
+				</IconButton>
 				<button type="button" onClick={() => setZoom(2)} className="w-12 text-center font-mono text-xs tabular-nums outline-none hover:text-primary focus-visible:text-primary" aria-label="Fit to width">
 					{Math.round(factor * 100)}%
 				</button>
-				<Button variant="ghost" size="icon-xs" aria-label="Zoom in" isDisabled={zoom === ZOOMS.length - 1} onPress={() => setZoom((z) => Math.min(ZOOMS.length - 1, z + 1))}>
+				<IconButton size="xs" label="Zoom in" isDisabled={zoom === ZOOMS.length - 1} onPress={() => setZoom((z) => Math.min(ZOOMS.length - 1, z + 1))}>
 					<Plus className="size-4" />
-				</Button>
+				</IconButton>
 			</div>
 			<div ref={scroller} className="min-h-0 flex-1 overflow-auto bg-muted/40 py-3" aria-label={`${name}, ${doc.numPages} pages`} tabIndex={0}>
 				{Array.from({ length: doc.numPages }, (_, i) => (

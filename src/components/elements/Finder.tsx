@@ -1,3 +1,4 @@
+import { Kbd } from "@/components/layout/Pane";
 // A Telescope-style finder: a search box over a fuzzy-filtered list, with an optional preview of the highlighted item.
 // The caller owns what the items are and what choosing one does; the finder owns typing, matching and keys.
 
@@ -127,7 +128,7 @@ export default function Finder({ open, onClose, query, onQueryChange, filterText
 					<Highlighted text={item.label} indexes={inLabel} />
 					{item.detail && <span className="ml-2 font-mono text-xs text-muted-foreground">{item.detail}</span>}
 				</span>
-				{item.hint && <kbd className="shrink-0 border bg-card px-2 py-0.5 font-mono text-xs text-muted-foreground">{item.hint}</kbd>}
+				{item.hint && <Kbd className="shrink-0">{item.hint}</Kbd>}
 			</li>,
 		);
 	});

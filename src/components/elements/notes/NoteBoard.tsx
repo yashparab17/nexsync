@@ -1,12 +1,12 @@
 // The note board: every note is a card on one big canvas. Drag the background to pan, scroll to zoom, drag a card to
 // move it for everyone, double-click a card to open the note. Other people's pointers show while they are on the board.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Trash2, ExternalLink, Link2 } from "@/components/animate-icons";
 import type { Awareness } from "y-protocols/awareness";
 
 import PresenceDots from "@/components/elements/PresenceDots";
-import { Button } from "@/components/ui/button";
 import { colorOf } from "@/lib/collabColor";
 import { CARD_H, CARD_W, clampZoom, summarize } from "@/features/notes/lib/board";
 import { degrees, type GraphEdge, type NoteInfo, type Point } from "@/features/notes/lib/graph";
@@ -202,13 +202,13 @@ export default function NoteBoard({ notes, positions, edges, activePath, onMove,
 								<h3 className="min-w-0 flex-1 truncate text-sm font-semibold">{noteTitle(note.name)}</h3>
 								<PresenceDots names={here} />
 								<div className="flex shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100" onPointerDown={(e) => e.stopPropagation()}>
-									<Button variant="ghost" size="icon-xs" aria-label={`Open ${noteTitle(note.name)}`} onPress={() => onOpen(note.path)}>
+									<IconButton size="xs" label={`Open ${noteTitle(note.name)}`} onPress={() => onOpen(note.path)}>
 										<ExternalLink className="size-3.5" />
-									</Button>
+									</IconButton>
 									{onDelete && !readOnly && (
-										<Button variant="ghost" size="icon-xs" aria-label={`Delete ${noteTitle(note.name)}`} onPress={() => onDelete(note.path)}>
+										<IconButton size="xs" label={`Delete ${noteTitle(note.name)}`} onPress={() => onDelete(note.path)}>
 											<Trash2 className="size-3.5 text-destructive" />
-										</Button>
+										</IconButton>
 									)}
 								</div>
 							</div>
@@ -253,15 +253,15 @@ export default function NoteBoard({ notes, positions, edges, activePath, onMove,
 
 			{/* Zoom controls */}
 			<div className="absolute right-3 bottom-3 flex items-center border bg-background/90 backdrop-blur-sm" onPointerDown={(e) => e.stopPropagation()}>
-				<Button variant="ghost" size="icon-xs" aria-label="Zoom out" onPress={() => zoomBy(1 / 1.25)}>
+				<IconButton size="xs" label="Zoom out" onPress={() => zoomBy(1 / 1.25)}>
 					−
-				</Button>
+				</IconButton>
 				<button type="button" className="w-12 text-center text-xs tabular-nums hover:bg-muted" onClick={() => setView({ x: 24, y: 24, zoom: 1 })} aria-label="Reset view">
 					{Math.round(view.zoom * 100)}%
 				</button>
-				<Button variant="ghost" size="icon-xs" aria-label="Zoom in" onPress={() => zoomBy(1.25)}>
+				<IconButton size="xs" label="Zoom in" onPress={() => zoomBy(1.25)}>
 					+
-				</Button>
+				</IconButton>
 			</div>
 		</div>
 	);

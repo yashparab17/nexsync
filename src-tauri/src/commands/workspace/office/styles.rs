@@ -63,6 +63,13 @@ pub struct TableLook {
     pub header_bold: bool,
     pub band_fill: String,
     pub fill: String,
+    /// The lines round and between the cells: their colour (`#rrggbb`, empty for the default) and width in points; 0 leaves what the style
+    /// had, a negative width takes the lines away
+    pub border_color: String,
+    pub border_width: f32,
+    /// Bold text in the first column and in the last row
+    pub first_col_bold: bool,
+    pub total_bold: bool,
 }
 
 /// A paragraph style of a file as the gallery shows it
@@ -143,6 +150,14 @@ fn table_look(doc: &Document, id: &str) -> TableLook {
                 };
             }
             look.header_bold |= t.header_chr.bold == Some(true);
+            look.first_col_bold |= t.first_col_chr.bold == Some(true);
+            look.total_bold |= t.total_chr.bold == Some(true);
+            if look.border_width == 0.0 {
+                if let Some(b) = t.borders.as_ref().and_then(|b| b.top.or(b.inside_v)).filter(|b| b.width > 0.0) {
+                    look.border_width = (b.width * 10.0).round() / 10.0;
+                    look.border_color = b.color.map(|wordcraft_doc::Rgb(r, g, bl)| format!("#{r:02x}{g:02x}{bl:02x}")).unwrap_or_default();
+                }
+            }
         }
         at = st.based_on.clone();
     }
@@ -261,6 +276,14 @@ fn apply_table(doc: &mut Document, s: &StyleIn) {
     parts.band_size = Some(u32::from(parts.band_fill.is_some()));
     parts.header_chr.bold = look.header_bold.then_some(true);
     parts.header_chr.color = parse_color(&look.header_color).map(TextColor::Rgb);
+    parts.first_col_chr.bold = look.first_col_bold.then_some(true);
+    parts.total_chr.bold = look.total_bold.then_some(true);
+    if look.border_width > 0.0 && look.border_width.is_finite() {
+        let line = wordcraft_doc::props::Border { color: parse_color(&look.border_color), ..wordcraft_doc::props::Border::single(look.border_width.min(12.0)) };
+        parts.borders = Some(wordcraft_doc::props::Borders::all(line));
+    } else if look.border_width < 0.0 {
+        parts.borders = None;
+    }
     let _: &TableStyleParts = &parts;
     st.table = Some(parts);
     match at {

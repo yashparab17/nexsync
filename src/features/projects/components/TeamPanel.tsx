@@ -1,3 +1,4 @@
+import { Caption } from "@/components/layout/Pane";
 import { Check, Users } from "@/components/animate-icons";
 import { Panel } from "@/components/layout/Page";
 import { Button } from "@/components/ui/button";
@@ -56,7 +57,7 @@ export default function TeamPanel({
 								<div className="flex items-center gap-2">
 									<span className={cn("size-2 shrink-0 rounded-full", r.mixed ? "bg-warning" : "bg-success")} aria-hidden />
 									<span className="font-mono text-sm">{r.tool}</span>
-									{r.range && <span className="font-mono text-[13px] text-muted-foreground">{r.range}</span>}
+									{r.range && <Caption>{r.range}</Caption>}
 								</div>
 								<p className="mt-1 text-[13px] text-muted-foreground">{mixedNote(r, envs.find((m) => m.key === me)?.name ?? "") ?? `Everyone has ${r.groups[0].version}`}</p>
 								{r.mixed && (
@@ -89,9 +90,9 @@ export default function TeamPanel({
 											{name}
 											{key === me && <span className="text-muted-foreground"> (you)</span>}
 										</span>
-										<span className="font-mono text-[13px] text-muted-foreground">
+										<Caption>
 											{steps.filter((s) => s.done).length}/{steps.length}
-										</span>
+										</Caption>
 									</div>
 									<ul className="mt-1 space-y-0.5">
 										{steps.map((s) => (
@@ -123,7 +124,7 @@ export default function TeamPanel({
 											<span className="min-w-0 flex-1 truncate">
 												<span className="font-medium">{f.name}</span> · {f.data.task} ended with code {f.data.code ?? "none"}
 											</span>
-											<span className="font-mono text-[13px] text-muted-foreground">{when(f.ts)}</span>
+											<Caption>{when(f.ts)}</Caption>
 										</summary>
 										<div className="mt-2 space-y-2">
 											<p className="font-mono text-[13px] text-muted-foreground">{f.data.command}</p>

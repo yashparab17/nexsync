@@ -1,5 +1,6 @@
 // Choosing the colours of code for each mode: follow the theme, a ready-made scheme, or one made here.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useState } from "react";
 import { Pencil, Plus, Trash2 } from "@/components/animate-icons";
 
@@ -45,12 +46,12 @@ function Group({ mode, label }: { mode: ThemeMode; label: string }) {
 				</select>
 				{chosen?.custom && (
 					<>
-						<Button variant="ghost" size="icon-xs" aria-label={`Edit ${chosen.name}`} onPress={() => setEditing({ scheme: chosen })}>
+						<IconButton size="xs" label={`Edit ${chosen.name}`} onPress={() => setEditing({ scheme: chosen })}>
 							<Pencil className="size-3.5" />
-						</Button>
-						<Button variant="ghost" size="icon-xs" aria-label={`Delete ${chosen.name}`} onPress={() => deleteCustomScheme(chosen.id)}>
+						</IconButton>
+						<IconButton size="xs" label={`Delete ${chosen.name}`} onPress={() => deleteCustomScheme(chosen.id)}>
 							<Trash2 className="size-3.5 text-destructive" />
-						</Button>
+						</IconButton>
 					</>
 				)}
 				<Button variant="outline" size="sm" onPress={() => setEditing({})}>

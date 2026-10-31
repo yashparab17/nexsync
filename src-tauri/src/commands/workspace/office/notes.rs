@@ -138,7 +138,7 @@ pub fn notes_of(doc: &Document) -> Vec<NoteOut> {
 pub type Place = (usize, Option<(usize, usize, usize)>);
 
 /// What `take_markers` finds: the note references (place, byte place, number), the numbers of every note found, and the character ranges
-pub type Markers = (Vec<(Place, usize, u32)>, Vec<u32>, Vec<CharRange>);
+pub type Markers = (Vec<(Place, usize, u32)>, Vec<u32>, Vec<CharRange>, Vec<CharRange>);
 
 /// A range of letters in a character style: where it is, the byte places of its start and end in the text without the markers, and the style
 pub type CharRange = (Place, usize, usize, String);
@@ -149,12 +149,17 @@ const CHAR_OPEN: char = '\u{E006}';
 const CHAR_ID_END: char = '\u{E007}';
 const CHAR_CLOSE: char = '\u{E008}';
 
+/// The same for a content control: `U+E00B spec U+E00C ... U+E00D` (see `controls.rs`); its ranges come back as the character ranges do, with the spec in place of the style
+const CTL_OPEN: char = '\u{E00B}';
+const CTL_SPEC_END: char = '\u{E00C}';
+const CTL_CLOSE: char = '\u{E00D}';
+
 /// Takes the markers off the text of a document read from the editor's HTML. Returns where each note reference stood (the place, the byte place in
 /// the paragraph's text without the markers, the note number), every note number found anywhere, and the ranges in a character style. Markers in a
 /// table nested in a cell are taken off the text but nothing is kept.
 pub fn take_markers(doc: &mut Document) -> Markers {
     // The notes found in a paragraph (byte place, number) and the character ranges (start, end, style)
-    type Found = (Vec<(usize, u32)>, Vec<(usize, usize, String)>);
+    type Found = (Vec<(usize, u32)>, Vec<(usize, usize, String)>, Vec<(usize, usize, String)>);
     fn cut(p: &mut Paragraph, a: usize, end: usize) {
         p.text.drain(a..end);
         let mut at = 0;
@@ -167,12 +172,13 @@ pub fn take_markers(doc: &mut Document) -> Markers {
         p.rev = wordcraft_doc::para::next_rev();
     }
     fn strip(p: &mut Paragraph) -> Found {
-        let mut found: Found = (Vec::new(), Vec::new());
+        let mut found: Found = (Vec::new(), Vec::new(), Vec::new());
         let mut open: Vec<(usize, String)> = Vec::new();
+        let mut open_controls: Vec<(usize, String)> = Vec::new();
         let mut from = 0;
         loop {
             // The next marker of any kind, from where the last one was
-            let next = p.text[from..].char_indices().find(|(_, c)| matches!(*c, OPEN | CHAR_OPEN | CHAR_CLOSE)).map(|(i, c)| (from + i, c));
+            let next = p.text[from..].char_indices().find(|(_, c)| matches!(*c, OPEN | CHAR_OPEN | CHAR_CLOSE | CTL_OPEN | CTL_CLOSE)).map(|(i, c)| (from + i, c));
             let Some((a, c)) = next else { break };
             match c {
                 OPEN => {
@@ -190,6 +196,19 @@ pub fn take_markers(doc: &mut Document) -> Markers {
                     let id = p.text[a + CHAR_OPEN.len_utf8()..a + rel].to_string();
                     cut(p, a, end);
                     open.push((a, id));
+                }
+                CTL_OPEN => {
+                    let Some(rel) = p.text[a..].find(CTL_SPEC_END) else { break };
+                    let end = a + rel + CTL_SPEC_END.len_utf8();
+                    let spec = p.text[a + CTL_OPEN.len_utf8()..a + rel].to_string();
+                    cut(p, a, end);
+                    open_controls.push((a, spec));
+                }
+                CTL_CLOSE => {
+                    cut(p, a, a + CTL_CLOSE.len_utf8());
+                    if let Some((start, spec)) = open_controls.pop() {
+                        found.2.push((start, a, spec));
+                    }
                 }
                 _ => {
                     cut(p, a, a + CHAR_CLOSE.len_utf8());
@@ -211,16 +230,17 @@ pub fn take_markers(doc: &mut Document) -> Markers {
             }
         }
     }
-    let (mut at, mut ids, mut chars) = (Vec::new(), Vec::new(), Vec::new());
+    let (mut at, mut ids, mut chars, mut controls) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     for (i, b) in doc.body.iter_mut().enumerate() {
         match Arc::make_mut(b) {
             Block::Para(p) => {
-                let (notes, ranges) = strip(p);
+                let (notes, ranges, ctl) = strip(p);
                 for (off, id) in notes {
                     at.push(((i, None), off, id));
                     ids.push(id);
                 }
                 chars.extend(ranges.into_iter().map(|(a, e, id)| ((i, None), a, e, id)));
+                controls.extend(ctl.into_iter().map(|(a, e, spec)| ((i, None), a, e, spec)));
             }
             Block::Table(t) => {
                 for (r, row) in t.rows.iter_mut().enumerate() {
@@ -229,12 +249,13 @@ pub fn take_markers(doc: &mut Document) -> Markers {
                             if matches!(&**cb, Block::Table(_)) {
                                 walk(std::slice::from_mut(cb), &mut ids);
                             } else if let Block::Para(p) = Arc::make_mut(cb) {
-                                let (notes, ranges) = strip(p);
+                                let (notes, ranges, ctl) = strip(p);
                                 for (off, id) in notes {
                                     at.push(((i, Some((r, c, k))), off, id));
                                     ids.push(id);
                                 }
                                 chars.extend(ranges.into_iter().map(|(a, e, id)| ((i, Some((r, c, k))), a, e, id)));
+                                controls.extend(ctl.into_iter().map(|(a, e, spec)| ((i, Some((r, c, k))), a, e, spec)));
                             }
                         }
                     }
@@ -242,7 +263,7 @@ pub fn take_markers(doc: &mut Document) -> Markers {
             }
         }
     }
-    (at, ids, chars)
+    (at, ids, chars, controls)
 }
 
 /// The paragraphs of a note from its words: `**bold**` and `*italic*` are bold and italic, `\*` and `\\` the characters themselves

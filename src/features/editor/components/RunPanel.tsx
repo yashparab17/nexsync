@@ -1,3 +1,4 @@
+import { IconButton } from "@/components/ui/icon-button";
 import { useEffect, useRef, useState } from "react";
 import { Trash2, Play, Square, AlertTriangle } from "@/components/animate-icons";
 
@@ -146,9 +147,9 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 						Run
 					</Button>
 				)}
-				<Button variant="ghost" size="icon-xs" aria-label="Clear output" onPress={() => setLines([])}>
+				<IconButton size="xs" label="Clear output" onPress={() => setLines([])}>
 					<Trash2 className="size-3.5" />
-				</Button>
+				</IconButton>
 			</div>
 			<div className="min-h-0 flex-1 overflow-auto bg-muted/20 p-3 font-mono text-xs">
 				{lines.length === 0 ? (

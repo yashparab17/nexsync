@@ -1,6 +1,7 @@
 // Settings: rules about whole tasks and cards. Merging keeps everyone's edits, so two correct edits made at the same time
 // can add up to a record that breaks a rule; with a rule on, such a record is flagged until somebody fixes it.
 
+import { FieldError } from "@/components/ui/notice";
 import { useEffect, useState } from "react";
 
 import { ShieldCheck } from "@/components/animate-icons";
@@ -40,9 +41,9 @@ export default function RulesCard({ workspacePath }: { workspacePath: string }) 
 	return (
 		<SectionCard id="rules" title="Rules for Tasks and Cards" icon={<ShieldCheck className="size-5" />}>
 				{error && (
-					<p role="alert" className="text-xs text-destructive">
+					<FieldError>
 						{error}
-					</p>
+					</FieldError>
 				)}
 				{rules.map((rule) => (
 					<label key={rule.id} className="flex cursor-pointer items-start gap-3 text-sm">

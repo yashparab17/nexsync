@@ -1,6 +1,7 @@
 // The Terminal tab: any number of shells side by side in a list, like VS Code's integrated terminal. They keep running
 // while the panel is hidden or another tab is showing; closing one ends its shell.
 
+import { IconButton } from "@/components/ui/icon-button";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import { ChevronDown, Plus, RefreshCw, Terminal, Trash2, X } from "@/components/animate-icons";
@@ -148,28 +149,21 @@ const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(functi
 			{/* The list of terminals, on the right as in VS Code */}
 			<div role="tablist" aria-label="Terminals" aria-orientation="vertical" className="flex w-44 shrink-0 flex-col border-l bg-panel">
 				<div className="flex h-8 shrink-0 items-center justify-end gap-0.5 border-b px-1">
-					<Button variant="ghost" size="icon-xs" aria-label="New terminal" onPress={() => create()}>
+					<IconButton size="xs" label="New terminal" onPress={() => create()}>
 						<Plus className="size-4" />
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon-xs"
-						aria-label="Choose a shell for a new terminal"
-						aria-haspopup="menu"
-						isDisabled={shells.length === 0}
-						onPress={() => {
+					</IconButton>
+					<IconButton size="xs" label="Choose a shell for a new terminal" aria-haspopup="menu" isDisabled={shells.length === 0} onPress={() => {
 							const r = document.activeElement?.getBoundingClientRect();
 							menu.open(
 								{ clientX: (r?.right ?? 0) - 160, clientY: (r?.bottom ?? 0) + 2, preventDefault: () => {} },
 								shells.map((s) => ({ label: s.name, icon: <Terminal className="size-4" />, onSelect: () => create(s.id) })),
 							);
-						}}
-					>
+						}}>
 						<ChevronDown className="size-4" />
-					</Button>
-					<Button variant="ghost" size="icon-xs" aria-label="Clear terminal" isDisabled={!current} onPress={() => active !== null && views.current.get(active)?.clear()}>
+					</IconButton>
+					<IconButton size="xs" label="Clear terminal" isDisabled={!current} onPress={() => active !== null && views.current.get(active)?.clear()}>
 						<Trash2 className="size-4" />
-					</Button>
+					</IconButton>
 				</div>
 				<div className="min-h-0 flex-1 overflow-y-auto">
 					{items.map((item) => (

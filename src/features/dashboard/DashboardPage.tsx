@@ -1,3 +1,4 @@
+import { IconButton } from "@/components/ui/icon-button";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -15,22 +16,11 @@ import { formatAction } from "@/lib/insights";
 import { useRecent } from "@/lib/recentFiles";
 import { useRuns } from "@/features/projects/lib/projectRuns";
 import { getTasks, loadConfig, projectRuns, projectsList } from "@/lib/tauri";
-import { cn } from "@/lib/utils";
+import { cn, timeAgo } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { Task } from "@/types/workspace";
 
-// "5m ago" from an ISO timestamp
-function formatRelative(iso: string): string {
-	if (!iso) return "";
-	const mins = Math.floor(Math.max(0, Date.now() - new Date(iso).getTime()) / 60_000);
-	if (mins < 1) return "just now";
-	if (mins < 60) return `${mins}m ago`;
-	const hours = Math.floor(mins / 60);
-	if (hours < 24) return `${hours}h ago`;
-	const days = Math.floor(hours / 24);
-	return days < 7 ? `${days}d ago` : new Date(iso).toLocaleDateString();
-}
 
 // The icon for what an event touched; neutral, so colour is saved for what needs attention
 function eventIcon(targetType?: string, action?: string) {
@@ -229,7 +219,7 @@ export default function DashboardPage() {
 											</p>
 											<p className="truncate text-sm text-muted-foreground">{event.detail}</p>
 										</div>
-										<span className="shrink-0 font-mono text-[13px] tabular-nums text-muted-foreground">{formatRelative(event.timestamp)}</span>
+										<span className="shrink-0 font-mono text-[13px] tabular-nums text-muted-foreground">{timeAgo(event.timestamp)}</span>
 									</li>
 								);
 							})}
@@ -332,13 +322,13 @@ function DashTile({ id, size, editing, dragging, onSize, onHide, onDragStart, on
 				>
 					<span className="flex-1" />
 					{(["s", "m", "l"] as const).map((v) => (
-						<Button key={v} variant={size === v ? "default" : "ghost"} size="icon-sm" aria-label={`${TITLES[id]}: ${v === "s" ? "Small" : v === "m" ? "Medium" : "Large"}`} onPress={() => onSize(v)}>
+						<IconButton key={v} variant={size === v ? "default" : "ghost"} label={`${TITLES[id]}: ${v === "s" ? "Small" : v === "m" ? "Medium" : "Large"}`} onPress={() => onSize(v)}>
 							{v.toUpperCase()}
-						</Button>
+						</IconButton>
 					))}
-					<Button variant="ghost" size="icon-sm" aria-label={`Hide ${TITLES[id]}`} onPress={onHide}>
+					<IconButton label={`Hide ${TITLES[id]}`} onPress={onHide}>
 						<EyeOff className="size-4" />
-					</Button>
+					</IconButton>
 				</div>
 			)}
 		</motion.div>

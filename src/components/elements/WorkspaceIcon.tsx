@@ -1,5 +1,6 @@
 // A workspace's icon wherever it is shown, and the picker that sets it. See src/lib/workspaceIcon.ts.
 
+import { FieldError } from "@/components/ui/notice";
 import { useEffect, useRef, useState } from "react";
 
 import { initialOf } from "@/components/elements/Avatar";
@@ -8,7 +9,7 @@ import ColorSwatches from "@/components/elements/ColorSwatches";
 import { Button } from "@/components/ui/button";
 import { Upload } from "@/components/animate-icons";
 import { NEUTRAL } from "@/lib/collabColor";
-import { GLYPHS, getIcon, pictureToIcon, type WorkspaceIcon as Icon } from "@/lib/workspaceIcon";
+import { getIcon, pictureToIcon, type WorkspaceIcon as Icon } from "@/lib/workspaceIcon";
 import { cn } from "@/lib/utils";
 
 // The icon of the workspace with this id; without one it is the first letter of the name on a colour, like an avatar
@@ -90,23 +91,10 @@ export function IconPicker({ value, onChange, name, shared = false, initial = nu
 					)}
 				</div>
 			</div>
-			<div role="group" aria-label="Emoji" className="flex flex-wrap gap-1">
-				{GLYPHS.map((g) => (
-					<button
-						key={g}
-						type="button"
-						aria-label={`Use ${g}`}
-						aria-pressed={value?.kind === "glyph" && value.glyph === g}
-						onClick={() => onChange({ kind: "glyph", glyph: g })}
-						className={cn("flex size-8 cursor-pointer items-center justify-center rounded-md text-lg outline-none hover:bg-muted focus-visible:bg-muted", value?.kind === "glyph" && value.glyph === g && "bg-primary/20")}
-					>
-						{g}
-					</button>
-				))}
-			</div>
+			
 			<div>
 				<Button variant="ghost" size="sm" aria-expanded={more} onPress={() => setMore(!more)}>
-					{more ? "Fewer emoji" : "All emoji"}
+					{more ? "Hide emoji" : "Choose an Emoji"}
 				</Button>
 			</div>
 			{more && <EmojiPicker value={value?.kind === "glyph" ? value.glyph : null} onPick={(glyph) => onChange(value?.kind === "glyph" && value.color ? { kind: "glyph", glyph, color: value.color } : { kind: "glyph", glyph })} />}
@@ -118,9 +106,9 @@ export function IconPicker({ value, onChange, name, shared = false, initial = nu
 			)}
 			{value?.kind === "image" && <p className="text-[13px] text-muted-foreground">Choose an emoji or the letter to pick a colour.</p>}
 			{error && (
-				<p role="alert" className="text-xs text-destructive">
+				<FieldError>
 					{error}
-				</p>
+				</FieldError>
 			)}
 			{!bare && <p className="text-[13px] text-muted-foreground">{shared ? "Everyone in the workspace sees this icon." : "Once the workspace is created, the Owner and Admins can change the icon, and everyone sees it."}</p>}
 		</div>

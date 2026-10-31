@@ -9,7 +9,7 @@ import type { FileVersion } from "@/types/workspace";
 
 // Compare: the open document against one of its saved versions, or against another document of the workspace, paragraph by paragraph and word by word. What the version had and the
 // document no longer has is struck through in red; what the document has and the version did not is underlined in green.
-export default function CompareDialog({ workspacePath, rel, others, lines, onClose }: { workspacePath: string; rel: string; others: { name: string; rel: string }[]; lines: () => string[]; onClose: () => void }) {
+export default function CompareDialog({ workspacePath, rel, others, lines, onMark, onClose }: { workspacePath: string; rel: string; others: { name: string; rel: string }[]; lines: () => string[]; onMark?: (comparison: Comparison) => number; onClose: () => void }) {
 	const [against, setAgainst] = useState<"version" | "file">("version");
 	const [file, setFile] = useState(others[0]?.rel ?? "");
 	const [versions, setVersions] = useState<FileVersion[] | null>(null);
@@ -84,6 +84,16 @@ export default function CompareDialog({ workspacePath, rel, others, lines, onClo
 					</>
 				)}
 				<DialogFooter>
+					{onMark && result && result.insertions + result.deletions > 0 && (
+						<Button
+							onPress={() => {
+								onMark(result);
+								onClose();
+							}}
+						>
+							Mark Changes in the Document
+						</Button>
+					)}
 					<Button variant="outline" onPress={onClose}>
 						Close
 					</Button>

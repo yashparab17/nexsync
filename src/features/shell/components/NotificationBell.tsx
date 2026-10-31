@@ -5,7 +5,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { History, Bell } from "@/components/animate-icons";
 
-import { Button } from "@/components/ui/button";
 import { plainPreview } from "@/features/chat/lib/preview";
 import { channelLabel, routeForChannel } from "@/features/chat/lib/routes";
 import { noticeText } from "@/features/moderation/lib/moderation";
@@ -14,7 +13,8 @@ import { cn } from "@/lib/utils";
 import { useChat } from "@/store/chat/ChatContext";
 import { useNotifications } from "@/store/notifications/NotificationContext";
 import { readPopupsMuted, savePopupsMuted } from "@/lib/popupPrefs";
-import BarBadge from "@/features/shell/components/BarBadge";
+import { Popover } from "@/components/ui/popover";
+import { IconButton } from "@/components/ui/icon-button";
 import { useCatchUp } from "@/features/shell/components/CatchUp";
 import { readQuiet, saveQuiet } from "@/lib/p2p/presence";
 
@@ -51,15 +51,11 @@ export default function NotificationBell() {
 
 	return (
 		<div className="relative">
-			<Button variant="ghost" size="icon-sm" onPress={toggle} aria-label={unread > 0 ? `Inbox, ${unread} new` : "Inbox"} aria-expanded={open} className="relative">
-				<Bell className="size-4" />
-				<BarBadge count={unread} />
-			</Button>
+			<IconButton size="md" label="Inbox" badge={unread} pressed={open} aria-expanded={open} onPress={toggle}>
+				<Bell className="size-5" />
+			</IconButton>
 			{review.review}
-			{open && (
-				<>
-					<button type="button" aria-label="Close notifications" className="fixed inset-0 z-[65] cursor-default" onClick={() => setOpen(false)} />
-					<div role="region" aria-label="Notifications" className="absolute right-0 z-[66] mt-1 w-96 max-w-[90vw] overflow-hidden rounded-lg bg-popover ring-1 ring-foreground/10">
+			<Popover open={open} onClose={() => setOpen(false)} label="Notifications" className="w-96">
 						<div className="flex h-12 items-center justify-between border-b px-4">
 							<span className="text-sm font-semibold">Inbox</span>
 							<span className="flex items-center gap-3">
@@ -168,9 +164,7 @@ export default function NotificationBell() {
 								))}
 							</ul>
 						)}
-					</div>
-				</>
-			)}
+			</Popover>
 		</div>
 	);
 }

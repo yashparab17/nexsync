@@ -1,3 +1,5 @@
+import { FieldError, Notice } from "@/components/ui/notice";
+import { IconButton } from "@/components/ui/icon-button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -217,9 +219,9 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 				}
 			>
 					{loadError && (
-						<p role="alert" className="border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+						<Notice framed size="sm" className="p-3">
 							Could not load your settings: {loadError}
-						</p>
+						</Notice>
 					)}
 
 					<SectionCard
@@ -281,9 +283,9 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								)}
 							</div>
 							{pictureError && (
-								<p role="alert" className="text-xs text-destructive">
+								<FieldError>
 									{pictureError}
-								</p>
+								</FieldError>
 							)}
 							<p className="text-[13px] text-muted-foreground">Shown to members of every workspace, shrunk to a small square.</p>
 						</div>
@@ -345,27 +347,15 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						icon={<Code2 className="size-5" />}
 					>
 						<Row title="Font size">
-							<Button
-								variant="outline"
-								size="icon-xs"
-								aria-label="Smaller text"
-								isDisabled={editorPrefs.fontSize <= FONT_SIZE_RANGE.min}
-								onPress={() => setEditorPrefs({ fontSize: editorPrefs.fontSize - 1 })}
-							>
+							<IconButton size="xs" variant="outline" label="Smaller text" isDisabled={editorPrefs.fontSize <= FONT_SIZE_RANGE.min} onPress={() => setEditorPrefs({ fontSize: editorPrefs.fontSize - 1 })}>
 								<Minus />
-							</Button>
+							</IconButton>
 							<span className="w-12 text-center text-sm tabular-nums" aria-live="polite">
 								{editorPrefs.fontSize} px
 							</span>
-							<Button
-								variant="outline"
-								size="icon-xs"
-								aria-label="Larger text"
-								isDisabled={editorPrefs.fontSize >= FONT_SIZE_RANGE.max}
-								onPress={() => setEditorPrefs({ fontSize: editorPrefs.fontSize + 1 })}
-							>
+							<IconButton size="xs" variant="outline" label="Larger text" isDisabled={editorPrefs.fontSize >= FONT_SIZE_RANGE.max} onPress={() => setEditorPrefs({ fontSize: editorPrefs.fontSize + 1 })}>
 								<Plus />
-							</Button>
+							</IconButton>
 						</Row>
 						<Row title="Tab width">
 							<Segmented
@@ -452,22 +442,17 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 												{root}
 											</span>
 										</span>
-										<Button
-											variant="ghost"
-											size="icon-xs"
-											aria-label={`Remove ${root}`}
-											onPress={() => setRoots((prev) => prev.filter((_, i) => i !== index))}
-										>
+										<IconButton size="xs" label={`Remove ${root}`} onPress={() => setRoots((prev) => prev.filter((_, i) => i !== index))}>
 											<Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
-										</Button>
+										</IconButton>
 									</li>
 								))}
 							</ul>
 						)}
 						{noRoots && (
-							<p role="alert" className="text-xs text-destructive">
+							<FieldError>
 								Add at least one folder, or you will not be able to create or import workspaces.
-							</p>
+							</FieldError>
 						)}
 
 						<div className="flex flex-col gap-2 sm:flex-row">

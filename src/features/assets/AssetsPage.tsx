@@ -1,3 +1,7 @@
+import { Caption } from "@/components/layout/Pane";
+import { Field } from "@/components/ui/field";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FieldError } from "@/components/ui/notice";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { EmptyState } from "@/components/layout/Page";
 import Toolbar, { ToolbarSearch, ToolbarSelect, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
@@ -16,7 +20,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 import AssetPreviewModal from "@/components/dialogs/workspace/AssetPreviewModal";
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
@@ -567,7 +570,7 @@ export default function AssetsPage() {
 										) : (
 											<div className={cn("flex h-full w-full flex-col items-center justify-center gap-2 border bg-muted/40", isRemote && "border border-dashed border-warning/60 bg-transparent")}>
 												{isRemote ? <Sparkles className="size-8 text-warning" /> : kindIcon(asset.category, "size-9 text-muted-foreground")}
-												<span className="font-mono text-xs text-muted-foreground">{isRemote ? "Remote" : ext}</span>
+												<Caption className="text-xs">{isRemote ? "Remote" : ext}</Caption>
 											</div>
 										)}
 										{/* The name and details appear only on hover or keyboard focus */}
@@ -683,9 +686,8 @@ export default function AssetsPage() {
 					<div className="space-y-4">
 						<DialogHeading icon={<Pencil className="size-6" />} title="Rename Asset" />
 
-						<div className="space-y-2">
-							<Label htmlFor="rename-input">New name</Label>
-							<Input
+						<Field label="New name" htmlFor="rename-input">
+<Input
 								id="rename-input"
 								value={newName}
 								onChange={(e) => setNewName(e.target.value)}
@@ -693,11 +695,11 @@ export default function AssetsPage() {
 								autoFocus
 							/>
 							{validateFileName(newName) && (
-								<p role="alert" className="text-xs text-destructive">
+								<FieldError>
 									{validateFileName(newName)}
-								</p>
+								</FieldError>
 							)}
-						</div>
+</Field>
 
 						<DialogFooter className="mt-4 gap-2">
 							<Button
@@ -720,36 +722,11 @@ export default function AssetsPage() {
 
 			{/* Delete Confirmation Dialog */}
 			{assetToDelete && (
-				<Dialog
-					isOpen={!!assetToDelete}
-					onOpenChange={(open) => !open && setAssetToDelete(null)}
-					className="max-w-sm p-5 bg-card border-border"
-				>
-					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Asset" description={<>Move{" "}
+				<ConfirmDialog isOpen={!!assetToDelete} onOpenChange={(open) => !open && setAssetToDelete(null)} className="max-w-sm p-5 bg-card border-border" icon={<Trash2 className="size-6" />} title="Delete Asset" description={<>Move{" "}
 								<span className="font-semibold text-foreground">
 									{assetToDelete.name}
 								</span>{" "}
-								to the Trash? You can restore it from there.</>} />
-
-						<DialogFooter className="mt-4 gap-2">
-							<Button
-								variant="outline"
-								onPress={() => setAssetToDelete(null)}
-								isDisabled={isDeleting}
-							>
-								Cancel
-							</Button>
-							<Button
-								variant="destructive"
-								onPress={handleDeleteConfirm}
-								isDisabled={isDeleting}
-							>
-								{isDeleting ? "Deleting…" : "Delete"}
-							</Button>
-						</DialogFooter>
-					</div>
-				</Dialog>
+								to the Trash? You can restore it from there.</>} confirmLabel={isDeleting ? "Deleting…" : "Delete"} onConfirm={handleDeleteConfirm} onCancel={() => setAssetToDelete(null)} isDisabled={isDeleting} isBusy={isDeleting} />
 			)}
 
 			{historyAsset && workspace && (

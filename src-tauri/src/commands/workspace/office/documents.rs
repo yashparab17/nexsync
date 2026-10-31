@@ -123,6 +123,11 @@ pub struct Layout {
     pub comments: Vec<CommentIn>,
     /// Paragraph styles made or changed in the editor, written into the file's styles
     pub styles: Vec<super::styles::StyleIn>,
+    /// Text across every page (empty: none), a border round each page, a number beside each line, and breaking words at the end of a line
+    pub watermark: String,
+    pub page_border: bool,
+    pub line_numbers: bool,
+    pub hyphenate: bool,
 }
 
 /// A comment thread: the words it is on, who said what, and whether it was settled
@@ -239,6 +244,30 @@ pub fn apply_layout(doc: &mut wordcraft_doc::Document, l: &Layout) {
                 p.props.line_spacing = Some(wordcraft_doc::props::LineSpacing::Multiple(l.spacing));
             }
         }
+    }
+    // The same on every section: a border, line numbers; the watermark and hyphenation belong to the whole document
+    let marks = |s: &mut wordcraft_doc::SectionProps| {
+        if l.page_border && s.page_borders.is_none() {
+            s.page_borders = Some(wordcraft_doc::props::Borders::all(wordcraft_doc::props::Border { space: 24.0, ..wordcraft_doc::props::Border::single(0.75) }));
+        }
+        if l.line_numbers && s.line_numbers.is_none() {
+            s.line_numbers = Some(wordcraft_doc::section::LineNumbering::default());
+        }
+    };
+    marks(&mut doc.last_section);
+    for b in doc.body.iter_mut() {
+        if let wordcraft_doc::Block::Para(p) = std::sync::Arc::make_mut(b) {
+            if let Some(s) = p.section.as_deref_mut() {
+                marks(s);
+            }
+        }
+    }
+    let mark = l.watermark.trim();
+    if !mark.is_empty() {
+        doc.settings.watermark = Some(wordcraft_doc::Watermark { text: mark.chars().take(40).collect(), ..Default::default() });
+    }
+    if l.hyphenate {
+        doc.settings.auto_hyphenation = true;
     }
     let header = l.header.trim();
     if !header.is_empty() {
@@ -547,7 +576,7 @@ fn build_document(html: &str, title: &str, author: &str, layout: Option<&Layout>
     let mut edited = wordcraft_formats::import("html", page.as_bytes()).ok_or("The document could not be read.")??;
     // The style each paragraph was given in the editor (see `styles`)
     let chosen = super::styles::take_markers(&mut edited);
-    let (note_at, note_ids, char_ranges) = super::notes::take_markers(&mut edited);
+    let (note_at, note_ids, char_ranges, control_ranges) = super::notes::take_markers(&mut edited);
     let breaks = super::sections::take_markers(&mut edited);
     let table_styles = super::styles::take_table_markers(&mut edited);
     let original = source.and_then(super::merge::get);
@@ -573,6 +602,8 @@ fn build_document(html: &str, title: &str, author: &str, layout: Option<&Layout>
     super::styles::settle_chars(&mut doc, &char_ranges, layout.is_some_and(|l| l.char_markers));
     super::sections::settle(&mut doc, &breaks);
     super::notes::settle(&mut doc, &note_at, &note_ids, layout.and_then(|l| l.notes.as_deref()));
+    super::controls::settle(&mut doc, &control_ranges, &note_at);
+    super::wrap::settle(&mut doc);
     Ok(doc)
 }
 
@@ -1121,7 +1152,7 @@ mod tests {
     #[test]
     fn a_table_style_is_made_applied_written_and_read_back_with_its_fills() {
         use super::super::styles::{StyleIn, TableLook};
-        let look = TableLook { header_fill: "#d9e2f3".into(), header_bold: true, band_fill: "#f2f2f2".into(), ..Default::default() };
+        let look = TableLook { header_fill: "#d9e2f3".into(), header_bold: true, band_fill: "#f2f2f2".into(), border_color: "#7f7f7f".into(), border_width: 1.0, first_col_bold: true, total_bold: true, ..Default::default() };
         let style = StyleIn { id: "Plan".into(), name: "Plan".into(), kind: "table".into(), table: Some(look), ..Default::default() };
         let html = format!("<table><tbody><tr><td>{}Plan{}Head</td><td>B</td></tr><tr><td>1</td><td>2</td></tr></tbody></table>", '\u{E009}', '\u{E00A}');
         let bytes = export("docx", &html, "T", "", Some(&Layout { styles: vec![style], ..Default::default() })).unwrap();
@@ -1133,6 +1164,7 @@ mod tests {
         assert_eq!(st.kind, "table");
         let t = st.table.as_ref().unwrap();
         assert_eq!((t.header_fill.as_str(), t.band_fill.as_str(), t.header_bold), ("#d9e2f3", "#f2f2f2", true));
+        assert_eq!((t.border_width, t.border_color.as_str(), t.first_col_bold, t.total_bold), (1.0, "#7f7f7f", true, true));
         let table = opened.blocks.iter().find(|b| b["type"] == "table").unwrap();
         assert!(table.to_string().contains("\"tableStyle\":\"Plan\""), "{table}");
         // Taking the style off
@@ -1264,6 +1296,117 @@ mod tests {
         let all = json(&back);
         assert!(all.contains("\"sectionBreak\":\"next|l|36,36,36,36|2\""), "{all}");
         assert_eq!(all.matches("sectionBreak").count(), 1);
+    }
+
+    #[test]
+    fn a_watermark_a_page_border_line_numbers_and_hyphenation_are_written_to_the_docx_and_read_back() {
+        let layout = Layout { watermark: "DRAFT".into(), page_border: true, line_numbers: true, hyphenate: true, ..Default::default() };
+        let html = format!("<p>One</p>{}<p>Two</p>", section_start("next|p||1", "Three"));
+        let bytes = export("docx", &html, "T", "", Some(&layout)).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert_eq!(body.matches("<w:pgBorders").count(), 2, "every section has the border: {body}");
+        assert_eq!(body.matches("<w:lnNumType").count(), 2, "{body}");
+        assert!(part(&bytes, "word/settings.xml").contains("<w:autoHyphenation"));
+        let all: String = (1..=4).filter_map(|n| std::panic::catch_unwind(|| part(&bytes, &format!("word/header{n}.xml"))).ok()).collect();
+        assert!(all.contains("DRAFT"), "{all}");
+        // The file's own come back as the editor's choices
+        let opened = import("w.docx", &bytes, None).unwrap();
+        assert_eq!(opened.layout.watermark, "DRAFT");
+        assert!(opened.layout.page_border && opened.layout.line_numbers && opened.layout.hyphenate);
+    }
+
+    fn control(spec: &str, words: &str) -> String {
+        format!("\u{E00B}{spec}\u{E00C}{words}\u{E00D}")
+    }
+
+    #[test]
+    fn content_controls_made_in_the_editor_are_the_files_own_and_come_back() {
+        let title = hexed("Colour")[1..].to_string();
+        let items = ["Red", "Green"].iter().map(|i| hexed(i)[1..].to_string()).collect::<Vec<_>>().join(",");
+        let html = format!(
+            "<p>Name: {} and {} and {} done</p>",
+            control("text||||", "Click to enter text"),
+            control("check||||1", "\u{2612}"),
+            control(&format!("drop|{title}||{items}|"), "Green")
+        );
+        let bytes = export("docx", &html, "T", "", None).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert_eq!(body.matches("<w:sdt>").count(), 3, "{body}");
+        assert!(body.contains("<w14:checkbox>") && body.contains("<w:dropDownList"), "{body}");
+        assert!(body.contains("w:alias w:val=\"Colour\""), "{body}");
+        assert!(!body.contains('\u{E00B}') && !body.contains('\u{E00D}'));
+        // They come back as the editor's controls with their words
+        let opened = import("c.docx", &bytes, None).unwrap();
+        let all = json(&opened);
+        assert_eq!(all.matches("\"contentControl\"").count(), 3, "{all}");
+        assert!(all.contains("check|") && all.contains("drop|") && all.contains("text|"), "{all}");
+    }
+
+    #[test]
+    fn an_equation_is_written_as_the_files_own_math_and_comes_back_as_its_source() {
+        let source = super::super::controls::equation_spec(r"\frac{a}{b}+\sqrt{x}");
+        let html = format!("<p>Before <em>{}</em> after</p>", control(&source, "a/b + √x"));
+        let bytes = export("docx", &html, "T", "", None).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert!(body.contains("<m:oMath"), "{body}");
+        assert!(body.contains("<m:f>") && body.contains("<m:rad>"), "built up as a fraction and a root: {body}");
+        assert!(!body.contains('\u{E00B}'));
+        // It opens as the equation's text with its source, so editing it elsewhere keeps it an equation
+        let all = json(&import("e.docx", &bytes, None).unwrap());
+        assert!(all.contains("\"contentControl\":\"eq|"), "{all}");
+        // Saved again from the editor's own text it is still one equation
+        let again = export("docx", &format!("<p>Before {} after</p>", control(&source, "a/b + √x")), "T", "", None).unwrap();
+        assert_eq!(part(&again, "word/document.xml").matches("<m:oMath>").count() + part(&again, "word/document.xml").matches("<m:oMath ").count(), 1);
+    }
+
+    #[test]
+    fn a_picture_that_text_runs_round_floats_in_the_docx_and_comes_back_as_such() {
+        let png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+        let marked = format!("{}{}{}Sunset", '\u{E00E}', "left", '\u{E00F}');
+        let html = format!("<p><img src=\"{png}\" alt=\"{marked}\" width=\"100\"></p><p>Text that runs beside it.</p>");
+        let bytes = export("docx", &html, "T", "", None).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert!(body.contains("<wp:anchor"), "{body}");
+        assert!(body.contains("<wp:wrapSquare"), "{body}");
+        assert!(body.contains("Sunset") && !body.contains('\u{E00E}'));
+        let back = json(&import("p.docx", &bytes, None).unwrap());
+        assert!(back.contains("\"wrap\":\"left\""), "{back}");
+    }
+
+    #[test]
+    fn a_shape_drawn_in_the_editor_is_the_files_own_shape_and_comes_back_as_a_picture_of_it() {
+        let png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+        let alt = format!("{}ellipse|#fde68a{}Shape", '\u{E010}', '\u{E011}');
+        let html = format!("<p><img src=\"{png}\" alt=\"{alt}\" width=\"200\"></p><p>After</p>");
+        let bytes = export("docx", &html, "T", "", None).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert!(body.contains("prst=\"ellipse\""), "an ellipse the file knows: {body}");
+        assert!(body.contains("FDE68A") || body.contains("fde68a"), "{body}");
+        assert!(!body.contains('\u{E010}'));
+        let back = json(&import("s.docx", &bytes, None).unwrap());
+        assert!(back.contains("data:image/svg+xml"), "{back}");
+        assert!(back.contains("ellipse|#fde68a"), "{back}");
+    }
+
+    #[test]
+    fn a_section_can_start_on_an_even_page_restart_its_page_numbers_and_have_first_page_and_even_page_headers() {
+        let spec = format!("even|p||1|{}||num=5|fh={}|eh={}", hexed("Every page"), &hexed("Title page")[1..], &hexed("Left page")[1..]);
+        let html = format!("<p>One</p><p>Two</p>{}<p>Four</p>", section_start(&spec, "Three"));
+        let bytes = export("docx", &html, "T", "", None).unwrap();
+        let body = part(&bytes, "word/document.xml");
+        assert!(body.contains("w:type w:val=\"evenPage\""), "{body}");
+        assert!(body.contains("w:start=\"5\""), "{body}");
+        assert!(body.contains("<w:titlePg"), "{body}");
+        let headers: String = (1..=6).filter_map(|n| std::panic::catch_unwind(|| part(&bytes, &format!("word/header{n}.xml"))).ok()).collect();
+        assert!(headers.contains("Every page") && headers.contains("Title page") && headers.contains("Left page"), "{headers}");
+        // It reads back the same, so saving it again changes nothing
+        let opened = import("e.docx", &bytes, None).unwrap();
+        let back = opened.blocks.iter().find_map(|b| b["props"]["sectionBreak"].as_str().map(str::to_string)).unwrap();
+        assert!(back.starts_with("even|") && back.contains("num=5") && back.contains("fh=") && back.contains("eh="), "{back}");
+        // "c" carries the numbers on from the section before
+        let carried = back.replace("num=5", "num=c");
+        let again = export_with("docx", &format!("<p>One</p><p>Two</p>{}<p>Four</p>", section_start(&carried, "Three")), "T", "", None, opened.source_id.as_deref()).unwrap();
+        assert!(!part(&again, "word/document.xml").contains("w:start=\"5\""));
     }
 
     #[test]

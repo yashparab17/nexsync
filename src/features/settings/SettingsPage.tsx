@@ -1,3 +1,4 @@
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SHARED_FOLDERS } from "@/lib/workspaceLayout";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -394,30 +395,11 @@ export default function SettingsPage({ onClose }: { onClose?: () => void } = {})
 
 			{/* Remove workspace Modal */}
 			{isRemoveConfirmOpen && (
-				<Dialog
-					isOpen={isRemoveConfirmOpen}
-					onOpenChange={setIsRemoveConfirmOpen}
-				>
-					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Remove Workspace" description={<>Are you sure you want to remove{" "}
+				<ConfirmDialog isOpen={isRemoveConfirmOpen} onOpenChange={setIsRemoveConfirmOpen} icon={<Trash2 className="size-6" />} title="Remove Workspace" description={<>Are you sure you want to remove{" "}
 								<span className="font-semibold text-foreground">
 									{workspace?.name}
 								</span>{" "}
-								from your recent workspaces? Your files and data on your disk will remain intact.</>} />
-
-						<DialogFooter>
-							<Button
-								variant="outline"
-								onPress={() => setIsRemoveConfirmOpen(false)}
-							>
-								Cancel
-							</Button>
-							<Button variant="destructive" onPress={handleRemoveWorkspace}>
-								Remove
-							</Button>
-						</DialogFooter>
-					</div>
-				</Dialog>
+								from your recent workspaces? Your files and data on your disk will remain intact.</>} confirmLabel="Remove" onConfirm={handleRemoveWorkspace} onCancel={() => setIsRemoveConfirmOpen(false)} />
 			)}
 
 			{/* Leave workspace (guests) */}
@@ -444,14 +426,12 @@ export default function SettingsPage({ onClose }: { onClose?: () => void } = {})
 
 			{/* Delete workspace (owner) */}
 			{isDeleteOpen && (
-				<Dialog isOpen={isDeleteOpen} onOpenChange={(o) => !busy && setIsDeleteOpen(o)}>
-					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Workspace" description={<><span className="font-semibold text-foreground">{workspace?.name}</span> will be moved to
+				<ConfirmDialog isOpen={isDeleteOpen} onOpenChange={(o) => !busy && setIsDeleteOpen(o)} icon={<Trash2 className="size-6" />} title="Delete Workspace" description={<><span className="font-semibold text-foreground">{workspace?.name}</span> will be moved to
 								the recycle bin, so you can still restore it from there.
 								{guestCount > 0 &&
 									` ${guestCount} connected collaborator${guestCount > 1 ? "s" : ""} will be told it was deleted; their copies stay on their devices.`}
-								{" "}Other files in the same folder are never touched.</>} />
-						<div className="space-y-2">
+								{" "}Other files in the same folder are never touched.</>} confirmLabel={busy ? "Deleting…" : "Delete Workspace"} onConfirm={() => runAction(true, true)} onCancel={() => setIsDeleteOpen(false)} isDisabled={busy || confirmName.trim() !== workspace?.name} isBusy={busy}>
+<div className="space-y-2">
 							<Label htmlFor="confirm-name" className="text-xs">
 								Type the workspace name to confirm
 							</Label>
@@ -464,20 +444,7 @@ export default function SettingsPage({ onClose }: { onClose?: () => void } = {})
 							/>
 						</div>
 						{actionError && <p className="text-xs text-destructive">{actionError}</p>}
-						<DialogFooter>
-							<Button variant="outline" isDisabled={busy} onPress={() => setIsDeleteOpen(false)}>
-								Cancel
-							</Button>
-							<Button
-								variant="destructive"
-								isDisabled={busy || confirmName.trim() !== workspace?.name}
-								onPress={() => runAction(true, true)}
-							>
-								{busy ? "Deleting…" : "Delete Workspace"}
-							</Button>
-						</DialogFooter>
-					</div>
-				</Dialog>
+</ConfirmDialog>
 			)}
 		</>
 	);

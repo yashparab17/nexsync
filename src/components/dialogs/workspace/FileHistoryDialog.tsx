@@ -1,3 +1,4 @@
+import { Notice } from "@/components/ui/notice";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { History, RotateCcw, Save } from "@/components/animate-icons";
 import { Loader2 } from "lucide-react";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { diffLines, type DiffResult, type DiffRow } from "@/lib/diff";
 import { isBinaryFile, isDocumentFile } from "@/lib/editor/languages";
 import { listFileVersions, readFileVersion, readWorkspaceFile, recordFileVersion, restoreFileVersion } from "@/lib/tauri";
-import { cn } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 import type { FileVersion } from "@/types/workspace";
 import Loading from "@/components/Loading";
 
@@ -24,7 +25,7 @@ const SOURCES: Record<string, string> = {
 
 const CONTEXT = 3;
 
-const formatSize = (bytes: number) => (bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`);
+const formatSize = formatBytes;
 
 type Shown = DiffRow | { gap: number };
 
@@ -205,9 +206,9 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 				<DialogHeading icon={<History className="size-6" />} title={`History of ${fileName}`} />
 
 				{error && (
-					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+					<Notice framed size="sm">
 						{error}
-					</p>
+					</Notice>
 				)}
 
 				{versions === null && !error ? (

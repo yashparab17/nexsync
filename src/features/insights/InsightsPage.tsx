@@ -1,3 +1,4 @@
+import { EmptyNote } from "@/components/layout/Pane";
 import { useEffect, useMemo, useState } from "react";
 import { History, X } from "@/components/animate-icons";
 
@@ -228,9 +229,9 @@ export default function InsightsPage() {
 							))}
 						</ul>
 						{feed.length > FEED_LIMIT && (
-							<p className="p-3 text-sm text-muted-foreground">
+							<EmptyNote>
 								Showing the latest {FEED_LIMIT} of {feed.length}. Narrow the filters to see the rest.
-							</p>
+							</EmptyNote>
 						)}
 					</>
 				)}

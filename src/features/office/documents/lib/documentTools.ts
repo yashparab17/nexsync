@@ -154,7 +154,7 @@ export const smartQuotesPlugin = new Plugin({
 // The editor's HTML as the file writers read it: a block that starts a page gets `page-break-before`, and a picture, which the editor
 // aligns with an attribute of its own, is put in a paragraph with that alignment
 export function forFile(html: string): string {
-	if (!html.includes("data-page-break-before") && !html.includes("<img") && !html.includes("data-style-id") && !html.includes("data-note") && !html.includes("data-section-break") && !html.includes("data-char-style") && !html.includes("data-table-style")) return html;
+	if (!html.includes("data-page-break-before") && !html.includes("<img") && !html.includes("data-style-id") && !html.includes("data-note") && !html.includes("data-section-break") && !html.includes("data-char-style") && !html.includes("data-control") && !html.includes("data-wrap") && !html.includes("data-table-style")) return html;
 	const d = new DOMParser().parseFromString(html, "text/html");
 	// A reference to a footnote or endnote goes as its marker (see `documentNotes`)
 	d.body.querySelectorAll<HTMLElement>("[data-note]").forEach((el) => {
@@ -164,16 +164,23 @@ export function forFile(html: string): string {
 	// Words in a character style are wrapped in markers: the style's id between two of them, the words, and a third (read in `notes.rs`, with the notes)
 	d.body.querySelectorAll<HTMLElement>("[data-char-style]").forEach((el) => {
 		const id = el.dataset.charStyle ?? "";
-		if (!id || /[\uE000-\uE00A]/.test(id)) return el.replaceWith(...Array.from(el.childNodes));
+		if (!id || /[\uE000-\uE00D]/.test(id)) return el.replaceWith(...Array.from(el.childNodes));
 		el.prepend(d.createTextNode(`\uE006${id}\uE007`));
 		el.append(d.createTextNode("\uE008"));
+	});
+	// Words in a content control are wrapped the same way, with the control's set-up in the first marker (read in `controls.rs`)
+	d.body.querySelectorAll<HTMLElement>("[data-control]").forEach((el) => {
+		const spec = el.dataset.control ?? "";
+		if (!spec || /[\uE000-\uE00D]/.test(spec)) return el.replaceWith(...Array.from(el.childNodes));
+		el.prepend(d.createTextNode(`\uE00B${spec}\uE00C`));
+		el.append(d.createTextNode("\uE00D"));
 	});
 	// A table in a table style carries its id at the start of its first cell (put first of the paragraph's markers, so that it stands last of them)
 	const styled = new Set<Element>();
 	d.body.querySelectorAll<HTMLElement>("span[data-table-style]").forEach((el) => {
 		const id = el.dataset.tableStyle ?? "";
 		const cell = el.closest("td, th");
-		if (id && !/[\uE000-\uE00A]/.test(id) && cell && !styled.has(cell)) {
+		if (id && !/[\uE000-\uE00D]/.test(id) && cell && !styled.has(cell)) {
 			styled.add(cell);
 			const target = cell.querySelector("p") ?? cell;
 			target.insertBefore(d.createTextNode(`\uE009${id}\uE00A`), target.firstChild);
@@ -190,9 +197,15 @@ export function forFile(html: string): string {
 	// A paragraph's style goes to the backend as its id between two private-use characters at the start of its text (read there by `styles.rs`)
 	d.body.querySelectorAll<HTMLElement>("[data-style-id]").forEach((el) => {
 		const id = el.getAttribute("data-style-id");
-		if (!id || /[]/.test(id) || ["IMG", "HR", "BR", "TABLE"].includes(el.tagName)) return;
+		if (!id || /[\uE000]/.test(id) || ["IMG", "HR", "BR", "TABLE"].includes(el.tagName)) return;
 		const target = el.tagName === "LI" ? (el.querySelector(":scope > p") ?? el) : el;
-		target.insertBefore(d.createTextNode(`${id}`), target.firstChild);
+		target.insertBefore(d.createTextNode(`\uE000${id}`), target.firstChild);
+	});
+	// A picture that text runs round says which side in its alt text, before the words (read in `wrap.rs`)
+	d.body.querySelectorAll<HTMLElement>('[data-wrap="left"], [data-wrap="right"]').forEach((el) => {
+		const img = el.tagName === "IMG" ? el : el.querySelector("img");
+		if (!img) return;
+		img.setAttribute("alt", `\uE00E${el.dataset.wrap}\uE00F${(img.getAttribute("alt") ?? "").replace(/[\uE00E\uE00F]/g, "")}`);
 	});
 	d.body.querySelectorAll<HTMLElement>('[data-page-break-before="true"]').forEach((el) => (el.style.pageBreakBefore = "always"));
 	d.body.querySelectorAll<HTMLElement>(":scope > img[data-text-alignment]").forEach((img) => {

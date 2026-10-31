@@ -35,6 +35,15 @@ pub(crate) fn is_same_path(p1: &str, p2: &str) -> bool {
 // Tauri commands — Recent workspaces registry
 // ────────────────────────────
 
+/// The later of two RFC 3339 times (the first when the second is not one, or they are equal)
+fn later(a: &str, b: &str) -> String {
+    match (chrono::DateTime::parse_from_rfc3339(a), chrono::DateTime::parse_from_rfc3339(b)) {
+        (Ok(x), Ok(y)) if y > x => b.to_string(),
+        (Err(_), Ok(_)) => b.to_string(),
+        _ => a.to_string(),
+    }
+}
+
 /// Retrieves the list of recent workspaces, filtering invalid paths, refreshing metadata, and deduplicating
 #[tauri::command(async)]
 pub fn get_recent_workspaces(app_handle: tauri::AppHandle) -> Result<Vec<WorkspaceInfo>, String> {
@@ -64,6 +73,10 @@ pub fn get_recent_workspaces(app_handle: tauri::AppHandle) -> Result<Vec<Workspa
                 w.id = fresh_id;
                 w.name = fresh_name;
                 w.description = fresh_desc;
+            }
+            // "Edited" on the Welcome page is when somebody last did something in it, which the registry's own stamp never learns
+            if let Ok(Some(at)) = db.conn.query_row("SELECT MAX(timestamp) FROM activity_events", [], |r| r.get::<_, Option<String>>(0)) {
+                w.updated_at = later(&w.updated_at, &at);
             }
         }
 
@@ -179,4 +192,17 @@ pub fn remove_recent_workspace(
     let json = serde_json::to_string_pretty(&workspaces).map_err(|e| e.to_string())?;
     fs::write(&registry, json).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod later_tests {
+    use super::later;
+
+    #[test]
+    fn edited_time_is_the_later_of_the_registry_stamp_and_the_newest_activity() {
+        assert_eq!(later("2026-01-01T00:00:00Z", "2026-03-05T10:00:00.000Z"), "2026-03-05T10:00:00.000Z");
+        assert_eq!(later("2026-04-01T00:00:00+00:00", "2026-03-05T10:00:00.000Z"), "2026-04-01T00:00:00+00:00");
+        assert_eq!(later("", "2026-03-05T10:00:00Z"), "2026-03-05T10:00:00Z");
+        assert_eq!(later("2026-01-01T00:00:00Z", "not a time"), "2026-01-01T00:00:00Z");
+    }
 }

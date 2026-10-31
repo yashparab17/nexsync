@@ -1,3 +1,4 @@
+import { panelLook } from "@/components/ui/popover";
 import { routeOf } from "@/lib/p2p/presence";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -261,14 +262,14 @@ export default function WorkspaceSearch() {
 			</div>
 
 			{showList && (
-				<div className="absolute top-full right-0 left-0 z-[66] mt-2 bg-popover rounded-lg ring-1 ring-foreground/10">
-					<div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b p-2">
-						<div role="group" aria-label="Filter results" className="flex flex-wrap gap-1">
+				<div className={cn("absolute top-full right-0 left-0 z-[66] mt-2", panelLook)}>
+					<div className="flex flex-col gap-2 border-b p-2">
+						<div role="group" aria-label="Filter results" className="grid grid-cols-4 gap-1">
 							{FILTERS.map((f) => (
 								<Chip key={f} on={filter === f} onClick={() => { setFilter(f); inputRef.current?.focus(); }}>{f}</Chip>
 							))}
 						</div>
-						<div role="group" aria-label="Search in" className="ml-auto flex gap-1 border-l pl-3">
+						<div role="group" aria-label="Search in" className="grid grid-cols-3 gap-1 border-t pt-2">
 							{SCOPES.map(([key, text]) => (
 								<Chip key={key} on={scope === key} onClick={() => { setScope(key); inputRef.current?.focus(); }}>{text}</Chip>
 							))}
@@ -330,7 +331,7 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
 			aria-pressed={on}
 			onClick={onClick}
 			className={cn(
-				"border px-2 py-0.5 font-mono text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+				"w-full truncate border px-2 py-0.5 text-center font-mono text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
 				on ? "border-primary bg-primary text-primary-foreground" : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
 			)}
 		>

@@ -1,10 +1,10 @@
+import { Field } from "@/components/ui/field";
 import { useState, useEffect, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, RefreshCw, FolderOpen, Globe, Lock, Sparkles, UsersRound } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogTrigger, DialogHeading, DialogFooter } from "@/components/ui/dialog";
 
@@ -134,7 +134,7 @@ export default function JoinWorkspaceDialog({
 		<DialogTrigger>
 			{children}
 
-			<Dialog className="sm:max-w-xl">
+			<Dialog className="sm:max-w-md">
 				<DialogHeading icon={<UsersRound className="size-6" />} title="Join with a Ticket" />
 
 				<p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -144,27 +144,24 @@ export default function JoinWorkspaceDialog({
 
 				{error && <p className="border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
 
-				<div className="flex flex-col gap-5">
-					<div className="flex flex-col gap-2">
-						<Label htmlFor="join-ticket">Invite or code</Label>
-						<Textarea id="join-ticket" placeholder="Invite or code" value={ticket} onChange={(e) => setTicket(e.target.value)} rows={3} className="font-mono text-xs break-all" autoFocus />
-					</div>
+				<div className="flex flex-col gap-3">
+					<Field label="Invite or code" htmlFor="join-ticket">
+<Textarea id="join-ticket" placeholder="Invite or code" value={ticket} onChange={(e) => setTicket(e.target.value)} rows={3} className="font-mono text-xs break-all" autoFocus />
+</Field>
 
-					<div className="flex flex-col gap-2">
-						<Label htmlFor="join-folder">Save in</Label>
-						<div className="flex gap-2">
+					<Field label="Save in" htmlFor="join-folder">
+<div className="flex gap-2">
 							<Input id="join-folder" value={workspaceParentPath} onChange={(e) => setWorkspaceParentPath(e.target.value)} placeholder="Choose a folder" className="font-mono text-xs" />
 							<Button variant="outline" onPress={pickDestinationFolder}>
 								<FolderOpen className="size-4" />
 								Browse
 							</Button>
 						</div>
-					</div>
+</Field>
 
-					<div className="flex flex-col gap-2">
-						<Label htmlFor="join-name">Your name</Label>
-						<Input id="join-name" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Your name" />
-					</div>
+					<Field label="Your name" htmlFor="join-name">
+<Input id="join-name" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Your name" />
+</Field>
 				</div>
 
 				{statusMessage && (

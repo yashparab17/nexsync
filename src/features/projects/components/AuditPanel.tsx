@@ -1,3 +1,4 @@
+import { Caption } from "@/components/layout/Pane";
 import { useState } from "react";
 
 import { AlertTriangle, Check, RefreshCw } from "@/components/animate-icons";
@@ -82,9 +83,9 @@ export default function AuditPanel({ path, project }: { path: string; project: s
 									{a.outdated.map((o) => (
 										<li key={o.package} className="flex items-center gap-3 px-4 py-1.5 text-sm">
 											<span className="min-w-0 flex-1 truncate font-mono">{o.package}</span>
-											<span className="font-mono text-[13px] text-muted-foreground">
+											<Caption>
 												{o.current} → {o.latest}
-											</span>
+											</Caption>
 										</li>
 									))}
 								</ul>

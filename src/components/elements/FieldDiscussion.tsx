@@ -1,10 +1,11 @@
+import { Caption } from "@/components/layout/Pane";
 // A short discussion under one conflicted field of a task or card: people say which value is right before someone chooses,
 // and the choice itself is written into the thread. It is a thread of the signed log on the record's channel, tagged with
 // the field (see src/lib/chat).
 
+import { IconButton } from "@/components/ui/icon-button";
 import { useMemo, useState } from "react";
 import { AnimateIcon, Bell, BellRing, CornerUpLeft } from "@/components/animate-icons";
-import { Button } from "@/components/ui/button";
 import ReactionBar from "@/features/chat/components/ReactionBar";
 import RichText from "@/features/chat/components/RichText";
 import Avatar from "@/components/elements/Avatar";
@@ -53,7 +54,7 @@ export default function FieldDiscussion({ channel, field, canComment, placeholde
 							<li key={c.id} className="flex gap-2">
 								<Avatar name={c.name} className="mt-1 size-5 text-xs" />
 								<div className="min-w-0 flex-1">
-									<span className="text-[13px] font-semibold">{c.name}</span> <span className="font-mono text-[13px] text-muted-foreground">{new Date(c.ts).toLocaleString()}</span>
+									<span className="text-[13px] font-semibold">{c.name}</span> <Caption>{new Date(c.ts).toLocaleString()}</Caption>
 									<RichText text={c.text} people={chat.people} me={chat.me} />
 									{!c.deleted && <ReactionBar reactions={c.reactions} me={chat.me} canReact={canComment && chat.canPost} onReact={(emoji) => chat.toggleReaction(channel, c.id, emoji, c.reactions)} />}
 								</div>
@@ -86,9 +87,9 @@ export default function FieldDiscussion({ channel, field, canComment, placeholde
 						}}
 						className="min-h-8 flex-1 resize-none rounded-md bg-input px-2 py-1 text-sm outline-none placeholder:text-muted-foreground"
 					/>
-					<Button variant="ghost" size="icon-sm" aria-label="Send" isDisabled={!text.trim() || busy} onPress={() => void send()} className="text-primary">
+					<IconButton label="Send" isDisabled={!text.trim() || busy} onPress={() => void send()} className="text-primary">
 						<CornerUpLeft className="size-4" />
-					</Button>
+					</IconButton>
 				</div>
 			)}
 		</div>

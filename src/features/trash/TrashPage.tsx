@@ -1,3 +1,5 @@
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { IconButton } from "@/components/ui/icon-button";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Trash2, FileText, Folder, RotateCcw } from "@/components/animate-icons";
@@ -5,7 +7,6 @@ import { Trash2, FileText, Folder, RotateCcw } from "@/components/animate-icons"
 import { EmptyState, Page, PageBody } from "@/components/layout/Page";
 import Toolbar from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 
 import { useErrorLog } from "@/hooks/useErrorLog";
 import { emptyTrash, eraseFileForGood, listTrash, purgeTrashItem, restoreTrashItem } from "@/lib/tauri";
@@ -108,9 +109,9 @@ export default function TrashPage() {
 											<RotateCcw className="size-3.5" />
 											Restore
 										</Button>
-										<Button variant="ghost" size="icon-xs" onPress={() => setConfirm(item)} aria-label={`Delete ${item.relPath} permanently`}>
+										<IconButton size="xs" onPress={() => setConfirm(item)} label={`Delete ${item.relPath} permanently`}>
 											<Trash2 className="size-3.5 text-destructive" />
-										</Button>
+										</IconButton>
 									</div>
 								)}
 							</li>
@@ -120,37 +121,20 @@ export default function TrashPage() {
 			</PageBody>
 
 			{confirm && (
-				<Dialog
-					isOpen
-					onOpenChange={(open) => {
+				<ConfirmDialog isOpen onOpenChange={(open) => {
 						if (!open) {
 							setConfirm(null);
 							setErase(false);
 						}
-					}}
-				>
-					<div className="space-y-4">
-						<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title="Delete Permanently" description={<>{confirm === "all"
+					}} icon={<Trash2 className="size-6" />} title="Delete Permanently" description={<>{confirm === "all"
 									? "Everything in the trash will be removed for good."
 									: `${confirm.relPath} will be removed for good.`}{" "}
-								This cannot be undone.</>} />
-						{confirm !== "all" && <EraseOption checked={erase} onChange={setErase} what={confirm.relPath} />}
-						<DialogFooter>
-							<Button
-								variant="outline"
-								onPress={() => {
+								This cannot be undone.</>} confirmLabel={erase && confirm !== "all" ? "Erase" : "Delete"} onConfirm={doConfirmed} onCancel={() => {
 									setConfirm(null);
 									setErase(false);
-								}}
-							>
-								Cancel
-							</Button>
-							<Button variant="destructive" onPress={doConfirmed}>
-								{erase && confirm !== "all" ? "Erase" : "Delete"}
-							</Button>
-						</DialogFooter>
-					</div>
-				</Dialog>
+								}}>
+{confirm !== "all" && <EraseOption checked={erase} onChange={setErase} what={confirm.relPath} />}
+</ConfirmDialog>
 			)}
 		</Page>
 	);

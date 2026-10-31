@@ -1,3 +1,4 @@
+import { Kbd } from "@/components/layout/Pane";
 // What Notes and the Editor show when nothing is open: the things to do next with their keys, what was opened lately, and a
 // tip. Built from the same panels as every other workspace page.
 
@@ -22,7 +23,7 @@ export interface WelcomeItem {
 	run: () => void;
 }
 
-export const Kbd = ({ children }: { children: ReactNode }) => <kbd className="border bg-card px-2 py-0.5 font-mono text-[13px] text-muted-foreground">{children}</kbd>;
+export { Kbd };
 
 export default function Welcome({ logo, title, intro, actions, recentTitle, recent, recentEmpty, tip, art }: { art?: ArtName; logo?: string; title: string; intro: ReactNode; actions: WelcomeAction[]; recentTitle: string; recent: WelcomeItem[]; recentEmpty: string; tip?: string }) {
 	return (

@@ -135,6 +135,10 @@ pub fn layout_of(doc: &Document) -> Layout {
         char_markers: false,
         footnote_format: super::notes::name_of(doc.settings.footnote_format).into(),
         endnote_format: super::notes::name_of(doc.settings.endnote_format).into(),
+        watermark: doc.settings.watermark.as_ref().map(|w| w.text.clone()).unwrap_or_default(),
+        page_border: s.page_borders.is_some(),
+        line_numbers: s.line_numbers.is_some(),
+        hyphenate: doc.settings.auto_hyphenation,
     }
 }
 

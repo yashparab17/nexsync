@@ -56,12 +56,16 @@ export function NewTableStyleForm({ onSubmit }: { onSubmit: (name: string, look:
 	const [header, setHeader] = useState("#d9e2f3");
 	const [band, setBand] = useState("#f2f2f2");
 	const [bold, setBold] = useState(true);
+	const [lineWidth, setLineWidth] = useState(0);
+	const [lineColor, setLineColor] = useState("#7f7f7f");
+	const [firstCol, setFirstCol] = useState(false);
+	const [lastRow, setLastRow] = useState(false);
 	return (
 		<form
 			className="flex w-64 flex-col gap-2 p-2 text-[13px]"
 			onSubmit={(e) => {
 				e.preventDefault();
-				if (name.trim()) onSubmit(name.trim(), { headerFill: header, headerColor: "", headerBold: bold, bandFill: band, fill: "" });
+				if (name.trim()) onSubmit(name.trim(), { headerFill: header, headerColor: "", headerBold: bold, bandFill: band, fill: "", borderColor: lineWidth > 0 ? lineColor : "", borderWidth: lineWidth, firstColBold: firstCol, totalBold: lastRow });
 				setName("");
 			}}
 		>
@@ -77,6 +81,24 @@ export function NewTableStyleForm({ onSubmit }: { onSubmit: (name: string, look:
 			<label className="flex items-center gap-2">
 				<input type="checkbox" checked={bold} onChange={(e) => setBold(e.target.checked)} />
 				Bold header text
+			</label>
+			<label className="flex items-center gap-2">
+				<span className="w-24 shrink-0">Lines</span>
+				<select aria-label="Line width" value={lineWidth} onChange={(e) => setLineWidth(Number(e.target.value))} className="h-7 flex-1 border bg-background px-1">
+					<option value={0}>None</option>
+					<option value={0.5}>Thin</option>
+					<option value={1}>Medium</option>
+					<option value={2}>Thick</option>
+				</select>
+				<input type="color" aria-label="Line colour" value={lineColor} onChange={(e) => setLineColor(e.target.value)} className="h-7 w-10" disabled={lineWidth === 0} />
+			</label>
+			<label className="flex items-center gap-2">
+				<input type="checkbox" checked={firstCol} onChange={(e) => setFirstCol(e.target.checked)} />
+				Bold first column
+			</label>
+			<label className="flex items-center gap-2">
+				<input type="checkbox" checked={lastRow} onChange={(e) => setLastRow(e.target.checked)} />
+				Bold last row
 			</label>
 			<button type="submit" className="h-7 self-end bg-[var(--office)] px-3 text-white">
 				Create

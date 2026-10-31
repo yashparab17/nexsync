@@ -310,3 +310,91 @@ export function compareLines(before: string[], after: string[]): Comparison {
 	}
 	return { rows, insertions, deletions };
 }
+
+// ----- Compare, written into the document
+
+const isTable = (n: PmNode) => n.type.name === "table";
+
+// The comparison as tracked changes: what the document has and the other text did not is marked as inserted, what the other text had and the
+// document does not is put back in struck through, so accepting every change keeps the document and rejecting every change gives the other text.
+// Lines are matched to the document's paragraphs in order; the rows of a table are skipped (a table's cells hold paragraphs of their own).
+export function applyComparison(state: EditorState, comparison: Comparison, author: string, at = new Date()): { tr: Transaction; marked: number } {
+	const ins = state.schema.marks.insertion;
+	const del = state.schema.marks.deletion;
+	const lines: ({ pos: number; node: PmNode } | null)[] = [];
+	state.doc.descendants((node, pos) => {
+		if (isTable(node)) {
+			let rows = 0;
+			node.forEach((child) => child.type.name === "tableRow" && rows++);
+			for (let i = 0; i < rows; i++) lines.push(null);
+			return false;
+		}
+		if (node.isTextblock) {
+			lines.push({ pos, node });
+			return false;
+		}
+		return true;
+	});
+	const tr = state.tr;
+	let marked = 0;
+	if (!ins || !del) return { tr, marked };
+	const value = markValue(author, at);
+	const insert = ins.create({ stringValue: value });
+	const strike = del.create({ stringValue: value });
+	// The text nodes of a paragraph with the place each starts at, so an offset in its text is a place in the document
+	const where = (line: { pos: number; node: PmNode }, offset: number): number => {
+		let seen = 0;
+		let found = line.pos + 1;
+		line.node.forEach((child, childOffset) => {
+			if (!child.isText) return;
+			const len = child.text?.length ?? 0;
+			if (offset >= seen && offset <= seen + len) found = line.pos + 1 + childOffset + (offset - seen);
+			seen += len;
+		});
+		return found;
+	};
+	const map = (p: number) => tr.mapping.map(p);
+	let i = 0;
+	for (const row of comparison.rows) {
+		if (row.kind === "same") {
+			i++;
+		} else if (row.kind === "inserted") {
+			const line = lines[i++];
+			if (line && line.node.textContent) {
+				tr.addMark(map(where(line, 0)), map(where(line, line.node.textContent.length)), insert);
+				marked++;
+			}
+		} else if (row.kind === "changed") {
+			const line = lines[i++];
+			if (!line) continue;
+			let offset = 0;
+			for (const piece of row.pieces) {
+				if (piece.kind === "same") offset += piece.text.length;
+				else if (piece.kind === "insertion") {
+					tr.addMark(map(where(line, offset)), map(where(line, offset + piece.text.length)), insert);
+					offset += piece.text.length;
+					marked++;
+				} else {
+					tr.insert(map(where(line, offset)), state.schema.text(piece.text, [strike]));
+					marked++;
+				}
+			}
+		} else {
+			// A paragraph the other text had and the document does not: put back, struck through, before the paragraph that follows
+			const next = lines.slice(i).find((l) => l !== null) ?? null;
+			const container = state.schema.nodes.blockContainer;
+			const paragraph = state.schema.nodes.paragraph;
+			if (next && container && paragraph) {
+				const $at = state.doc.resolve(next.pos);
+				for (let d = $at.depth; d > 0; d--) {
+					if ($at.node(d).type === container) {
+						tr.insert(map($at.before(d)), container.create(null, paragraph.create(null, state.schema.text(row.pieces[0].text, [strike]))));
+						marked++;
+						break;
+					}
+				}
+			}
+		}
+	}
+	return { tr, marked };
+}

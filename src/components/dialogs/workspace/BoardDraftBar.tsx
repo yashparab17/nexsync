@@ -1,3 +1,4 @@
+import { Notice } from "@/components/ui/notice";
 import { useEffect, useState } from "react";
 import { GitBranch, GitMerge } from "@/components/animate-icons";
 
@@ -112,9 +113,9 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 			)}
 
 			{error && !choosing && !reviewing && (
-				<p role="alert" className="shrink-0 border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+				<Notice framed size="sm" className="shrink-0">
 					{error}
-				</p>
+				</Notice>
 			)}
 
 			{choosing && (
@@ -123,9 +124,9 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 						<DialogHeading icon={<GitBranch className="size-6" />} title="Try a Reorganisation" description={<>Move cards between lists and reorder them without changing the real board. When it looks right, review what it would change and merge it. Nothing reaches your collaborators until then,
 								and anything they change meanwhile is kept.</>} />
 						{error && (
-							<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+							<Notice framed size="sm">
 								{error}
-							</p>
+							</Notice>
 						)}
 						<form
 							className="flex gap-2"
@@ -175,9 +176,9 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 					<div className="flex max-h-[75vh] min-h-0 flex-col gap-4">
 						<DialogHeading icon={<GitMerge className="size-6" />} title={`Merge ${board.name}?`} description={<>What merging would change on the real board, all together or not at all.</>} />
 						{error && (
-							<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+							<Notice framed size="sm">
 								{error}
-							</p>
+							</Notice>
 						)}
 						{reviewing.cards.length === 0 ? (
 							<p className="text-sm text-muted-foreground">Every card is where it was, so there is nothing to merge.</p>

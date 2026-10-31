@@ -1,3 +1,4 @@
+import { IconButton } from "@/components/ui/icon-button";
 import { Check, ListTodo, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -55,12 +56,12 @@ export default function ChangesDialog({ changes, readOnly, onGo, onResolve, onCl
 										</Button>
 										{!readOnly && (
 											<>
-												<Button size="icon-xs" variant="ghost" aria-label="Accept" onPress={() => onResolve(c, true)}>
+												<IconButton size="xs" label="Accept" onPress={() => onResolve(c, true)}>
 													<Check className="size-4" />
-												</Button>
-												<Button size="icon-xs" variant="ghost" aria-label="Reject" onPress={() => onResolve(c, false)}>
+												</IconButton>
+												<IconButton size="xs" label="Reject" onPress={() => onResolve(c, false)}>
 													<X className="size-4" />
-												</Button>
+												</IconButton>
 											</>
 										)}
 									</span>

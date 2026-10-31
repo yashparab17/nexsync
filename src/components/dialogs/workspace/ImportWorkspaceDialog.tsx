@@ -1,3 +1,4 @@
+import { Field } from "@/components/ui/field";
 // React
 import { useState, type ReactNode } from "react";
 
@@ -10,7 +11,6 @@ import { FolderOpen, FolderUp } from "@/components/animate-icons";
 // Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { cleanPath } from "@/lib/utils";
 import { Dialog, DialogTrigger, DialogHeading, DialogFooter } from "@/components/ui/dialog";
 
@@ -72,12 +72,11 @@ export default function ImportWorkspaceDialog({
 		<DialogTrigger>
 			{children}
 
-			<Dialog className="sm:max-w-xl">
+			<Dialog className="sm:max-w-md">
 				<DialogHeading icon={<FolderUp className="size-6" />} title="Import a Workspace" />
 
-				<div className="flex flex-col gap-2">
-					<Label htmlFor="workspace-path">Workspace folder</Label>
-					<div className="flex gap-2">
+				<Field label="Workspace folder" htmlFor="workspace-path">
+<div className="flex gap-2">
 						<Input id="workspace-path" readOnly placeholder="Choose a folder" value={workspacePath} className="font-mono text-xs" />
 						<Button variant="outline" onPress={pickWorkspace}>
 							<FolderOpen className="size-4" />
@@ -85,7 +84,7 @@ export default function ImportWorkspaceDialog({
 						</Button>
 					</div>
 					{error && <p className="text-sm text-destructive">{error}</p>}
-				</div>
+</Field>
 
 				<DialogFooter>
 					<Button variant="outline" slot="close">Cancel</Button>

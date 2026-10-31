@@ -1,10 +1,10 @@
+import { IconButton } from "@/components/ui/icon-button";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import Toolbar, { ToolbarSearch } from "@/components/layout/Toolbar";
 import { ChevronRight, Columns3, Copy, Eye, EyeOff, RefreshCw, Trash2, ChevronDown, ChevronsDownUp, Download, FilePlus, FolderPlus, Pencil } from "@/components/animate-icons";
 
 import FileKindIcon, { FolderKindIcon } from "@/features/editor/components/FileKindIcon";
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
-import { Button } from "@/components/ui/button";
 import { useFileDrop } from "@/hooks/useFileDrop";
 import type { DroppedFile } from "@/lib/dropImport";
 import PresenceDots from "@/components/elements/PresenceDots";
@@ -200,20 +200,20 @@ export default function FileExplorer({
 								<div className="flex shrink-0 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
 									{entry.is_dir && (
 										<>
-											<Button variant="ghost" size="icon-xs" aria-label={`New file in ${entry.name}`} onPress={() => onNew("file", rel)}>
+											<IconButton size="xs" label={`New file in ${entry.name}`} onPress={() => onNew("file", rel)}>
 												<FilePlus />
-											</Button>
-											<Button variant="ghost" size="icon-xs" aria-label={`New folder in ${entry.name}`} onPress={() => onNew("folder", rel)}>
+											</IconButton>
+											<IconButton size="xs" label={`New folder in ${entry.name}`} onPress={() => onNew("folder", rel)}>
 												<FolderPlus />
-											</Button>
+											</IconButton>
 										</>
 									)}
-									<Button variant="ghost" size="icon-xs" aria-label={`Rename ${entry.name}`} onPress={() => onRename(entry)}>
+									<IconButton size="xs" label={`Rename ${entry.name}`} onPress={() => onRename(entry)}>
 										<Pencil />
-									</Button>
-									<Button variant="ghost" size="icon-xs" aria-label={`Delete ${entry.name}`} onPress={() => onDelete(entry)}>
+									</IconButton>
+									<IconButton size="xs" label={`Delete ${entry.name}`} onPress={() => onDelete(entry)}>
 										<Trash2 className="text-destructive" />
-									</Button>
+									</IconButton>
 								</div>
 							)}
 						</div>
@@ -244,28 +244,28 @@ export default function FileExplorer({
 				<div className="flex shrink-0">
 {!readOnly && (
 <>
-<Button variant="ghost" size="icon-xs" aria-label="New file" onPress={() => onNew("file", targetDir)}>
+<IconButton size="xs" label="New file" onPress={() => onNew("file", targetDir)}>
 								<FilePlus className="size-4" />
-							</Button>
-							<Button variant="ghost" size="icon-xs" aria-label="New folder" onPress={() => onNew("folder", targetDir)}>
+							</IconButton>
+							<IconButton size="xs" label="New folder" onPress={() => onNew("folder", targetDir)}>
 								<FolderPlus className="size-4" />
-							</Button>
+							</IconButton>
 						</>
 					)}
 <span className="hidden group-focus-within/header:flex group-hover/header:flex">
-					<Button variant="ghost" size="icon-xs" aria-label={showIgnored ? "Hide files kept on this device" : "Show files kept on this device"} aria-pressed={showIgnored} onPress={() => setShowIgnored((v) => !v)}>
+					<IconButton size="xs" label={showIgnored ? "Hide files kept on this device" : "Show files kept on this device"} pressed={showIgnored} onPress={() => setShowIgnored((v) => !v)}>
 						{showIgnored ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
-					</Button>
-					<Button variant="ghost" size="icon-xs" aria-label="Refresh files" onPress={onRefresh}>
+					</IconButton>
+					<IconButton size="xs" label="Refresh files" onPress={onRefresh}>
 						<RefreshCw className="size-3.5" />
-					</Button>
-					<Button variant="ghost" size="icon-xs" aria-label={`Export ${targetDir} as zip`} onPress={onExport}>
+					</IconButton>
+					<IconButton size="xs" label={`Export ${targetDir} as zip`} onPress={onExport}>
 						<Download className="size-3.5" />
-					</Button>
+					</IconButton>
 </span>
-					<Button variant="ghost" size="icon-xs" aria-label="Collapse all folders" onPress={onCollapseAll}>
+					<IconButton size="xs" label="Collapse all folders" onPress={onCollapseAll}>
 						<ChevronsDownUp className="size-3.5" />
-					</Button>
+					</IconButton>
 				</div>
 			</Toolbar>
 
@@ -294,12 +294,12 @@ export default function FileExplorer({
 								</button>
 								{!readOnly && (
 									<div className="flex shrink-0 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
-										<Button variant="ghost" size="icon-xs" aria-label={`New file in ${root}`} onPress={() => onNew("file", root)}>
+										<IconButton size="xs" label={`New file in ${root}`} onPress={() => onNew("file", root)}>
 											<FilePlus />
-										</Button>
-										<Button variant="ghost" size="icon-xs" aria-label={`New folder in ${root}`} onPress={() => onNew("folder", root)}>
+										</IconButton>
+										<IconButton size="xs" label={`New folder in ${root}`} onPress={() => onNew("folder", root)}>
 											<FolderPlus />
-										</Button>
+										</IconButton>
 									</div>
 								)}
 							</div>

@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use serde::Serialize;
 use serde_json::{json, Map, Value};
+use wordcraft_doc::fill::Fill;
 use wordcraft_doc::{
     numbering::Counters,
     para::{COLUMN_BREAK, OBJ, PAGE_BREAK},
@@ -343,31 +344,77 @@ impl Conv<'_> {
         let mut pieces: Vec<Vec<Value>> = vec![Vec::new()];
         let mut pictures: Vec<Value> = Vec::new();
         let mut objects = p.objects.iter();
+        let mut controls: Vec<String> = Vec::new();
         let mut at = 0;
         for run in &p.runs {
             let Some(text) = p.text.get(at..at + run.len) else { break };
             at += run.len;
             let (styles, link, hidden) = self.run_styles(style, &run.props, heading);
             let mut buf = String::new();
-            let flush = |buf: &mut String, pieces: &mut Vec<Vec<Value>>| {
+            // The words of a content control carry its set-up, so the editor can show and change it
+            let mut cur = styles.clone();
+            let with_control = |base: &Map<String, Value>, stack: &[String]| {
+                let mut m = base.clone();
+                if let Some(spec) = stack.last() {
+                    m.insert("contentControl".into(), json!(spec));
+                }
+                m
+            };
+            let flush = |buf: &mut String, pieces: &mut Vec<Vec<Value>>, styles: &Map<String, Value>| {
                 if !buf.is_empty() {
-                    push_text(pieces.last_mut().unwrap(), std::mem::take(buf), &styles, link.as_deref());
+                    push_text(pieces.last_mut().unwrap(), std::mem::take(buf), styles, link.as_deref());
                 }
             };
+            if !controls.is_empty() {
+                cur = with_control(&styles, &controls);
+            }
             for ch in text.chars() {
                 match ch {
                     OBJ => match objects.next() {
+                        Some(InlineObject::ControlStart { control }) => {
+                            flush(&mut buf, &mut pieces, &cur);
+                            controls.push(super::controls::spec_of(control));
+                            cur = with_control(&styles, &controls);
+                        }
+                        Some(InlineObject::Equation { linear, math, .. }) if !hidden => {
+                            flush(&mut buf, &mut pieces, &cur);
+                            let source = if math.nodes.is_empty() { linear.clone() } else { wordcraft_doc::math_latex::to_latex(&math.nodes) };
+                            let mut m = cur.clone();
+                            m.insert("contentControl".into(), json!(super::controls::equation_spec(&source)));
+                            m.insert("italic".into(), json!(true));
+                            push_text(pieces.last_mut().unwrap(), linear.clone(), &m, link.as_deref());
+                        }
+                        Some(InlineObject::Shape { kind, w, h, fill, .. }) if !hidden => {
+                            if let (Some(name), Some(Fill::Solid { color: wordcraft_doc::props::Rgb(r, g, b), .. })) = (super::wrap::editor_kind(*kind), fill.as_ref().or(Some(&Fill::Solid { color: wordcraft_doc::props::Rgb(0xff, 0xff, 0xff), transparency: 0.0 }))) {
+                                let color = format!("#{r:02x}{g:02x}{b:02x}");
+                                let svg = super::wrap::shape_svg(name, &color, *w, *h);
+                                use base64::prelude::{Engine, BASE64_STANDARD};
+                                let url = format!("data:image/svg+xml;base64,{}", BASE64_STANDARD.encode(svg));
+                                pictures.push(json!({ "type": "image", "props": { "url": url, "name": format!("{}Shape", super::wrap::shape_marker(name, &color)), "previewWidth": (f64::from(*w) * 4.0 / 3.0).round(), "textAlignment": props.get("textAlignment").cloned().unwrap_or(json!("left")) } }));
+                            }
+                        }
+                        Some(InlineObject::ControlEnd) => {
+                            flush(&mut buf, &mut pieces, &cur);
+                            controls.pop();
+                            cur = with_control(&styles, &controls);
+                        }
                         Some(InlineObject::Field { result, .. }) if !hidden => buf.push_str(result),
                         Some(InlineObject::NoteRef { id, .. }) if !hidden => buf.push_str(&super::notes::marker(*id)),
-                        Some(InlineObject::Image { media, w, alt, .. }) => {
+                        Some(InlineObject::Image { media, w, alt, float, .. }) => {
+                            // Text that runs round the picture, as the editor says it
+                            let wrap = match (float.wrap, float.h_align) {
+                                (wordcraft_doc::para::Wrap::Square | wordcraft_doc::para::Wrap::Tight | wordcraft_doc::para::Wrap::Through, Some(wordcraft_doc::para::FloatAlign::Start)) => "left",
+                                (wordcraft_doc::para::Wrap::Square | wordcraft_doc::para::Wrap::Tight | wordcraft_doc::para::Wrap::Through, Some(wordcraft_doc::para::FloatAlign::End)) => "right",
+                                _ => "none",
+                            };
                             if let Some(url) = self.doc.media.get(media).and_then(|b| data_url(b)) {
-                                pictures.push(json!({ "type": "image", "props": { "url": url, "name": alt, "previewWidth": (f64::from(*w) * 4.0 / 3.0).round(), "textAlignment": props.get("textAlignment").cloned().unwrap_or(json!("left")) } }));
+                                pictures.push(json!({ "type": "image", "props": { "url": url, "name": alt, "wrap": wrap, "previewWidth": (f64::from(*w) * 4.0 / 3.0).round(), "textAlignment": props.get("textAlignment").cloned().unwrap_or(json!("left")) } }));
                             }
                         }
                         _ => {}
                     },
                     PAGE_BREAK => {
-                        flush(&mut buf, &mut pieces);
+                        flush(&mut buf, &mut pieces, &cur);
                         pieces.push(Vec::new());
                     }
                     COLUMN_BREAK | '\n' => buf.push('\n'),
@@ -375,7 +422,7 @@ impl Conv<'_> {
                     c => buf.push(c),
                 }
             }
-            flush(&mut buf, &mut pieces);
+            flush(&mut buf, &mut pieces, &cur);
         }
 
         // Nothing after the last break: the break carries over to the next block (and a paragraph that was only a break leaves

@@ -1,6 +1,7 @@
 // A workbook open for editing: the title bar, tabs and ribbon of a spreadsheet program around the grid. What people type and how cells look
 // live in the shared document; the answers come from the engine, from that same text, on every device.
 
+import { Notice } from "@/components/ui/notice";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download, FilePenLine, History, Info, Redo2, Save, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -71,7 +72,7 @@ import {
 } from "@/features/office/sheets/lib/sheet";
 import { cardRows, expandLive, taskRows } from "@/features/office/sheets/lib/liveRanges";
 import { getKanban, getTasks, sheetCalculate, sheetSave, sheetSort } from "@/lib/tauri";
-import { cn, errorText } from "@/lib/utils";
+import { cn, errorText, formatBytes } from "@/lib/utils";
 
 const LOCAL = "local-edit";
 const TABS: RibbonTab[] = [
@@ -385,7 +386,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 			const dest = await save({ title: "Save a copy", defaultPath: `${base}.${ext}`, filters: [{ name: ext.toUpperCase(), extensions: [ext] }] });
 			if (!dest) return;
 			const size = await sheetSave(workspacePath, dest, readWorkbookForFile(doc, COL_W), sheet.name);
-			flash(true, `Saved a copy (${Math.max(1, Math.round(size / 1024))} KB).`);
+			flash(true, `Saved a copy (${formatBytes(size)}).`);
 		} catch (err) {
 			flash(false, errorText(err, "The copy could not be saved."));
 		}
@@ -579,9 +580,9 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 		>
 			<div className="flex h-full min-h-0 flex-col">
 				{notice && (
-					<p role={notice.ok ? "status" : "alert"} className={cn("px-3 py-1.5 text-sm", notice.ok ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive")}>
+					<Notice tone={notice.ok ? "success" : "error"} className="px-3 py-1.5">
 						{notice.text}
-					</p>
+					</Notice>
 				)}
 				{opened.notes.length > 0 && <p className="border-b bg-muted/40 px-3 py-1 text-[13px] text-muted-foreground">{opened.notes.join(" ")}</p>}
 				{view.formulaBar && (
