@@ -89,7 +89,7 @@ export default function ModerateDialog({ member, selfRole, onClose }: ModerateDi
 						maxLength={MAX_REASON}
 						rows={2}
 						onChange={(e) => setReason(e.target.value)}
-						placeholder="Shown to them and to the Admins"
+						placeholder="Reason"
 						className="w-full resize-none rounded-md bg-input p-2 text-sm outline-none placeholder:text-muted-foreground"
 					/>
 					<p className="text-right font-mono text-[13px] text-muted-foreground">

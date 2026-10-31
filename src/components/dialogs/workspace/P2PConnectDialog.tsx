@@ -164,8 +164,8 @@ export default function P2PConnectDialog({
 	);
 
 	return (
-		<Dialog isOpen={open} onOpenChange={onOpenChange} className="max-w-2xl">
-			<div className="min-w-0 space-y-5">
+		<Dialog isOpen={open} onOpenChange={onOpenChange} className="max-w-lg">
+<div className="min-w-0 space-y-3">
 				<DialogHeading icon={<Radio className="size-6" />} title="Collaborate" />
 
 				{network.online && hostUnreachable && peers.length === 0 &&
@@ -218,7 +218,7 @@ export default function P2PConnectDialog({
 							aria-selected={activeTab === tab.id}
 							onClick={() => setActiveTab(tab.id)}
 							className={cn(
-								"flex flex-1 items-center justify-center gap-2 border-b-2 py-3 text-sm font-medium outline-none transition-colors focus-visible:bg-muted",
+								"flex flex-1 items-center justify-center gap-2 border-b-2 py-2 text-sm font-medium outline-none transition-colors focus-visible:bg-muted",
 								activeTab === tab.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
 							)}
 						>
@@ -230,51 +230,52 @@ export default function P2PConnectDialog({
 
 				{/* INVITE */}
 				{activeTab === "invite" && (
-					<div className="space-y-5">
-						{!shortCode && !invite && (
+					<div className="space-y-3">
+{!shortCode && !invite && (
 							<>
 								<fieldset className="space-y-2">
-									<legend className="text-sm font-medium">1. What can they do?</legend>
-									<div role="radiogroup" aria-label="What the person you invite can do" className="grid gap-2 sm:grid-cols-2">
-										{roles.map((r) => (
+									<legend className="text-sm font-medium">They can</legend>
+									<div role="radiogroup" aria-label="What the person you invite can do" className="flex flex-wrap gap-2">
+{roles.map((r) => (
 											<button
 												key={r.id}
 												type="button"
 												role="radio"
 												aria-checked={hostRole === r.id}
 												onClick={() => setHostRole(r.id)}
-												className={cn("flex flex-col items-start gap-0.5 border p-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", hostRole === r.id ? "border-primary bg-primary/10" : "hover:bg-muted/50")}
+title={r.text}
+												className={cn("flex flex-1 items-center border px-3 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", hostRole === r.id ? "border-primary bg-primary/10" : "hover:bg-muted/50")}
 											>
 												<span className="flex items-center gap-2 text-sm font-semibold">
 													<span className={cn("flex size-4 items-center justify-center border", hostRole === r.id ? "border-primary bg-primary text-primary-foreground" : "border-input")}>{hostRole === r.id && <Check className="size-3" />}</span>
 													{r.title}
 												</span>
-												<span className="pl-6 text-sm text-muted-foreground">{r.text}</span>
+												
 											</button>
 										))}
 									</div>
 								</fieldset>
 
 								<fieldset className="space-y-2">
-									<legend className="text-sm font-medium">2. How do they join?</legend>
+									<legend className="text-sm font-medium">Join with</legend>
 									<div className="grid gap-2 sm:grid-cols-2">
-										<button type="button" onClick={handleGenerateShortCode} disabled={isGenerating} className="flex flex-col items-start gap-1 border p-3 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
+										<button type="button" title="Quickest. Works for 2 minutes; you approve each person." onClick={handleGenerateShortCode} disabled={isGenerating} className="flex flex-col items-start gap-1 border px-3 py-2 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
 											<span className="flex items-center gap-2 text-sm font-semibold">
 												{isGenerating ? <RefreshCw className="size-4 animate-spin motion-reduce:animate-none" /> : <KeyRound className="size-4 text-primary" />}
 												6-digit code
 											</span>
-											<span className="text-sm text-muted-foreground">Quickest. Works for 2 minutes; you approve each person.</span>
+											
 										</button>
-										<button type="button" onClick={handleGenerateInvite} disabled={isGenerating} className="flex flex-col items-start gap-1 border p-3 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
+										<button type="button" title="A long invite to paste. Works until it expires or you stop it." onClick={handleGenerateInvite} disabled={isGenerating} className="flex flex-col items-start gap-1 border px-3 py-2 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
 											<span className="flex items-center gap-2 text-sm font-semibold">
 												<Link2 className="size-4 text-primary" />
 												Invite link
 											</span>
-											<span className="text-sm text-muted-foreground">A long invite to paste. Works until it expires or you stop it.</span>
+											
 										</button>
 									</div>
 									<button type="button" aria-expanded={showOptions} onClick={() => setShowOptions((o) => !o)} className="text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:text-foreground">
-										{showOptions ? "Hide options for the invite link" : "Options for the invite link"}
+										{showOptions ? "Hide invite link options" : "Invite link options"}
 									</button>
 									{showOptions && (
 										<div className="flex flex-wrap items-center gap-x-5 gap-y-2 border bg-muted/30 p-3 text-sm">
@@ -299,9 +300,9 @@ export default function P2PConnectDialog({
 						)}
 
 						{shortCode && (
-							<div className="space-y-4 border bg-muted/40 p-5 text-center">
+							<div className="space-y-3 border bg-muted/40 p-4 text-center">
 								<p className="text-sm text-muted-foreground">Share this code</p>
-								<div className="text-5xl tabular-nums font-bold tracking-[0.25em] text-primary select-all" aria-label={`Code ${shortCode.code.split("").join(" ")}`}>
+								<div className="text-4xl tabular-nums font-bold tracking-[0.25em] text-primary select-all" aria-label={`Code ${shortCode.code.split("").join(" ")}`}>
 									{shortCode.code.slice(0, 3)} {shortCode.code.slice(3)}
 								</div>
 								<p className="text-sm text-muted-foreground" aria-live="off">
@@ -321,7 +322,7 @@ export default function P2PConnectDialog({
 						)}
 
 						{invite && (
-							<div className="space-y-4 border bg-muted/40 p-5">
+							<div className="space-y-3 border bg-muted/40 p-4">
 								<div className="flex items-center justify-between gap-3">
 									<p className="text-sm text-muted-foreground">Send this invite</p>
 									<Button variant="secondary" size="sm" onPress={() => copy(invite.ticket)}>
@@ -356,7 +357,7 @@ export default function P2PConnectDialog({
 										</Button>
 									</span>
 								</div>
-								<p className="text-sm text-muted-foreground">A new invite or Stop turns this one off. People already in stay connected.</p>
+								
 							</div>
 						)}
 					</div>
@@ -371,14 +372,14 @@ export default function P2PConnectDialog({
 							</Label>
 							<Textarea
 								id="invite-ticket"
-								placeholder="123 456, or a long invite"
+								placeholder="Code or invite"
 								value={ticketInput}
 								onChange={(e) => setTicketInput(e.target.value)}
 								rows={4}
 								className="rounded-md border border-input px-3 py-2 font-mono text-xs break-all"
 								autoFocus
 							/>
-							<p className="text-sm text-muted-foreground">Their workspace is copied into this one.</p>
+							
 						</div>
 						{joinSuccess ? (
 							<div role="status" className="flex items-center justify-center gap-2 p-3 text-sm font-medium text-success">

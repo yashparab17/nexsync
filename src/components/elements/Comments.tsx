@@ -72,7 +72,7 @@ export default function Comments({ comments, me, memberNames, canComment, onChan
 						value={draft}
 						maxLength={MAX_COMMENT_LENGTH}
 						rows={2}
-						placeholder="Write a comment. Type @ to mention someone."
+						placeholder="Comment"
 						onChange={(e) => setDraft(e.target.value)}
 						onKeyDown={(e) => {
 							if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {

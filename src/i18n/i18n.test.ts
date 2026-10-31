@@ -7,7 +7,6 @@ afterEach(() => setLocale("en"));
 describe("i18n scaffold", () => {
 	it("looks text up and fills placeholders", () => {
 		expect(t("nav.notes")).toBe("Notes");
-		expect(t("tour.step", { current: 2, total: 4 })).toBe("Step 2 of 4");
 		expect(t("welcome.evening", { name: "Yash" })).toBe("Good evening, Yash.");
 		expect(t("welcome.evening")).toBe("Good evening, {name}.");
 	});

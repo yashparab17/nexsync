@@ -233,7 +233,7 @@ export default function WorkspaceSearch() {
 
 	return (
 		<div ref={box} className="relative w-full max-w-md">
-			<div className={cn("flex h-9 items-center gap-2 rounded-md bg-input px-3 field-focus", "hover:bg-muted")}>
+			<div className={cn("flex h-7 items-center gap-2 rounded-md bg-input px-3 field-focus", "hover:bg-muted")}>
 				<span className="shrink-0 font-mono text-sm text-primary" aria-hidden>&gt;</span>
 				<input
 					ref={inputRef}
@@ -247,7 +247,7 @@ export default function WorkspaceSearch() {
 					onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
 					onFocus={() => { setOpen(true); setRecent(readRecent(workspace?.id)); void loadIndex(); }}
 					onKeyDown={onKeyDown}
-					placeholder="Search notes, files, tasks, pages…"
+					placeholder="Search"
 					aria-label="Search workspace"
 					className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none focus-visible:outline-none placeholder:text-muted-foreground"
 				/>

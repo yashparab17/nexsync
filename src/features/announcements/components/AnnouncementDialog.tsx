@@ -89,15 +89,15 @@ export default function AnnouncementDialog({ existing, people, pinnedCount, onCl
 				}}
 			>
 				<DialogHeading icon={<Megaphone className="size-6" />} title={existing ? "Edit Announcement" : "New Announcement"} />
-				<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+				<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1 -mx-1">
 				<SectionTitle title="Message" />
 				<div className="space-y-1">
 					<Label htmlFor="ann-title">Title</Label>
-					<Input id="ann-title" autoFocus value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} placeholder="Release on Friday" />
+					<Input id="ann-title" autoFocus value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
 				</div>
 				<div className="space-y-1">
 					<Label htmlFor="ann-text">Text (Markdown)</Label>
-					<Textarea id="ann-text" value={text} rows={5} maxLength={5000} onChange={(e) => setText(e.target.value)} placeholder="What people need to know" />
+					<Textarea id="ann-text" value={text} rows={5} maxLength={5000} onChange={(e) => setText(e.target.value)} placeholder="Message" />
 				</div>
 				<div className="space-y-1">
 					<Label>Level</Label>

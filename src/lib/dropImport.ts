@@ -52,12 +52,13 @@ export interface ImportResult {
 }
 
 // Saves dropped files under `dir`. A name already taken at the top level gets " (2)", so nothing is overwritten.
-export async function importDropped(workspacePath: string, dir: string, items: DroppedFile[]): Promise<ImportResult> {
+// With `unique`, every file is a new name even when two share one (files from different folders going into one flat folder).
+export async function importDropped(workspacePath: string, dir: string, items: DroppedFile[], unique = false): Promise<ImportResult> {
 	const taken = new Set((await listWorkspaceFiles(workspacePath, dir).catch(() => [])).map((e) => e.name.toLowerCase()));
 	const renamed = new Map<string, string>();
 	const top = (name: string) => {
 		const safe = safeUploadName(name);
-		const done = renamed.get(safe);
+		const done = unique ? undefined : renamed.get(safe);
 		if (done) return done;
 		let next = safe;
 		const dot = safe.lastIndexOf(".");

@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell } from "@/components/animate-icons";
+import { History, Bell } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { plainPreview } from "@/features/chat/lib/preview";
@@ -14,6 +14,9 @@ import { cn } from "@/lib/utils";
 import { useChat } from "@/store/chat/ChatContext";
 import { useNotifications } from "@/store/notifications/NotificationContext";
 import { readPopupsMuted, savePopupsMuted } from "@/lib/popupPrefs";
+import BarBadge from "@/features/shell/components/BarBadge";
+import { useCatchUp } from "@/features/shell/components/CatchUp";
+import { readQuiet, saveQuiet } from "@/lib/p2p/presence";
 
 const time = (at: number) => {
 	const day = new Date(at).toDateString() === new Date().toDateString();
@@ -34,9 +37,11 @@ export default function NotificationBell() {
 	const navigate = useNavigate();
 	const [open, setOpen] = useState(false);
 	const [muted, setMuted] = useState(readPopupsMuted);
+	const [quiet, setQuiet] = useState(readQuiet);
 
-	const unread = chat.active ? chat.inboxUnread : session.unread;
-	const empty = chat.active ? chat.inbox.length === 0 : session.items.length === 0;
+	const review = useCatchUp();
+	const unread = (chat.active ? chat.inboxUnread : session.unread) + review.unread;
+	const empty = (chat.active ? chat.inbox.length === 0 : session.items.length === 0) && review.unread === 0;
 
 	const toggle = () => {
 		// Opening the list is not reading it: an item is read when you open it or choose Mark All Read
@@ -46,14 +51,11 @@ export default function NotificationBell() {
 
 	return (
 		<div className="relative">
-			<Button variant="ghost" size="icon" onPress={toggle} aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"} aria-expanded={open}>
-				<Bell className="size-5" />
-				{unread > 0 && (
-					<span className="absolute right-1 top-1 flex min-w-4 items-center justify-center bg-primary px-1 text-xs font-bold text-primary-foreground">
-						{unread > 9 ? "9+" : unread}
-					</span>
-				)}
+			<Button variant="ghost" size="icon-sm" onPress={toggle} aria-label={unread > 0 ? `Inbox, ${unread} new` : "Inbox"} aria-expanded={open} className="relative">
+				<Bell className="size-4" />
+				<BarBadge count={unread} />
 			</Button>
+			{review.review}
 			{open && (
 				<>
 					<button type="button" aria-label="Close notifications" className="fixed inset-0 z-[65] cursor-default" onClick={() => setOpen(false)} />
@@ -73,7 +75,19 @@ export default function NotificationBell() {
 								>
 									{muted ? "Unmute Pop-ups" : "Mute Pop-ups"}
 								</button>
-								{chat.active && unread > 0 && (
+								<button
+									type="button"
+									aria-pressed={quiet}
+									title="Whether a notice shows when someone joins or leaves"
+									onClick={() => {
+										saveQuiet(!quiet);
+										setQuiet(!quiet);
+									}}
+									className="cursor-pointer text-[13px] text-muted-foreground hover:text-foreground"
+								>
+									{quiet ? "Show Joins" : "Hide Joins"}
+								</button>
+								{chat.active && chat.inboxUnread > 0 && (
 									<button type="button" onClick={() => chat.markInboxRead()} className="cursor-pointer text-[13px] text-muted-foreground hover:text-foreground">
 										Mark All Read
 									</button>
@@ -85,10 +99,27 @@ export default function NotificationBell() {
 								)}
 							</span>
 						</div>
+						{review.unread > 0 && (
+							<button
+								type="button"
+								onClick={() => {
+									setOpen(false);
+									review.openReview();
+								}}
+								className="flex w-full cursor-pointer items-center gap-3 border-b bg-primary/5 px-4 py-3 text-left text-sm hover:bg-muted/60"
+							>
+								<History className="size-4 shrink-0 text-primary" aria-hidden />
+								<span className="min-w-0 flex-1">
+									{review.unread} {review.unread === 1 ? "change" : "changes"} by others to review
+								</span>
+								<span className="text-[13px] text-muted-foreground">Catch up</span>
+							</button>
+						)}
 						{empty ? (
 							<div className="flex flex-col items-center gap-3 p-6 text-center">
 								<Art name="caught-up" className="h-28 w-40" />
 								<p className="text-sm text-muted-foreground">Nothing yet. Mentions, replies, new people and assigned tasks appear here.</p>
+								<button type="button" onClick={() => { setOpen(false); review.openReview(); }} className="cursor-pointer text-[13px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Look back at changes by others</button>
 							</div>
 						) : chat.active ? (
 							<ul className="max-h-96 overflow-y-auto">

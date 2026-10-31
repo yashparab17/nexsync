@@ -73,7 +73,7 @@ export default function ImportWorkspaceDialog({
 			{children}
 
 			<Dialog className="sm:max-w-xl">
-				<DialogHeading icon={<FolderUp className="size-6" />} title="Import a Folder" />
+				<DialogHeading icon={<FolderUp className="size-6" />} title="Import a Workspace" />
 
 				<div className="flex flex-col gap-2">
 					<Label htmlFor="workspace-path">Workspace folder</Label>

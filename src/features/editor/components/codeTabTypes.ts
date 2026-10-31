@@ -21,6 +21,8 @@ export interface CodeTabHandle {
 	history: () => void;
 	branches: () => void;
 	suggest: () => void;
+	undo: () => void;
+	redo: () => void;
 	goToLine: (line: number) => void;
 	focus: () => void;
 }

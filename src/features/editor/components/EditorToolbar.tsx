@@ -1,9 +1,9 @@
-// The strip above the editor: the path of the file as a breadcrumb on the left, and what can be done with it on the right.
+// What can be done with the open file, at the right of the row of tabs.
 
-import Toolbar from "@/components/layout/Toolbar";
-import { ChevronRight, Columns3, Eye, GitBranch, History, MessageSquareDiff, Save, Search, Sparkles, Terminal, UsersRound, Check } from "@/components/animate-icons";
+import { Columns3, Eye, GitBranch, History, MessageSquareDiff, Save, Search, Sparkles, Terminal, UsersRound, Check } from "@/components/animate-icons";
 
 import type { CodeTabHandle, CodeTabStatus } from "@/features/editor/components/codeTabTypes";
+import { Redo2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -33,21 +33,23 @@ function Tool({ label, shortcut, pressed, onPress, disabled, children }: { label
 }
 
 export default function EditorToolbar({ path, status, handle, showBlame, onToggleBlame, split, onToggleSplit, canPreview, preview, onTogglePreview, panelOpen, onTogglePanel }: EditorToolbarProps) {
-	const segments = path ? path.split("/") : [];
 	return (
-		<Toolbar variant="sub">
-			<nav aria-label="Path" className="flex min-w-0 flex-1 items-center gap-1 px-1 font-mono text-xs text-muted-foreground">
-				{segments.map((segment, i) => (
-					<span key={i} className="flex min-w-0 items-center gap-1">
-						{i > 0 && <ChevronRight className="size-3 shrink-0 opacity-60" />}
-						<span className={cn("truncate", i === segments.length - 1 && "font-semibold text-foreground")}>{segment}</span>
-					</span>
-				))}
-			</nav>
+		<div className="flex shrink-0 items-center gap-1 border-l px-2">
+			
 
 			{path && handle && (
 				<>
-					<Tool label="Find in file" shortcut="Ctrl+F" onPress={() => handle.find()}>
+					{status && !status.readOnly && (
+<>
+<Tool label="Undo" shortcut="Ctrl+Z" onPress={() => handle.undo()}>
+<Undo2 className="size-4" />
+</Tool>
+<Tool label="Redo" shortcut="Ctrl+Y" onPress={() => handle.redo()}>
+<Redo2 className="size-4" />
+</Tool>
+</>
+)}
+<Tool label="Find in file" shortcut="Ctrl+F" onPress={() => handle.find()}>
 						<Search className="size-4" />
 					</Tool>
 					<Tool label="File history" onPress={() => handle.history()}>
@@ -92,6 +94,6 @@ export default function EditorToolbar({ path, status, handle, showBlame, onToggl
 					{status.saving ? "Saving…" : status.dirty ? "Save" : "Saved"}
 				</Button>
 			)}
-		</Toolbar>
+		</div>
 	);
 }

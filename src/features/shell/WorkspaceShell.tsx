@@ -4,7 +4,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 // Context
 import { useCollapsed } from "@/hooks/useCollapsed";
-import { PanelLeftOpen, PanelTopOpen } from "lucide-react";
+import { PanelLeftOpen } from "lucide-react";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { pageOf } from "@/lib/p2p/presence";
@@ -16,6 +16,9 @@ import WorkspaceHeader from "@/features/shell/components/WorkspaceHeader";
 import JoinRequestDialog from "@/components/dialogs/workspace/JoinRequestDialog";
 import WorkspaceDeletedDialog from "@/components/dialogs/workspace/WorkspaceDeletedDialog";
 import HostHandoffDialog from "@/components/dialogs/workspace/HostHandoffDialog";
+import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
+import { importSorted, sortSummary } from "@/lib/dropSort";
+import { useIsViewer } from "@/store/p2p/P2PContext";
 import TransferTray from "@/features/shell/components/TransferTray";
 import HostGate from "@/features/shell/components/HostGate";
 import DueReminders from "@/features/shell/components/DueReminders";
@@ -37,22 +40,27 @@ export default function Workspace() {
 	// The Editor, Notes, Files and Assets are full-bleed workspaces: no page padding, and they fill the window
 	// Below the medium breakpoint the sidebar is a drawer
 	const [navOpen, setNavOpen] = useState(false);
-	// Both can be folded away for room to work: the sidebar (Ctrl+\) and the headers (Ctrl+Shift+H), kept on this device
+	// The sidebar can be folded away for room to work (Ctrl+\), kept on this device
 	const [sidebarHidden, toggleSidebar] = useCollapsed("chrome.sidebar");
-	const [headersHidden, toggleHeaders] = useCollapsed("chrome.headers");
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key === "\\") {
 				e.preventDefault();
 				toggleSidebar();
-			} else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "h") {
-				e.preventDefault();
-				toggleHeaders();
 			}
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [toggleSidebar, toggleHeaders]);
+	}, [toggleSidebar]);
+
+	// A folder or files dropped on a page that has no drop of its own are sorted into the workspace (Assets, Documents, Notes...)
+	const isViewer = useIsViewer();
+	const dropNotice = useDropNotice();
+	const ownDrop = /^\/workspace\/(assets|notes|others|editor|explorer)(\/|$)/.test(pathname);
+	const { dragging, bind: dropProps } = useFileDrop(async (items) => {
+		if (!workspace?.path) return;
+		dropNotice.show(sortSummary(await importSorted(workspace.path, items)));
+	}, isViewer || ownDrop);
 
 	// Collaborators see which page this device is on
 	const { setMyPresence } = useP2P();
@@ -122,19 +130,16 @@ export default function Workspace() {
 			)}
 
 			{/* Main content area */}
-			<div data-hide-toolbars={headersHidden ? "" : undefined} className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-xl bg-background window-edge">
+			<div {...dropProps} onDrop={(e) => !e.defaultPrevented && dropProps.onDrop(e)} className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-xl bg-background window-edge">
+					<DropOverlay show={dragging} title="Drop to sort into the workspace" hint="Pictures go to Assets, Word files to Documents, notes to Notes, the rest to Others" />
+					{dropNotice.node}
 				{sidebarHidden && (
 					<button type="button" aria-label="Show the sidebar" title="Show the sidebar (Ctrl+\)" onClick={toggleSidebar} className="absolute top-1/2 left-0 z-30 hidden h-10 w-4 -translate-y-1/2 items-center justify-center rounded-r-sm border border-l-0 bg-background text-muted-foreground opacity-60 shadow-sm outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring md:flex">
 						<PanelLeftOpen className="size-3" />
 					</button>
 				)}
-				{headersHidden && (
-					<button type="button" aria-label="Show the headers" title="Show the headers (Ctrl+Shift+H)" onClick={toggleHeaders} className="absolute top-0 right-3 z-30 flex h-4 w-10 items-center justify-center rounded-b-sm border border-t-0 bg-background text-muted-foreground opacity-60 shadow-sm outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring">
-						<PanelTopOpen className="size-3" />
-					</button>
-				)}
 				{/* Header */}
-				{!headersHidden && <WorkspaceHeader onOpenMenu={() => setNavOpen(true)} menuOpen={navOpen} onHide={toggleHeaders} />}
+				<WorkspaceHeader onOpenMenu={() => setNavOpen(true)} menuOpen={navOpen} />
 				<TimeoutBanner />
 				<ReviewBanner />
 				<AnnouncementRuntime />

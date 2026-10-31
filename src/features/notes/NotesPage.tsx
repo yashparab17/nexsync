@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
 import { dropSummary, importDropped } from "@/lib/dropImport";
 import Welcome from "@/components/elements/Welcome";
-import Toolbar, { ToolbarSearch, ToolbarTitle } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarSearch } from "@/components/layout/Toolbar";
 import { useNavigate } from "react-router-dom";
 import { CalendarPlus, FilePlus, FileText, LayoutGrid, Network, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "@/components/animate-icons";
 
@@ -14,7 +14,7 @@ import { useContextMenu } from "@/components/elements/ContextMenu";
 import EditorTabs from "@/features/editor/components/EditorTabs";
 import Finder from "@/components/elements/Finder";
 import PresenceDots from "@/components/elements/PresenceDots";
-import CollapsiblePane from "@/components/layout/CollapsiblePane";
+import CollapsiblePane, { LIST_WIDTH } from "@/components/layout/CollapsiblePane";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -459,10 +459,10 @@ export default function NotesPage() {
 			<DropOverlay show={dragging} title="Drop to add to notes" />
 			{dropNotice.node}
 			{/* Notes list */}
-			<CollapsiblePane id="notes.list" defaultWidth={300} label="the notes list">
+			<CollapsiblePane id="notes.list" defaultWidth={LIST_WIDTH} label="the notes list">
 					<aside aria-label="Notes list" className="flex shrink-0 flex-col bg-panel">
 						<Toolbar variant="header">
-							<div className="flex-1"><ToolbarTitle as="h2" name="Notes" meta={notes.length} /></div>
+							<ToolbarSearch label="Search notes" placeholder="Search" value={query} onChange={setQuery} className="min-w-0 flex-1" />
 							{!isViewer && (
 								<>
 									<Button variant="ghost" size="icon-xs" aria-label="Open today's note" onPress={openToday}>
@@ -481,9 +481,6 @@ export default function NotesPage() {
 									</Button>
 								</>
 							)}
-						</Toolbar>
-						<Toolbar variant="sub" className="gap-2">
-							<ToolbarSearch label="Search notes" placeholder="Search notes" value={query} onChange={setQuery} className="w-full" />
 						</Toolbar>
 						<div className="min-h-0 flex-1 overflow-y-auto">
 							{loading ? (
@@ -620,7 +617,7 @@ export default function NotesPage() {
 						className="space-y-4"
 					>
 						<DialogHeading icon={<Plus className="size-6" />} title="New Note" />
-						<Input aria-label="Note title" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g. Architecture overview, Meeting notes" aria-invalid={!!validateFileName(newTitle)} autoFocus />
+						<Input aria-label="Note title" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Title" aria-invalid={!!validateFileName(newTitle)} autoFocus />
 						{validateFileName(newTitle) && <p role="alert" className="text-xs text-destructive">{validateFileName(newTitle)}</p>}
 						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setIsNewOpen(false)} isDisabled={submitting}>

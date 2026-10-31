@@ -123,6 +123,14 @@ GDK_BACKEND=x11 ./Nexsync_*.AppImage
 WEBKIT_DISABLE_COMPOSITING_MODE=1 ./Nexsync_*.AppImage
 ```
 
+The real cause is that the AppImage carries its own Wayland, EGL, GL and GBM libraries, which clash with a newer system's graphics drivers. From the release after 0.9.2, the `linux-appimage-libs` job in `release.yml` removes them from the AppImage, re-signs it and updates `latest.json`, so the system's libraries are used. On an older AppImage you can do the same by hand:
+
+```bash
+./Nexsync_*.AppImage --appimage-extract
+rm -f squashfs-root/usr/lib/{libwayland-*,libEGL*,libGL*,libgbm*}
+./squashfs-root/AppRun
+```
+
 The other way round the AppImage is to build the app against your own WebKitGTK: install `webkit2gtk-4.1`, `base-devel`, `gtk3`, `libayatana-appindicator`, `librsvg` and `xdotool` with `pacman`, then `pnpm install` and `pnpm tauri build --no-bundle` (the binary is in `src-tauri/target/release/`).
 
 ## Command line

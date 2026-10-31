@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Activity, Trash2, Crown, KeyRound, MessageSquareText, Pencil, Shield, ShieldAlert, ShieldCheck, UserCheck, UserPlus, Plus } from "@/components/animate-icons";
 
 import { Page, PageBody, Panel } from "@/components/layout/Page";
-import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
+import Toolbar, {} from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import Avatar from "@/components/elements/Avatar";
@@ -270,7 +270,6 @@ export default function MembersPage() {
 	return (
 		<Page>
 			<Toolbar>
-				<ToolbarTitle name="Members" meta={members.length || undefined} />
 				<span className="flex-1" />
 				<Button variant="outline" size="sm" onPress={() => setIsInviteOpen(true)}>
 					<KeyRound className="size-4 text-info" />
@@ -544,7 +543,7 @@ export default function MembersPage() {
 									required
 									value={newMemberName}
 									onChange={(e) => setNewMemberName(e.target.value)}
-									placeholder="e.g. Alice, Bob"
+									placeholder="Names"
 									className="mt-1"
 									autoFocus
 								/>

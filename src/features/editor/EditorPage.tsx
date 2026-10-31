@@ -19,7 +19,7 @@ import QuickOpen, { type EditorCommand } from "@/features/editor/components/Quic
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
 import MarkdownPreview from "@/components/elements/MarkdownPreview";
 import Splitter from "@/components/elements/Splitter";
-import CollapsiblePane from "@/components/layout/CollapsiblePane";
+import CollapsiblePane, { LIST_WIDTH } from "@/components/layout/CollapsiblePane";
 import { useCollapsed } from "@/hooks/useCollapsed";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -564,7 +564,7 @@ export default function EditorPage() {
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-background">
 			<div className="flex min-h-0 flex-1">
-				<CollapsiblePane id="editor.explorer" defaultWidth={300} label="the explorer">
+				<CollapsiblePane id="editor.explorer" defaultWidth={LIST_WIDTH} label="the explorer">
 						<div className="min-w-0 shrink-0">
 							<FileExplorer
 								roots={ROOTS}
@@ -632,8 +632,7 @@ export default function EditorPage() {
 							onReorder={reorder}
 							onContextMenu={tabMenu}
 						/>
-					</Toolbar>
-					<EditorToolbar
+						<EditorToolbar
 						path={current}
 						status={currentStatus}
 						handle={handleOf(current)}
@@ -650,6 +649,7 @@ export default function EditorPage() {
 						panelOpen={showPanel}
 						onTogglePanel={() => togglePanel()}
 					/>
+					</Toolbar>
 
 					<div className="relative min-h-0 flex-1">
 						{tabs.length === 0 && (
@@ -692,7 +692,7 @@ export default function EditorPage() {
 							{(rightPath || previewOpen) && <Splitter orientation="vertical" grows="right" size={splitWidth} onResize={setSplitWidth} label="Resize the split" quiet className="[grid-column:2] [grid-row:1]" />}
 							{previewOpen && (
 								<div style={{ gridColumn: 3, gridRow: 1 }} className="min-h-0 min-w-0 border-l bg-background">
-									<MarkdownPreview text={rightText} notes={noteRefs} />
+									<MarkdownPreview text={rightText} notes={noteRefs} workspacePath={workspacePath} from={active ?? ""} />
 								</div>
 							)}
 						</div>

@@ -52,7 +52,7 @@ export default function WorkspaceIconView({ id, name, className }: { id: string 
 
 // Choose a picture from the computer, an emoji, or go back to the letter
 // `initial` is the icon when the picker was opened: Revert goes back to it
-export function IconPicker({ value, onChange, name, shared = false, initial = null }: { value: Icon | null; onChange: (icon: Icon | null) => void; name: string; shared?: boolean; initial?: Icon | null }) {
+export function IconPicker({ value, onChange, name, shared = false, initial = null, bare = false }: { value: Icon | null; onChange: (icon: Icon | null) => void; name: string; shared?: boolean; initial?: Icon | null; bare?: boolean }) {
 	const file = useRef<HTMLInputElement>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [more, setMore] = useState(false);
@@ -61,7 +61,7 @@ export function IconPicker({ value, onChange, name, shared = false, initial = nu
 	return (
 		<div className="flex flex-col gap-2">
 			<div className="flex items-center gap-4">
-				<IconView icon={value} name={name} className="size-14 text-3xl" />
+				{!bare && <IconView icon={value} name={name} className="size-14 text-3xl" />}
 				<div className="flex flex-wrap gap-2">
 					<input
 						ref={file}
@@ -122,7 +122,7 @@ export function IconPicker({ value, onChange, name, shared = false, initial = nu
 					{error}
 				</p>
 			)}
-			<p className="text-[13px] text-muted-foreground">{shared ? "Everyone in the workspace sees this icon." : "Once the workspace is created, the Owner and Admins can change the icon, and everyone sees it."}</p>
+			{!bare && <p className="text-[13px] text-muted-foreground">{shared ? "Everyone in the workspace sees this icon." : "Once the workspace is created, the Owner and Admins can change the icon, and everyone sees it."}</p>}
 		</div>
 	);
 }

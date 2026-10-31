@@ -8,8 +8,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Check, EyeOff, Clock, FolderPlus, Info, Network, Play, RefreshCw, Terminal, X } from "@/components/animate-icons";
 import TerminalView from "@/features/editor/components/TerminalView";
 import { EmptyState, Page, PageBody, Panel } from "@/components/layout/Page";
-import CollapsiblePane from "@/components/layout/CollapsiblePane";
-import Toolbar, { ToolbarSelect, ToolbarTabs, ToolbarTitle } from "@/components/layout/Toolbar";
+import CollapsiblePane, { LIST_WIDTH } from "@/components/layout/CollapsiblePane";
+import Toolbar, { ToolbarSelect, ToolbarTabs } from "@/components/layout/Toolbar";
 import ContainersPanel from "@/features/projects/components/ContainersPanel";
 import AuditPanel from "@/features/projects/components/AuditPanel";
 import GeneratorsPanel from "@/features/projects/components/GeneratorsPanel";
@@ -351,7 +351,6 @@ export default function ProjectsPage() {
 	return (
 		<Page>
 			<Toolbar>
-				<ToolbarTitle name="Projects" meta={projects ? String(projects.length) : undefined} />
 				{projectId && (
 					<ToolbarTabs
 						label="Project view"
@@ -389,7 +388,7 @@ export default function ProjectsPage() {
 
 			<div className="@container flex min-h-0 flex-1">
 				{projects && projects.length > 0 && (
-					<CollapsiblePane id="projects.list" defaultWidth={240} label="the list of projects" className="hidden @3xl:flex">
+					<CollapsiblePane id="projects.list" defaultWidth={LIST_WIDTH} label="the list of projects" className="hidden @3xl:flex">
 					<nav aria-label="Projects" className="flex w-60 shrink-0 flex-col gap-0.5 overflow-y-auto bg-panel p-2">
 						{projects.map((p) => (
 							<button

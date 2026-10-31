@@ -44,7 +44,7 @@ export default function NewChannelDialog({ existing, onClose, onCreate }: { exis
 				</div>
 				<div className="space-y-1">
 					<Label htmlFor="channel-topic">Topic (optional)</Label>
-					<Input id="channel-topic" value={topic} maxLength={120} onChange={(e) => setTopic(e.target.value)} placeholder="What this channel is for" />
+					<Input id="channel-topic" value={topic} maxLength={120} onChange={(e) => setTopic(e.target.value)} placeholder="Description" />
 				</div>
 				{error && (
 					<p role="alert" className="bg-destructive/10 p-2 text-sm text-destructive">

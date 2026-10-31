@@ -11,6 +11,9 @@ import { setCollapsed, useCollapsed } from "@/hooks/useCollapsed";
 import { usePanelSize } from "@/hooks/usePanelSize";
 import { cn } from "@/lib/utils";
 
+// Every list at the left of a workspace page (notes, files, documents, channels, projects) opens at this width
+export const LIST_WIDTH = 256;
+
 const MIN_OPEN = 140;
 const FOLD_BELOW = 110;
 const MAX = 560;

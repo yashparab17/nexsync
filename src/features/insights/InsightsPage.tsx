@@ -4,7 +4,7 @@ import { History, X } from "@/components/animate-icons";
 import Avatar from "@/components/elements/Avatar";
 import { BarRows, DayColumns, Donut, Empty, Heatmap, MonthCalendar, SERIES, Stat, StackBar } from "@/components/elements/charts";
 import { Page, PageBody, Panel } from "@/components/layout/Page";
-import Toolbar, { ToolbarTitle, ToolbarSearch, ToolbarTabs } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarSearch, ToolbarTabs } from "@/components/layout/Toolbar";
 import ModerationLog from "@/features/moderation/components/ModerationLog";
 import { moderationLog } from "@/features/moderation/lib/moderation";
 import { useChat } from "@/store/chat/ChatContext";
@@ -74,7 +74,7 @@ export default function InsightsPage() {
 	return (
 		<Page>
 			<Toolbar>
-				<ToolbarTitle name="Insights" />
+						<ToolbarSearch label="Search activity" placeholder="Search" value={filter.query ?? ""} onChange={(query) => set({ query })} />
 				<ToolbarTabs
 					label="Insights"
 					value={tab}
@@ -90,7 +90,6 @@ export default function InsightsPage() {
 					<span className="text-sm text-muted-foreground">Latest {events.length} actions{events.some((e) => !e.author) ? " · some older ones have no name" : ""}</span>
 				) : tab === "moderation" ? null : (
 					<>
-						<ToolbarSearch label="Search activity" placeholder="Search activity" value={filter.query ?? ""} onChange={(query) => set({ query })} />
 						<select aria-label="Person" value={filter.author ?? ""} onChange={(e) => set({ author: e.target.value || undefined })} className={select}>
 							<option value="">Everyone</option>
 							{byPerson.map(([name]) => (

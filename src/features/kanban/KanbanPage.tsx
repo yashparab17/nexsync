@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, AlertTriangle, ArrowRight, CheckSquare, Pencil } from "@/components/animate-icons";
 
 import { EmptyState } from "@/components/layout/Page";
-import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
+import Toolbar, {} from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import EraseOption from "@/components/elements/EraseOption";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -504,7 +504,6 @@ export default function KanbanPage() {
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-background">
 			<Toolbar>
-				<ToolbarTitle name="Kanban" meta={`${columns.reduce((n, c) => n + c.cards.length, 0)} cards · ${columns.length} ${columns.length === 1 ? "column" : "columns"}`} />
 				<span className="flex-1" />
 				{workspace?.path && <BoardDraftBar workspacePath={workspace.path} columns={columns} board={board} onBoard={setBoard} canDraft={!isViewer} />}
 				{canChange && (
@@ -795,7 +794,7 @@ export default function KanbanPage() {
 								required
 								value={newColTitle}
 								onChange={(e) => setNewColTitle(e.target.value)}
-								placeholder="e.g. Blocked, In Review, QA"
+								placeholder="Column name"
 								className="mt-1"
 								autoFocus
 							/>
@@ -840,7 +839,7 @@ export default function KanbanPage() {
 									required
 									value={cardTitle}
 									onChange={(e) => setCardTitle(e.target.value)}
-									placeholder="e.g. Design wireframes for assets lazy loading"
+									placeholder="Title"
 									className="mt-1"
 									autoFocus
 								/>
@@ -852,7 +851,7 @@ export default function KanbanPage() {
 									id="card-desc"
 									value={cardDesc}
 									onChange={(e) => setCardDesc(e.target.value)}
-									placeholder="Add context or notes…"
+									placeholder="Notes"
 									rows={3}
 									className="mt-1"
 								/>
@@ -929,7 +928,7 @@ export default function KanbanPage() {
 						/>
 						<section aria-label="Discussion" className="space-y-1">
 							<h3 className="text-sm font-semibold">Discussion</h3>
-							<FieldDiscussion channel={`card:${editingCard.id}`} field="" canComment={!isViewer} placeholder="Say something about this card" label="Discuss this card" />
+							<FieldDiscussion channel={`card:${editingCard.id}`} field="" canComment={!isViewer} placeholder="Comment" label="Discuss this card" />
 						</section>
 
 						<DialogFooter>

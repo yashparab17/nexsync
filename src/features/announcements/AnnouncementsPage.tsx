@@ -7,7 +7,7 @@ import AnnouncementCard from "@/features/announcements/components/AnnouncementCa
 import AnnouncementDialog from "@/features/announcements/components/AnnouncementDialog";
 import { Megaphone } from "@/components/animate-icons";
 import { EmptyState, Page, PageBody } from "@/components/layout/Page";
-import Toolbar, { ToolbarSearch, ToolbarTabs, ToolbarTitle } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarSearch, ToolbarTabs } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import { forMe, MAX_PINNED, ordered, statusOf, type Announcement, type AnnouncementDraft } from "@/features/announcements/lib/announcements";
 import { useChat } from "@/store/chat/ChatContext";
@@ -48,7 +48,7 @@ export default function AnnouncementsPage() {
 	return (
 		<Page>
 			<Toolbar>
-				<ToolbarTitle name="Announcements" meta={String(groups.active.length)} />
+				<ToolbarSearch placeholder="Search" label="Search announcements" value={query} onChange={setQuery} />
 				<ToolbarTabs
 					label="Which announcements"
 					value={tab}
@@ -60,7 +60,6 @@ export default function AnnouncementsPage() {
 					]}
 				/>
 				<span className="flex-1" />
-				<ToolbarSearch label="Search announcements" value={query} onChange={setQuery} />
 				{canPost && (
 					<Button size="sm" onPress={() => setDialog({})}>
 						<Megaphone className="size-3.5" />

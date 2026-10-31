@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { Trash2, FileText, Folder, RotateCcw } from "@/components/animate-icons";
 
 import { EmptyState, Page, PageBody } from "@/components/layout/Page";
-import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
+import Toolbar from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 
@@ -72,7 +72,6 @@ export default function TrashPage() {
 	return (
 		<Page>
 			<Toolbar>
-				<ToolbarTitle name="Trash" meta={items.length ? `${items.length} ${items.length === 1 ? "item" : "items"}` : undefined} />
 				<span className="flex-1" />
 				{!isViewer && items.length > 0 && (
 					<Button variant="outline" size="sm" onPress={() => setConfirm("all")}>

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
+import { acceptCompletion, autocompletion } from "@codemirror/autocomplete";
 import { lintGutter } from "@codemirror/lint";
 import { EditorState, Prec, type Extension } from "@codemirror/state";
 import { EditorView, GutterMarker, gutter, keymap, lineNumbers } from "@codemirror/view";
 import { codeLook } from "@/lib/editor/codeTheme";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
+import { UndoManager } from "yjs";
 
 import { useThemeContext } from "@/store/ThemeContext";
 import { colorOf } from "@/lib/collabColor";
@@ -232,6 +234,10 @@ export default function CodeEditor({
 			...(vimExtension ? [Prec.highest(EditorView.domEventHandlers({ keydown: (e) => leader(e) && (e.preventDefault(), e.stopPropagation(), true) })), vimExtension] : []),
 			...(minimapExtension ? [minimapExtension] : []),
 			...(wrap || language.name === "Markdown" ? [EditorView.lineWrapping] : []),
+				// Suggestions only while writing code: none open on their own in prose or a plain file. None is chosen until the arrow keys pick one, so Enter
+				// still makes a new line; Tab takes the shown one,
+				autocompletion({ activateOnTyping: !["Markdown", "Plain Text"].includes(language.name), selectOnOpen: false, icons: false, maxRenderedOptions: 30 }),
+				Prec.high(keymap.of([{ key: "Tab", run: acceptCompletion }])),
 		],
 		[isDark, fontSize, tabSize, wrap, language.name, relativeNumbers, cursorExtension, vimExtension, minimapExtension, leader],
 	);
@@ -252,19 +258,22 @@ export default function CodeEditor({
 		awareness?.setLocalStateField("user", { name: userName, color: colorOf(userName) });
 	}, [awareness, userName]);
 
+	// One undo history for as long as the shared text lasts. yCollab would make a new one each time the extensions are rebuilt (a comment
+	// or suggestion arriving does that), which silently emptied the history.
+	const undoManager = useMemo(() => (collab ? new UndoManager(collab.doc.getText("content")) : null), [collab]);
 	const extensions = useMemo(() => {
 		if (!collab) return [...languageExtensions, ...lookExtensions, ...(extraExtensions ?? [])];
 		return [
 			...languageExtensions,
 			...lookExtensions,
 			...(extraExtensions ?? []),
-			yCollab(collab.doc.getText("content"), collab.awareness),
+			yCollab(collab.doc.getText("content"), collab.awareness, undoManager ? { undoManager } : undefined),
 			// Route Ctrl+Z/Ctrl+Y through yCollab's Y.UndoManager instead of CodeMirror's own
 			// history (disabled below via basicSetup), so undo only reverts local edits rather
 			// than fighting the shared CRDT state.
 			keymap.of(yUndoManagerKeymap),
 		];
-	}, [languageExtensions, lookExtensions, extraExtensions, collab]);
+	}, [languageExtensions, lookExtensions, extraExtensions, collab, undoManager]);
 
 	return (
 		<div className="h-full w-full overflow-hidden border-t bg-background font-mono text-xs">
@@ -296,7 +305,7 @@ export default function CodeEditor({
 					syntaxHighlighting: true,
 					bracketMatching: true,
 					closeBrackets: true,
-					autocompletion: true,
+					autocompletion: false,
 					rectangularSelection: true,
 					crosshairCursor: true,
 					highlightActiveLine: true,

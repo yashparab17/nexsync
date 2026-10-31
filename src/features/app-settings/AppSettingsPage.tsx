@@ -299,7 +299,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 								value={proxy}
 								maxLength={256}
 								onChange={(e) => setProxy(e.target.value)}
-								placeholder="http://proxy.example.edu:8080"
+								placeholder="Proxy address"
 								aria-label="Proxy address"
 								disabled={saved === null}
 							/>
@@ -477,7 +477,7 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 									setNewRoot(e.target.value);
 									setRootNote(null);
 								}}
-								placeholder="Folder path, e.g. C:\Users\You\Documents"
+								placeholder="Folder"
 								aria-label="Folder path"
 								className="font-mono text-xs"
 								onKeyDown={(e) => {

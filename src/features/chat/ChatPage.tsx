@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import CollapsiblePane from "@/components/layout/CollapsiblePane";
+import CollapsiblePane, { LIST_WIDTH } from "@/components/layout/CollapsiblePane";
 import ChannelList from "@/features/chat/components/ChannelList";
 import Composer from "@/features/chat/components/Composer";
 import { MAX_ATTACHMENT, MAX_ATTACHMENTS } from "@/features/chat/components/Attachment";
@@ -259,7 +259,7 @@ export default function ChatPage() {
 	return (
 		<Page>
 			<div className="@container flex min-h-0 flex-1">
-				<CollapsiblePane id="chat.channels" defaultWidth={240} label="the channel list">
+				<CollapsiblePane id="chat.channels" defaultWidth={LIST_WIDTH} label="the channel list">
 				<ChannelList
 					channels={chat.channels}
 					active={channel.id}

@@ -1,16 +1,12 @@
-// The top of the sidebar's list: a New menu (a document, sheet, deck or note) and the files opened most recently, across the office
-// editors, notes and the code editor.
+// The top of the sidebar's list: a New menu (a document, sheet, deck or note)
 
 import { ChevronDown, FilePlus } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
-import { editorRouteFor } from "@/lib/editor/languages";
 import { routeOf } from "@/lib/p2p/presence";
-import { useRecent } from "@/lib/recentFiles";
 import { cn } from "@/lib/utils";
 import { useIsViewer } from "@/store/p2p/P2PContext";
-import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
 const NEW_ITEMS = [
 	["Document", "documents"],
@@ -19,14 +15,10 @@ const NEW_ITEMS = [
 	["Note", "notes"],
 ] as const;
 
-const PAGE_OF: Record<string, string> = { notes: "notes", documents: "documents", sheets: "sheets", slides: "slides", editor: "editor", system: "others" };
-
 export default function SidebarQuick({ onNavigate }: { onNavigate?: () => void }) {
-	const { workspace } = useWorkspace();
 	const isViewer = useIsViewer();
 	const navigate = useNavigate();
 	const [open, setOpen] = useState(false);
-	const recent = useRecent(workspace?.path).slice(0, 5);
 
 	return (
 		<div className="flex flex-col gap-0.5">
@@ -57,25 +49,6 @@ export default function SidebarQuick({ onNavigate }: { onNavigate?: () => void }
 						</ul>
 					)}
 				</>
-			)}
-			{recent.length > 0 && (
-				<div className="mt-1">
-					<p className="px-3 pb-1 font-mono text-xs text-muted-foreground">Recent</p>
-					<ul>
-						{recent.map((path) => (
-							<li key={path}>
-								<Link
-									to={`${routeOf(PAGE_OF[editorRouteFor(path.split("/").pop() ?? "")] ?? "editor")}?open=${encodeURIComponent(path)}`}
-									onClick={onNavigate}
-									title={path}
-									className="block truncate rounded-md px-3 py-1.5 text-sm text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted"
-								>
-									{path.split("/").pop()}
-								</Link>
-							</li>
-						))}
-					</ul>
-				</div>
 			)}
 		</div>
 	);

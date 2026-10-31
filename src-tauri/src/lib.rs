@@ -38,6 +38,19 @@ pub fn linux_graphics_env(get: &dyn Fn(&str) -> Option<String>) -> Vec<(&'static
     out
 }
 
+/// The system's own copies of the libraries an AppImage also carries (Wayland, EGL, GBM...), as a value for LD_PRELOAD. The AppImage's older copies are
+/// found first and do not match a newer Mesa, which aborts the web process; loading the system's before them makes everything use the matching ones.
+/// Only libraries that exist are listed, so a system without them gets None and nothing changes.
+pub fn system_graphics_preload(exists: &dyn Fn(&str) -> bool) -> Option<String> {
+    const DIRS: [&str; 6] = ["/usr/lib", "/usr/lib64", "/usr/lib/x86_64-linux-gnu", "/usr/lib/aarch64-linux-gnu", "/lib/x86_64-linux-gnu", "/lib64"];
+    const LIBS: [&str; 7] = ["libwayland-client.so.0", "libwayland-server.so.0", "libwayland-egl.so.1", "libwayland-cursor.so.0", "libgbm.so.1", "libEGL.so.1", "libGLESv2.so.2"];
+    let found: Vec<String> = LIBS
+        .iter()
+        .filter_map(|lib| DIRS.iter().map(|d| format!("{d}/{lib}")).find(|p| exists(p)))
+        .collect();
+    (!found.is_empty()).then(|| found.join(":"))
+}
+
 /// Initializes plugins, registers Tauri command handlers, and runs the application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -355,5 +368,13 @@ mod linux_env_tests {
         assert!(!env(&[("APPDIR", "/tmp/.mount_x"), ("DISPLAY", ":0")]).contains(&("GDK_BACKEND", "x11")));
         let chosen = env(&[("APPIMAGE", "a"), ("WAYLAND_DISPLAY", "w"), ("DISPLAY", ":0"), ("GDK_BACKEND", "wayland"), ("WEBKIT_DISABLE_COMPOSITING_MODE", "0"), ("WEBKIT_DISABLE_DMABUF_RENDERER", "0")]);
         assert!(chosen.is_empty(), "{chosen:?}");
+    }
+
+    #[test]
+    fn the_systems_graphics_libraries_are_preloaded_when_it_has_them() {
+        use super::system_graphics_preload;
+        let has = |p: &str| p == "/usr/lib/libEGL.so.1" || p == "/usr/lib/libgbm.so.1" || p == "/usr/lib64/libgbm.so.1";
+        assert_eq!(system_graphics_preload(&has).as_deref(), Some("/usr/lib/libgbm.so.1:/usr/lib/libEGL.so.1"));
+        assert_eq!(system_graphics_preload(&|_| false), None);
     }
 }

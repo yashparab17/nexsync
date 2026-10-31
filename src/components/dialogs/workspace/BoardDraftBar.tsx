@@ -134,7 +134,7 @@ export default function BoardDraftBar({ workspacePath, columns, board, onBoard, 
 								void start();
 							}}
 						>
-							<Input aria-label="Name of the draft" placeholder="Name it, for example Sprint 12 plan" value={name} maxLength={MAX_NAME} onChange={(e) => setName(e.target.value)} />
+							<Input aria-label="Name of the draft" placeholder="Name" value={name} maxLength={MAX_NAME} onChange={(e) => setName(e.target.value)} />
 							<Button type="submit" isDisabled={busy || !name.trim()}>
 								Start
 							</Button>

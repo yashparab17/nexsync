@@ -3,7 +3,7 @@ import { LAYOUT } from "@/lib/workspaceLayout";
 import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
 import { dropSummary, importDropped } from "@/lib/dropImport";
 import { EmptyState } from "@/components/layout/Page";
-import Toolbar, { ToolbarSearch, ToolbarSwitch, ToolbarTitle } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarSearch, ToolbarSwitch } from "@/components/layout/Toolbar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -495,7 +495,6 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 			{notice.node}
 			{/* Toolbar */}
 			<Toolbar>
-				<ToolbarTitle name={ROOT ? "Files" : "Explorer"} />
 				<Button variant="ghost" size="icon-xs" aria-label="Up one folder" className="ml-1" isDisabled={atRoot} onPress={() => navigateToDir(parentDir)}>
 					<ChevronUp className="size-4 -rotate-90" />
 				</Button>
@@ -517,7 +516,7 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 						</div>
 					))}
 				</nav>
-				<ToolbarSearch label="Filter this folder" value={filter} onChange={setFilter} />
+				<ToolbarSearch label="Filter this folder" placeholder="Filter" value={filter} onChange={setFilter} />
 				<ToolbarSwitch
 					label="View"
 					value={view}

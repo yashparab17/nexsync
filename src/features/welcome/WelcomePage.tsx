@@ -40,7 +40,7 @@ import type { WorkspaceInfo } from "@/types/workspace";
 import logo_black from "@/assets/logos/logo-black.svg";
 import logo_white from "@/assets/logos/logo-white.svg";
 import Loading from "@/components/Loading";
-import OnboardingTour, { tourSeen } from "@/components/dialogs/OnboardingTour";
+import { hintsSeen, markHintsSeen } from "@/lib/hints";
 import { t } from "@/i18n";
 
 // Keys that work from any workspace screen
@@ -116,7 +116,12 @@ export default function Welcome() {
 	const greeting = userName ? t(`welcome.${part}` as const, { name: userName }) : t(`welcome.${part}NoName` as const);
 
 	// The introduction opens by itself the first time, and from the link below after that
-	const [tourOpen, setTourOpen] = useState(() => !tourSeen());
+	// A pulsing ring on the first thing to do, until it is used or put away
+	const [hint, setHint] = useState(() => !hintsSeen());
+	const endHint = () => {
+		markHintsSeen();
+		setHint(false);
+	};
 	// The folder icon opens while anything on its button is hovered or focused, not only the icon
 	const [importHot, setImportHot] = useState(false);
 	const [settingsOpen, setSettingsOpen] = useState(false);
@@ -168,7 +173,7 @@ export default function Welcome() {
 					<span className="font-mono text-xs text-muted-foreground">v{APP_VERSION}</span>
 				</div>
 				<div className="flex items-center gap-1">
-					<Button variant="ghost" size="sm" onPress={() => setTourOpen(true)}>{t("welcome.tour")}</Button>
+					
 					<ThemeToggle />
 					<Button variant="ghost" size="icon" onPress={() => setSettingsOpen(true)} aria-label="Application Settings">
 						<SettingsIcon className="size-5" />
@@ -211,12 +216,20 @@ export default function Welcome() {
 					<aside className="flex flex-col gap-8">
 						<section className="flex flex-col gap-3">
 							<h2 className="font-mono text-xs text-muted-foreground">Start</h2>
-							<CreateWorkspaceDialog>
+							<div className="relative" onClickCapture={hint ? endHint : undefined}>
+<CreateWorkspaceDialog>
 								<Button className={tile}>
 									<FolderPlus className="size-6 shrink-0" />
 									<span><span className="block font-semibold">Create a Workspace</span><span className="block text-sm font-normal opacity-80">A new folder on this computer</span></span>
 								</Button>
 							</CreateWorkspaceDialog>
+{hint && recentWorkspaces.length === 0 && (
+<>
+<span aria-hidden className="pointer-events-none absolute -inset-1 animate-pulse border-2 border-primary motion-reduce:animate-none" />
+<span className="pointer-events-none absolute -top-2.5 right-3 bg-primary px-2 font-mono text-xs text-primary-foreground">Start here</span>
+</>
+)}
+</div>
 							<JoinWorkspaceDialog>
 								<Button variant="outline" className={tile}>
 									<UsersRound className="size-6 shrink-0" />
@@ -227,7 +240,7 @@ export default function Welcome() {
 								<Button variant="outline" className={tile} onHoverStart={() => setImportHot(true)} onHoverEnd={() => setImportHot(false)} onFocus={() => setImportHot(true)} onBlur={() => setImportHot(false)}>
 									<AnimateIcon animate={importHot} className="flex items-center gap-4">
 										<FolderClose className="size-6 shrink-0" />
-										<span><span className="block font-semibold">Import a Folder</span><span className="block text-sm font-normal text-muted-foreground">Use files you already have</span></span>
+										<span><span className="block font-semibold">Import a Workspace</span><span className="block text-sm font-normal text-muted-foreground">Use files you already have</span></span>
 									</AnimateIcon>
 								</Button>
 							</ImportWorkspaceDialog>
@@ -257,7 +270,7 @@ export default function Welcome() {
 				)}
 			</Dialog>
 
-			<OnboardingTour open={tourOpen} onClose={() => setTourOpen(false)} />
+			
 		</div>
 	);
 }

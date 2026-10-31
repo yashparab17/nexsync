@@ -11,10 +11,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FilePlus, FileText, Pencil, Trash2, Upload } from "@/components/animate-icons";
 import { useContextMenu } from "@/components/elements/ContextMenu";
 import DocumentWorkspace, { type Layout } from "@/features/office/documents/components/DocumentWorkspace";
-import CollapsiblePane from "@/components/layout/CollapsiblePane";
+import CollapsiblePane, { LIST_WIDTH } from "@/components/layout/CollapsiblePane";
 import PresenceDots from "@/components/elements/PresenceDots";
 import { EmptyState, Page } from "@/components/layout/Page";
-import Toolbar, { ToolbarSearch, ToolbarTitle } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarSearch } from "@/components/layout/Toolbar";
 import Loading from "@/components/Loading";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -244,38 +244,34 @@ export default function DocumentsPage() {
 
 	return (
 		<Page>
-			<Toolbar>
-				<ToolbarTitle name="Documents" meta={docs ? String(docs.length) : undefined} />
-				<ToolbarSearch label="Search documents" value={query} onChange={setQuery} placeholder="Search" className="w-48" />
-				<span className="flex-1" />
-				{!isViewer && (
-					<>
-						<input
-							ref={fileInput}
-							type="file"
-							accept=".docx,.docm,.dotx,.dotm,.doc,.dot,.odt,.rtf"
-							className="hidden"
-							onChange={(e) => {
+			<div className="flex min-h-0 flex-1">
+				<CollapsiblePane id="documents.list" defaultWidth={LIST_WIDTH} label="the list of documents">
+					<div className="flex shrink-0 flex-col bg-panel">
+					<Toolbar variant="header">
+						<ToolbarSearch label="Search documents" value={query} onChange={setQuery} placeholder="Search" className="min-w-0 flex-1" />
+						{!isViewer && (
+							<>
+								<input
+								ref={fileInput}
+								type="file"
+								accept=".docx,.docm,.dotx,.dotm,.doc,.dot,.odt,.rtf"
+								className="hidden"
+								onChange={(e) => {
 								const f = e.target.files?.[0];
 								e.target.value = "";
 								if (f) void addFile(f);
-							}}
-						/>
-						<Button variant="outline" size="sm" onPress={() => fileInput.current?.click()}>
-							<Upload className="size-4" />
-							Add a File
-						</Button>
-						<Button size="sm" onPress={() => setCreating(true)}>
-							<FilePlus className="size-4" />
-							New Document
-						</Button>
-					</>
-				)}
-			</Toolbar>
-
-			<div className="flex min-h-0 flex-1">
-				<CollapsiblePane id="documents.list" defaultWidth={224} label="the list of documents">
-					<nav aria-label="Documents" className="w-56 shrink-0 space-y-0.5 overflow-y-auto bg-panel p-2">
+								}}
+								/>
+								<Button variant="ghost" size="icon-xs" aria-label="Add a file" onPress={() => fileInput.current?.click()}>
+									<Upload className="size-4" />
+								</Button>
+								<Button size="icon-xs" aria-label="New document" onPress={() => setCreating(true)}>
+									<FilePlus className="size-4" />
+								</Button>
+							</>
+						)}
+					</Toolbar>
+					<nav aria-label="Documents" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5">
 					{docs === null ? null : shown.length === 0 ? (
 						<p className="p-3 text-sm text-muted-foreground">{docs.length === 0 ? "No documents yet. Make one, or add a .docx, .doc, .odt or .rtf file." : "No document matches."}</p>
 					) : (
@@ -291,10 +287,9 @@ export default function DocumentsPage() {
 										if (e.key === "F2") startRename(d);
 										else if (e.key === "Delete") setDeleting(d);
 									}}
-									className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-3 text-left text-sm outline-none focus-visible:bg-muted"
+									className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-3 text-left text-[13px] outline-none focus-visible:bg-muted"
 								>
-									<FileText className="size-4 shrink-0 text-muted-foreground" />
-									<span className="min-w-0 flex-1 truncate">{d.name}</span>
+																		<span className="min-w-0 flex-1 truncate">{d.name}</span>
 									<PresenceDots names={viewersAt("documents", d.rel)} />
 								</button>
 								{!isViewer && (
@@ -306,6 +301,7 @@ export default function DocumentsPage() {
 						))
 					)}
 				</nav>
+					</div>
 				</CollapsiblePane>
 
 				<main className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -413,7 +409,7 @@ export default function DocumentsPage() {
 						}}
 					>
 						<DialogHeading icon={<FilePlus className="size-6" />} title="New Document" />
-						<Input aria-label="Document name" autoFocus required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Project brief" aria-invalid={!!(newName && validateFileName(newName))} />
+						<Input aria-label="Document name" autoFocus required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Title" aria-invalid={!!(newName && validateFileName(newName))} />
 						<select aria-label="Template" value={template} onChange={(e) => setTemplate(e.target.value)} className="h-9 w-full border bg-background px-2 text-sm">
 						{DOC_TEMPLATES.map((t) => (
 							<option key={t.id} value={t.id}>

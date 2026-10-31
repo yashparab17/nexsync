@@ -106,3 +106,49 @@ jobs:
                   # Shown in the app as "What's new" when this release is installed as an update (RELEASE_NOTES.md at the tag)
                   releaseBody: ${{ steps.notes.outputs.body }}
                   includeUpdaterJson: true
+
+    # The AppImage ships its own Wayland, EGL, GL and GBM libraries, which clash with a newer system's graphics drivers
+    # (Arch: "Could not create default EGL display: EGL_BAD_PARAMETER"). This strips them so the system's are used, then
+    # repacks, re-signs (the updater checks the signature) and replaces the AppImage, its .sig and the update file's entry.
+    linux-appimage-libs:
+        needs: release
+        runs-on: ubuntu-22.04
+        permissions:
+            contents: write
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+            TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 12.11.2
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: "pnpm"
+            - run: pnpm install
+            - name: Strip the bundled graphics libraries
+              run: |
+                  sudo apt-get update && sudo apt-get install -y libfuse2 squashfs-tools
+                  tag="v$(node -p "require('./package.json').version")"
+                  mkdir work && cd work
+                  gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern '*.AppImage'
+                  app="$(ls *.AppImage)"
+                  chmod +x "$app" && "./$app" --appimage-extract >/dev/null
+                  find squashfs-root -name 'libwayland-*' -o -name 'libEGL*' -o -name 'libGL.*' -o -name 'libGL-*' -o -name 'libGLX*' -o -name 'libgbm*' | xargs -r rm -fv
+                  curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+                  chmod +x appimagetool
+                  rm "$app"
+                  ARCH=x86_64 ./appimagetool --appimage-extract-and-run squashfs-root "$app"
+                  rm -f "$app.sig"
+                  pnpm --dir .. tauri signer sign "$PWD/$app"
+                  gh release upload "$tag" "$app" "$app.sig" --repo "$GITHUB_REPOSITORY" --clobber
+                  gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern latest.json
+                  sig="$(cat "$app.sig")"
+                  node -e "
+                    const fs=require('fs');const j=JSON.parse(fs.readFileSync('latest.json','utf8'));
+                    for(const k of Object.keys(j.platforms)) if(k.startsWith('linux-x86_64')) j.platforms[k].signature=process.argv[1];
+                    fs.writeFileSync('latest.json',JSON.stringify(j,null,2));" "$sig"
+                  gh release upload "$tag" latest.json --repo "$GITHUB_REPOSITORY" --clobber

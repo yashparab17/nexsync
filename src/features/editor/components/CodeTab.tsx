@@ -2,7 +2,7 @@ import CollapsiblePane from "@/components/layout/CollapsiblePane";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 import { openSearchPanel } from "@codemirror/search";
-import { EditorView } from "@codemirror/view";
+import { EditorView, runScopeHandlers } from "@codemirror/view";
 import { AlertTriangle, GitBranch } from "@/components/animate-icons";
 
 import CodeEditor, { type CursorInfo } from "@/features/editor/components/CodeEditor";
@@ -264,6 +264,14 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 		view.focus();
 	};
 
+	const press = (redo: boolean) => {
+		const view = viewRef.current;
+		if (!view) return;
+		const mac = /Mac/i.test(navigator.platform || navigator.userAgent);
+		view.focus();
+		runScopeHandlers(view, new KeyboardEvent("keydown", { key: redo ? "y" : "z", ctrlKey: !mac, metaKey: mac, shiftKey: redo && mac }), "editor");
+	};
+
 	const canSuggest = !readOnly && !!collab;
 	useImperativeHandle(
 		ref,
@@ -278,6 +286,9 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 				const { from, to } = viewRef.current?.state.selection.main ?? { from: 0, to: 0 };
 				setSuggesting({ from, to });
 			},
+			// Undo and redo run whichever keymap the editor has (the shared history when collaborating, its own otherwise)
+			undo: () => press(false),
+			redo: () => press(true),
 			goToLine: jumpToLine,
 			focus: () => viewRef.current?.focus(),
 		}),

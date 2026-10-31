@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import Toolbar, { ToolbarSearch, ToolbarTitle } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarSearch } from "@/components/layout/Toolbar";
 import { ChevronRight, Columns3, Copy, Eye, EyeOff, RefreshCw, Trash2, ChevronDown, ChevronsDownUp, Download, FilePlus, FolderPlus, Pencil } from "@/components/animate-icons";
 
 import FileKindIcon, { FolderKindIcon } from "@/features/editor/components/FileKindIcon";
@@ -172,7 +172,7 @@ export default function FileExplorer({
 								type="button"
 								data-explorer-row
 								title={rel}
-								className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-3 text-left outline-none focus-visible:bg-muted"
+								className="flex min-w-0 flex-1 items-center gap-2 py-1 pl-3 text-left text-[13px] outline-none focus-visible:bg-muted"
 								onClick={() => (entry.is_dir ? onToggleDir(rel) : onOpenFile(rel))}
 								onKeyDown={(e) => (e.key === "Enter" && e.ctrlKey && !entry.is_dir ? onOpenSide?.(rel) : onRowKey(e, entry, rel, isOpen))}
 							>
@@ -239,12 +239,12 @@ export default function FileExplorer({
 			}}
 			className={cn("flex h-full min-w-0 flex-col bg-panel", dragging && "ring-2 ring-primary ring-inset")}
 		>
-			<Toolbar variant="header" className="justify-between">
-				<ToolbarTitle as="h2" name="Editor" />
-				<div className="flex">
-					{!readOnly && (
-						<>
-							<Button variant="ghost" size="icon-xs" aria-label="New file" onPress={() => onNew("file", targetDir)}>
+			<Toolbar variant="header" className="group/header justify-between">
+				<ToolbarSearch label="Filter files" placeholder="Filter" value={query} onChange={setQuery} className="min-w-0 flex-1" />
+				<div className="flex shrink-0">
+{!readOnly && (
+<>
+<Button variant="ghost" size="icon-xs" aria-label="New file" onPress={() => onNew("file", targetDir)}>
 								<FilePlus className="size-4" />
 							</Button>
 							<Button variant="ghost" size="icon-xs" aria-label="New folder" onPress={() => onNew("folder", targetDir)}>
@@ -252,6 +252,7 @@ export default function FileExplorer({
 							</Button>
 						</>
 					)}
+<span className="hidden group-focus-within/header:flex group-hover/header:flex">
 					<Button variant="ghost" size="icon-xs" aria-label={showIgnored ? "Hide files kept on this device" : "Show files kept on this device"} aria-pressed={showIgnored} onPress={() => setShowIgnored((v) => !v)}>
 						{showIgnored ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
 					</Button>
@@ -261,21 +262,18 @@ export default function FileExplorer({
 					<Button variant="ghost" size="icon-xs" aria-label={`Export ${targetDir} as zip`} onPress={onExport}>
 						<Download className="size-3.5" />
 					</Button>
+</span>
 					<Button variant="ghost" size="icon-xs" aria-label="Collapse all folders" onPress={onCollapseAll}>
 						<ChevronsDownUp className="size-3.5" />
 					</Button>
 				</div>
 			</Toolbar>
 
-			{/* The filter sits in the same row as the search in Notes */}
-			<Toolbar variant="sub">
-				<ToolbarSearch label="Filter files" placeholder="Filter files" value={query} onChange={setQuery} className="w-full" />
-				{notice && (
-					<p role={notice.ok ? "status" : "alert"} className={cn("mt-2 break-words text-xs", notice.ok ? "text-success" : "text-destructive")}>
+			{notice && (
+					<p role={notice.ok ? "status" : "alert"} className={cn("break-words px-3 py-1 text-xs", notice.ok ? "text-success" : "text-destructive")}>
 						{notice.text}
 					</p>
 				)}
-			</Toolbar>
 
 			<div ref={treeRef} className="flex-1 overflow-y-auto pb-3" role="tree" aria-label="Files">
 				{roots.map((root) => {
@@ -287,7 +285,7 @@ export default function FileExplorer({
 								<button
 									type="button"
 									data-explorer-row
-									className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-muted-foreground outline-none focus-visible:bg-muted"
+									className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left text-xs font-semibold text-muted-foreground outline-none focus-visible:bg-muted"
 									onClick={() => onToggleDir(root)}
 									onKeyDown={(e) => onRowKey(e, null, root, isOpen)}
 								>

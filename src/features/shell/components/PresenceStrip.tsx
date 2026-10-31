@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, BellOff } from "@/components/animate-icons";
 
 import Avatar from "@/components/elements/Avatar";
-import { followPath, placeLabel, readQuiet, saveQuiet } from "@/lib/p2p/presence";
+import { followPath, placeLabel } from "@/lib/p2p/presence";
 import { cn } from "@/lib/utils";
 import { useP2P } from "@/store/p2p/P2PContext";
 import type { ConnectedPeerInfo } from "@/lib/p2p/types";
@@ -13,10 +12,9 @@ import type { ConnectedPeerInfo } from "@/lib/p2p/types";
 const route = (p: ConnectedPeerInfo) => (p.connectionType === "direct" ? "Direct" : p.connectionType === "relay" ? "Through a relay" : "Connecting");
 
 export default function PresenceStrip() {
-	const { peers, presence, nameOf, link, hostName } = useP2P();
+	const { peers, presence, nameOf } = useP2P();
 	const navigate = useNavigate();
 	const [following, setFollowing] = useState<string | null>(null);
-	const [quiet, setQuiet] = useState(readQuiet);
 
 	// Go where the followed person goes, each time they move
 	const there = following ? presence[following] : undefined;
@@ -62,25 +60,7 @@ export default function PresenceStrip() {
 					);
 				})}
 			</div>
-			{hostName !== null && link === "members" && (
-				<span className="hidden text-xs text-warning md:inline" title={`${hostName} is offline. You are working with the other members.`}>
-					Host offline
-				</span>
-			)}
-			{following && <span className="hidden text-xs text-primary md:inline">Following {nameOf(following)}</span>}
-			<button
-				type="button"
-				onClick={() => {
-					saveQuiet(!quiet);
-					setQuiet(!quiet);
-				}}
-				aria-pressed={quiet}
-				aria-label={quiet ? "Join and leave notices are off" : "Join and leave notices are on"}
-				title={quiet ? "Join and leave notices are off. Click to turn them on." : "Join and leave notices are on. Click to turn them off."}
-				className="p-1 text-muted-foreground hover:text-foreground"
-			>
-				{quiet ? <BellOff className="size-3.5" /> : <Bell className="size-3.5" />}
-			</button>
+{following && <span className="hidden text-xs text-primary md:inline">Following {nameOf(following)}</span>}
 		</div>
 	);
 }

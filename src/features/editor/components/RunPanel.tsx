@@ -131,7 +131,7 @@ export default function RunPanel({ workspacePath, activePath }: { workspacePath:
 					onKeyDown={(e) => {
 						if (e.key === "Enter") confirmedThisSession ? void start() : setConfirming(true);
 					}}
-					placeholder="Command to run in the projects folder, e.g. python main.py"
+					placeholder="Command"
 					className="h-7 flex-1 font-mono text-xs"
 					aria-label="Command to run"
 				/>

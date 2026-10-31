@@ -20,7 +20,7 @@ export default function DiscussToggle({ channel, canComment }: { channel: string
 				Discuss{n > 0 ? ` (${n})` : ""}
 			</button>
 			</AnimateIcon>
-			{open && <FieldDiscussion channel={channel} field="" canComment={canComment} placeholder="Say something about this" label="Discuss this" />}
+			{open && <FieldDiscussion channel={channel} field="" canComment={canComment} placeholder="Comment" label="Discuss this" />}
 		</div>
 	);
 }

@@ -1,9 +1,12 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import NotificationBell from "@/features/shell/components/NotificationBell";
 import { MAX_NOTIFICATIONS, NotificationProvider, useNotifications } from "@/store/notifications/NotificationContext";
+
+// The review of others' changes needs a workspace; here there is none
+vi.mock("@/features/shell/components/CatchUp", () => ({ useCatchUp: () => ({ unread: 0, openReview: () => {}, review: null }) }));
 
 afterEach(cleanup);
 
@@ -30,7 +33,7 @@ describe("notifications", () => {
 		expect(api.unread).toBe(2);
 		expect(api.items[0].text).toBe('Ann assigned you "Ship"');
 
-		fireEvent.click(screen.getByRole("button", { name: "Notifications, 2 unread" }));
+		fireEvent.click(screen.getByRole("button", { name: "Inbox, 2 new" }));
 		expect(api.unread).toBe(0);
 		expect(screen.getByText("Ann joined the workspace")).toBeTruthy();
 	});
@@ -38,7 +41,7 @@ describe("notifications", () => {
 	it("can be cleared, and says so when there is nothing", () => {
 		mount();
 		act(() => api.notify("Something"));
-		fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+		fireEvent.click(screen.getByRole("button", { name: /inbox/i }));
 		fireEvent.click(screen.getByRole("button", { name: "Clear" }));
 		expect(api.items).toHaveLength(0);
 		expect(screen.getByText(/nothing yet/i)).toBeTruthy();

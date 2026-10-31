@@ -40,7 +40,7 @@ export default function SuggestEditDialog({ doc, userName, from, to, onClose }: 
 				{original && <pre className="max-h-32 overflow-auto border bg-muted/40 p-2 text-xs whitespace-pre-wrap">{original}</pre>}
 				<div className="space-y-1">
 					<Label htmlFor="suggested-text">{from === to ? "Add" : "Replace with"}</Label>
-					<Textarea id="suggested-text" autoFocus value={text} maxLength={MAX_PROPOSAL_TEXT} onChange={(e) => setText(e.target.value)} placeholder="Leave empty to suggest removing the text" className="min-h-24 border-input px-2" />
+					<Textarea id="suggested-text" autoFocus value={text} maxLength={MAX_PROPOSAL_TEXT} onChange={(e) => setText(e.target.value)} placeholder="Replacement" className="min-h-24 border-input px-2" />
 				</div>
 				{error && (
 					<p role="alert" className="border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">

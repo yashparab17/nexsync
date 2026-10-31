@@ -161,7 +161,7 @@ export default function BranchesDialog({ workspacePath, fileName, doc, userName,
 									void create();
 								}}
 							>
-								<Input aria-label="Branch name" placeholder="Name the branch, for example Try a new layout" value={name} maxLength={MAX_BRANCH_NAME} onChange={(e) => setName(e.target.value)} />
+								<Input aria-label="Branch name" placeholder="Branch name" value={name} maxLength={MAX_BRANCH_NAME} onChange={(e) => setName(e.target.value)} />
 								<Button type="submit" isDisabled={busy || !name.trim()}>
 									Start a Branch
 								</Button>

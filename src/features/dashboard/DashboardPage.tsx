@@ -8,7 +8,7 @@ import Avatar from "@/components/elements/Avatar";
 import AnnouncementStrip from "@/features/announcements/components/AnnouncementStrip";
 import { Button } from "@/components/ui/button";
 import { Page, PageBody, Panel } from "@/components/layout/Page";
-import Toolbar, { ToolbarTitle } from "@/components/layout/Toolbar";
+import Toolbar from "@/components/layout/Toolbar";
 import Art from "@/components/elements/Art";
 import { DEFAULT_LAYOUT, loadLayout, moveTile, saveLayout, type DashboardLayout, type TileId, type TileSize } from "@/lib/dashboardLayout";
 import { formatAction } from "@/lib/insights";
@@ -256,8 +256,6 @@ export default function DashboardPage() {
 	return (
 		<Page>
 			<Toolbar>
-				<ToolbarTitle name={workspace?.name ?? "Dashboard"} />
-				{workspace?.description && <span className="ml-1 hidden min-w-0 flex-1 truncate border-l pl-3 text-sm text-muted-foreground md:block">{workspace.description}</span>}
 				<span className="flex-1" />
 				<Button variant={editing ? "default" : "ghost"} size="sm" onPress={() => setEditing((v) => !v)}>
 					{editing ? <Check className="size-4" /> : <SlidersHorizontal className="size-4" />}

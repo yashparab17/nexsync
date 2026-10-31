@@ -168,7 +168,7 @@ function DraftsDialog({ workspacePath, entity, record, members, onMerged, onClos
 								void create();
 							}}
 						>
-							<Input aria-label="Draft name" placeholder="Name the draft, for example Reword for the client" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+							<Input aria-label="Draft name" placeholder="Draft name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
 							<Button type="submit" isDisabled={busy || !name.trim()}>
 								Start a Draft
 							</Button>

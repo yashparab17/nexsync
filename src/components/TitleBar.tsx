@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+import logoBlack from "@/assets/logos/logo-black.svg";
+import logoWhite from "@/assets/logos/logo-white.svg";
 import { cn } from "@/lib/utils";
 
 // macOS keeps its own traffic-light buttons (the window is configured to draw them over this bar, see
@@ -62,10 +64,23 @@ export default function TitleBar() {
 	];
 
 	return (
-		<header className="relative z-[60] flex h-9 shrink-0 select-none items-center">
-			<div data-tauri-drag-region className={cn("flex h-full min-w-0 flex-1 items-center gap-2", IS_MAC ? "pl-20" : "pl-3")}>
+		<header className="relative z-[60] grid h-10 shrink-0 select-none grid-cols-[minmax(0,1fr)_minmax(0,32rem)_minmax(0,1fr)] items-center">
+			{/* The app, then back and forward once a workspace is open */}
+			<div data-tauri-drag-region className={cn("flex h-full min-w-0 items-center gap-2", IS_MAC ? "pl-20" : "pl-3")}>
+				{!IS_MAC && (
+					<>
+						<img src={logoBlack} alt="" draggable={false} className="pointer-events-none size-5 dark:hidden" />
+						<img src={logoWhite} alt="" draggable={false} className="pointer-events-none hidden size-5 dark:block" />
+					</>
+				)}
+				<span className="pointer-events-none mr-2 text-sm font-semibold">Nexsync</span>
+				<div id="titlebar-left" className="flex items-center gap-0.5" />
 			</div>
-			{!IS_MAC &&
+			{/* The search of a workspace sits in the middle column, so it is centred on the window whatever is at either side */}
+			<div id="titlebar-center" data-tauri-drag-region className="flex h-full min-w-0 items-center justify-center" />
+			<div data-tauri-drag-region className="flex h-full min-w-0 items-center justify-end">
+				<div id="titlebar-right" className="flex min-w-0 items-center gap-1 pr-1" />
+				{!IS_MAC &&
 				controls.map(({ label, icon, run, danger }) => (
 					<button
 						key={label}
@@ -81,6 +96,7 @@ export default function TitleBar() {
 						{icon}
 					</button>
 				))}
+			</div>
 		</header>
 	);
 }

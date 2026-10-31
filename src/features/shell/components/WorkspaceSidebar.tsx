@@ -7,6 +7,7 @@ import { useCallback, useState, type ElementType } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
 // Icons
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { ArrowLeft, ChartColumn as BarChart3, SquareKanban as KanbanSquare, LayoutDashboard, ChevronDown, Trash2, UsersRound } from "@/components/animate-icons";
 
 // Components
@@ -131,7 +132,6 @@ const byPath = (path: string) => navigation.find((item) => item.path === path)!;
 // items, then planning
 const navGroups: { id: string; label?: MessageKey; items: NavigationItem[] }[] = [
 	{ id: "top", items: [byPath("/workspace"), byPath("/workspace/explorer")] },
-	{ id: "talk", label: "nav.groupTalk", items: [byPath("/workspace/announcements"), byPath("/workspace/chat")] },
 	{ id: "office", label: "nav.groupOffice", items: [byPath("/workspace/office/documents"), byPath("/workspace/office/sheets"), byPath("/workspace/office/slides"), byPath("/workspace/notes")] },
 	{ id: "code", label: "nav.groupCode", items: [byPath("/workspace/projects"), byPath("/workspace/editor")] },
 	{ id: "storage", label: "nav.groupStorage", items: [byPath("/workspace/others"), byPath("/workspace/assets")] },
@@ -288,7 +288,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 			className={cn("glide flex h-full shrink-0 flex-col overflow-hidden bg-sidebar", expanded && "w-64 border-r")}
 		>
 			{/* Workspace identity */}
-			<div className={cn("flex h-12 shrink-0 items-center gap-2", "justify-start pl-[14px]")}>
+			<div className={cn("flex h-12 shrink-0 items-center gap-2", "justify-start pl-[14px] pr-2")}>
 				<Button
 					variant="ghost"
 					size="icon"
@@ -299,9 +299,31 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 				</Button>
 
 				<WorkspaceIconView id={workspace?.id} name={workspace?.name ?? ""} className={cn("size-6 text-sm", !showLabels && "hidden")} />
-				<p className={cn("truncate font-semibold whitespace-nowrap", showLabels ? "block" : "hidden")}>{workspace?.name}</p>
+				<p className={cn("min-w-0 flex-1 truncate font-semibold whitespace-nowrap", showLabels ? "block" : "hidden")}>{workspace?.name}</p>
+					{!expanded && showLabels && <button
+						type="button"
+						onClick={() => setCollapsed("sidebar", !collapsed)}
+						aria-label={collapsed ? "Expand the sidebar" : "Collapse the sidebar"}
+						title={collapsed ? "Expand the sidebar" : "Collapse the sidebar to icons"}
+						className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-foreground outline-none hover:bg-muted focus-visible:bg-muted"
+					>
+						{collapsed ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
+					</button>}
 			</div>
 
+				{!expanded && !showLabels && (
+					<div className="flex justify-center">
+						<button
+						type="button"
+						onClick={() => setCollapsed("sidebar", !collapsed)}
+						aria-label={collapsed ? "Expand the sidebar" : "Collapse the sidebar"}
+						title={collapsed ? "Expand the sidebar" : "Collapse the sidebar to icons"}
+						className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-foreground outline-none hover:bg-muted focus-visible:bg-muted"
+					>
+						{collapsed ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
+					</button>
+					</div>
+				)}
 			{showLabels && (
 				<div className="px-3 pt-1">
 					<SidebarQuick onNavigate={onNavigate} />

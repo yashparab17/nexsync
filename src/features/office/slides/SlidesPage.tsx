@@ -6,12 +6,12 @@ import { pushRecent } from "@/lib/recentFiles";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { FilePlus, FileText, Upload } from "@/components/animate-icons";
-import CollapsiblePane from "@/components/layout/CollapsiblePane";
+import { FilePlus, Upload } from "@/components/animate-icons";
+import CollapsiblePane, { LIST_WIDTH } from "@/components/layout/CollapsiblePane";
 import PresenceDots from "@/components/elements/PresenceDots";
 import { EmptyState, Page } from "@/components/layout/Page";
 import SlideWorkspace from "@/features/office/slides/components/SlideWorkspace";
-import Toolbar, { ToolbarSearch, ToolbarTitle } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarSearch } from "@/components/layout/Toolbar";
 import Loading from "@/components/Loading";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
@@ -129,50 +129,46 @@ export default function SlidesPage() {
 
 	return (
 		<Page>
-			<Toolbar>
-				<ToolbarTitle name="Slides" meta={decks ? String(decks.length) : undefined} />
-				<ToolbarSearch label="Search decks" value={query} onChange={setQuery} placeholder="Search" className="w-48" />
-				<span className="flex-1" />
-				{!isViewer && (
-					<>
-						<input
-							ref={fileInput}
-							type="file"
-							accept=".pptx,.pptm,.potx,.ppsx"
-							className="hidden"
-							onChange={(e) => {
+			<div className="flex min-h-0 flex-1">
+				<CollapsiblePane id="slides.list" defaultWidth={LIST_WIDTH} label="the list of decks">
+					<div className="flex shrink-0 flex-col bg-panel">
+					<Toolbar variant="header">
+						<ToolbarSearch label="Search decks" value={query} onChange={setQuery} placeholder="Search" className="min-w-0 flex-1" />
+						{!isViewer && (
+							<>
+								<input
+								ref={fileInput}
+								type="file"
+								accept=".pptx,.pptm,.potx,.ppsx"
+								className="hidden"
+								onChange={(e) => {
 								const f = e.target.files?.[0];
 								e.target.value = "";
 								if (f) void addFile(f);
-							}}
-						/>
-						<Button variant="outline" size="sm" onPress={() => fileInput.current?.click()}>
-							<Upload className="size-4" />
-							Add a File
-						</Button>
-						<Button size="sm" onPress={() => setCreating(true)}>
-							<FilePlus className="size-4" />
-							New Deck
-						</Button>
-					</>
-				)}
-			</Toolbar>
-
-			<div className="flex min-h-0 flex-1">
-				<CollapsiblePane id="slides.list" defaultWidth={224} label="the list of decks">
-					<nav aria-label="Decks" className="w-56 shrink-0 space-y-0.5 overflow-y-auto bg-panel p-2">
+								}}
+								/>
+								<Button variant="ghost" size="icon-xs" aria-label="Add a file" onPress={() => fileInput.current?.click()}>
+									<Upload className="size-4" />
+								</Button>
+								<Button size="icon-xs" aria-label="New deck" onPress={() => setCreating(true)}>
+									<FilePlus className="size-4" />
+								</Button>
+							</>
+						)}
+					</Toolbar>
+					<nav aria-label="Decks" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5">
 					{decks === null ? null : shownDecks.length === 0 ? (
 						<p className="p-3 text-sm text-muted-foreground">{decks.length === 0 ? "No decks yet. Make one, or add a .pptx file." : "No deck matches."}</p>
 					) : (
 						shownDecks.map((d) => (
-							<button key={d.rel} type="button" aria-current={d.rel === selected} onClick={() => setSelected(d.rel)} className={cn("flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted", d.rel === selected && "bg-muted")}>
-								<FileText className="size-4 shrink-0 text-muted-foreground" />
-								<span className="min-w-0 flex-1 truncate">{d.name}</span>
+							<button key={d.rel} type="button" aria-current={d.rel === selected} onClick={() => setSelected(d.rel)} className={cn("flex w-full min-w-0 items-center gap-2 px-3 py-1.5 text-left text-[13px] outline-none hover:bg-muted focus-visible:bg-muted", d.rel === selected && "bg-muted")}>
+																<span className="min-w-0 flex-1 truncate">{d.name}</span>
 								<PresenceDots names={viewersAt("slides", d.rel)} />
 							</button>
 						))
 					)}
 				</nav>
+					</div>
 				</CollapsiblePane>
 
 				<main className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -209,7 +205,7 @@ export default function SlidesPage() {
 						}}
 					>
 						<DialogHeading icon={<FilePlus className="size-6" />} title="New Deck" />
-						<Input aria-label="Deck name" autoFocus required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Quarterly review" aria-invalid={!!(newName && validateFileName(newName))} />
+						<Input aria-label="Deck name" autoFocus required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Title" aria-invalid={!!(newName && validateFileName(newName))} />
 						{newName && validateFileName(newName) && <p role="alert" className="text-xs text-destructive">{validateFileName(newName)}</p>}
 						<DialogFooter className="mt-2">
 							<Button type="button" variant="outline" onPress={() => setCreating(false)}>

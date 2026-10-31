@@ -234,7 +234,7 @@ export default function SettingsPage({ onClose }: { onClose?: () => void } = {})
 					</div>
 					<div>
 						<Label htmlFor="ws-desc">Description</Label>
-						<Textarea id="ws-desc" value={description} disabled={isJoinedCopy} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description…" rows={3} className="mt-1" />
+						<Textarea id="ws-desc" value={description} disabled={isJoinedCopy} onChange={(e) => setDescription(e.target.value)} placeholder="Description" rows={3} className="mt-1" />
 					</div>
 					<div>
 						<Label htmlFor="workspace-path">Local path</Label>

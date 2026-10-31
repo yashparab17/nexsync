@@ -841,11 +841,6 @@ select option:checked {
   }
 }
 
-/* "Hide the headers": the workspace bar above the page and the page's own toolbar are folded away together */
-[data-hide-toolbars] [data-page-toolbar] {
-  display: none;
-}
-
 /* Formatting marks: a pilcrow at the end of each paragraph */
 .doc-marks .bn-block-content[data-content-type="paragraph"] > p::after,
 .doc-marks
@@ -946,4 +941,21 @@ select option:checked {
   ) {
   float: right;
   margin: 0 0 6px 14px;
+}
+
+/* A note shown inside another with ![[Note]], and pictures that are wider than the page */
+.md-preview img {
+  max-width: 100%;
+  height: auto;
+}
+.md-embed-note {
+  margin: 0.75rem 0;
+  border-left: 2px solid var(--primary);
+  background: color-mix(in oklab, var(--muted) 50%, transparent);
+  padding: 0.25rem 1rem;
+}
+.md-embed-title {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
 }

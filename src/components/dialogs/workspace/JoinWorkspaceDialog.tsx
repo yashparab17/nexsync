@@ -147,7 +147,7 @@ export default function JoinWorkspaceDialog({
 				<div className="flex flex-col gap-5">
 					<div className="flex flex-col gap-2">
 						<Label htmlFor="join-ticket">Invite or code</Label>
-						<Textarea id="join-ticket" placeholder="Paste an invite or type a code" value={ticket} onChange={(e) => setTicket(e.target.value)} rows={3} className="font-mono text-xs break-all" autoFocus />
+						<Textarea id="join-ticket" placeholder="Invite or code" value={ticket} onChange={(e) => setTicket(e.target.value)} rows={3} className="font-mono text-xs break-all" autoFocus />
 					</div>
 
 					<div className="flex flex-col gap-2">

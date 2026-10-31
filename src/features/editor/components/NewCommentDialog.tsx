@@ -42,7 +42,7 @@ export default function NewCommentDialog({ quote, onClose, onSubmit }: { quote: 
 								void submit();
 							}
 						}}
-						placeholder="Say what you think. Type @ and a name to mention someone."
+						placeholder="Comment"
 						className="min-h-24 w-full resize-y rounded-md bg-input p-2 text-sm outline-none placeholder:text-muted-foreground"
 					/>
 				</div>

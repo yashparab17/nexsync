@@ -12,7 +12,6 @@ import { FolderOpen, FolderPlus } from "@/components/animate-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { IconPicker, IconView } from "@/components/elements/WorkspaceIcon";
 import { setIcon, type WorkspaceIcon } from "@/lib/workspaceIcon";
 import { Dialog, DialogTrigger, DialogHeading, DialogFooter } from "@/components/ui/dialog";
@@ -45,6 +44,7 @@ export default function CreateWorkspaceDialog({
 
 	const [workspaceName, setWorkspaceName] = useState("");
 	const [description, setDescription] = useState("");
+	const [pickIcon, setPickIcon] = useState(false);
 	const [workspacePath, setWorkspacePath] = useState("");
 	const [error, setError] = useState("");
 	const [icon, setIconChoice] = useState<WorkspaceIcon | null>(null);
@@ -113,58 +113,43 @@ export default function CreateWorkspaceDialog({
 			{children}
 
 			{/* Dialog */}
-			<Dialog className="sm:max-w-3xl">
-				<DialogHeading icon={<FolderPlus className="size-6" />} title="Create a Workspace" />
+			<Dialog className="sm:max-w-md">
+					<DialogHeading icon={<FolderPlus className="size-6" />} title="Create a Workspace" />
 
-				<div className="grid gap-8 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-					<div className="flex min-w-0 flex-col gap-5">
-						<div className="flex flex-col gap-2">
-							<Label htmlFor="workspace-name">Name</Label>
-							<Input id="workspace-name" autoComplete="off" autoFocus placeholder="e.g. Thesis project" value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} aria-invalid={!!nameProblem} aria-describedby={nameProblem ? "workspace-name-problem" : undefined} />
-							{nameProblem && (
-								<p id="workspace-name-problem" role="alert" className="text-xs text-destructive">
-									{nameProblem}
-								</p>
-							)}
-						</div>
-
-						<div className="flex flex-col gap-2">
-							<Label htmlFor="description">Description <span className="font-normal text-muted-foreground">(optional)</span></Label>
-							<Textarea id="description" autoComplete="off" placeholder="e.g. Notes, code and tasks for our group" value={description} onChange={(e) => setDescription(e.target.value)} />
-						</div>
-
-						<div className="flex flex-col gap-2">
-							<Label>Icon <span className="font-normal text-muted-foreground">(optional)</span></Label>
-							<IconPicker value={icon} onChange={setIconChoice} name={workspaceName} />
-						</div>
-
-						<div className="flex flex-col gap-2">
-							<Label htmlFor="workspace-location">Save in</Label>
-							<div className="flex gap-2">
-								<Input id="workspace-location" readOnly value={workspacePath} className="font-mono text-xs" />
-								<Button variant="outline" onPress={pickFolder} aria-label="Choose a folder">
-									<FolderOpen className="size-4" />
-									Browse
-								</Button>
+					{/* The card as it will appear on the Welcome screen; its name, description and icon are edited right here */}
+					<div className="flex min-w-0 flex-col gap-3 border border-primary bg-card p-4">
+						<div className="flex min-w-0 items-center gap-3">
+							<button type="button" aria-expanded={pickIcon} aria-label="Change the icon" title="Change the icon" onClick={() => setPickIcon(!pickIcon)} className="shrink-0 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring">
+								<IconView icon={icon} name={workspaceName} className="size-12 text-2xl" />
+							</button>
+							<div className="flex min-w-0 flex-1 flex-col gap-1">
+								<Label htmlFor="workspace-name" className="sr-only">Name</Label>
+								<Input id="workspace-name" autoComplete="off" autoFocus placeholder="Workspace name" value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} aria-invalid={!!nameProblem} aria-describedby={nameProblem ? "workspace-name-problem" : undefined} />
+								<Label htmlFor="description" className="sr-only">Description</Label>
+								<Input id="description" autoComplete="off" placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
 							</div>
 						</div>
+						{nameProblem && (
+							<p id="workspace-name-problem" role="alert" className="text-xs text-destructive">
+								{nameProblem}
+							</p>
+						)}
+						{pickIcon && <IconPicker value={icon} onChange={setIconChoice} name={workspaceName} bare />}
+						<span className="truncate font-mono text-xs text-muted-foreground">{previewPath(workspacePath, workspaceName.trim() || "…")}</span>
 					</div>
 
-					{/* The card as it will appear on the Welcome screen */}
-					<div className="flex min-w-0 flex-col gap-3">
-						<span className="font-mono text-xs text-muted-foreground">preview</span>
-						<div className="flex h-56 min-w-0 flex-col gap-3 overflow-hidden border border-primary bg-card p-6">
-							<span className="flex min-w-0 items-center gap-3">
-								<IconView icon={icon} name={workspaceName} className="size-10 text-xl" />
-								<span className="line-clamp-2 min-w-0 text-xl font-semibold [overflow-wrap:anywhere]">{workspaceName.trim() || "Workspace name"}</span>
-							</span>
-							<span className="line-clamp-2 min-w-0 text-muted-foreground [overflow-wrap:anywhere]">{description.trim() || "No description yet."}</span>
-							<span className="mt-auto truncate font-mono text-xs text-muted-foreground">{previewPath(workspacePath, workspaceName.trim() || "…")}</span>
+					<div className="flex flex-col gap-1">
+						<Label htmlFor="workspace-location">Save in</Label>
+						<div className="flex gap-2">
+							<Input id="workspace-location" readOnly value={workspacePath} className="font-mono text-xs" />
+							<Button variant="outline" onPress={pickFolder} aria-label="Choose a folder">
+								<FolderOpen className="size-4" />
+								Browse
+							</Button>
 						</div>
 					</div>
-				</div>
 
-				{error && <p className="text-sm text-destructive">{error}</p>}
+					{error && <p className="text-sm text-destructive">{error}</p>}
 
 				<DialogFooter>
 					<Button variant="outline" slot="close">Cancel</Button>

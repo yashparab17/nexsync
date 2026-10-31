@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { EmptyState } from "@/components/layout/Page";
-import Toolbar, { ToolbarTitle, ToolbarSearch, ToolbarSelect, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarSearch, ToolbarSelect, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
 import { SlidersHorizontal, Copy, Check, Play, Trash2, FileText, Film, Headphones, Image as ImageIcon, History, Pencil, Sparkles, Upload, UploadCloud } from "@/components/animate-icons";
 import { displaySize } from "@/features/assets/lib/displaySize";
 import { justify } from "@/features/assets/lib/justify";
@@ -8,6 +8,7 @@ import { validateFileName } from "@/lib/validation";
 import { MAX_PREVIEW_BYTES, pdfFirstPage, previewKind, textSnippet, videoFrame, type TilePreview } from "@/features/assets/lib/previews";
 import { DropOverlay, useDropNotice, useFileDrop } from "@/hooks/useFileDrop";
 import { dropSummary, importDropped } from "@/lib/dropImport";
+import { hasFolder, importSorted, sortSummary } from "@/lib/dropSort";
 import { Ellipsis } from "lucide-react";
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
 import { cn } from "@/lib/utils";
@@ -380,8 +381,9 @@ export default function AssetsPage() {
 	const notice = useDropNotice();
 	const { dragging, bind: dropProps } = useFileDrop(async (items) => {
 		if (!workspace?.path) return;
-		const result = await importDropped(workspace.path, "assets", items.map((i) => ({ ...i, rel: i.file.name })));
-		notice.show(dropSummary(result));
+		// A folder is sorted: pictures, sound, video and PDFs stay here, and its Word files, sheets, decks and notes go to their own places
+		const message = hasFolder(items) ? sortSummary(await importSorted(workspace.path, items)) : dropSummary(await importDropped(workspace.path, "assets", items.map((i) => ({ ...i, rel: i.file.name })), true));
+		notice.show(message);
 		await loadAssets();
 		await refreshStats();
 	}, isViewer || !workspace?.path);
@@ -455,7 +457,7 @@ export default function AssetsPage() {
 
 			{/* Toolbar */}
 			<Toolbar>
-				<ToolbarTitle name="Assets" meta={assets.length || undefined} />
+				<ToolbarSearch label="Search assets" placeholder="Search" value={searchQuery} onChange={setSearchQuery} />
 				<ToolbarTabs label="Kind of asset" value={selectedCategory} onChange={setSelectedCategory} tabs={tabs as { key: AssetCategory; label: string; count: number }[]} />
 				<span className="flex-1" />
 				{!isViewer && (
@@ -466,7 +468,6 @@ export default function AssetsPage() {
 				)}
 			</Toolbar>
 			<Toolbar variant="sub" className="h-auto min-h-10 flex-wrap gap-2 py-1">
-				<ToolbarSearch label="Search assets" placeholder="Search assets" value={searchQuery} onChange={setSearchQuery} />
 				<Button variant={showFilters || narrowed ? "secondary" : "outline"} size="sm" aria-expanded={showFilters} onPress={() => setShowFilters((v) => !v)}>
 					<SlidersHorizontal className="size-4" />
 					Filters

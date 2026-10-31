@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type ElementType } from "rea
 import { Plus, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, } from "@/components/animate-icons";
 
 import { EmptyState } from "@/components/layout/Page";
-import Toolbar, { ToolbarTitle, ToolbarSearch, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarSearch, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-field";
@@ -435,7 +435,7 @@ export default function TasksPage() {
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-background">
 			<Toolbar>
-				<ToolbarTitle name="Tasks" meta={stats.total - stats.done ? `${stats.total - stats.done} open` : undefined} />
+				<ToolbarSearch label="Search tasks" placeholder="Search" value={searchQuery} onChange={setSearchQuery} />
 				<ToolbarTabs
 					label="Status"
 					value={statusFilter}
@@ -448,7 +448,6 @@ export default function TasksPage() {
 					]}
 				/>
 				<span className="flex-1" />
-				<ToolbarSearch label="Search tasks" placeholder="Search tasks" value={searchQuery} onChange={setSearchQuery} />
 				<ToolbarSwitch
 					label="Priority"
 					value={priorityFilter}
@@ -604,7 +603,7 @@ export default function TasksPage() {
 									required
 									value={formTitle}
 									onChange={(e) => setFormTitle(e.target.value)}
-									placeholder="e.g. Prepare the project proposal"
+									placeholder="Title"
 									className="mt-1"
 									autoFocus
 								/>
@@ -616,7 +615,7 @@ export default function TasksPage() {
 									id="create-desc"
 									value={formDescription}
 									onChange={(e) => setFormDescription(e.target.value)}
-									placeholder="Provide extra details, acceptance criteria, or context…"
+									placeholder="Details"
 									rows={3}
 									className="mt-1"
 								/>
@@ -774,7 +773,7 @@ export default function TasksPage() {
 						/>
 						<section aria-label="Discussion" className="space-y-1">
 							<h3 className="text-sm font-semibold">Discussion</h3>
-							<FieldDiscussion channel={`task:${editingTask.id}`} field="" canComment={!isViewer} placeholder="Say something about this task" label="Discuss this task" />
+							<FieldDiscussion channel={`task:${editingTask.id}`} field="" canComment={!isViewer} placeholder="Comment" label="Discuss this task" />
 						</section>
 
 						<DialogFooter>

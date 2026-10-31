@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
-import { Check, Download, FileText, GitBranch, History, MessageSquareDiff, PanelRight, Type, Users } from "@/components/animate-icons";
+import { Check, Download, Eye, FileText, GitBranch, History, MessageSquareDiff, PanelRight, Type, Users } from "@/components/animate-icons";
 
 import CodeEditor from "@/features/editor/components/CodeEditor";
 import RichTextEditor from "@/features/editor/components/RichTextEditor";
+import MarkdownPreview from "@/components/elements/MarkdownPreview";
 import CollapsiblePane from "@/components/layout/CollapsiblePane";
 import NoteSidePanel from "@/features/editor/components/NoteSidePanel";
 import BranchesDialog from "@/components/dialogs/workspace/BranchesDialog";
@@ -62,6 +63,8 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 	const mainCollab = useCollabDoc(workspacePath, docId);
 	const [branch, setBranch] = useState<{ id: string; name: string } | null>(null);
 	const [branchesOpen, setBranchesOpen] = useState(false);
+	// The note as it reads, with its pictures and embedded notes, beside the text
+	const [previewOpen, setPreviewOpen] = useState(false);
 	const branchCollab = useCollabDoc(workspacePath, branch ? branchDocId(branch.id) : undefined);
 	const collab = branch ? branchCollab : mainCollab;
 	const openBranch = (id: string | null) => {
@@ -253,6 +256,11 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 									<GitBranch className="size-4" />
 								</Button>
 							)}
+							{isMarkdown && (
+								<Button variant="ghost" size="icon-xs" aria-label={previewOpen ? "Hide the preview" : "Show the preview"} aria-pressed={previewOpen} onPress={() => setPreviewOpen((open) => !open)}>
+									<Eye className="size-4" />
+								</Button>
+							)}
 							<ExpiryControl entity="file" id={docId} name={fileName} />
 							<Button variant="ghost" size="icon-xs" aria-label="History" onPress={() => setHistoryOpen(true)}>
 								<History className="size-4" />
@@ -337,6 +345,11 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 					/>
 				)}
 				</div>
+				{isMarkdown && previewOpen && (
+					<div className="min-h-0 w-1/2 min-w-0 border-l bg-background">
+						<MarkdownPreview text={content} notes={notes ?? []} workspacePath={workspacePath} from={docId} onOpenNote={onOpenNote ? (note) => onOpenNote(note.path) : undefined} />
+					</div>
+				)}
 				{!branch && comments.panel}
 				{panelOpen && notes && onOpenNote && workspacePath && (
 					<CollapsiblePane id="note.outline" defaultWidth={256} label="the outline" side="right">

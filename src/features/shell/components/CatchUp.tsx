@@ -1,9 +1,7 @@
-// Header button for the catch-up review: how many changes by other people have not been reviewed, and the review itself
+// The catch-up review, kept in the Inbox: how many changes by other people have not been reviewed, and the review itself
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { History } from "@/components/animate-icons";
 
-import { Button } from "@/components/ui/button";
 import { countRows, type Lookups } from "@/lib/catchup";
 import { getCatchup, getKanban } from "@/lib/tauri";
 import { useNotifications } from "@/store/notifications/NotificationContext";
@@ -13,7 +11,7 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 const CatchUpDialog = lazy(() => import("@/components/dialogs/workspace/CatchUpDialog"));
 import type { CatchupEntry, KanbanColumn } from "@/types/workspace";
 
-export default function CatchUp() {
+export function useCatchUp() {
 	const { workspace, metadata } = useWorkspace();
 	const { dataVersion } = useP2P();
 	const { notify } = useNotifications();
@@ -80,21 +78,11 @@ export default function CatchUp() {
 		entries.filter((e) => e.state === "new"),
 		members ?? [],
 	);
-	if (!path) return null;
+	const review = path && open ? (
+		<Suspense fallback={null}>
+			<CatchUpDialog workspacePath={path} entries={entries} lookups={lookups} members={members ?? []} onChanged={refresh} onClose={() => setOpen(false)} />
+		</Suspense>
+	) : null;
 
-	return (
-		<>
-			<Button variant="ghost" size="icon" onPress={() => setOpen(true)} aria-label={unread > 0 ? `Catch up, ${unread} to review` : "Catch up"} className="relative">
-				<History className="size-5" />
-				{unread > 0 && (
-					<span className="absolute right-1 top-1 flex min-w-4 items-center justify-center bg-primary px-1 text-xs font-bold text-primary-foreground">{unread > 9 ? "9+" : unread}</span>
-				)}
-			</Button>
-			{open && (
-				<Suspense fallback={null}>
-					<CatchUpDialog workspacePath={path} entries={entries} lookups={lookups} members={members ?? []} onChanged={refresh} onClose={() => setOpen(false)} />
-				</Suspense>
-			)}
-		</>
-	);
+	return { unread: path ? unread : 0, openReview: () => setOpen(true), review };
 }

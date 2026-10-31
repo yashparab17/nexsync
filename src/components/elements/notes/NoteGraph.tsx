@@ -1,5 +1,5 @@
 // Graph view: every note is a dot, and a [[link]] from one note to another is a line. Hovering a note lights up the
-// notes it is linked to; clicking opens it.
+// notes it is linked to; clicking opens it, and a note can be dragged to where you want it (until the notes change).
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -30,7 +30,17 @@ export default function NoteGraph({ notes, edges, activePath, onOpen }: NoteGrap
 	}, []);
 
 	const paths = useMemo(() => notes.map((n) => n.path), [notes]);
-	const points = useMemo(() => layoutGraph(paths, edges, size.width, size.height), [paths, edges, size]);
+	const laidOut = useMemo(() => layoutGraph(paths, edges, size.width, size.height), [paths, edges, size]);
+	// Notes the person moved keep their place; the rest stay where the layout put them
+	const [moved, setMoved] = useState<Map<string, { x: number; y: number }>>(new Map());
+	const drag = useRef<{ path: string; dx: number; dy: number; x0: number; y0: number; far: boolean } | null>(null);
+	const justDragged = useRef(false);
+	const points = useMemo(() => {
+		if (moved.size === 0) return laidOut;
+		const merged = new Map(laidOut);
+		for (const [path, at] of moved) if (merged.has(path)) merged.set(path, at);
+		return merged;
+	}, [laidOut, moved]);
 	const degree = useMemo(() => degrees(paths, edges), [paths, edges]);
 	const names = useMemo(() => new Map(notes.map((n) => [n.path, graphLabel(n)])), [notes]);
 
@@ -47,7 +57,26 @@ export default function NoteGraph({ notes, edges, activePath, onOpen }: NoteGrap
 
 	return (
 		<div ref={frame} className="relative h-full w-full overflow-hidden bg-[radial-gradient(circle,var(--border)_1px,transparent_1px)] [background-size:24px_24px]">
-			<svg width={size.width} height={size.height} role="img" aria-label="Graph of linked notes">
+			<svg
+				width={size.width}
+				height={size.height}
+				role="img"
+				aria-label="Graph of linked notes"
+				onPointerMove={(e) => {
+					const d = drag.current;
+					if (!d) return;
+					const box = e.currentTarget.getBoundingClientRect();
+					const x = Math.min(Math.max(e.clientX - box.left - d.dx, 12), size.width - 12);
+					const y = Math.min(Math.max(e.clientY - box.top - d.dy, 12), size.height - 24);
+					if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) > 4) d.far = true;
+					if (d.far) setMoved((prev) => new Map(prev).set(d.path, { x, y }));
+				}}
+				onPointerUp={() => {
+					if (drag.current?.far) justDragged.current = true;
+					drag.current = null;
+				}}
+				onPointerLeave={() => (drag.current = null)}
+			>
 				{edges.map((e) => {
 					const a = points.get(e.from);
 					const b = points.get(e.to);
@@ -64,7 +93,7 @@ export default function NoteGraph({ notes, edges, activePath, onOpen }: NoteGrap
 						<g
 							key={note.path}
 							transform={`translate(${p.x} ${p.y})`}
-							className={cn("cursor-pointer transition-opacity", dim && "opacity-30")}
+							className={cn("cursor-grab touch-none transition-opacity active:cursor-grabbing", dim && "opacity-30")}
 							role="button"
 							tabIndex={0}
 							aria-label={`Open ${names.get(note.path)}`}
@@ -72,7 +101,16 @@ export default function NoteGraph({ notes, edges, activePath, onOpen }: NoteGrap
 							onMouseLeave={() => setHover(null)}
 							onFocus={() => setHover(note.path)}
 							onBlur={() => setHover(null)}
-							onClick={() => onOpen(note.path)}
+							onPointerDown={(e) => {
+								const box = e.currentTarget.ownerSVGElement?.getBoundingClientRect();
+								if (!box) return;
+								drag.current = { path: note.path, dx: e.clientX - box.left - p.x, dy: e.clientY - box.top - p.y, x0: e.clientX, y0: e.clientY, far: false };
+							}}
+							onClick={() => {
+								// Letting go after a drag is not a click
+								if (justDragged.current) return void (justDragged.current = false);
+								onOpen(note.path);
+							}}
 							onKeyDown={(e) => e.key === "Enter" && onOpen(note.path)}
 						>
 							<circle r={radius} className={cn("stroke-background", activePath === note.path || hover === note.path ? "fill-primary" : "fill-primary/60")} strokeWidth={2} />

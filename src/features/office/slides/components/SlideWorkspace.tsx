@@ -466,7 +466,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 							<div className="shrink-0 border-t bg-background">
 								<textarea
 									aria-label="Speaker notes"
-									placeholder="Click to add notes"
+									placeholder="Notes"
 									readOnly={readOnly}
 									value={notesDraft ?? notesOf(slide)}
 									onChange={(e) => setNotesDraft(e.target.value)}
