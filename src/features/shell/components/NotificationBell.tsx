@@ -56,8 +56,8 @@ export default function NotificationBell() {
 			</Button>
 			{open && (
 				<>
-					<button type="button" aria-label="Close notifications" className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
-					<div role="region" aria-label="Notifications" className="absolute right-0 z-20 mt-1 w-96 max-w-[90vw] overflow-hidden rounded-lg bg-popover ring-1 ring-foreground/10">
+					<button type="button" aria-label="Close notifications" className="fixed inset-0 z-[65] cursor-default" onClick={() => setOpen(false)} />
+					<div role="region" aria-label="Notifications" className="absolute right-0 z-[66] mt-1 w-96 max-w-[90vw] overflow-hidden rounded-lg bg-popover ring-1 ring-foreground/10">
 						<div className="flex h-12 items-center justify-between border-b px-4">
 							<span className="text-sm font-semibold">Inbox</span>
 							<span className="flex items-center gap-3">
