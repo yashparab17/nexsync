@@ -1,1 +1,1 @@
-Slide show with presenter view, revamped Office ribbon, Slides sorter, tables, groups, find and replace, language servers.
+Notes can be Markdown or text, profile pictures share reliably, renamed members keep their activity, reconnecting no longer downloads every file again, downloads show in the pop-up stack, slide show fixes.
