@@ -34,6 +34,9 @@ export default function SlideCanvas({
 	onDelete,
 	onText,
 	onEditing,
+	also = [],
+	onToggle,
+	onTextSelect,
 }: {
 	image: DeckRendered;
 	displayWidth: number;
@@ -47,6 +50,11 @@ export default function SlideCanvas({
 	onDelete: (id: number) => void;
 	onText: (id: number, text: string) => void;
 	onEditing?: (editing: boolean) => void;
+	// The other shapes chosen along with `selected` (Shift and a press adds or takes one away)
+	also?: number[];
+	onToggle?: (id: number) => void;
+	// Where the caret or selection is in the text being typed, in characters, with the text as typed
+	onTextSelect?: (s: { id: number; start: number; end: number; value: string }) => void;
 }) {
 	const k = displayWidth / image.widthPt;
 	const height = image.heightPt * k;
@@ -67,6 +75,7 @@ export default function SlideCanvas({
 	const begin = (e: React.PointerEvent, f: Frame, handle: Handle) => {
 		if (typing) return;
 		e.stopPropagation();
+		if (e.shiftKey && onToggle) return onToggle(f.id);
 		onSelect(f.id);
 		if (readOnly) return;
 		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -137,6 +146,7 @@ export default function SlideCanvas({
 			{image.frames.map((f) => {
 				const b = frameBox(f);
 				const mine = f.id === selected;
+				const chosen = also.includes(f.id);
 				const theirs = others.find((o) => o.id === f.id);
 				return (
 					<div
@@ -144,7 +154,7 @@ export default function SlideCanvas({
 						data-frame={f.id}
 						onPointerDown={(e) => begin(e, f, "move")}
 						onDoubleClick={() => !readOnly && setTyping({ id: f.id, value: text(f.id) })}
-						className={cn("absolute touch-none", !readOnly && "cursor-move", mine ? "outline outline-2 outline-primary" : "hover:outline hover:outline-1 hover:outline-primary/50")}
+						className={cn("absolute touch-none", !readOnly && "cursor-move", mine ? "outline outline-2 outline-primary" : chosen ? "outline outline-2 outline-primary/60" : "hover:outline hover:outline-1 hover:outline-primary/50")}
 						style={{ left: b.x * k, top: b.y * k, width: b.w * k, height: b.h * k, transform: b.rot ? `rotate(${b.rot}deg)` : undefined, ...(theirs ? { outline: `2px solid ${theirs.color}` } : {}) }}
 					>
 						{theirs && !mine && (
@@ -161,16 +171,36 @@ export default function SlideCanvas({
 					autoFocus
 					aria-label="Text of the shape"
 					value={typing.value}
-					onChange={(e) => setTyping({ ...typing, value: e.target.value })}
+					onChange={(e) => {
+						setTyping({ ...typing, value: e.target.value });
+						onTextSelect?.({ id: typing.id, start: e.target.selectionStart, end: e.target.selectionEnd, value: e.target.value });
+					}}
+					onSelect={(e) => onTextSelect?.({ id: typing.id, start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd, value: e.currentTarget.value })}
 					onBlur={() => finish(true)}
 					onKeyDown={(e) => {
 						e.stopPropagation();
 						if (e.key === "Escape") finish(false);
 						else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) finish(true);
 					}}
-					className="absolute resize-none bg-white/90 p-1 text-black outline outline-2 outline-primary"
-					style={{ left: typed.x * k, top: typed.y * k, width: typed.w * k, height: Math.max(typed.h * k, 40), fontSize: Math.max(11, 18 * k) }}
-				/>
+					className="absolute resize-none overflow-hidden bg-white p-0 outline outline-2 outline-primary"
+					style={{
+						left: typed.x * k,
+						top: typed.y * k,
+						width: typed.w * k,
+						minHeight: typed.h * k,
+						padding: `${3.6 * k}px ${7.2 * k}px`,
+						// The text is typed in the look it is drawn in, so nothing changes when the box closes
+						fontSize: (typed.look?.size ?? 18) * k,
+						fontFamily: typed.look ? `"${typed.look.font}", sans-serif` : undefined,
+						fontWeight: typed.look?.bold ? 700 : 400,
+						fontStyle: typed.look?.italic ? "italic" : "normal",
+						color: typed.look ? `#${typed.look.color}` : "#000",
+						textAlign: (typed.look?.align ?? "left") as "left",
+						lineHeight: 1.2 * (typed.look?.line ?? 1),
+						fieldSizing: "content",
+						transform: typed.rot ? `rotate(${typed.rot}deg)` : undefined,
+					} as React.CSSProperties}
+					/>
 			)}
 		</div>
 	);

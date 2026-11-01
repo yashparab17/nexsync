@@ -17,10 +17,20 @@ import { initSecurityPolicies } from "@/lib/security";
 initSecurityPolicies();
 
 // Development only: /?lab=documents shows an editor on its own (src/dev/Lab.tsx)
+// The slide show's second window, which shows the audience only the slide (src/features/office/slides/components/AudienceView.tsx)
+const audience = new URLSearchParams(location.search).get("audience");
 const lab = import.meta.env.DEV
   ? new URLSearchParams(location.search).get("lab")
   : null;
-if (lab) {
+if (audience) {
+  void import("@/features/office/slides/components/AudienceView").then(({ default: AudienceView }) => {
+    ReactDOM.createRoot(document.getElementById("root")!).render(
+      <ThemeProvider>
+        <AudienceView />
+      </ThemeProvider>,
+    );
+  });
+} else if (lab) {
   void import("@/dev/Lab").then(({ default: Lab }) => {
     ReactDOM.createRoot(document.getElementById("root")!).render(
       <ThemeProvider>

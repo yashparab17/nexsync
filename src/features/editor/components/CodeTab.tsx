@@ -18,7 +18,7 @@ import { useFileComments } from "@/features/editor/components/useFileComments";
 import { useCanComment } from "@/store/p2p/P2PContext";
 import { proposalMarks } from "@/lib/editor/proposalsView";
 import { coverageGutter, useCoverage } from "@/features/projects/lib/coverage";
-import { listenToLsp, lspTarget } from "@/features/projects/lib/lsp";
+import { FILES_SCOPE, listenToLsp, lspPath, lspTarget } from "@/features/projects/lib/lsp";
 import { lspExtension } from "@/lib/editor/lspExtension";
 import type { LspStatus } from "@/features/projects/types";
 import { useCollabDoc } from "@/hooks/useCollabDoc";
@@ -43,6 +43,7 @@ import { countSyntaxErrors, errorRanges } from "@/lib/editor/syntax";
 import { canTypeCheck, firstNewError, loadTypeScript, typeErrors } from "@/lib/editor/typecheck";
 import { lspEnable, lspStatus, readWorkspaceFile, writeWorkspaceFile } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
+import { readFlag, saveFlag } from "@/lib/storage";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import Loading from "@/components/Loading";
@@ -124,8 +125,16 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 	const ext = path.split(".").pop()?.toLowerCase() ?? "";
 	const lspServer = lsp?.servers.find((s) => s.extensions.includes(ext)) ?? null;
 	const lspOn = !!lspServer && lspServer.installed && lsp?.enabled === true;
+	// The reminder that a server is missing is asked away once per language on this device
+	const hintKey = `nexsync.lspHint.${lspServer?.id ?? ""}`;
+	const [hintDismissed, setHintDismissed] = useState(() => readFlag(hintKey));
+	useEffect(() => setHintDismissed(readFlag(hintKey)), [hintKey]);
+	const dismissHint = () => {
+		saveFlag(hintKey, true);
+		setHintDismissed(true);
+	};
 	const lspExt = useMemo(
-		() => (target && lspOn ? lspExtension({ workspacePath, project: target.project, rel: target.rel, onOpen: (rel, line) => onOpenAt?.(`projects/${target.project}/${rel}`, line), onNotice: setLspNotice }) : null),
+		() => (target && lspOn ? lspExtension({ workspacePath, project: target.project, rel: target.rel, onOpen: (rel, line) => onOpenAt?.(lspPath(target.project, rel), line), onNotice: setLspNotice }) : null),
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- the target is its project and file
 		[workspacePath, target?.project, target?.rel, lspOn],
 	);
@@ -518,10 +527,33 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 			{target && lspServer && lspServer.installed && lsp && !lsp.enabled && !readOnly && (
 				<div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-3 py-2 text-xs">
 					<span className="min-w-0 flex-1">
-						{lspServer.label} intelligence (problems, hover, completion, go to definition) is available for this project. It starts the {lspServer.label} language server on this device, which can run code from the project, such as build scripts and plugins.
+						{lspServer.label} intelligence (problems, hover, completion, go to definition) is available for {target.project === FILES_SCOPE ? "the files of this workspace" : "this project"}. It starts the {lspServer.label} language server on this device, which can run code from {target.project === FILES_SCOPE ? "the workspace" : "the project"}, such as build scripts and plugins.
 					</span>
 					<Button size="xs" onPress={() => void lspEnable(workspacePath, target.project, true).then(() => lspStatus(workspacePath, target.project)).then(setLsp).catch((e) => setLspNotice(String(e?.message ?? e)))}>
-						Turn On for This Project
+						{target.project === FILES_SCOPE ? "Turn On for This Workspace" : "Turn On for This Project"}
+					</Button>
+				</div>
+			)}
+			{target && lspServer && !lspServer.installed && lsp && !readOnly && !hintDismissed && (
+				<div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-3 py-2 text-xs">
+					<span className="min-w-0 flex-1">
+						{lspServer.label} intelligence (problems, hover, completion, go to definition) needs its language server, which is not installed on this device. Install it with{" "}
+						{/^https?:/.test(lspServer.install) ? (
+							<a className="underline" href={lspServer.install} target="_blank" rel="noreferrer">
+								its instructions
+							</a>
+						) : (
+							<code className="bg-muted px-1">{lspServer.install}</code>
+						)}
+						, then reopen the file.
+					</span>
+					{!/^https?:/.test(lspServer.install) && (
+						<Button size="xs" variant="outline" onPress={() => void navigator.clipboard?.writeText(lspServer.install).catch(() => {})}>
+							Copy
+						</Button>
+					)}
+					<Button variant="ghost" size="xs" onPress={dismissHint}>
+						Dismiss
 					</Button>
 				</div>
 			)}

@@ -269,9 +269,25 @@ export interface RuntimeInfo {
 	wsl: string | null;
 }
 
+export interface LspServerInfo {
+	id: string;
+	label: string;
+	installed: boolean;
+	// What to run to install it, or a page that says how
+	install: string;
+	recommended: boolean;
+	// Where the program was found
+	path: string | null;
+	// The tool that installs it with one command (npm, cargo, ...); null when there is only a page of instructions
+	installer: string | null;
+	// Whether that tool is on this device, so the install button can work
+	canInstall: boolean;
+	extensions: string[];
+}
+
 export interface LspStatus {
 	enabled: boolean;
-	servers: { id: string; label: string; installed: boolean; url: string; extensions: string[] }[];
+	servers: LspServerInfo[];
 }
 
 export interface ReportFile {

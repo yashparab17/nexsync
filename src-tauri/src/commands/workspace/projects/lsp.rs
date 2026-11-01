@@ -276,39 +276,122 @@ pub fn rel_in(project_dir: &Path, file: &Path) -> Option<String> {
 struct Server {
     id: &'static str,
     label: &'static str,
-    programs: &'static [&'static str],
-    args: &'static [&'static str],
+    /// Programs that can be this server, best first, each with the arguments that make it speak over standard input and output
+    programs: &'static [(&'static str, &'static [&'static str])],
     /// Extensions it handles, with the language id the protocol wants for each
     exts: &'static [(&'static str, &'static str)],
     /// Files that mark the root of a project for this server
     markers: &'static [&'static str],
-    url: &'static str,
+    /// What to run to install it, or a page that says how
+    install: &'static str,
 }
 
 const SERVERS: &[Server] = &[
     Server {
         id: "typescript",
         label: "TypeScript and JavaScript",
-        programs: &["typescript-language-server"],
-        args: &["--stdio"],
+        programs: &[("typescript-language-server", &["--stdio"])],
         exts: &[("ts", "typescript"), ("tsx", "typescriptreact"), ("mts", "typescript"), ("cts", "typescript"), ("js", "javascript"), ("jsx", "javascriptreact"), ("mjs", "javascript"), ("cjs", "javascript")],
         markers: &["tsconfig.json", "jsconfig.json", "package.json"],
-        url: "https://github.com/typescript-language-server/typescript-language-server#installing",
+        install: "npm install -g typescript-language-server typescript",
     },
-    Server { id: "rust", label: "Rust", programs: &["rust-analyzer"], args: &[], exts: &[("rs", "rust")], markers: &["Cargo.toml"], url: "https://rust-analyzer.github.io/book/installation.html" },
-    Server { id: "python", label: "Python", programs: &["pyright-langserver"], args: &["--stdio"], exts: &[("py", "python"), ("pyi", "python")], markers: &["pyproject.toml", "pyrightconfig.json", "setup.py", "requirements.txt"], url: "https://microsoft.github.io/pyright/#/installation" },
-    Server { id: "go", label: "Go", programs: &["gopls"], args: &[], exts: &[("go", "go")], markers: &["go.mod", "go.work"], url: "https://pkg.go.dev/golang.org/x/tools/gopls#readme-installation" },
+    Server { id: "rust", label: "Rust", programs: &[("rust-analyzer", &[])], exts: &[("rs", "rust")], markers: &["Cargo.toml"], install: "rustup component add rust-analyzer" },
+    Server {
+        id: "python",
+        label: "Python",
+        programs: &[("pyright-langserver", &["--stdio"]), ("basedpyright-langserver", &["--stdio"]), ("pylsp", &[])],
+        exts: &[("py", "python"), ("pyi", "python")],
+        markers: &["pyproject.toml", "pyrightconfig.json", "setup.py", "requirements.txt"],
+        install: "npm install -g pyright",
+    },
+    Server { id: "go", label: "Go", programs: &[("gopls", &[])], exts: &[("go", "go")], markers: &["go.mod", "go.work"], install: "go install golang.org/x/tools/gopls@latest" },
     Server {
         id: "clangd",
         label: "C and C++",
-        programs: &["clangd"],
-        args: &[],
+        programs: &[("clangd", &[])],
         exts: &[("c", "c"), ("h", "c"), ("cc", "cpp"), ("cpp", "cpp"), ("cxx", "cpp"), ("hpp", "cpp"), ("hh", "cpp")],
         markers: &["compile_commands.json", "CMakeLists.txt", ".clangd"],
-        url: "https://clangd.llvm.org/installation",
+        install: "https://clangd.llvm.org/installation",
     },
-    Server { id: "php", label: "PHP", programs: &["intelephense"], args: &["--stdio"], exts: &[("php", "php")], markers: &["composer.json"], url: "https://intelephense.com/" },
+    Server { id: "php", label: "PHP", programs: &[("intelephense", &["--stdio"])], exts: &[("php", "php")], markers: &["composer.json"], install: "npm install -g intelephense" },
+    Server {
+        id: "java",
+        label: "Java",
+        programs: &[("jdtls", &[])],
+        exts: &[("java", "java")],
+        markers: &["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle"],
+        install: "https://github.com/eclipse-jdtls/eclipse.jdt.ls#installation",
+    },
+    Server {
+        id: "csharp",
+        label: "C#",
+        programs: &[("csharp-ls", &[]), ("OmniSharp", &["-lsp"])],
+        exts: &[("cs", "csharp")],
+        markers: &["global.json", "Directory.Build.props"],
+        install: "dotnet tool install -g csharp-ls",
+    },
+    Server { id: "ruby", label: "Ruby", programs: &[("ruby-lsp", &[]), ("solargraph", &["stdio"])], exts: &[("rb", "ruby")], markers: &["Gemfile", ".ruby-version"], install: "gem install ruby-lsp" },
+    Server { id: "lua", label: "Lua", programs: &[("lua-language-server", &[])], exts: &[("lua", "lua")], markers: &[".luarc.json", ".luarc.jsonc"], install: "https://luals.github.io/#install" },
+    Server {
+        id: "bash",
+        label: "Shell",
+        programs: &[("bash-language-server", &["start"])],
+        exts: &[("sh", "shellscript"), ("bash", "shellscript"), ("zsh", "shellscript")],
+        markers: &[],
+        install: "npm install -g bash-language-server",
+    },
+    Server { id: "html", label: "HTML", programs: &[("vscode-html-language-server", &["--stdio"])], exts: &[("html", "html"), ("htm", "html")], markers: &[], install: "npm install -g vscode-langservers-extracted" },
+    Server {
+        id: "css",
+        label: "CSS, SCSS and Less",
+        programs: &[("vscode-css-language-server", &["--stdio"])],
+        exts: &[("css", "css"), ("scss", "scss"), ("less", "less")],
+        markers: &[],
+        install: "npm install -g vscode-langservers-extracted",
+    },
+    Server { id: "json", label: "JSON", programs: &[("vscode-json-language-server", &["--stdio"])], exts: &[("json", "json"), ("jsonc", "jsonc")], markers: &[], install: "npm install -g vscode-langservers-extracted" },
+    Server { id: "yaml", label: "YAML", programs: &[("yaml-language-server", &["--stdio"])], exts: &[("yaml", "yaml"), ("yml", "yaml")], markers: &[], install: "npm install -g yaml-language-server" },
+    Server { id: "toml", label: "TOML", programs: &[("taplo", &["lsp", "stdio"])], exts: &[("toml", "toml")], markers: &[], install: "cargo install taplo-cli --locked --features lsp" },
+    Server { id: "kotlin", label: "Kotlin", programs: &[("kotlin-language-server", &[])], exts: &[("kt", "kotlin"), ("kts", "kotlin")], markers: &["settings.gradle.kts", "build.gradle.kts", "pom.xml"], install: "https://github.com/fwcd/kotlin-language-server#getting-started" },
+    Server { id: "swift", label: "Swift", programs: &[("sourcekit-lsp", &[])], exts: &[("swift", "swift")], markers: &["Package.swift"], install: "https://www.swift.org/install/" },
+    Server { id: "zig", label: "Zig", programs: &[("zls", &[])], exts: &[("zig", "zig")], markers: &["build.zig"], install: "https://github.com/zigtools/zls#installation" },
+    Server { id: "dart", label: "Dart", programs: &[("dart", &["language-server", "--protocol=lsp"])], exts: &[("dart", "dart")], markers: &["pubspec.yaml"], install: "https://dart.dev/get-dart" },
+    Server { id: "haskell", label: "Haskell", programs: &[("haskell-language-server-wrapper", &["--lsp"])], exts: &[("hs", "haskell")], markers: &["cabal.project", "stack.yaml", "hie.yaml"], install: "ghcup install hls" },
+    Server { id: "ocaml", label: "OCaml", programs: &[("ocamllsp", &[])], exts: &[("ml", "ocaml"), ("mli", "ocaml")], markers: &["dune-project"], install: "opam install ocaml-lsp-server" },
+    Server { id: "terraform", label: "Terraform", programs: &[("terraform-ls", &["serve"])], exts: &[("tf", "terraform"), ("tfvars", "terraform-vars")], markers: &[], install: "https://github.com/hashicorp/terraform-ls#installation" },
+    Server { id: "docker", label: "Dockerfile", programs: &[("docker-langserver", &["--stdio"])], exts: &[("dockerfile", "dockerfile")], markers: &[], install: "npm install -g dockerfile-language-server-nodejs" },
+    Server { id: "svelte", label: "Svelte", programs: &[("svelteserver", &["--stdio"])], exts: &[("svelte", "svelte")], markers: &["svelte.config.js"], install: "npm install -g svelte-language-server" },
 ];
+
+/// The servers worth having first: the languages most workspaces hold
+const RECOMMENDED: &[&str] = &["python", "typescript", "rust", "go", "json", "html", "css", "yaml", "bash"];
+
+/// What the Settings page runs to install a server, when one command does it. Fixed here: the page names a server, never a command.
+fn run_for(id: &str) -> Option<(&'static str, &'static [&'static str])> {
+    Some(match id {
+        "typescript" => ("npm", &["install", "-g", "typescript-language-server", "typescript"]),
+        "python" => ("npm", &["install", "-g", "pyright"]),
+        "rust" => ("rustup", &["component", "add", "rust-analyzer"]),
+        "go" => ("go", &["install", "golang.org/x/tools/gopls@latest"]),
+        "php" => ("npm", &["install", "-g", "intelephense"]),
+        "csharp" => ("dotnet", &["tool", "install", "-g", "csharp-ls"]),
+        "ruby" => ("gem", &["install", "ruby-lsp"]),
+        "bash" => ("npm", &["install", "-g", "bash-language-server"]),
+        "html" | "css" | "json" => ("npm", &["install", "-g", "vscode-langservers-extracted"]),
+        "yaml" => ("npm", &["install", "-g", "yaml-language-server"]),
+        "toml" => ("cargo", &["install", "taplo-cli", "--locked", "--features", "lsp"]),
+        "ocaml" => ("opam", &["install", "ocaml-lsp-server"]),
+        "docker" => ("npm", &["install", "-g", "dockerfile-language-server-nodejs"]),
+        "svelte" => ("npm", &["install", "-g", "svelte-language-server"]),
+        "haskell" => ("ghcup", &["install", "hls"]),
+        _ => return None,
+    })
+}
+
+/// The first of a server's programs that is installed, with its arguments
+fn program_of(server: &Server) -> Option<(PathBuf, &'static [&'static str])> {
+    server.programs.iter().find_map(|(name, args)| find_on_path(name).map(|p| (p, *args)))
+}
 
 fn server_for(rel: &str) -> Option<(&'static Server, &'static str)> {
     let ext = rel.rsplit('.').next()?.to_ascii_lowercase();
@@ -323,8 +406,21 @@ pub fn find_on_path(name: &str) -> Option<PathBuf> {
     })
 }
 
-/// The folder a server should treat as the root for a file: the nearest one up to the project that holds a marker
-fn root_for(project_dir: &Path, rel: &str, server: &Server) -> PathBuf {
+/// The name that stands for the workspace's own files, which are not in a project
+pub const FILES: &str = "@files";
+
+/// The folder a project's files are in: the project's own, or, for the workspace's own files, the workspace
+fn scope_dir(workspace: &str, project: &str) -> Result<PathBuf, String> {
+    if project == FILES {
+        let dir = PathBuf::from(workspace);
+        return if dir.is_dir() { Ok(dir) } else { Err("That workspace folder does not exist.".to_string()) };
+    }
+    project_dir(workspace, project)
+}
+
+/// The folder a server should treat as the root for a file: the nearest one up to the project that holds a marker. A file of the
+/// workspace with no marker above it is its own folder's business, not the whole workspace's.
+fn root_for(project_dir: &Path, rel: &str, server: &Server, loose: bool) -> PathBuf {
     let mut dir = project_dir.join(rel);
     dir.pop();
     while dir.starts_with(project_dir) {
@@ -334,6 +430,9 @@ fn root_for(project_dir: &Path, rel: &str, server: &Server) -> PathBuf {
         if !dir.pop() {
             break;
         }
+    }
+    if loose {
+        return project_dir.join(rel).parent().map_or_else(|| project_dir.to_path_buf(), Path::to_path_buf);
     }
     project_dir.to_path_buf()
 }
@@ -430,7 +529,7 @@ async fn instance(app: &AppHandle, state: &LspState, workspace: &str, project: &
             return Ok(i.clone());
         }
     }
-    let program = server.programs.iter().find_map(|p| find_on_path(p)).ok_or_else(|| format!("{} is not installed on this device. {}", server.label, server.url))?;
+    let (program, args) = program_of(server).ok_or_else(|| format!("{} is not installed on this device. {}", server.label, server.install))?;
     let (app2, project2, dir2) = (app.clone(), project.to_string(), project_dir.to_path_buf());
     let sid = server.id;
     let notify: Notify = Arc::new(move |method, params| {
@@ -443,7 +542,7 @@ async fn instance(app: &AppHandle, state: &LspState, workspace: &str, project: &
         }
     });
     let _ = app.emit(EVENT_STATE, StateEvent { project: project.to_string(), server: server.id, state: "starting", message: String::new() });
-    let client = Client::start(&program, server.args, root, notify)?;
+    let client = Client::start(&program, args, root, notify)?;
     let uri = to_uri(root);
     let name = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "project".into());
     let init = client
@@ -468,7 +567,16 @@ pub struct ServerInfo {
     pub id: &'static str,
     pub label: &'static str,
     pub installed: bool,
-    pub url: &'static str,
+    /// What to run to install it, or a page that says how
+    pub install: &'static str,
+    /// Among the ones to set up first
+    pub recommended: bool,
+    /// Where the program was found, when it is installed
+    pub path: Option<String>,
+    /// The tool that installs it (npm, cargo, ...), when one command does it; `None` means the page can only point to instructions
+    pub installer: Option<&'static str>,
+    /// Whether that tool is on this device, so the install button can work
+    pub can_install: bool,
     pub extensions: Vec<&'static str>,
 }
 
@@ -479,10 +587,66 @@ pub struct LspStatus {
     pub servers: Vec<ServerInfo>,
 }
 
+fn server_infos() -> Vec<ServerInfo> {
+    SERVERS
+        .iter()
+        .map(|s| {
+            let found = program_of(s);
+            let run = run_for(s.id);
+            ServerInfo {
+                id: s.id,
+                label: s.label,
+                installed: found.is_some(),
+                install: s.install,
+                recommended: RECOMMENDED.contains(&s.id),
+                path: found.map(|(p, _)| p.to_string_lossy().into_owned()),
+                installer: run.map(|(tool, _)| tool),
+                can_install: run.is_some_and(|(tool, _)| find_on_path(tool).is_some()),
+                extensions: s.exts.iter().map(|(e, _)| *e).collect(),
+            }
+        })
+        .collect()
+}
+
 pub fn status_of(workspace: &str, project: &str) -> LspStatus {
     LspStatus {
         enabled: enabled(workspace, project),
-        servers: SERVERS.iter().map(|s| ServerInfo { id: s.id, label: s.label, installed: s.programs.iter().any(|p| find_on_path(p).is_some()), url: s.url, extensions: s.exts.iter().map(|(e, _)| *e).collect() }).collect(),
+        servers: server_infos(),
+    }
+}
+
+/// The servers this device has and could have, for the Settings page. Needs no workspace: servers belong to the device.
+#[tauri::command]
+pub async fn lsp_servers() -> Result<Vec<ServerInfo>, String> {
+    tokio::task::spawn_blocking(server_infos).await.map_err(|e| e.to_string())
+}
+
+/// Installs one language server by running its fixed command (never one the page supplies) and says what happened. The person
+/// asked for exactly this by pressing the button next to the command shown to them.
+#[tauri::command]
+pub async fn lsp_install(id: String) -> Result<String, String> {
+    let server = SERVERS.iter().find(|s| s.id == id).ok_or("That language server is not one Nexsync knows.")?;
+    let (tool, args) = run_for(server.id).ok_or("That one has no single install command. Follow its instructions.")?;
+    let program = find_on_path(tool).ok_or_else(|| format!("{tool} is not installed on this device, so it cannot install {}.", server.label))?;
+    let mut command = Command::new(program);
+    command.args(args).stdin(Stdio::null()).kill_on_drop(true);
+    #[cfg(windows)]
+    command.creation_flags(0x0800_0000);
+    let output = tokio::time::timeout(Duration::from_secs(600), command.output())
+        .await
+        .map_err(|_| format!("Installing {} took too long and was stopped.", server.label))?
+        .map_err(|e| format!("Could not run {tool}: {e}"))?;
+    let tail = |bytes: &[u8]| {
+        let text = String::from_utf8_lossy(bytes);
+        let lines: Vec<&str> = text.lines().rev().take(6).collect();
+        lines.into_iter().rev().collect::<Vec<_>>().join("
+")
+    };
+    if output.status.success() {
+        Ok(tail(&output.stdout))
+    } else {
+        Err(format!("{} could not be installed:
+{}", server.label, tail(&output.stderr)))
     }
 }
 
@@ -496,7 +660,7 @@ fn checked_rel(rel: &str) -> Result<(), String> {
 #[tauri::command]
 pub async fn lsp_status(app: AppHandle, path: String, project: String) -> Result<LspStatus, String> {
     validate_allowed_root(&app, &path)?;
-    project_dir(&path, &project)?;
+    scope_dir(&path, &project)?;
     tokio::task::spawn_blocking(move || status_of(&path, &project)).await.map_err(|e| e.to_string())
 }
 
@@ -504,7 +668,7 @@ pub async fn lsp_status(app: AppHandle, path: String, project: String) -> Result
 #[tauri::command]
 pub async fn lsp_enable(app: AppHandle, state: State<'_, LspState>, path: String, project: String, on: bool) -> Result<(), String> {
     validate_allowed_root(&app, &path)?;
-    project_dir(&path, &project)?;
+    scope_dir(&path, &project)?;
     set_enabled(&path, &project, on)?;
     if !on {
         let prefix = format!("{path}|{project}|");
@@ -525,19 +689,19 @@ pub async fn lsp_enable(app: AppHandle, state: State<'_, LspState>, path: String
 #[tauri::command]
 pub async fn lsp_sync(app: AppHandle, state: State<'_, LspState>, path: String, project: String, rel: String, text: String, version: i64) -> Result<Option<String>, String> {
     validate_allowed_root(&app, &path)?;
-    let dir = project_dir(&path, &project)?;
+    let dir = scope_dir(&path, &project)?;
     checked_rel(&rel)?;
     if text.len() > MAX_DOC_BYTES {
         return Ok(None);
     }
     let Some((server, language)) = server_for(&rel) else { return Ok(None) };
-    if !server.programs.iter().any(|p| find_on_path(p).is_some()) {
+    if program_of(server).is_none() {
         return Ok(None);
     }
     if !enabled(&path, &project) {
         return Err("Language intelligence is off for this project on this device.".to_string());
     }
-    let root = root_for(&dir, &rel, server);
+    let root = root_for(&dir, &rel, server, project == FILES);
     let inst = instance(&app, &state, &path, &project, &dir, server, &root).await?;
     let uri = to_uri(&dir.join(&rel));
     let known = inst.open.lock().unwrap_or_else(|p| p.into_inner()).insert(uri.clone(), version).is_some();
@@ -552,7 +716,7 @@ pub async fn lsp_sync(app: AppHandle, state: State<'_, LspState>, path: String, 
 #[tauri::command]
 pub async fn lsp_close(app: AppHandle, state: State<'_, LspState>, path: String, project: String, rel: String) -> Result<(), String> {
     validate_allowed_root(&app, &path)?;
-    let dir = project_dir(&path, &project)?;
+    let dir = scope_dir(&path, &project)?;
     checked_rel(&rel)?;
     let uri = to_uri(&dir.join(&rel));
     let all: Vec<_> = state.instances.lock().await.values().cloned().collect();
@@ -594,7 +758,7 @@ pub fn annotate(project_dir: &Path, v: &mut Value) {
 #[tauri::command]
 pub async fn lsp_request(app: AppHandle, state: State<'_, LspState>, path: String, project: String, rel: String, method: String, params: Value) -> Result<Value, String> {
     validate_allowed_root(&app, &path)?;
-    let dir = project_dir(&path, &project)?;
+    let dir = scope_dir(&path, &project)?;
     checked_rel(&rel)?;
     if !REQUESTS.contains(&method.as_str()) {
         return Err("That request is not one Nexsync makes.".to_string());
@@ -687,12 +851,34 @@ process.stdin.on('data', (d) => {
         assert_eq!(server_for("src/a.tsx").map(|(s, l)| (s.id, l)), Some(("typescript", "typescriptreact")));
         assert_eq!(server_for("lib/x.RS").map(|(s, _)| s.id), Some("rust"));
         assert!(server_for("README.md").is_none() && server_for("Makefile").is_none());
+        // Every server has a program to run, and no extension is claimed by two of them
+        let mut seen = std::collections::HashSet::new();
+        for s in SERVERS {
+            assert!(!s.programs.is_empty() && !s.install.is_empty(), "{}", s.id);
+            for (e, _) in s.exts {
+                assert!(seen.insert(*e), "{e} is claimed twice");
+            }
+        }
+        // The recommended ones and the ones with an install command are all servers in the table
+        assert!(RECOMMENDED.iter().all(|id| SERVERS.iter().any(|s| s.id == *id)));
+        // What is shown as the install command is exactly what the button runs
+        for s in SERVERS {
+            if let Some((tool, args)) = run_for(s.id) {
+                assert_eq!(format!("{tool} {}", args.join(" ")), s.install, "{}", s.id);
+            }
+        }
+        assert!(run_for("python").is_some() && run_for("java").is_none());
+        assert_eq!(server_for("main.py").map(|(s, l)| (s.id, l)), Some(("python", "python")));
+        assert_eq!(server_for("Dockerfile").map(|(s, _)| s.id), Some("docker"));
+        assert_eq!(server_for("deploy/site.SCSS").map(|(s, l)| (s.id, l)), Some(("css", "scss")));
         let d = std::env::temp_dir().join(format!("nexsync-lsp-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(d.join("packages/web/src")).unwrap();
         std::fs::write(d.join("packages/web/package.json"), "{}").unwrap();
         let (ts, _) = server_for("a.ts").unwrap();
-        assert_eq!(root_for(&d, "packages/web/src/a.ts", ts), d.join("packages/web"));
-        assert_eq!(root_for(&d, "tools/x.ts", ts), d);
+        assert_eq!(root_for(&d, "packages/web/src/a.ts", ts, false), d.join("packages/web"));
+        assert_eq!(root_for(&d, "tools/x.ts", ts, false), d);
+        // A file of the workspace with no marker above it is rooted in its own folder
+        assert_eq!(root_for(&d, "tools/x.ts", ts, true), d.join("tools"));
         let _ = std::fs::remove_dir_all(&d);
     }
 

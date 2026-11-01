@@ -42,6 +42,8 @@ export interface Frame {
 	rot: number;
 	kind: string;
 	placeholder: boolean;
+	// How the text looks as drawn
+	look?: { font: string; size: number; color: string; bold: boolean; italic: boolean; align: string; line: number } | null;
 }
 
 export const keyId = () => Math.random().toString(36).slice(2, 10);
@@ -191,8 +193,39 @@ export function arrange(doc: Y.Doc, key: string, id: number, to: "front" | "back
 	});
 }
 
+// The largest id a shape and the shapes grouped inside it use
+const topId = (s: ShapeJson): number => ((s.kind as { children?: ShapeJson[] } | undefined)?.children ?? []).reduce((m, c) => Math.max(m, topId(c)), s.id);
+
 export function nextShapeId(slide: SlideJson): number {
-	return slide.shapes.reduce((m, s) => Math.max(m, s.id), slide.id) + 1;
+	return slide.shapes.reduce((m, s) => Math.max(m, topId(s)), slide.id) + 1;
+}
+
+// A copy of a shape for pasting: new ids (also inside a group), moved by (dx, dy), and no longer a placeholder, because a placeholder
+// pasted on another slide would have no layout to take its place from
+export function cloneShape(shape: ShapeJson, next: () => number, dx: number, dy: number): ShapeJson {
+	const copy = JSON.parse(JSON.stringify(shape)) as ShapeJson;
+	const fresh = (s: ShapeJson, top: boolean) => {
+		s.id = next();
+		if (top) {
+			delete s.ph;
+			if (s.xfrm) s.xfrm = { ...s.xfrm, x: s.xfrm.x + dx, y: s.xfrm.y + dy };
+		}
+		for (const c of (s.kind as { children?: ShapeJson[] } | undefined)?.children ?? []) fresh(c, false);
+	};
+	fresh(copy, true);
+	return copy;
+}
+
+// All the words a shape holds, for finding: its text, and the cells of a table
+export function searchText(s: ShapeJson): string {
+	const rows = (s.kind as { rows?: { cells: { text?: ShapeJson["text"] }[] }[] } | undefined)?.rows ?? [];
+	return [textOf(s), ...rows.flatMap((r) => r.cells.map((c) => textOf({ id: 0, text: c.text })))].join("\n");
+}
+
+// How a slide moves on: after how many seconds (0 for never), on a click, and how long the transition takes
+export function timingOf(s: SlideJson): { after: number; click: boolean; seconds: number } {
+	const t = s.transition as { advanceAfterMs?: number | null; advanceOnClick?: boolean; durationMs?: number } | null | undefined;
+	return { after: (t?.advanceAfterMs ?? 0) / 1000, click: t?.advanceOnClick ?? true, seconds: (t?.durationMs ?? 700) / 1000 };
 }
 
 // Adds a slide after another (or at the end) and returns its key
@@ -257,4 +290,19 @@ export function dragged(box: Xfrm, handle: Handle, dx: number, dy: number, keepR
 		h = nh;
 	}
 	return { ...box, x, y, w, h };
+}
+
+// The looks of the runs of a shape's text that touch the characters [from, to) (all of it without a range); a paragraph break counts as one
+export function runsIn(s: ShapeJson, range?: [number, number] | null): { bold?: boolean; italic?: boolean; underline?: string }[] {
+	const out: { bold?: boolean; italic?: boolean; underline?: string }[] = [];
+	let pos = 0;
+	for (const p of (s.text?.paragraphs ?? []) as { runs: { text: string; props?: { bold?: boolean; italic?: boolean; underline?: string } }[] }[]) {
+		for (const r of p.runs) {
+			const n = [...r.text].length;
+			if (!range || (pos < range[1] && pos + n > range[0])) out.push(r.props ?? {});
+			pos += n;
+		}
+		pos += 1;
+	}
+	return out;
 }

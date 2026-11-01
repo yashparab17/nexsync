@@ -3,10 +3,12 @@
 // office programs are, because people already know where things are in them; the header and bars look like the rest of the app.
 
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ElementType, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ElementType, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { ToolbarTitle } from "@/components/layout/Toolbar";
+import { chosenLook } from "@/components/ui/icon-button";
+import { readFlag, saveFlag } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 export type Accent = "word" | "excel" | "powerpoint";
@@ -23,6 +25,13 @@ export interface RibbonTab {
 	id: string;
 	label: string;
 }
+
+const COLLAPSED_KEY = "nexsync.office.ribbonCollapsed";
+
+// The look every ribbon control shares with the app's icon buttons: a quiet hover, the primary tint when on, the same focus ring
+const idle = "text-foreground hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent";
+const focusRing = "outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
+const on = chosenLook;
 
 // The whole window of an editor: title bar, tabs, the ribbon of the open tab, the work area and the status bar
 export function OfficeFrame({
@@ -58,9 +67,29 @@ export function OfficeFrame({
 	children: ReactNode;
 }) {
 	const a = ACCENTS[accent];
-	const [collapsed, setCollapsed] = useState(false);
+	const [collapsed, setCollapsedState] = useState(() => readFlag(COLLAPSED_KEY));
 	const [peek, setPeek] = useState(false);
 	const showBody = tab !== "file" && (!collapsed || peek);
+	const setCollapsed = (c: boolean) => {
+		saveFlag(COLLAPSED_KEY, c);
+		setCollapsedState(c);
+		setPeek(false);
+	};
+	const all = [{ id: "file", label: "File" }, ...tabs];
+	// Arrow keys move between the tabs, as in a tab list; Ctrl+F1 collapses the ribbon
+	const onTabKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+		if (e.key === "F1" && e.ctrlKey) {
+			e.preventDefault();
+			setCollapsed(!collapsed);
+			return;
+		}
+		const at = all.findIndex((t) => t.id === tab);
+		const to = e.key === "ArrowRight" ? (at + 1) % all.length : e.key === "ArrowLeft" ? (at + all.length - 1) % all.length : e.key === "Home" ? 0 : e.key === "End" ? all.length - 1 : -1;
+		if (to < 0) return;
+		e.preventDefault();
+		onTab(all[to].id);
+		e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[to]?.focus();
+	};
 	return (
 		<AccentContext.Provider value={accent}>
 			<div className="flex h-full min-h-0 flex-col bg-background" style={{ "--office": a.color, "--office-dark": a.dark } as CSSProperties}>
@@ -73,18 +102,26 @@ export function OfficeFrame({
 					<div className="flex shrink-0 items-center gap-2">{people}</div>
 					<div className="flex shrink-0 items-center gap-1">{actions}</div>
 				</div>
-				<div role="tablist" aria-label="Ribbon tabs" className="flex h-10 shrink-0 items-center gap-1 border-b px-3">
-					{[{ id: "file", label: "File" }, ...tabs].map((t) => (
+				<div role="tablist" aria-label="Ribbon tabs" onKeyDown={onTabKey} className="flex h-10 shrink-0 items-end gap-0.5 border-b px-3">
+					{all.map((t) => (
 						<button
 							key={t.id}
 							type="button"
 							role="tab"
 							aria-selected={tab === t.id}
+							tabIndex={tab === t.id ? 0 : -1}
 							onClick={() => {
 								onTab(t.id);
 								if (collapsed && t.id !== "file") setPeek(true);
 							}}
-							className={cn("flex h-8 items-center px-3 text-sm whitespace-nowrap outline-none transition-colors focus-visible:bg-muted", tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
+							onDoubleClick={() => t.id !== "file" && setCollapsed(!collapsed)}
+							className={cn(
+								"relative flex h-9 items-center px-3.5 text-sm whitespace-nowrap transition-colors",
+								focusRing,
+								t.id === "file" ? "mr-1 font-medium text-[var(--office)] hover:bg-muted" : tab === t.id ? "font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+								// The tab you are on is underlined in the editor's colour
+								tab === t.id && "after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-[var(--office)]",
+							)}
 						>
 							{t.label}
 						</button>
@@ -93,18 +130,16 @@ export function OfficeFrame({
 					<button
 						type="button"
 						aria-label={collapsed ? "Pin the ribbon" : "Collapse the ribbon"}
-						title={collapsed ? "Pin the ribbon" : "Collapse the ribbon"}
-						onClick={() => {
-							setCollapsed((c) => !c);
-							setPeek(false);
-						}}
-						className="flex size-7 items-center justify-center text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+						aria-pressed={collapsed}
+						title={collapsed ? "Pin the ribbon (Ctrl+F1)" : "Collapse the ribbon (Ctrl+F1)"}
+						onClick={() => setCollapsed(!collapsed)}
+						className={cn("mb-1 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground", focusRing)}
 					>
 						{collapsed ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}
 					</button>
 				</div>
 				{showBody && (
-					<div role="tabpanel" className="relative z-30 flex h-[96px] shrink-0 items-stretch overflow-x-auto border-b bg-panel px-1 py-1" onMouseDown={(e) => { if (!(e.target as HTMLElement).closest("input,select,textarea")) e.preventDefault(); }} onMouseLeave={() => collapsed && setPeek(false)}>
+					<div role="tabpanel" className="relative z-30 flex h-[100px] shrink-0 items-stretch gap-0.5 overflow-x-auto border-b bg-panel px-2 py-1.5" onMouseDown={(e) => { if (!(e.target as HTMLElement).closest("input,select,textarea")) e.preventDefault(); }} onMouseLeave={() => collapsed && setPeek(false)}>
 						{ribbon}
 					</div>
 				)}
@@ -123,9 +158,9 @@ export function OfficeFrame({
 // A set of controls under one label, with a rule after it
 export function Group({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
 	return (
-		<div role="group" aria-label={label} className="flex shrink-0 flex-col border-r border-black/10 px-1.5 last:border-r-0 dark:border-white/10">
+		<div role="group" aria-label={label} className="flex shrink-0 flex-col border-r px-2 last:border-r-0">
 			<div className={cn("flex min-h-0 flex-1 items-center gap-1", className)}>{children}</div>
-			<div className="pb-0.5 text-center text-[11px] leading-3 text-muted-foreground">{label}</div>
+			<div className="pt-0.5 text-center text-[11px] leading-3 tracking-wide text-muted-foreground">{label}</div>
 		</div>
 	);
 }
@@ -137,7 +172,7 @@ export function Rows({ children, className }: { children: ReactNode; className?:
 export function Row({ children, className }: { children: ReactNode; className?: string }) {
 	return <div className={cn("flex items-center gap-0.5", className)}>{children}</div>;
 }
-export const Sep = () => <span aria-hidden className="mx-0.5 h-5 w-px self-center bg-black/15 dark:bg-white/15" />;
+export const Sep = () => <span aria-hidden className="mx-0.5 h-5 w-px self-center bg-border" />;
 
 interface ButtonProps {
 	icon: ElementType;
@@ -152,7 +187,6 @@ interface ButtonProps {
 	bar?: string;
 }
 
-const hoverCls = "hover:bg-black/8 dark:hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent";
 
 // A large button: the icon above the words
 export function Big({ icon: Icon, label, title, active, disabled, onPress, menu }: ButtonProps) {
@@ -167,7 +201,7 @@ export function Big({ icon: Icon, label, title, active, disabled, onPress, menu 
 			aria-expanded={menu ? isOpen : undefined}
 			disabled={disabled}
 			onClick={() => (menu ? open() : onPress?.())}
-			className={cn("flex h-[66px] w-[54px] flex-col items-center justify-start gap-0.5 rounded-sm px-0.5 pt-1.5 text-[11px] leading-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring", hoverCls, (active || isOpen) && "bg-black/10 dark:bg-white/15")}
+			className={cn("flex h-[66px] w-[56px] flex-col items-center justify-start gap-0.5 rounded-md px-0.5 pt-1.5 text-[11px] leading-[13px] transition-colors", focusRing, idle, (active || isOpen) && on)}
 		>
 			<Icon className="size-7" strokeWidth={1.4} style={{ color: ACCENTS[accent].color }} aria-hidden />
 			<span className="line-clamp-2 text-center">{label}</span>
@@ -189,7 +223,7 @@ export function Small({ icon: Icon, label, title, active, disabled, onPress, men
 			aria-expanded={menu ? isOpen : undefined}
 			disabled={disabled}
 			onClick={() => (menu ? open() : onPress?.())}
-			className={cn("flex h-6 items-center gap-1 rounded-sm px-1 text-[12px] outline-none focus-visible:ring-2 focus-visible:ring-ring", !label && "min-w-6 justify-center", hoverCls, (active || isOpen) && "bg-black/10 dark:bg-white/15")}
+			className={cn("flex h-6 items-center gap-1 rounded-md px-1 text-[12px] transition-colors", focusRing, !label && "min-w-6 justify-center", idle, (active || isOpen) && on)}
 		>
 			<span className="relative flex flex-col items-center">
 				<Icon className="size-4" strokeWidth={1.7} aria-hidden />
@@ -212,7 +246,7 @@ export function Choice({ label, value, options, onChange, width = 120, disabled 
 			disabled={disabled}
 			onChange={(e) => onChange(e.target.value)}
 			style={{ width }}
-			className="h-6 cursor-pointer rounded-sm border border-black/20 bg-background px-1 text-[12px] outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 dark:border-white/20"
+			className="h-6 cursor-pointer rounded-md border bg-background px-1 text-[12px] outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40"
 		>
 			{!options.some((o) => o.value === value) && <option value={value}>{value}</option>}
 			{options.map((o) => (
@@ -244,7 +278,19 @@ export function Popover({ trigger, children, align = "left" }: { trigger: (open:
 	useEffect(() => {
 		if (!open) return;
 		const down = (e: MouseEvent) => !root.current?.contains(e.target as Node) && !panel.current?.contains(e.target as Node) && setOpen(false);
-		const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+		const key = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				setOpen(false);
+				root.current?.querySelector<HTMLElement>("button")?.focus();
+			} else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+				// Up and down walk the items of the panel
+				const items = Array.from(panel.current?.querySelectorAll<HTMLElement>("button:not(:disabled)") ?? []);
+				if (items.length === 0) return;
+				e.preventDefault();
+				const at = items.indexOf(document.activeElement as HTMLElement);
+				items[(at + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
+			}
+		};
 		document.addEventListener("mousedown", down);
 		document.addEventListener("keydown", key);
 		return () => {
@@ -258,7 +304,7 @@ export function Popover({ trigger, children, align = "left" }: { trigger: (open:
 			{open &&
 				createPortal(
 					<PopoverContext.Provider value={() => setOpen(false)}>
-						<div ref={panel} role="menu" style={{ position: "fixed", left: at.left, top: at.top }} className="z-[60] min-w-44 border bg-popover p-1 text-popover-foreground shadow-lg">
+						<div ref={panel} role="menu" style={{ position: "fixed", left: at.left, top: at.top }} className="z-[60] min-w-44 rounded-md border bg-popover p-1 text-popover-foreground shadow-lg">
 							{children}
 						</div>
 					</PopoverContext.Provider>,
@@ -281,7 +327,7 @@ export function MenuItem({ icon: Icon, label, hint, checked, disabled, onPress }
 				onPress();
 				close();
 			}}
-			className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-[13px] outline-none hover:bg-muted focus-visible:bg-muted disabled:opacity-40"
+			className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] outline-none hover:bg-muted focus-visible:bg-muted disabled:opacity-40"
 		>
 			<span className="flex size-4 shrink-0 items-center justify-center">{Icon ? <Icon className="size-4" /> : checked ? "✓" : null}</span>
 			<span className="flex-1">{label}</span>
@@ -297,7 +343,7 @@ export function ColorButton({ icon, title, color, colors, none, onPick }: { icon
 	return (
 		<span className="inline-flex">
 			<Small icon={icon} title={title} bar={color} onPress={() => onPick(color)} />
-			<Popover trigger={(open, isOpen) => <button type="button" aria-label={`${title}: more colours`} aria-expanded={isOpen} onClick={open} className="flex h-6 w-3.5 items-center justify-center rounded-sm outline-none hover:bg-black/8 focus-visible:ring-2 focus-visible:ring-ring dark:hover:bg-white/10"><ChevronDown className="size-3 opacity-60" /></button>}>
+			<Popover trigger={(open, isOpen) => <button type="button" aria-label={`${title}: more colours`} aria-expanded={isOpen} onClick={open} className={cn("flex h-6 w-3.5 items-center justify-center rounded-md transition-colors hover:bg-muted", focusRing)}><ChevronDown className="size-3 opacity-60" /></button>}>
 				<Palette colors={colors} none={none} onPick={onPick} />
 			</Popover>
 		</span>
@@ -310,7 +356,7 @@ export function Palette({ colors, none, onPick }: { colors: readonly string[]; n
 		<div className="w-[178px]">
 			<div className="grid grid-cols-7 gap-1 p-1">
 				{colors.map((c) => (
-					<button key={c} type="button" role="menuitem" aria-label={`#${c}`} title={`#${c}`} onClick={() => { onPick(c); close(); }} className="size-5 border border-black/20 outline-none hover:scale-110 focus-visible:ring-2 focus-visible:ring-ring" style={{ background: `#${c}` }} />
+					<button key={c} type="button" role="menuitem" aria-label={`#${c}`} title={`#${c}`} onClick={() => { onPick(c); close(); }} className="size-5 rounded-sm border outline-none hover:scale-110 focus-visible:ring-2 focus-visible:ring-ring" style={{ background: `#${c}` }} />
 				))}
 			</div>
 			<MenuItem label={none} onPress={() => onPick("")} />
@@ -326,7 +372,7 @@ export function Palette({ colors, none, onPick }: { colors: readonly string[]; n
 // A strip of looks to choose from, each drawn as it will look
 export function Gallery({ label, items, current, onPick, width = 72, className }: { label: string; items: { id: string; label: string; preview: ReactNode }[]; current?: string; onPick: (id: string) => void; width?: number; className?: string }) {
 	return (
-		<div role="listbox" aria-label={label} className={cn("flex h-[62px] items-stretch gap-1 overflow-x-auto border border-black/15 bg-background p-1 dark:border-white/15", className)}>
+		<div role="listbox" aria-label={label} className={cn("flex h-[62px] items-stretch gap-1 overflow-x-auto rounded-md border bg-background p-1", className)}>
 			{items.map((i) => (
 				<button
 					key={i.id}
@@ -336,7 +382,7 @@ export function Gallery({ label, items, current, onPick, width = 72, className }
 					title={i.label}
 					onClick={() => onPick(i.id)}
 					style={{ width }}
-					className={cn("flex shrink-0 flex-col items-start justify-between overflow-hidden border border-transparent px-1.5 py-1 text-left outline-none hover:border-black/30 focus-visible:ring-2 focus-visible:ring-ring dark:hover:border-white/30", current === i.id && "border-[var(--office)] bg-black/5 dark:bg-white/10")}
+					className={cn("flex shrink-0 flex-col items-start justify-between overflow-hidden rounded-sm border border-transparent px-1.5 py-1 text-left outline-none transition-colors hover:border-border hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50", current === i.id && "border-[var(--office)] bg-muted")}
 				>
 					<span className="w-full truncate leading-none">{i.preview}</span>
 					<span className="w-full truncate text-[10px] text-muted-foreground">{i.label}</span>

@@ -15,16 +15,24 @@ import { PeopleStack, usePeople } from "@/features/office/shared/People";
 import { OfficeFrame, ZoomBar, type RibbonTab } from "@/features/office/shared/Ribbon";
 import SlideCanvas, { type OtherSelection } from "@/features/office/slides/components/SlideCanvas";
 import SlideRibbon from "@/features/office/slides/components/SlideRibbon";
+import SlideShow from "@/features/office/slides/components/SlideShow";
+import SlideSorter from "@/features/office/slides/components/SlideSorter";
+import { align as alignBoxes, distribute as distributeBoxes, type AlignTo, type Box } from "@/features/office/slides/lib/arrange";
+import { crisp } from "@/features/office/slides/lib/show";
+import { readFlag, saveFlag } from "@/lib/storage";
 import Loading from "@/components/Loading";
 import { Button } from "@/components/ui/button";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
 import { colorOf } from "@/lib/collabColor";
-import { addShape, addSlide, arrange, deleteSlide, duplicateSlide, getBase, moveSlide, nextShapeId, notesOf, readSlide, readSlides, removeShape, seed, setBase, setShape, setSlideMeta, slideKeys, slideOrder, textOf, transitionOf, type ShapeJson, type SlideJson, type Xfrm } from "@/features/office/slides/lib/deck";
-import { deckAddPicture, deckEditShape, deckEditSlide, deckLayouts, deckNewShape, deckNewSlide, deckRegister, deckSave, type ShapeEdit, type SlideEdit } from "@/lib/tauri";
+import { addShape, addSlide, arrange, cloneShape, deleteSlide, duplicateSlide, getBase, moveSlide, nextShapeId, notesOf, readSlide, readSlides, removeShape, runsIn, searchText, seed, setBase, setShape, setSlideMeta, slideKeys, slideOrder, textOf, timingOf, transitionOf, type ShapeJson, type SlideJson, type Xfrm } from "@/features/office/slides/lib/deck";
+import { deckAddPicture, deckApplyLayout, deckEditShape, deckEditSlide, deckEditTable, deckGroup, deckLayouts, deckNewShape, deckNewSlide, deckNewTable, deckRegister, deckReplace, deckSave, deckUngroup, type ShapeEdit, type SlideEdit, type TableEdit } from "@/lib/tauri";
 import { useSlideImage } from "@/features/office/slides/lib/useSlideImage";
 import { cn, errorText, formatBytes } from "@/lib/utils";
 
 const LOCAL = "local-edit";
+const ZOOM_MIN = 30;
+const ZOOM_MAX = 300;
+const PRESENTER_KEY = "nexsync.slides.presenterView";
 const TABS: RibbonTab[] = [
 	{ id: "home", label: "Home" },
 	{ id: "insert", label: "Insert" },
@@ -112,14 +120,43 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 		ro.observe(el);
 		return () => ro.disconnect();
 	}, [slide === null]);
-	const width = Math.round((fit * zoom) / 100);
+	// Ctrl and the wheel zoom the slide, as in a browser or a presentation program. A listener of our own, because the page's would be
+	// passive and could not stop the whole window from zooming.
+	useEffect(() => {
+		const el = stage.current;
+		if (!el) return;
+		const onWheel = (e: WheelEvent) => {
+			if (!e.ctrlKey && !e.metaKey) return;
+			e.preventDefault();
+			setZoom((z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(z * (e.deltaY < 0 ? 1.1 : 1 / 1.1)))));
+		};
+		el.addEventListener("wheel", onWheel, { passive: false });
+		return () => el.removeEventListener("wheel", onWheel);
+	}, [slide === null]);
 	const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
+	// Drawn at a size whose pixels land one for one on the screen's, so the text is sharp
+	const [slideSize, setSlideSize] = useState({ w: 960, h: 540 });
+	const drawn = crisp((fit * zoom) / 100, slideSize.w, dpr);
+	const width = drawn.width;
 	const slideText = slide ? JSON.stringify(slide) : null;
-	const { image, error: drawError } = useSlideImage(baseId, slideText, (width / 960) * dpr, reregister);
+	const { image, error: drawError } = useSlideImage(baseId, slideText, drawn.scale, reregister);
+	useEffect(() => {
+		if (image && (image.widthPt !== slideSize.w || image.heightPt !== slideSize.h)) setSlideSize({ w: image.widthPt, h: image.heightPt });
+	}, [image, slideSize]);
 
 	// Who has what selected
-	const [sel, setSel] = useState<number | null>(null);
-	useEffect(() => setSel(null), [key]);
+	// The shapes chosen on this slide; the last is the one the ribbon and the handles go with
+	const [picked, setPicked] = useState<number[]>([]);
+	const sel = picked.length > 0 ? picked[picked.length - 1] : null;
+	const setSel = (id: number | null) => setPicked(id === null ? [] : [id]);
+	// A shape to choose once the slide it is on is open (a search finds it there)
+	const pendingSel = useRef<number | null>(null);
+	useEffect(() => {
+		setPicked(pendingSel.current !== null ? [pendingSel.current] : []);
+		pendingSel.current = null;
+	}, [key]);
+	// Where the text being typed is selected, so a look applies to those words only
+	const range = useRef<{ id: number; start: number; end: number; value: string } | null>(null);
 	const [others, setOthers] = useState<(OtherSelection & { key: string })[]>([]);
 	useEffect(() => {
 		if (!key) return;
@@ -148,19 +185,210 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 	const selectedShape = sel !== null ? shapeOf(sel) : undefined;
 	const hasText = selectedShape?.text !== undefined && selectedShape?.text !== null;
 
-	const setBox = (id: number, box: Xfrm) => {
+	const frameOf = (id: number) => image?.frames.find((f) => f.id === id);
+	const place = (id: number, box: Xfrm) => {
 		const s = shapeOf(id);
-		if (s && key) edit(() => setShape(doc, key, { ...s, xfrm: { x: box.x, y: box.y, w: box.w, h: box.h, ...(box.rot ? { rot: box.rot } : {}) } }));
+		if (s && key) setShape(doc, key, { ...s, xfrm: { x: box.x, y: box.y, w: box.w, h: box.h, ...(box.rot ? { rot: box.rot } : {}) } });
+	};
+	// A move of one of several chosen shapes moves them all
+	const setBox = (id: number, box: Xfrm) => {
+		const f = frameOf(id);
+		edit(() => {
+			place(id, box);
+			if (!f || picked.length < 2 || !picked.includes(id) || box.w !== f.w || box.h !== f.h) return;
+			for (const o of picked) {
+				const g = frameOf(o);
+				if (o !== id && g) place(o, { x: g.x + box.x - f.x, y: g.y + box.y - f.y, w: g.w, h: g.h, rot: g.rot });
+			}
+		});
 	};
 	const change = async (id: number, e: ShapeEdit) => {
 		const s = shapeOf(id);
 		if (!s || !key) return;
 		try {
-			const next = JSON.parse(await deckEditShape(JSON.stringify(s), e)) as ShapeJson;
+			let sent = e;
+			const r = range.current;
+			// Words selected in the text being typed: the look goes to them, and the typed text goes along
+			if (r && r.id === id && e.text === undefined) sent = { ...e, range: [r.start, r.end], ...(typing && r.value !== textOf(s) ? { text: r.value } : {}) };
+			const next = JSON.parse(await deckEditShape(JSON.stringify(s), sent)) as ShapeJson;
 			edit(() => setShape(doc, key, next));
 		} catch (err) {
 			flash(false, errorText(err, "That did not work."));
 		}
+	};
+	// Bold, italic and underline switch off when everything they apply to has them on
+	const toggled = (e: ShapeEdit): ShapeEdit => {
+		if (!selectedShape) return e;
+		const r = range.current;
+		const runs = runsIn(selectedShape, r && r.id === selectedShape.id && r.start < r.end ? [r.start, r.end] : null);
+		if (runs.length === 0) return e;
+		return {
+			...e,
+			...(e.bold && runs.every((x) => x.bold) ? { bold: false } : {}),
+			...(e.italic && runs.every((x) => x.italic) ? { italic: false } : {}),
+			...(e.underline && runs.every((x) => x.underline && x.underline !== "none") ? { underline: false } : {}),
+		};
+	};
+
+	// Copying, cutting and pasting shapes
+	const clip = useRef<ShapeJson[]>([]);
+	const [clipCount, setClipCount] = useState(0);
+	const chosen = (): ShapeJson[] =>
+		picked.flatMap((id) => {
+			const s = shapeOf(id);
+			const f = frameOf(id);
+			// A placeholder takes its place from the layout: the copy needs the place it has
+			return s ? [s.xfrm || !f ? s : { ...s, xfrm: { x: f.x, y: f.y, w: f.w, h: f.h } }] : [];
+		});
+	const pasteShapes = (list: ShapeJson[]) => {
+		if (!slide || !key || list.length === 0 || readOnly) return;
+		let n = nextShapeId(slide) - 1;
+		const made = list.map((s) => cloneShape(s, () => ++n, 12, 12));
+		edit(() => made.forEach((m) => addShape(doc, key, m)));
+		setPicked(made.map((m) => m.id));
+	};
+	const copy = () => {
+		const list = chosen();
+		if (list.length === 0) return;
+		clip.current = list;
+		setClipCount(list.length);
+	};
+	const removePicked = () => {
+		if (!key) return;
+		edit(() => picked.forEach((id) => removeShape(doc, key, id)));
+		setSel(null);
+	};
+
+	// Lining up, grouping and turning
+	const boxes = (): Box[] => picked.flatMap((id) => frameOf(id) ?? []).map((f) => ({ id: f.id, x: f.x, y: f.y, w: f.w, h: f.h }));
+	const applyBoxes = (list: Box[]) => edit(() => list.forEach((b) => place(b.id, { x: b.x, y: b.y, w: b.w, h: b.h, rot: frameOf(b.id)?.rot })));
+	const alignTo = (how: AlignTo) => applyBoxes(alignBoxes(boxes(), how, slideSize));
+	const distribute = (axis: "h" | "v") => applyBoxes(distributeBoxes(boxes(), axis));
+	const rotate = (by: number | "reset") =>
+		edit(() =>
+			picked.forEach((id) => {
+				const f = frameOf(id);
+				if (f) place(id, { x: f.x, y: f.y, w: f.w, h: f.h, rot: by === "reset" ? 0 : (((f.rot + by) % 360) + 360) % 360 });
+			}),
+		);
+	const group = async () => {
+		if (!slide || !key || picked.length < 2) return;
+		try {
+			const id = nextShapeId(slide);
+			const g = JSON.parse(await deckGroup(chosen().map((s) => JSON.stringify(s)), id)) as ShapeJson;
+			edit(() => {
+				picked.forEach((i) => removeShape(doc, key, i));
+				addShape(doc, key, g);
+			});
+			setSel(id);
+		} catch (err) {
+			flash(false, errorText(err, "The shapes could not be grouped."));
+		}
+	};
+	const ungroup = async () => {
+		if (!key || !selectedShape) return;
+		try {
+			const list = (await deckUngroup(JSON.stringify(selectedShape))).map((j) => JSON.parse(j) as ShapeJson);
+			edit(() => {
+				removeShape(doc, key, selectedShape.id);
+				list.forEach((s) => addShape(doc, key, s));
+			});
+			setPicked(list.map((s) => s.id));
+		} catch (err) {
+			flash(false, errorText(err, "The group could not be taken apart."));
+		}
+	};
+
+	// Tables
+	const kindOf = (s?: ShapeJson) => (s?.kind as { type?: string } | undefined)?.type;
+	const tableCells = kindOf(selectedShape) === "table" ? ((selectedShape!.kind as { rows: { cells: { text?: ShapeJson["text"] }[] }[] }).rows.map((r) => r.cells.map((c) => textOf({ id: 0, text: c.text })))) : null;
+	const addTable = async (rows: number, cols: number) => {
+		if (!slide || !key) return;
+		try {
+			const id = nextShapeId(slide);
+			const w = slideSize.w * 0.7;
+			const h = Math.min(rows * 36, slideSize.h * 0.7);
+			const shape = JSON.parse(await deckNewTable(id, rows, cols, (slideSize.w - w) / 2, 140, w, h)) as ShapeJson;
+			edit(() => addShape(doc, key, shape));
+			setSel(id);
+			setTab("home");
+		} catch (err) {
+			flash(false, errorText(err, "The table could not be added."));
+		}
+	};
+	const editTable = async (e: TableEdit) => {
+		if (!selectedShape || !key) return;
+		try {
+			const next = JSON.parse(await deckEditTable(JSON.stringify(selectedShape), e)) as ShapeJson;
+			edit(() => setShape(doc, key, next));
+		} catch (err) {
+			flash(false, errorText(err, "That did not work."));
+		}
+	};
+
+	// Moving the slide to another layout: its placeholders follow the new layout and the ones it lacked are added
+	const changeLayout = async (layout: number) => {
+		if (!baseId || !slide || !key) return;
+		try {
+			const next = JSON.parse(await deckApplyLayout(baseId, JSON.stringify(slide), layout, nextShapeId(slide))) as SlideJson;
+			const had = new Set(slide.shapes.map((s) => s.id));
+			edit(() => {
+				setSlideMeta(doc, key, next);
+				next.shapes.forEach((s) => (had.has(s.id) ? setShape(doc, key, s) : addShape(doc, key, s)));
+			});
+		} catch (err) {
+			flash(false, errorText(err, "The layout could not be changed."));
+		}
+	};
+
+	// Find and replace across the slides, in text and in table cells
+	const hits = (s: ShapeJson, q: string, matchCase: boolean) => (matchCase ? searchText(s).includes(q) : searchText(s).toLowerCase().includes(q.toLowerCase()));
+	const findNext = async (q: string, matchCase: boolean) => {
+		const all = keys.flatMap((k) => (readSlide(doc, k)?.shapes ?? []).map((s) => ({ k, s })));
+		const at = all.findIndex((x) => x.k === key && x.s.id === sel);
+		const start = at >= 0 ? at + 1 : Math.max(0, all.findIndex((x) => x.k === key));
+		for (let i = 0; i < all.length; i++) {
+			const x = all[(start + i) % all.length];
+			if (!hits(x.s, q, matchCase)) continue;
+			range.current = null;
+			if (x.k === key) setSel(x.s.id);
+			else {
+				pendingSel.current = x.s.id;
+				setActiveKey(x.k);
+			}
+			return true;
+		}
+		return false;
+	};
+	const replaceOne = async (q: string, r: string, matchCase: boolean) => {
+		if (!selectedShape || !key || !hits(selectedShape, q, matchCase)) return findNext(q, matchCase);
+		try {
+			const [json] = await deckReplace(JSON.stringify(selectedShape), q, r, matchCase, true);
+			range.current = null;
+			edit(() => setShape(doc, key, JSON.parse(json) as ShapeJson));
+			await findNext(q, matchCase);
+			return true;
+		} catch (err) {
+			flash(false, errorText(err, "That could not be replaced."));
+			return false;
+		}
+	};
+	const replaceAll = async (q: string, r: string, matchCase: boolean) => {
+		let total = 0;
+		try {
+			for (const k of keys) {
+				for (const s of readSlide(doc, k)?.shapes ?? []) {
+					if (!hits(s, q, matchCase)) continue;
+					const [json, n] = await deckReplace(JSON.stringify(s), q, r, matchCase, false);
+					if (n > 0) edit(() => setShape(doc, k, JSON.parse(json) as ShapeJson));
+					total += n;
+				}
+			}
+			range.current = null;
+		} catch (err) {
+			flash(false, errorText(err, "That could not be replaced."));
+		}
+		return total;
 	};
 
 	// A change to a slide's own settings, for this slide or for all of them
@@ -264,22 +492,46 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 	};
 
 	const [presenting, setPresenting] = useState<number | null>(null);
+	// Whether a show opens a second window for the audience and keeps this one for the presenter; on unless it was turned off
+	const [presenterView, setPresenterViewState] = useState(() => !(readFlag(PRESENTER_KEY, true) === false));
+	const setPresenterView = (on: boolean) => {
+		saveFlag(PRESENTER_KEY, on);
+		setPresenterViewState(on);
+	};
 	const [typing, setTyping] = useState(false);
-	const [view, setViewState] = useState({ notes: true });
+	const readOnlyRef = useRef(readOnly);
+	readOnlyRef.current = readOnly;
+	const [view, setViewState] = useState({ notes: true, sorter: false });
 	const [notesDraft, setNotesDraft] = useState<string | null>(null);
 	useEffect(() => setNotesDraft(null), [key]);
 
+	// What the keys of the page do with the shapes, as they stand right now
+	const shapeKeys = useRef<Record<string, () => void>>({});
+	shapeKeys.current = { c: copy, x: () => (copy(), removePicked()), v: () => pasteShapes(clip.current), d: () => pasteShapes(chosen()), g: () => void group(), G: () => void ungroup() };
 	// Keys of the whole page: slide navigation and undo, when no text is being typed
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			if (typing || presenting !== null || (e.target as HTMLElement | null)?.closest("input, textarea, select")) return;
-			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+			const chord = (e.ctrlKey || e.metaKey) && !e.altKey ? (e.shiftKey && e.key.toLowerCase() === "g" ? "G" : e.shiftKey ? "" : e.key.toLowerCase()) : "";
+			if (chord && shapeKeys.current[chord]) {
+				e.preventDefault();
+				if (chord === "c" || !readOnlyRef.current) shapeKeys.current[chord]();
+			} else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
 				e.preventDefault();
 				if (e.shiftKey) undo.redo();
 				else undo.undo();
 			} else if (e.key === "PageDown" && index >= 0 && index < keys.length - 1) setActiveKey(keys[index + 1]);
 			else if (e.key === "PageUp" && index > 0) setActiveKey(keys[index - 1]);
-			else if (e.key === "F5") {
+			else if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+")) {
+					e.preventDefault();
+					setZoom((z) => Math.min(ZOOM_MAX, z + 10));
+				} else if ((e.ctrlKey || e.metaKey) && e.key === "-") {
+					e.preventDefault();
+					setZoom((z) => Math.max(ZOOM_MIN, z - 10));
+				} else if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+					e.preventDefault();
+					setZoom(100);
+				} else if (e.key === "F5") {
 				e.preventDefault();
 				setPresenting(e.shiftKey ? Math.max(0, index) : 0);
 			}
@@ -314,38 +566,59 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 			}
 			people={<PeopleStack people={people} />}
 			ribbon={
-				<SlideRibbon
-					tab={tab}
-					readOnly={readOnly}
-					hasSelection={!!selectedShape}
-					hasText={hasText}
-					layouts={layouts}
-					hidden={slide.hidden === true}
-					transition={transitionOf(slide)}
-					newSlide={(l) => void newSlide(l)}
-					duplicate={() => edit(() => setActiveKey(duplicateSlide(doc, key)))}
-					deleteSlide={() => {
-						const problem = deleteSlide(doc, key);
-						if (problem) flash(false, problem);
-					}}
-					moveSlide={(by) => edit(() => moveSlide(doc, key, by))}
-					addShape={(k) => void addShapeOfKind(k)}
-					pickPicture={() => picker.current?.click()}
-					change={(e) => sel !== null && void change(sel, e)}
-					arrange={(to) => sel !== null && edit(() => arrange(doc, key, sel, to))}
-					deleteShape={() => {
-						if (sel === null) return;
-						edit(() => removeShape(doc, key, sel));
-						setSel(null);
-					}}
-					setBackground={(hex, all) => void changeSlide({ background: hex }, all)}
-					setTransition={(kind, all) => void changeSlide({ transition: kind }, all)}
-					setHidden={(h) => void changeSlide({ hidden: h })}
-					present={(fromStart) => setPresenting(fromStart ? 0 : Math.max(0, index))}
-					view={view}
-					setView={(v) => setViewState((cur) => ({ ...cur, ...v }))}
-				/>
-			}
+					<SlideRibbon
+						tab={tab}
+						readOnly={readOnly}
+						hasSelection={!!selectedShape}
+						hasText={hasText}
+						selectionCount={picked.length}
+						isGroup={kindOf(selectedShape) === "group"}
+						isTable={tableCells !== null}
+						tableCells={tableCells}
+						hasClipboard={clipCount > 0}
+						layouts={layouts}
+						layout={Number(slide.layout)}
+						hidden={slide.hidden === true}
+						transition={transitionOf(slide)}
+						timing={timingOf(slide)}
+						newSlide={(l) => void newSlide(l)}
+						changeLayout={(l) => void changeLayout(l)}
+						duplicate={() => edit(() => setActiveKey(duplicateSlide(doc, key)))}
+						deleteSlide={() => {
+							const problem = deleteSlide(doc, key);
+							if (problem) flash(false, problem);
+						}}
+						moveSlide={(by) => edit(() => moveSlide(doc, key, by))}
+						addShape={(k) => void addShapeOfKind(k)}
+						addTable={(r, c) => void addTable(r, c)}
+						editTable={(e) => void editTable(e)}
+						pickPicture={() => picker.current?.click()}
+						change={(e) => sel !== null && void change(sel, toggled(e))}
+						arrange={(to) => sel !== null && edit(() => picked.forEach((id) => arrange(doc, key, id, to)))}
+						align={alignTo}
+						distribute={distribute}
+						group={() => void group()}
+						ungroup={() => void ungroup()}
+						rotate={rotate}
+						copy={copy}
+						cut={() => (copy(), removePicked())}
+						paste={() => pasteShapes(clip.current)}
+						duplicateShape={() => pasteShapes(chosen())}
+						deleteShape={removePicked}
+						find={findNext}
+						replaceOne={replaceOne}
+						replaceAll={replaceAll}
+						setBackground={(hex, all) => void changeSlide({ background: hex }, all)}
+						setTransition={(kind, all) => void changeSlide({ transition: kind }, all)}
+						setTiming={(e, all) => void changeSlide(e, all)}
+						setHidden={(h) => void changeSlide({ hidden: h })}
+						present={(fromStart) => setPresenting(fromStart ? 0 : Math.max(0, index))}
+						presenterView={presenterView}
+						setPresenterView={setPresenterView}
+						view={view}
+						setView={(v) => setViewState((cur) => ({ ...cur, ...v }))}
+					/>
+				}
 			file={
 				<Backstage
 					accent="#B7472A"
@@ -414,7 +687,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 					<button type="button" onClick={() => setViewState((v) => ({ ...v, notes: !v.notes }))} className="outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring">
 						Notes
 					</button>
-					<ZoomBar value={zoom} onChange={setZoom} min={30} max={200} />
+					<ZoomBar value={zoom} onChange={setZoom} min={ZOOM_MIN} max={ZOOM_MAX} />
 				</>
 			}
 		>
@@ -426,7 +699,25 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 					</Notice>
 				)}
 				{opened.notes.length > 0 && <p className="border-b bg-muted/40 px-3 py-1 text-[13px] text-muted-foreground">{opened.notes.join(" ")}</p>}
-				<div className="flex min-h-0 flex-1">
+					<div className="flex min-h-0 flex-1">
+					{view.sorter && (
+						<SlideSorter
+							doc={doc}
+							keys={keys}
+							current={key}
+							baseId={baseId}
+							reregister={reregister}
+							version={version}
+							readOnly={readOnly}
+							onPick={setActiveKey}
+							onOpen={(k) => {
+								setActiveKey(k);
+								setViewState((cur) => ({ ...cur, sorter: false }));
+							}}
+							onMove={(k, to) => edit(() => moveSlide(doc, k, to - keys.indexOf(k)))}
+						/>
+					)}
+					<div className={cn("flex min-h-0 min-w-0 flex-1", view.sorter && "hidden")}>
 					<CollapsiblePane id="slides.thumbs" defaultWidth={176} label="the slide list">
 					<ol aria-label="Slides" className="w-44 shrink-0 space-y-2 overflow-y-auto bg-[#f3f2f1] p-2 dark:bg-neutral-800">
 						{keys.map((k, i) => (
@@ -437,7 +728,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 					</ol>
 					</CollapsiblePane>
 					<div className="flex min-w-0 flex-1 flex-col">
-						<div ref={stage} className="flex min-h-0 flex-1 items-start justify-center overflow-auto bg-[#e6e6e6] p-6 dark:bg-neutral-900">
+						<div ref={stage} className="flex min-h-0 flex-1 overflow-auto bg-[#e6e6e6] p-6 dark:bg-neutral-900"><div className="m-auto">
 							{image ? (
 								<SlideCanvas
 									image={image}
@@ -446,14 +737,28 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 									others={others.filter((o) => o.key === key)}
 									readOnly={readOnly}
 									text={(id) => (shapeOf(id) ? textOf(shapeOf(id)!) : "")}
-									onSelect={setSel}
+									also={picked.slice(0, -1)}
+									onSelect={(id) => {
+										range.current = null;
+										// Pressing one of several chosen shapes keeps them chosen, so they can be moved together
+										setPicked((cur) => (id === null ? [] : cur.length > 1 && cur.includes(id) ? [...cur.filter((x) => x !== id), id] : [id]));
+									}}
+									onToggle={(id) => setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))}
 									onBox={setBox}
 									onDelete={(id) => {
-										edit(() => removeShape(doc, key, id));
+										edit(() => (picked.includes(id) ? picked : [id]).forEach((i) => removeShape(doc, key, i)));
 										setSel(null);
 									}}
 									onText={(id, text) => void change(id, { text })}
-									onEditing={setTyping}
+									onEditing={(on) => {
+										if (on) range.current = null;
+										setTyping(on);
+									}}
+									onTextSelect={(t) => {
+										// The caret counts characters, not UTF-16 units as the text box does
+										const at = (n: number) => [...t.value.slice(0, n)].length;
+										range.current = { id: t.id, start: at(t.start), end: at(t.end), value: t.value };
+									}}
 								/>
 							) : drawError ? (
 								<Notice className="max-w-md p-3">
@@ -462,6 +767,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 							) : (
 								<Loading className="h-48" />
 							)}
+							</div>
 						</div>
 						{view.notes && (
 							<div className="shrink-0 border-t bg-background">
@@ -480,10 +786,11 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 							</div>
 						)}
 					</div>
+					</div>
 				</div>
 			</div>
 			{presenting !== null && baseId && (
-				<Presenter doc={doc} keys={keys} start={presenting} baseId={baseId} reregister={reregister} onShow={(i) => setActiveKey(keys[i])} onClose={() => setPresenting(null)} />
+				<SlideShow doc={doc} keys={keys} start={presenting} baseId={baseId} reregister={reregister} presenterView={presenterView} slideSize={slideSize} onShow={(i) => setActiveKey(keys[i])} onClose={() => setPresenting(null)} />
 			)}
 		</OfficeFrame>
 	);
@@ -504,48 +811,5 @@ function Thumb({ doc, k, baseId, reregister, current, number, onPick, version }:
 				</span>
 			</span>
 		</button>
-	);
-}
-
-// The full-screen show: the slides at the size of the screen, moved with the arrow keys, space or a click; Escape ends it. Hidden slides are
-// skipped, and a slide with a transition fades in.
-function Presenter({ doc, keys, start, baseId, reregister, onShow, onClose }: { doc: Y.Doc; keys: string[]; start: number; baseId: string; reregister: () => Promise<string | null>; onShow: (i: number) => void; onClose: () => void }) {
-	const shownKeys = useMemo(() => keys.filter((k) => readSlide(doc, k)?.hidden !== true), []); // eslint-disable-line react-hooks/exhaustive-deps
-	const list = shownKeys.length > 0 ? shownKeys : keys;
-	const [i, setI] = useState(Math.max(0, Math.min(list.length - 1, list.indexOf(keys[start]) >= 0 ? list.indexOf(keys[start]) : 0)));
-	const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
-	useEffect(() => {
-		const on = () => setSize({ w: window.innerWidth, h: window.innerHeight });
-		window.addEventListener("resize", on);
-		return () => window.removeEventListener("resize", on);
-	}, []);
-	useEffect(() => onShow(keys.indexOf(list[i])), [i]); // eslint-disable-line react-hooks/exhaustive-deps
-	const go = useCallback((n: number) => setI((c) => Math.max(0, Math.min(list.length - 1, c + n))), [list.length]);
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key === "Escape") onClose();
-			else if (["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"].includes(e.key)) go(1);
-			else if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(e.key)) go(-1);
-		};
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [go, onClose]);
-	const s = readSlide(doc, list[i]);
-	const text = s ? JSON.stringify(s) : null;
-	const first = useSlideImage(baseId, text, 1, reregister, 0).image;
-	// Drawn at the width that fits the screen, at the pixel density of the display
-	const w = first ? Math.min(size.w, (size.h * first.widthPt) / first.heightPt) : size.w;
-	const { image } = useSlideImage(baseId, text, (w / (first?.widthPt ?? 960)) * (window.devicePixelRatio || 1), reregister, 0);
-	const moves = s ? transitionOf(s) !== "none" : false;
-	return (
-		<div role="dialog" aria-label="Slide show" className="fixed inset-0 z-50 flex items-center justify-center bg-black" onClick={() => go(1)}>
-			{(image ?? first) && <img key={list[i]} src={`data:image/png;base64,${(image ?? first)!.png}`} alt={`Slide ${i + 1} of ${list.length}`} draggable={false} style={{ width: w }} className={cn("select-none", moves && "animate-in fade-in duration-500")} />}
-			<span className="pointer-events-none absolute right-3 bottom-2 font-mono text-xs text-white/50">
-				{i + 1} / {list.length}
-			</span>
-			<button type="button" aria-label="End the show" onClick={(e) => { e.stopPropagation(); onClose(); }} className="absolute top-3 right-3 text-white/50 hover:text-white">
-				<X className="size-5" />
-			</button>
-		</div>
 	);
 }

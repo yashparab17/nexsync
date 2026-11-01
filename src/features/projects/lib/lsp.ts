@@ -187,8 +187,17 @@ export function completionsOf(result: unknown, doc: LineSource): CompletionLike[
 		});
 }
 
-// `projects/app/src/a.ts` is file `src/a.ts` of project `app`; anything else has no language server
+// The name that stands for the workspace's own files, which are in no project (the backend's `FILES`)
+export const FILES_SCOPE = "@files";
+
+// `projects/app/src/a.ts` is file `src/a.ts` of project `app`; any other file of the workspace belongs to the files scope, and the
+// server for it (if its type has one) is told by the file's extension
 export function lspTarget(path: string): { project: string; rel: string } | null {
 	const m = /^\/?projects\/([^/]+)\/(.+)$/.exec(path);
-	return m ? { project: m[1], rel: m[2] } : null;
+	if (m) return { project: m[1], rel: m[2] };
+	const rel = path.replace(/^\/+/, "");
+	return rel ? { project: FILES_SCOPE, rel } : null;
 }
+
+// The workspace path of a file a server named, which the editor opens
+export const lspPath = (project: string, rel: string): string => (project === FILES_SCOPE ? rel : `projects/${project}/${rel}`);

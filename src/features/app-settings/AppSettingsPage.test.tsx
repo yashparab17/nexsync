@@ -16,6 +16,7 @@ vi.mock("@/hooks/useAppUpdater", () => ({ useAppUpdater: () => updater }));
 const logError = () => {};
 vi.mock("@/hooks/useErrorLog", () => ({ useErrorLog: () => logError }));
 vi.mock("@/components/elements/ErrorLogCard", () => ({ default: () => <div>error log</div> }));
+vi.mock("@/components/elements/LanguageServersCard", () => ({ default: () => <div>language servers</div> }));
 
 import { resetEditorPrefs } from "@/lib/editorPrefs";
 import { APP_VERSION } from "@/lib/version";

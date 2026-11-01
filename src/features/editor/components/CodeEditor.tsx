@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { acceptCompletion, autocompletion } from "@codemirror/autocomplete";
+import { codeCompletion } from "@/lib/editor/completion";
 import { lintGutter } from "@codemirror/lint";
 import { EditorState, Prec, type Extension } from "@codemirror/state";
 import { EditorView, GutterMarker, gutter, keymap, lineNumbers } from "@codemirror/view";
@@ -236,7 +237,7 @@ export default function CodeEditor({
 			...(wrap || language.name === "Markdown" ? [EditorView.lineWrapping] : []),
 				// Suggestions only while writing code: none open on their own in prose or a plain file. None is chosen until the arrow keys pick one, so Enter
 				// still makes a new line; Tab takes the shown one,
-				autocompletion({ activateOnTyping: !["Markdown", "Plain Text"].includes(language.name), selectOnOpen: false, icons: false, maxRenderedOptions: 30 }),
+				autocompletion({ activateOnTyping: !["Markdown", "Plain Text"].includes(language.name), selectOnOpen: false, icons: false, maxRenderedOptions: 30, override: [codeCompletion] }),
 				Prec.high(keymap.of([{ key: "Tab", run: acceptCompletion }])),
 		],
 		[isDark, fontSize, tabSize, wrap, language.name, relativeNumbers, cursorExtension, vimExtension, minimapExtension, leader],

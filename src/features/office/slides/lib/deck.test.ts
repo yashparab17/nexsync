@@ -1,7 +1,7 @@
 import * as Y from "yjs";
 import { describe, expect, it } from "vitest";
 
-import { addShape, addSlide, arrange, deleteSlide, dragged, duplicateSlide, getBase, moveSlide, nextShapeId, readSlide, readSlides, removeShape, seed, setShape, slideKeys, textOf, type SlideJson } from "@/features/office/slides/lib/deck";
+import { addShape, addSlide, arrange, deleteSlide, dragged, duplicateSlide, getBase, moveSlide, cloneShape, nextShapeId, searchText, timingOf, readSlide, readSlides, removeShape, seed, setShape, slideKeys, textOf, type SlideJson } from "@/features/office/slides/lib/deck";
 
 const slide = (id: number, shapes: number[]): SlideJson => ({ id, layout: 1, name: `s${id}`, shapes: shapes.map((s) => ({ id: s, name: `shape ${s}`, xfrm: { x: s, y: s, w: 10, h: 10 } })) });
 
@@ -174,5 +174,42 @@ describe("a shape in pieces", () => {
 		expect(readSlide(doc, key)!.shapes[0]).toEqual({ id: 11, name: "placeholder", xfrm: null, text: null });
 		setShape(doc, key, { id: 11, name: "renamed", xfrm: null, text: null });
 		expect(readSlide(doc, key)!.shapes[0]).toEqual({ id: 11, name: "renamed", xfrm: null, text: null });
+	});
+});
+
+describe("copying, finding and timing", () => {
+	const group = { id: 5, name: "g", xfrm: { x: 10, y: 10, w: 100, h: 100 }, ph: { kind: "title" }, kind: { type: "group", children: [{ id: 6, name: "c", xfrm: { x: 10, y: 10, w: 50, h: 50 } }] } };
+
+	it("copies a shape with new ids inside and out, moved, and not a placeholder", () => {
+		let n = 100;
+		const copy = cloneShape(group, () => ++n, 12, 12);
+		expect(copy.id).toBe(101);
+		expect((copy.kind as { children: { id: number }[] }).children[0].id).toBe(102);
+		expect(copy.xfrm).toEqual({ x: 22, y: 22, w: 100, h: 100 });
+		expect(copy.ph).toBeUndefined();
+		expect(group.id).toBe(5);
+		expect(nextShapeId({ id: 1, layout: 1, shapes: [group] })).toBe(7);
+	});
+
+	it("finds words in text and in the cells of a table", () => {
+		const text = (t: string) => ({ paragraphs: [{ runs: [{ text: t }] }] });
+		expect(searchText({ id: 1, text: text("Hello") })).toContain("Hello");
+		expect(searchText({ id: 2, kind: { type: "table", rows: [{ cells: [{ text: text("cell") }] }] } })).toContain("cell");
+	});
+
+	it("reads a slide's timing, with a click moving on unless it says otherwise", () => {
+		expect(timingOf({ id: 1, layout: 1, shapes: [] })).toEqual({ after: 0, click: true, seconds: 0.7 });
+		expect(timingOf({ id: 1, layout: 1, shapes: [], transition: { kind: "fade", advanceAfterMs: 5000, advanceOnClick: false, durationMs: 1500 } })).toEqual({ after: 5, click: false, seconds: 1.5 });
+	});
+});
+
+describe("runs in a range", () => {
+	it("lists the looks of the runs the range touches", async () => {
+		const { runsIn } = await import("@/features/office/slides/lib/deck");
+		const shape = { id: 1, text: { paragraphs: [{ runs: [{ text: "Hello ", props: {} }, { text: "big", props: { bold: true } }, { text: " world" }] }, { runs: [{ text: "x", props: { italic: true } }] }] } };
+		expect(runsIn(shape as never)).toHaveLength(4);
+		expect(runsIn(shape as never, [6, 9])).toEqual([{ bold: true }]);
+		expect(runsIn(shape as never, [8, 11])).toEqual([{ bold: true }, {}]);
+		expect(runsIn(shape as never, [16, 20])).toEqual([{ italic: true }]);
 	});
 });

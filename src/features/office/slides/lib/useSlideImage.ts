@@ -24,7 +24,8 @@ export function useSlideImage(baseId: string | null, slide: string | null, scale
 
 	useEffect(() => {
 		if (!baseId || !slide) return;
-		const s = Math.round(scale * 20) / 20 || 0.05;
+		// To the hundredth: a coarser step would draw the slide a little off the size it is shown at, and the browser would stretch it
+		const s = Math.round(scale * 100) / 100 || 0.05;
 		const key = `${baseId}|${s}|${hash(slide)}`;
 		const hit = cache.get(key);
 		if (hit) {

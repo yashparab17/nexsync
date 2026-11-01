@@ -16,6 +16,7 @@ import ColorSwatches from "@/components/elements/ColorSwatches";
 import { ensureLocalColor, setLocalProfile, type Profile } from "@/lib/profile";
 import { pictureToIcon } from "@/lib/workspaceIcon";
 import ErrorLogCard from "@/components/elements/ErrorLogCard";
+import LanguageServersCard from "@/components/elements/LanguageServersCard";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -550,6 +551,8 @@ export default function Settings({ onClose }: { onClose?: () => void } = {}) {
 						)}
 						{updater.status === "error" && <p className="text-xs text-destructive">{updater.error}</p>}
 					</SectionCard>
+
+					<LanguageServersCard />
 
 					<ErrorLogCard />
 			</SettingsShell>

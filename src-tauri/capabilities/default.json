@@ -3,7 +3,8 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": [
-    "main"
+    "main",
+    "audience"
   ],
   "permissions": [
     "core:default",
@@ -15,6 +16,12 @@
     "core:window:allow-close",
     "core:window:allow-start-dragging",
     "core:window:allow-set-focus",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-set-position",
+    "core:window:allow-available-monitors",
+    "core:window:allow-current-monitor",
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-create",
     "opener:default",
     "dialog:default",
     "updater:default",

@@ -23,6 +23,7 @@ use deckcraft_model::{
     defaults,
     resolve::{self, Ctx},
     style::{ColorRef, Fill, Line},
+    table::Table,
     text::{Paragraph, Run, TextBody},
     Geom, LayoutId, Presentation, SchemeSlot, Shape, ShapeId, ShapeKind, Slide, SlideId,
 };
@@ -201,6 +202,37 @@ pub struct Frame {
     /// `shape`, `picture`, `group`, `table`, `chart`, `media` and so on
     pub kind: &'static str,
     pub placeholder: bool,
+    /// How the first paragraph's text looks as drawn, for the box typed into
+    pub look: Option<Look>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct Look {
+    pub font: String,
+    pub size: f64,
+    /// `RRGGBB`
+    pub color: String,
+    pub bold: bool,
+    pub italic: bool,
+    pub align: &'static str,
+    pub line: f64,
+}
+
+fn look_of(ctx: &Ctx, s: &Shape) -> Option<Look> {
+    use deckcraft_model::text::{Align, Spacing};
+    let t = s.text.as_ref()?;
+    let para = t.paragraphs.iter().find(|p| !p.runs.is_empty()).or(t.paragraphs.first())?;
+    let run = resolve::run(ctx, s, para, &para.runs.first().map(|r| r.props.clone()).unwrap_or_default());
+    let pp = resolve::para(ctx, s, para);
+    Some(Look {
+        font: resolve::font_family(ctx, &run),
+        size: run.size.unwrap_or(18.0),
+        color: resolve::text_color(ctx, &run).hex().trim_start_matches('#').chars().take(6).collect(),
+        bold: run.bold.unwrap_or(false),
+        italic: run.italic.unwrap_or(false),
+        align: match pp.align { Some(Align::Center) => "center", Some(Align::Right) => "right", Some(Align::Justify) => "justify", _ => "left" },
+        line: match pp.line_spacing { Some(Spacing::Pct(p)) => p, _ => 1.0 },
+    })
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -251,7 +283,7 @@ pub fn render(base_id: &str, slide_json: &str, scale: f64) -> Result<Rendered, S
                 .filter(|s| !s.hidden)
                 .map(|s| {
                     let x = resolve::xfrm(&ctx, s);
-                    Frame { id: s.id.0, name: s.name.clone(), x: x.x, y: x.y, w: x.w, h: x.h, rot: x.rot, kind: kind_name(&s.kind), placeholder: s.ph.is_some() }
+                    Frame { id: s.id.0, name: s.name.clone(), x: x.x, y: x.y, w: x.w, h: x.h, rot: x.rot, kind: kind_name(&s.kind), placeholder: s.ph.is_some(), look: look_of(&ctx, s) }
                 })
                 .collect(),
             None => Vec::new(),
@@ -336,6 +368,119 @@ pub struct ShapeEdit {
     pub line: Option<String>,
     /// The outline's width in points
     pub line_width: Option<f64>,
+    /// The characters (start, end) of the text that the look edits apply to; none means all of it. Paragraph edits (bullets, spacing)
+    /// apply to the paragraphs the range touches.
+    pub range: Option<[usize; 2]>,
+    /// `none`, `dot`, `dash`, `num`, `alpha` or `roman`
+    pub bullet: Option<String>,
+    /// Line spacing as a multiple of the text's height (1.0 is single)
+    pub line_spacing: Option<f64>,
+    /// Space before and after a paragraph, in points
+    pub space_before: Option<f64>,
+    pub space_after: Option<f64>,
+    /// Moves the paragraphs in (+1) or out (-1) a level
+    pub level: Option<i8>,
+}
+
+/// Sets the text of a body, keeping the look of the characters around the change and each paragraph's own settings; a body with
+/// fields or breaks in it takes the look of its first paragraph and run instead
+fn set_text(body: &mut TextBody, new: &str) {
+    use deckcraft_model::text::{RunKind, RunProps};
+    let plain = body.paragraphs.iter().all(|p| p.runs.iter().all(|r| matches!(r.kind, RunKind::Text)));
+    let mut old: Vec<(char, RunProps)> = Vec::new();
+    for (i, p) in body.paragraphs.iter().enumerate() {
+        if !plain {
+            break;
+        }
+        for r in &p.runs {
+            old.extend(r.text.chars().map(|c| (c, r.props.clone())));
+        }
+        if i + 1 < body.paragraphs.len() {
+            old.push(('\n', p.end_props.clone()));
+        }
+    }
+    if !plain {
+        let first = body.paragraphs.first();
+        let (para, run) = first.map(|p| (p.props.clone(), p.runs.first().map(|r| r.props.clone()).unwrap_or_default())).unwrap_or_default();
+        let level = first.map_or(0, |p| p.level);
+        body.paragraphs = new
+            .split('\n')
+            .map(|line| {
+                let mut p = Paragraph::new("");
+                p.level = level;
+                p.props = para.clone();
+                if !line.is_empty() {
+                    p.runs = vec![Run { text: line.to_string(), props: run.clone(), kind: RunKind::Text }];
+                }
+                p
+            })
+            .collect();
+        return;
+    }
+    let new: Vec<char> = new.chars().collect();
+    let pre = old.iter().zip(&new).take_while(|(a, b)| a.0 == **b).count();
+    let suf = old.iter().rev().zip(new.iter().rev()).take_while(|(a, b)| a.0 == **b).count().min(old.len() - pre).min(new.len() - pre);
+    let ins = if pre > 0 { old[pre - 1].1.clone() } else { old.first().map(|o| o.1.clone()).unwrap_or_default() };
+    let mut chars: Vec<(char, RunProps)> = old[..pre].to_vec();
+    chars.extend(new[pre..new.len() - suf].iter().map(|c| (*c, ins.clone())));
+    chars.extend_from_slice(&old[old.len() - suf..]);
+    let head = old[..pre].iter().filter(|o| o.0 == '\n').count();
+    let tail = old[old.len() - suf..].iter().filter(|o| o.0 == '\n').count();
+    let (was, now) = (body.paragraphs.len(), chars.iter().filter(|o| o.0 == '\n').count() + 1);
+    let from_old = |j: usize| -> Paragraph {
+        let at = if j <= head { j } else if j + tail >= now { was.saturating_sub(now - j) } else { head };
+        let mut p = body.paragraphs.get(at.min(was.saturating_sub(1))).cloned().unwrap_or_default();
+        p.runs.clear();
+        p
+    };
+    let mut out = Vec::with_capacity(now);
+    for (j, line) in chars.split(|o| o.0 == '\n').enumerate() {
+        let mut p = from_old(j);
+        for (c, props) in line {
+            match p.runs.last_mut() {
+                Some(r) if r.props == *props => r.text.push(*c),
+                _ => p.runs.push(Run { text: c.to_string(), props: props.clone(), kind: RunKind::Text }),
+            }
+        }
+        out.push(p);
+    }
+    body.paragraphs = out;
+}
+
+/// Splits runs so the characters from..to (counting a paragraph break as one) are runs of their own, and applies `f` to those
+fn format_range(t: &mut TextBody, from: usize, to: usize, f: &dyn Fn(&mut deckcraft_model::text::RunProps)) {
+    let mut pos = 0;
+    for p in &mut t.paragraphs {
+        let len: usize = p.runs.iter().map(|r| r.text.chars().count()).sum();
+        if from < pos + len && to > pos {
+            let (a, b) = (from.saturating_sub(pos), to.saturating_sub(pos));
+            let mut at = 0;
+            let mut runs = Vec::with_capacity(p.runs.len() + 2);
+            for r in std::mem::take(&mut p.runs) {
+                let n = r.text.chars().count();
+                let (lo, hi) = (a.clamp(at, at + n) - at, b.clamp(at, at + n) - at);
+                at += n;
+                if lo >= hi {
+                    runs.push(r);
+                    continue;
+                }
+                let cut = |i: usize| r.text.char_indices().nth(i).map_or(r.text.len(), |(b, _)| b);
+                let (x, y) = (cut(lo), cut(hi));
+                for (s, hit) in [(&r.text[..x], false), (&r.text[x..y], true), (&r.text[y..], false)] {
+                    if s.is_empty() {
+                        continue;
+                    }
+                    let mut piece = Run { text: s.to_string(), props: r.props.clone(), kind: r.kind.clone() };
+                    if hit {
+                        f(&mut piece.props);
+                    }
+                    runs.push(piece);
+                }
+            }
+            p.runs = runs;
+        }
+        pos += len + 1;
+    }
 }
 
 pub fn edit_shape(shape_json: &str, edit: &ShapeEdit) -> Result<String, String> {
@@ -344,25 +489,7 @@ pub fn edit_shape(shape_json: &str, edit: &ShapeEdit) -> Result<String, String> 
         if text.len() > 200_000 {
             return Err("That is too much text for a shape.".to_string());
         }
-        let first = s.text.as_ref().and_then(|t| t.paragraphs.first());
-        let (para, run) = first.map(|p| (p.props.clone(), p.runs.first().map(|r| r.props.clone()).unwrap_or_default())).unwrap_or_default();
-        let level = first.map_or(0, |p| p.level);
-        let body = s.text.take().unwrap_or_default();
-        s.text = Some(TextBody {
-            paragraphs: text
-                .split('\n')
-                .map(|line| {
-                    let mut p = Paragraph::new("");
-                    p.level = level;
-                    p.props = para.clone();
-                    if !line.is_empty() {
-                        p.runs = vec![Run { text: line.to_string(), props: run.clone(), kind: deckcraft_model::text::RunKind::Text }];
-                    }
-                    p
-                })
-                .collect(),
-            ..body
-        });
+        set_text(s.text.get_or_insert_with(Default::default), text);
     }
     if let Some(hex) = &edit.fill {
         s.fill = Some(if hex.is_empty() { Fill::None } else { Fill::solid(ColorRef::rgb(Rgba::from_hex(hex).ok_or("That is not a colour.")?)) });
@@ -388,30 +515,77 @@ pub fn edit_shape(shape_json: &str, edit: &ShapeEdit) -> Result<String, String> 
     }
     if edit.bold.is_some() || edit.italic.is_some() || edit.size.is_some() || edit.color.is_some() || edit.underline.is_some() || edit.font.is_some() {
         let color = edit.color.as_deref().map(|c| Rgba::from_hex(c).ok_or("That is not a colour.")).transpose()?;
+        let apply = |r: &mut deckcraft_model::text::RunProps| {
+            if let Some(b) = edit.bold {
+                r.bold = Some(b);
+            }
+            if let Some(i) = edit.italic {
+                r.italic = Some(i);
+            }
+            if let Some(z) = edit.size {
+                r.size = Some(z.clamp(1.0, 400.0));
+            }
+            if let Some(c) = color {
+                r.fill = Some(Fill::solid(ColorRef::rgb(c)));
+            }
+            if let Some(u) = edit.underline {
+                r.underline = Some(if u { "sng" } else { "none" }.to_string());
+            }
+            if let Some(f) = edit.font.as_deref().filter(|f| !f.is_empty() && f.len() < 64) {
+                r.font = Some(f.to_string());
+            }
+        };
         if let Some(t) = s.text.as_mut() {
+            match edit.range {
+                Some([from, to]) if from < to => format_range(t, from, to, &apply),
+                _ => {
+                    for p in &mut t.paragraphs {
+                        p.runs.iter_mut().for_each(|r| apply(&mut r.props));
+                        apply(&mut p.end_props);
+                    }
+                }
+            }
+        }
+    }
+    if edit.bullet.is_some() || edit.line_spacing.is_some() || edit.space_before.is_some() || edit.space_after.is_some() || edit.level.is_some() {
+        use deckcraft_model::text::{Bullet, Spacing};
+        let bullet = match edit.bullet.as_deref() {
+            None => None,
+            Some("none") => Some(Bullet::None),
+            Some("dot") => Some(Bullet::Char { char: "\u{2022}".to_string() }),
+            Some("dash") => Some(Bullet::Char { char: "\u{2013}".to_string() }),
+            Some("num") => Some(Bullet::AutoNum { scheme: "arabicPeriod".to_string(), start_at: 1 }),
+            Some("alpha") => Some(Bullet::AutoNum { scheme: "alphaLcPeriod".to_string(), start_at: 1 }),
+            Some("roman") => Some(Bullet::AutoNum { scheme: "romanLcPeriod".to_string(), start_at: 1 }),
+            Some(_) => return Err("That bullet is not offered.".to_string()),
+        };
+        if let Some(t) = s.text.as_mut() {
+            let [from, to] = edit.range.unwrap_or([0, usize::MAX]);
+            let mut pos = 0;
             for p in &mut t.paragraphs {
-                let apply = |r: &mut deckcraft_model::text::RunProps| {
-                    if let Some(b) = edit.bold {
-                        r.bold = Some(b);
+                let len: usize = p.runs.iter().map(|r| r.text.chars().count()).sum();
+                // A caret (from == to) is in the paragraph that holds it
+                if pos <= to && from <= pos + len {
+                    if let Some(b) = &bullet {
+                        let on = !matches!(b, Bullet::None);
+                        p.props.bullet = Some(b.clone());
+                        p.props.margin_left = Some(if on { 27.0 + 27.0 * f64::from(p.level) } else { 0.0 });
+                        p.props.indent = Some(if on { -27.0 } else { 0.0 });
                     }
-                    if let Some(i) = edit.italic {
-                        r.italic = Some(i);
+                    if let Some(l) = edit.line_spacing {
+                        p.props.line_spacing = Some(Spacing::Pct(l.clamp(0.1, 10.0)));
                     }
-                    if let Some(z) = edit.size {
-                        r.size = Some(z.clamp(1.0, 400.0));
+                    if let Some(v) = edit.space_before {
+                        p.props.space_before = Some(Spacing::Pts(v.clamp(0.0, 1000.0)));
                     }
-                    if let Some(c) = color {
-                        r.fill = Some(Fill::solid(ColorRef::rgb(c)));
+                    if let Some(v) = edit.space_after {
+                        p.props.space_after = Some(Spacing::Pts(v.clamp(0.0, 1000.0)));
                     }
-                    if let Some(u) = edit.underline {
-                        r.underline = Some(if u { "sng" } else { "none" }.to_string());
+                    if let Some(d) = edit.level {
+                        p.level = (i16::from(p.level) + i16::from(d)).clamp(0, 8) as u8;
                     }
-                    if let Some(f) = edit.font.as_deref().filter(|f| !f.is_empty() && f.len() < 64) {
-                        r.font = Some(f.to_string());
-                    }
-                };
-                p.runs.iter_mut().for_each(|r| apply(&mut r.props));
-                apply(&mut p.end_props);
+                }
+                pos += len + 1;
             }
         }
     }
@@ -437,6 +611,11 @@ pub struct SlideEdit {
     pub hidden: Option<bool>,
     /// The background: `RRGGBB`, or an empty string to follow the layout
     pub background: Option<String>,
+    /// Seconds after which the slide moves on by itself; 0 or less for never
+    pub advance_after: Option<f64>,
+    pub advance_on_click: Option<bool>,
+    /// How long the transition takes, in seconds
+    pub duration: Option<f64>,
 }
 
 const TRANSITIONS_OFFERED: &[&str] = &["none", "fade", "push", "wipe", "split", "reveal", "cut", "uncover", "cover", "flash", "dissolve", "checker", "blinds", "clock", "zoom", "randomBar"];
@@ -450,11 +629,28 @@ pub fn edit_slide(slide_json: &str, edit: &SlideEdit) -> Result<String, String> 
         }
         s.notes = TextBody::from_text(n);
     }
-    if let Some(t) = &edit.transition {
-        if !TRANSITIONS_OFFERED.contains(&t.as_str()) {
-            return Err("That transition is not offered.".to_string());
+    if edit.transition.is_some() || edit.advance_after.is_some() || edit.advance_on_click.is_some() || edit.duration.is_some() {
+        if let Some(t) = &edit.transition {
+            if !TRANSITIONS_OFFERED.contains(&t.as_str()) {
+                return Err("That transition is not offered.".to_string());
+            }
         }
-        s.transition = if t == "none" { None } else { Some(deckcraft_model::anim::Transition { kind: t.clone(), duration_ms: 700, ..Default::default() }) };
+        let mut tr = s.transition.take().unwrap_or(deckcraft_model::anim::Transition { duration_ms: 700, ..Default::default() });
+        if let Some(t) = &edit.transition {
+            tr.kind = t.clone();
+            tr.option.clear();
+        }
+        if let Some(a) = edit.advance_after {
+            tr.advance_after_ms = if a > 0.0 { Some((a.min(86_400.0) * 1000.0) as u32) } else { None };
+        }
+        if let Some(c) = edit.advance_on_click {
+            tr.advance_on_click = c;
+        }
+        if let Some(d) = edit.duration {
+            tr.duration_ms = (d.clamp(0.1, 60.0) * 1000.0) as u32;
+        }
+        // A slide with nothing special about how it is left has no transition at all
+        s.transition = if tr.kind == "none" && tr.advance_after_ms.is_none() && tr.advance_on_click && tr.sound.is_none() && !tr.stop_sound { None } else { Some(tr) };
     }
     if let Some(h) = edit.hidden {
         s.hidden = h;
@@ -464,6 +660,195 @@ pub fn edit_slide(slide_json: &str, edit: &SlideEdit) -> Result<String, String> 
     }
     serde_json::to_string(&s).map_err(|e| e.to_string())
 }
+
+/// A table to put on a slide, `rows` by `cols`
+pub fn new_table(id: u32, rows: usize, cols: usize, x: f64, y: f64, w: f64, h: f64) -> Result<String, String> {
+    if !(1..=30).contains(&rows) || !(1..=20).contains(&cols) {
+        return Err("A table has 1 to 30 rows and 1 to 20 columns.".to_string());
+    }
+    let (w, h) = (w.max(40.0), h.max(20.0));
+    let shape = Shape {
+        id: ShapeId(id),
+        name: format!("Table {id}"),
+        xfrm: Some(Xfrm { x, y, w, h, ..Default::default() }),
+        kind: ShapeKind::Table(Table::new(rows, cols, w, h / rows as f64)),
+        ..Default::default()
+    };
+    serde_json::to_string(&shape).map_err(|e| e.to_string())
+}
+
+#[derive(Deserialize, Default, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TableEdit {
+    /// A row or column is added before (or removed at) this number
+    pub insert_row: Option<usize>,
+    pub delete_row: Option<usize>,
+    pub insert_col: Option<usize>,
+    pub delete_col: Option<usize>,
+    /// The text of every cell, row by row; only the cells that differ are changed
+    pub cells: Option<Vec<Vec<String>>>,
+    /// The first row is a header; rows are banded
+    pub header: Option<bool>,
+    pub banded: Option<bool>,
+}
+
+pub fn edit_table(shape_json: &str, edit: &TableEdit) -> Result<String, String> {
+    let mut s: Shape = serde_json::from_str(shape_json).map_err(|e| format!("The shape could not be read: {e}"))?;
+    let ShapeKind::Table(t) = &mut s.kind else { return Err("That is not a table.".to_string()) };
+    if let Some(at) = edit.insert_row {
+        if t.n_rows() >= 30 {
+            return Err("A table has at most 30 rows.".to_string());
+        }
+        t.insert_row(at);
+    }
+    if let Some(at) = edit.insert_col {
+        if t.n_cols() >= 20 {
+            return Err("A table has at most 20 columns.".to_string());
+        }
+        t.insert_col(at);
+    }
+    if let Some(at) = edit.delete_row {
+        if !t.delete_row(at) {
+            return Err("A table keeps at least one row.".to_string());
+        }
+    }
+    if let Some(at) = edit.delete_col {
+        if !t.delete_col(at) {
+            return Err("A table keeps at least one column.".to_string());
+        }
+    }
+    if let Some(grid) = &edit.cells {
+        for (r, row) in grid.iter().enumerate() {
+            for (c, text) in row.iter().enumerate() {
+                if text.len() > 50_000 {
+                    return Err("That is too much text for a cell.".to_string());
+                }
+                if let Some(cell) = t.cell_mut(r, c).filter(|cell| cell.text.text() != *text) {
+                    set_text(&mut cell.text, text);
+                }
+            }
+        }
+    }
+    if let Some(h) = edit.header {
+        t.first_row = h;
+    }
+    if let Some(b) = edit.banded {
+        t.band_row = b;
+    }
+    let (w, h) = (t.width(), t.height());
+    let x = s.xfrm.get_or_insert_with(Default::default);
+    x.w = w;
+    x.h = h;
+    serde_json::to_string(&s).map_err(|e| e.to_string())
+}
+
+/// The shapes joined into one group that is as big as they are together
+pub fn group(shapes: &[String], id: u32) -> Result<String, String> {
+    let kids: Vec<Shape> = shapes.iter().map(|j| serde_json::from_str(j).map_err(|e| format!("A shape could not be read: {e}"))).collect::<Result<_, _>>()?;
+    if kids.len() < 2 {
+        return Err("Choose two or more shapes to group.".to_string());
+    }
+    let mut bounds: Option<(f64, f64, f64, f64)> = None;
+    for k in &kids {
+        let Some(x) = k.xfrm else { return Err("Move the placeholder before grouping it.".to_string()) };
+        let (l, t, r, b) = (x.x, x.y, x.x + x.w, x.y + x.h);
+        bounds = Some(bounds.map_or((l, t, r, b), |(a, c, d, e)| (a.min(l), c.min(t), d.max(r), e.max(b))));
+    }
+    let (l, t, r, b) = bounds.unwrap_or_default();
+    let frame = Xfrm { x: l, y: t, w: r - l, h: b - t, ..Default::default() };
+    let g = Shape { id: ShapeId(id), name: format!("Group {id}"), xfrm: Some(frame), kind: ShapeKind::Group { children: kids, child: frame }, ..Default::default() };
+    serde_json::to_string(&g).map_err(|e| e.to_string())
+}
+
+/// The shapes of a group, put where they are on the slide
+pub fn ungroup(shape_json: &str) -> Result<Vec<String>, String> {
+    let g: Shape = serde_json::from_str(shape_json).map_err(|e| format!("The shape could not be read: {e}"))?;
+    let (ShapeKind::Group { children, child }, Some(frame)) = (&g.kind, g.xfrm) else { return Err("That is not a group.".to_string()) };
+    let (sx, sy) = (if child.w > 0.0 { frame.w / child.w } else { 1.0 }, if child.h > 0.0 { frame.h / child.h } else { 1.0 });
+    children
+        .iter()
+        .map(|k| {
+            let mut k = k.clone();
+            if let Some(x) = k.xfrm.as_mut() {
+                x.x = frame.x + (x.x - child.x) * sx;
+                x.y = frame.y + (x.y - child.y) * sy;
+                x.w *= sx;
+                x.h *= sy;
+            }
+            serde_json::to_string(&k).map_err(|e| e.to_string())
+        })
+        .collect()
+}
+
+/// A slide moved to another layout: its placeholders follow the new layout, and the new layout's placeholders it did not have are added
+/// (empty, with ids from `first_id` up)
+pub fn apply_layout(base_id: &str, slide_json: &str, layout: u32, first_id: u32) -> Result<String, String> {
+    let mut p = (*base_of(base_id)?).clone();
+    if p.layout(LayoutId(layout)).is_none() {
+        return Err("That layout is not in the deck.".to_string());
+    }
+    let mut slide: Slide = serde_json::from_str(slide_json).map_err(|e| format!("The slide could not be read: {e}"))?;
+    let fresh = defaults::new_slide(&mut p, LayoutId(layout)).ok_or("The deck has used every id.")?;
+    let same = |a: &Shape, b: &Shape| matches!((&a.ph, &b.ph), (Some(x), Some(y)) if x.kind == y.kind && x.idx == y.idx);
+    for mut s in fresh.shapes {
+        if let Some(mine) = slide.shapes.iter_mut().find(|m| same(m, &s)) {
+            mine.xfrm = None;
+        } else {
+            s.id = ShapeId(first_id + slide.shapes.len() as u32);
+            slide.shapes.push(s);
+        }
+    }
+    slide.layout = LayoutId(layout);
+    serde_json::to_string(&slide).map_err(|e| e.to_string())
+}
+
+/// Replaces `find` with `with` in a shape's text and table cells, in runs (a match across two looks is not found); returns the shape and
+/// how many were replaced. `first` stops after one.
+pub fn replace_text(shape_json: &str, find: &str, with: &str, match_case: bool, first: bool) -> Result<(String, usize), String> {
+    let mut s: Shape = serde_json::from_str(shape_json).map_err(|e| format!("The shape could not be read: {e}"))?;
+    let mut left = if first { 1 } else { usize::MAX };
+    let mut done = 0;
+    let mut body = |t: &mut TextBody| {
+        for r in t.paragraphs.iter_mut().flat_map(|p| p.runs.iter_mut()) {
+            let (text, n) = replace_in(&r.text, find, with, match_case, left);
+            if n > 0 {
+                r.text = text;
+                left = left.saturating_sub(n);
+                done += n;
+            }
+        }
+    };
+    if let Some(t) = s.text.as_mut() {
+        body(t);
+    }
+    if let ShapeKind::Table(t) = &mut s.kind {
+        t.rows.iter_mut().flat_map(|r| r.cells.iter_mut()).for_each(|c| body(&mut c.text));
+    }
+    Ok((serde_json::to_string(&s).map_err(|e| e.to_string())?, done))
+}
+
+fn replace_in(s: &str, find: &str, with: &str, match_case: bool, mut limit: usize) -> (String, usize) {
+    let f: Vec<char> = find.chars().collect();
+    let c: Vec<char> = s.chars().collect();
+    if f.is_empty() {
+        return (s.to_string(), 0);
+    }
+    let same = |a: char, b: char| a == b || (!match_case && a.to_lowercase().eq(b.to_lowercase()));
+    let (mut out, mut i, mut n) = (String::new(), 0, 0);
+    while i < c.len() {
+        if limit > 0 && i + f.len() <= c.len() && (0..f.len()).all(|k| same(c[i + k], f[k])) {
+            out.push_str(with);
+            i += f.len();
+            n += 1;
+            limit -= 1;
+        } else {
+            out.push(c[i]);
+            i += 1;
+        }
+    }
+    (out, n)
+}
+
 
 const MAX_PICTURE_BYTES: usize = 20 * 1024 * 1024;
 
@@ -566,6 +951,37 @@ pub async fn deck_add_picture(base: String, name: String, data: String, id: u32,
 }
 
 #[tauri::command(async)]
+#[allow(clippy::too_many_arguments)]
+pub fn deck_new_table(id: u32, rows: usize, cols: usize, x: f64, y: f64, w: f64, h: f64) -> Result<String, String> {
+    new_table(id, rows, cols, x, y, w, h)
+}
+
+#[tauri::command(async)]
+pub fn deck_edit_table(shape: String, edit: TableEdit) -> Result<String, String> {
+    edit_table(&shape, &edit)
+}
+
+#[tauri::command(async)]
+pub fn deck_group(shapes: Vec<String>, id: u32) -> Result<String, String> {
+    group(&shapes, id)
+}
+
+#[tauri::command(async)]
+pub fn deck_ungroup(shape: String) -> Result<Vec<String>, String> {
+    ungroup(&shape)
+}
+
+#[tauri::command(async)]
+pub fn deck_apply_layout(base_id: String, slide: String, layout: u32, first_id: u32) -> Result<String, String> {
+    apply_layout(&base_id, &slide, layout, first_id)
+}
+
+#[tauri::command(async)]
+pub fn deck_replace(shape: String, find: String, with: String, match_case: bool, first: bool) -> Result<(String, usize), String> {
+    replace_text(&shape, &find, &with, match_case, first)
+}
+
+#[tauri::command(async)]
 pub fn deck_text_of(shape: String) -> Result<String, String> {
     text_of(&shape)
 }
@@ -596,7 +1012,7 @@ mod tests {
     fn slides_get_notes_transitions_and_backgrounds_and_shapes_get_outlines_and_alignment() {
         let (_, id, slides) = deck();
         let s = edit_slide(&slides[0], &SlideEdit { notes: Some("Say hello
-Then the numbers".into()), transition: Some("fade".into()), hidden: Some(true), background: Some("102030".into()) }).unwrap();
+Then the numbers".into()), transition: Some("fade".into()), hidden: Some(true), background: Some("102030".into()), ..Default::default() }).unwrap();
         let slide: Slide = serde_json::from_str(&s).unwrap();
         assert_eq!(slide.notes.text(), "Say hello
 Then the numbers");
@@ -746,5 +1162,81 @@ Then the numbers");
         let id = register(&base.to_string()).unwrap();
         assert!(render(&id, "{}", 1.0).unwrap_err().contains("too large"));
         assert!(assemble(&blank().unwrap().parts.base, &["{".to_string()]).is_err());
+    }
+
+    #[test]
+    fn looks_apply_to_a_range_and_typing_keeps_them() {
+        let tb = new_shape("textBox", 90, 10.0, 10.0, 200.0, 60.0).unwrap();
+        let tb = edit_shape(&tb, &ShapeEdit { text: Some("Hello big world".into()), ..Default::default() }).unwrap();
+        let tb = edit_shape(&tb, &ShapeEdit { bold: Some(true), range: Some([6, 9]), ..Default::default() }).unwrap();
+        let shape: Shape = serde_json::from_str(&tb).unwrap();
+        let runs = &shape.text.as_ref().unwrap().paragraphs[0].runs;
+        assert_eq!(runs.iter().map(|r| (r.text.as_str(), r.props.bold)).collect::<Vec<_>>(), vec![("Hello ", None), ("big", Some(true)), (" world", None)]);
+        // Typing inside the bold word keeps it bold, and the rest is as it was
+        let typed = edit_shape(&tb, &ShapeEdit { text: Some("Hello bigger world".into()), ..Default::default() }).unwrap();
+        let shape: Shape = serde_json::from_str(&typed).unwrap();
+        let runs = &shape.text.as_ref().unwrap().paragraphs[0].runs;
+        assert_eq!(runs.iter().map(|r| (r.text.as_str(), r.props.bold)).collect::<Vec<_>>(), vec![("Hello ", None), ("bigger", Some(true)), (" world", None)]);
+        // Paragraphs: a new one takes the settings of the one it was typed in
+        let two = edit_shape(&typed, &ShapeEdit { text: Some("Hello bigger world\nmore".into()), bullet: Some("num".into()), line_spacing: Some(1.5), space_after: Some(6.0), ..Default::default() }).unwrap();
+        let shape: Shape = serde_json::from_str(&two).unwrap();
+        let ps = &shape.text.as_ref().unwrap().paragraphs;
+        assert_eq!(ps.len(), 2);
+        assert!(ps.iter().all(|p| matches!(p.props.bullet, Some(deckcraft_model::text::Bullet::AutoNum { .. })) && p.props.line_spacing.is_some()));
+        // A range touching only the second paragraph leaves the first one's bullet alone
+        let off = edit_shape(&two, &ShapeEdit { bullet: Some("none".into()), range: Some([20, 20]), ..Default::default() }).unwrap();
+        let shape: Shape = serde_json::from_str(&off).unwrap();
+        let ps = &shape.text.as_ref().unwrap().paragraphs;
+        assert!(matches!(ps[0].props.bullet, Some(deckcraft_model::text::Bullet::AutoNum { .. })) && matches!(ps[1].props.bullet, Some(deckcraft_model::text::Bullet::None)));
+        assert!(edit_shape(&tb, &ShapeEdit { bullet: Some("star".into()), ..Default::default() }).is_err());
+    }
+
+    #[test]
+    fn tables_groups_layouts_find_and_timing() {
+        let (_, id, slides) = deck();
+        // A table: grows, takes text, draws
+        let t = new_table(80, 2, 2, 50.0, 200.0, 400.0, 100.0).unwrap();
+        let t = edit_table(&t, &TableEdit { insert_row: Some(2), cells: Some(vec![vec!["a".into(), "b".into()], vec!["c".into(), "d".into()], vec!["e".into(), "f".into()]]), ..Default::default() }).unwrap();
+        let shape: Shape = serde_json::from_str(&t).unwrap();
+        let ShapeKind::Table(table) = &shape.kind else { panic!("not a table") };
+        assert_eq!((table.n_rows(), table.cell(2, 1).unwrap().text.text()), (3, "f".to_string()));
+        assert!(edit_table(&t, &TableEdit { delete_row: Some(0), ..Default::default() }).is_ok());
+        assert!(new_table(80, 0, 2, 0.0, 0.0, 10.0, 10.0).is_err());
+        let mut slide: Slide = serde_json::from_str(&slides[0]).unwrap();
+        slide.shapes.push(shape);
+        let drawn = render(&id, &serde_json::to_string(&slide).unwrap(), 0.5).unwrap();
+        assert!(drawn.frames.iter().any(|f| f.id == 80 && f.kind == "table"));
+        // Find and replace in the table's cells, case aside, one then all
+        let (_, n) = replace_text(&t, "A", "x", false, false).unwrap();
+        assert_eq!(n, 1);
+        let (_, n) = replace_text(&t, "A", "x", true, false).unwrap();
+        assert_eq!(n, 0);
+        let tb = edit_shape(&new_shape("textBox", 81, 10.0, 10.0, 200.0, 60.0).unwrap(), &ShapeEdit { text: Some("one two one".into()), ..Default::default() }).unwrap();
+        assert_eq!(replace_text(&tb, "one", "1", true, true).unwrap().1, 1);
+        let (done, n) = replace_text(&tb, "one", "1", true, false).unwrap();
+        assert_eq!((n, text_of(&done).unwrap()), (2, "1 two 1".to_string()));
+        // Group and ungroup give the shapes back where they were
+        let a = new_shape("rect", 82, 10.0, 10.0, 100.0, 50.0).unwrap();
+        let b = new_shape("ellipse", 83, 200.0, 100.0, 100.0, 50.0).unwrap();
+        let g = group(&[a, b], 84).unwrap();
+        let gs: Shape = serde_json::from_str(&g).unwrap();
+        assert_eq!((gs.xfrm.unwrap().x, gs.xfrm.unwrap().w), (10.0, 290.0));
+        let back = ungroup(&g).unwrap();
+        let first: Shape = serde_json::from_str(&back[0]).unwrap();
+        assert_eq!((back.len(), first.xfrm.unwrap().x, first.xfrm.unwrap().w), (2, 10.0, 100.0));
+        assert!(group(&[tb.clone()], 85).is_err() && ungroup(&tb).is_err());
+        // A title slide moved to a layout with content gets its placeholders
+        let content = layouts(&id).unwrap().into_iter().find(|l| l.name.to_lowercase().contains("content")).unwrap();
+        let moved: Slide = serde_json::from_str(&apply_layout(&id, &slides[0], content.id, 500).unwrap()).unwrap();
+        assert_eq!(moved.layout.0, content.id);
+        assert!(moved.shapes.len() >= 2 && moved.shapes.iter().map(|s| s.id.0).collect::<std::collections::HashSet<_>>().len() == moved.shapes.len());
+        assert!(apply_layout(&id, &slides[0], 999_999, 500).is_err());
+        // Timing: after 5 seconds, not on a click; clearing it all leaves no transition
+        let timed = edit_slide(&slides[0], &SlideEdit { advance_after: Some(5.0), advance_on_click: Some(false), ..Default::default() }).unwrap();
+        let s: Slide = serde_json::from_str(&timed).unwrap();
+        let tr = s.transition.unwrap();
+        assert_eq!((tr.advance_after_ms, tr.advance_on_click, tr.kind.as_str()), (Some(5000), false, "none"));
+        let cleared = edit_slide(&timed, &SlideEdit { advance_after: Some(0.0), advance_on_click: Some(true), ..Default::default() }).unwrap();
+        assert!(serde_json::from_str::<Slide>(&cleared).unwrap().transition.is_none());
     }
 }

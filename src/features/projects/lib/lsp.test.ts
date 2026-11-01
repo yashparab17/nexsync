@@ -1,7 +1,7 @@
 import { Text } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 
-import { clearProject, completionsOf, firstPlace, hoverText, lspTarget, offsetOf, problemsOf, setFileDiagnostics, severityOf } from "@/features/projects/lib/lsp";
+import { clearProject, completionsOf, firstPlace, hoverText, lspPath, lspTarget, offsetOf, problemsOf, setFileDiagnostics, severityOf } from "@/features/projects/lib/lsp";
 
 describe("lsp", () => {
 	it("finds an offset from a line and a character, clamped to the line", () => {
@@ -42,7 +42,10 @@ describe("lsp", () => {
 		expect([1, 2, 3, 4, undefined].map(severityOf)).toEqual(["error", "warning", "info", "info", "error"]);
 		expect(lspTarget("projects/app/src/a.ts")).toEqual({ project: "app", rel: "src/a.ts" });
 		expect(lspTarget("/projects/app/a.ts")).toEqual({ project: "app", rel: "a.ts" });
-		expect(lspTarget("notes/a.md")).toBeNull();
+		expect(lspTarget("notes/a.md")).toEqual({ project: "@files", rel: "notes/a.md" });
+		expect(lspTarget("/main.py")).toEqual({ project: "@files", rel: "main.py" });
+		expect(lspPath("@files", "src/a.py")).toBe("src/a.py");
+		expect(lspPath("app", "a.ts")).toBe("projects/app/a.ts");
 	});
 
 	it("lists errors before warnings for the Problems tab and leaves out information", () => {

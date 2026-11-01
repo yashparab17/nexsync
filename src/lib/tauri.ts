@@ -10,7 +10,7 @@ import { listen } from "@tauri-apps/api/event";
 import { cleanPath } from "@/lib/utils";
 import type { EntryKind, LogEntry } from "@/features/chat/lib/entries";
 import type { ModerationView } from "@/features/moderation/lib/moderation";
-import type { LspStatus } from "@/features/projects/types";
+import type { LspServerInfo, LspStatus } from "@/features/projects/types";
 import type { ImportAnswer, OfficeInspect, OfficeLayout } from "@/features/office/types";
 import type { ChartPrim, SheetIn, SheetOut } from "@/features/office/sheets/lib/sheet";
 import type { Frame } from "@/features/office/slides/lib/deck";
@@ -1055,6 +1055,26 @@ export interface ShapeEdit {
 	// The outline: RRGGBB, or "" for none
 	line?: string;
 	lineWidth?: number;
+	// The characters [start, end) of the text the look edits apply to; all of it when left out
+	range?: [number, number];
+	bullet?: "none" | "dot" | "dash" | "num" | "alpha" | "roman";
+	// A multiple of the text's height; 1 is single
+	lineSpacing?: number;
+	// Points
+	spaceBefore?: number;
+	spaceAfter?: number;
+	// Moves the paragraphs in (+1) or out (-1) a level
+	level?: number;
+}
+export interface TableEdit {
+	insertRow?: number;
+	deleteRow?: number;
+	insertCol?: number;
+	deleteCol?: number;
+	// The text of every cell, row by row
+	cells?: string[][];
+	header?: boolean;
+	banded?: boolean;
 }
 // The settings of a slide that are not its shapes
 export interface SlideEdit {
@@ -1063,6 +1083,11 @@ export interface SlideEdit {
 	hidden?: boolean;
 	// RRGGBB, or "" to follow the layout
 	background?: string;
+	// Seconds after which the slide moves on by itself; 0 for never
+	advanceAfter?: number;
+	advanceOnClick?: boolean;
+	// Seconds the transition takes
+	duration?: number;
 }
 export function deckEditSlide(slide: string, edit: SlideEdit): Promise<string> {
 	return invoke("deck_edit_slide", { slide, edit });
@@ -1074,11 +1099,39 @@ export function deckAddPicture(base: string, name: string, data: string, id: num
 export function deckEditShape(shape: string, edit: ShapeEdit): Promise<string> {
 	return invoke("deck_edit_shape", { shape, edit });
 }
+export function deckNewTable(id: number, rows: number, cols: number, x: number, y: number, w: number, h: number): Promise<string> {
+	return invoke("deck_new_table", { id, rows, cols, x, y, w, h });
+}
+export function deckEditTable(shape: string, edit: TableEdit): Promise<string> {
+	return invoke("deck_edit_table", { shape, edit });
+}
+export function deckGroup(shapes: string[], id: number): Promise<string> {
+	return invoke("deck_group", { shapes, id });
+}
+export function deckUngroup(shape: string): Promise<string[]> {
+	return invoke("deck_ungroup", { shape });
+}
+// A slide moved to another layout (the new placeholders get ids from firstId)
+export function deckApplyLayout(baseId: string, slide: string, layout: number, firstId: number): Promise<string> {
+	return invoke("deck_apply_layout", { baseId, slide, layout, firstId });
+}
+// The shape with `find` replaced, and how many were
+export function deckReplace(shape: string, find: string, withText: string, matchCase: boolean, first: boolean): Promise<[string, number]> {
+	return invoke("deck_replace", { shape, find, with: withText, matchCase, first });
+}
 export function deckSave(path: string, dest: string, base: string, slides: string[]): Promise<number> {
 	return invoke("deck_save", { path, dest, base, slides });
 }
 export function lspStatus(path: string, project: string): Promise<LspStatus> {
 	return invoke("lsp_status", { path, project });
+}
+// The language servers this device has and could have; they belong to the device, not to a workspace
+export function lspServers(): Promise<LspServerInfo[]> {
+	return invoke("lsp_servers");
+}
+// Installs one by running its fixed command; resolves to the last lines of what it printed
+export function lspInstall(id: string): Promise<string> {
+	return invoke("lsp_install", { id });
 }
 export function lspEnable(path: string, project: string, on: boolean): Promise<void> {
 	return invoke("lsp_enable", { path, project, on });
