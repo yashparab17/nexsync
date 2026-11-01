@@ -1,1 +1,1 @@
-Minor UI rework, improved Documents functionality.
+Merge lens and history scrubber, Linux AppImage fix.
