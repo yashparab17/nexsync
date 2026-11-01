@@ -5,6 +5,7 @@
 // to drag onto the projector when there is not), and this window becomes the presenter's: this slide, the next one, the notes and a
 // timer. B and W put up a black or white screen for the audience; typing a slide number and Enter jumps to it.
 
+import { createPortal } from "react-dom";
 import { emit, listen } from "@tauri-apps/api/event";
 import { PhysicalPosition, availableMonitors, currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -63,7 +64,7 @@ export default function SlideShow({ doc, keys, start, baseId, reregister, presen
 	const list = shown.length > 0 ? shown : keys;
 	const [i, setI] = useState(() => Math.max(0, Math.min(list.length - 1, list.indexOf(keys[start]) >= 0 ? list.indexOf(keys[start]) : 0)));
 	const [cover, setCover] = useState<"black" | "white" | null>(null);
-	const [audience, setAudience] = useState<"opening" | "open" | "failed">(presenterView ? "opening" : "failed");
+	const [audience, setAudience] = useState<"opening" | "open" | "failed" | "single">(presenterView ? "opening" : "failed");
 	const [typed, setTyped] = useState("");
 	const [noteSize, setNoteSize] = useState(22);
 	const [now, setNow] = useState(Date.now());
@@ -76,11 +77,31 @@ export default function SlideShow({ doc, keys, start, baseId, reregister, presen
 
 	useEffect(() => onShow(keys.indexOf(key)), [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	// Full screen, which also hides the taskbar; put back when the show ends
+	// Full screen, which also hides the taskbar; put back when the show ends. A maximized window is restored first and on top of
+	// everything for the show, because Windows keeps the taskbar over a maximized window that is made full screen.
 	useEffect(() => {
 		const win = getCurrentWindow();
-		void win.setFullscreen(true).catch(() => {});
-		return () => void win.setFullscreen(false).catch(() => {});
+		let wasMax = false;
+		void (async () => {
+			try {
+				wasMax = (await win.isMaximized?.()) ?? false;
+				if (wasMax) await win.unmaximize?.();
+				await win.setAlwaysOnTop?.(true);
+			} catch {
+				// A window that cannot do this still goes full screen
+			}
+			await win.setFullscreen(true).catch(() => {});
+		})();
+		return () =>
+			void (async () => {
+				await win.setFullscreen(false).catch(() => {});
+				try {
+					await win.setAlwaysOnTop?.(false);
+					if (wasMax) await win.maximize?.();
+				} catch {
+					// Left as it is
+				}
+			})();
 	}, []);
 
 	// The audience's window
@@ -91,6 +112,11 @@ export default function SlideShow({ doc, keys, start, baseId, reregister, presen
 		void (async () => {
 			try {
 				const target = pickAudienceMonitor(await availableMonitors(), await currentMonitor());
+				// One screen: the audience's window would sit over the presenter's, so the slide fills the screen alone
+				if (!target) {
+					if (live) setAudience("single");
+					return;
+				}
 				win = new WebviewWindow(AUDIENCE_LABEL, { url: "index.html?audience=1", title: "Nexsync slide show", width: 960, height: 540, center: true, decorations: !target, focus: false });
 				await new Promise<void>((ok, bad) => {
 					void win.once("tauri://created", () => ok());
@@ -175,9 +201,9 @@ export default function SlideShow({ doc, keys, start, baseId, reregister, presen
 	const nextBox = useBox();
 
 	// One screen, no presenter view: the slide alone
-	if (!presenterView || audience === "failed") {
-		return (
-			<div role="dialog" aria-label="Slide show" className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: cover === "white" ? "#fff" : "#000" }} onClick={() => go(1)}>
+	if (!presenterView || audience === "failed" || audience === "single") {
+		return createPortal(
+			<div role="dialog" aria-label="Slide show" className="fixed inset-0 z-[1000] flex items-center justify-center" style={{ background: cover === "white" ? "#fff" : "#000" }} onClick={() => go(1)}>
 				{!cover && <Fitted doc={doc} k={key} baseId={baseId} reregister={reregister} box={screen} slideSize={slideSize} className={moves ? "animate-in fade-in duration-500" : undefined} />}
 				<span className="pointer-events-none absolute right-3 bottom-2 font-mono text-xs text-white/50">
 					{typed ? `Go to ${typed}` : `${i + 1} / ${list.length}`}
@@ -187,11 +213,11 @@ export default function SlideShow({ doc, keys, start, baseId, reregister, presen
 					<X className="size-5" />
 				</button>
 			</div>
-		);
+		, document.body);
 	}
 
-	return (
-		<div role="dialog" aria-label="Presenter view" className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-100">
+	return createPortal(
+		<div role="dialog" aria-label="Presenter view" className="fixed inset-0 z-[1000] flex flex-col bg-neutral-950 text-neutral-100">
 			<header className="flex items-center gap-4 border-b border-white/10 px-4 py-2 text-sm">
 				<span className="font-mono text-2xl tabular-nums">{clock(now - began.current)}</span>
 				<span className="text-neutral-400">{new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
@@ -252,5 +278,5 @@ export default function SlideShow({ doc, keys, start, baseId, reregister, presen
 				</aside>
 			</div>
 		</div>
-	);
+	, document.body);
 }

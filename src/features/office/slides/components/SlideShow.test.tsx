@@ -62,10 +62,10 @@ describe("the slide show", () => {
 	});
 	afterEach(cleanup);
 
-	it("goes full screen, skips hidden slides, and gives the screen back when it ends", () => {
+	it("goes full screen, skips hidden slides, and gives the screen back when it ends", async () => {
 		const p = props();
 		const { unmount } = render(<SlideShow {...p} />);
-		expect(mocks.current.setFullscreen).toHaveBeenCalledWith(true);
+		await waitFor(() => expect(mocks.current.setFullscreen).toHaveBeenCalledWith(true));
 		expect(p.onShow).toHaveBeenLastCalledWith(0);
 		fireEvent.keyDown(window, { key: "ArrowRight" });
 		// "b" is hidden, so the next slide is "c"
@@ -73,7 +73,7 @@ describe("the slide show", () => {
 		fireEvent.keyDown(window, { key: "Escape" });
 		expect(p.onClose).toHaveBeenCalled();
 		unmount();
-		expect(mocks.current.setFullscreen).toHaveBeenLastCalledWith(false);
+		await waitFor(() => expect(mocks.current.setFullscreen).toHaveBeenLastCalledWith(false));
 	});
 
 	it("jumps to a typed slide number and puts up a black screen on B", () => {
@@ -104,11 +104,18 @@ describe("the slide show", () => {
 
 	it("falls back to the slide alone when the second window cannot open", async () => {
 		const original = mocks.win.once;
+		mocks.monitors = [...mocks.monitors, { name: "projector", position: { x: 1920, y: 0 }, size: { width: 1920, height: 1080 } }];
 		mocks.win.once = vi.fn(async (e: string, cb: (x: { payload: string }) => void) => {
 			if (e === "tauri://error") queueMicrotask(() => cb({ payload: "denied" }));
 		}) as never;
 		render(<SlideShow {...props({ presenterView: true })} />);
 		expect(await screen.findByText(/second window could not open/)).toBeTruthy();
 		mocks.win.once = original;
+	});
+
+	it("keeps the slide alone on one screen instead of opening a window over the notes", async () => {
+		render(<SlideShow {...props({ presenterView: true })} />);
+		await waitFor(() => expect(screen.getByRole("dialog", { name: "Slide show" })).toBeTruthy());
+		expect(mocks.created).toHaveLength(0);
 	});
 });

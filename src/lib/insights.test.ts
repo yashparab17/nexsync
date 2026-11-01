@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { authorOf, countBy, filterEvents, isCompletion, itemTarget, kindOf, perDay, workload } from "@/lib/insights";
+import { authorOf, countBy, renameAuthor, filterEvents, isCompletion, itemTarget, kindOf, perDay, workload } from "@/lib/insights";
 import type { ActivityEvent, KanbanColumn, Member, Task } from "@/types/workspace";
 
 const ev = (over: Partial<ActivityEvent>): ActivityEvent => ({ id: "e", timestamp: "2026-03-10T12:00:00", action: "Created task", detail: "Created task: A", ...over });
@@ -53,5 +53,16 @@ describe("activity insights", () => {
 			{ name: "Ana", tasks: 1, cards: 1 },
 			{ name: "Unassigned", tasks: 1, cards: 1 },
 		]);
+	});
+
+	it("counts what a member did under an old name as theirs under the new one", () => {
+		const events = [ev({ id: "1", author: "Soman" }), ev({ id: "2", author: "soman " }), ev({ id: "3", author: "Yash" }), ev({ id: "4" })];
+		const renamed = renameAuthor(events, "Soman", "Arv");
+		expect(renamed.map((e) => e.author)).toEqual(["Arv", "Arv", "Yash", undefined]);
+		expect(countBy(renamed, authorOf)[0]).toEqual(["Arv", 2]);
+		expect(countBy(renamed, authorOf)).toHaveLength(3);
+		// Nothing to do when the name did not change, or there was no old name
+		expect(renameAuthor(events, "Soman", "SOMAN")).toBe(events);
+		expect(renameAuthor(events, "", "Arv")).toBe(events);
 	});
 });

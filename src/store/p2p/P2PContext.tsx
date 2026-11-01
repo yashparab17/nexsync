@@ -53,6 +53,7 @@ import type { Member } from "@/types/workspace";
 import { bindGuestMember, canChangeRole, canCommentRole, canEditRole, roleTable } from "@/lib/roles";
 import { applyCatchUp, buildInventory, editDoc, updatesFor, type Inventory } from "@/lib/p2p/yjsCatchUp";
 import { replaceText, revertHunk, type TextHunk } from "@/lib/catchup";
+import { renameAuthor } from "@/lib/insights";
 import { readSelfName, setSelfName } from "@/lib/p2p/selfName";
 import { readRejoin, saveRejoin, type Rejoin } from "@/lib/p2p/rejoin";
 import { HEARTBEAT_MS, HERE, IDLE_MS, parsePresence, readQuiet, whoIsAt, type PeerPresence, type Presence } from "@/lib/p2p/presence";
@@ -640,9 +641,15 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 				setDataVersion((v) => v + 1);
 
 				cancelledRef.current = false;
-				const eager = snapshot.files.filter((f) => !f.isPlaceholder);
+				// What this device already has is not fetched again: a file of the same size is taken to be the same file, and the changes made
+					// since arrive as they happen. Every file was downloaded again each time the connection came back.
+					// ponytail: size only; a change that keeps the size is picked up by the next change to that file, add a hash to the snapshot if it matters.
+					const have = new Map<string, number>();
+					for (const f of await p2p.listShareableFiles(path).catch(() => [])) have.set(stripLeadingSlash(f.relPath), f.size);
+					const missing = (f: { relPath: string; size: number }) => have.get(stripLeadingSlash(f.relPath)) !== f.size;
+					const eager = snapshot.files.filter((f) => !f.isPlaceholder && missing(f));
 				const lazy: PlaceholderItem[] = snapshot.files
-					.filter((f) => f.isPlaceholder)
+					.filter((f) => f.isPlaceholder && missing(f))
 					.map((f) => ({
 						relPath: stripLeadingSlash(f.relPath),
 						name: f.relPath.split("/").pop() || f.relPath,
@@ -1054,7 +1061,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 						const name = cleanName(request.name);
 						if (name === me.name) break;
 						const updated = members.map((m) => (m.id === me.id ? { ...m, name } : m));
-						await writeWorkspaceMetadata({ path, metadata: { ...meta, members: { members: updated } } });
+						await writeWorkspaceMetadata({ path, metadata: { ...meta, members: { members: updated }, activity: { ...meta.activity, events: renameAuthor(meta.activity.events, me.name, name) } } });
 						await refreshMetadataRef.current(path);
 					} catch (err) {
 						console.error("[P2P] Failed to apply a name change:", err);

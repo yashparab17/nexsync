@@ -152,6 +152,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 	const { setSink } = useNotifications();
 
 	const [entries, setEntries] = useState<LogEntry[]>([]);
+	// Whether the log has been read from disk: an empty list before that is not an empty log
+	const [loaded, setLoaded] = useState(false);
 	const [me, setMe] = useState("");
 	const [read, setRead] = useState<Record<string, ReadMarker>>({});
 	const [inbox, setInbox] = useState<InboxItem[]>([]);
@@ -181,6 +183,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 			const [state, items, view] = await Promise.all([chatState(path), inboxList(path), moderationState(path)]);
 			setModeration(view ?? EMPTY_VIEW);
 			setEntries(state.entries);
+			setLoaded(true);
 			setMe(state.me);
 			setSeen(state.seen ?? {});
 			setRead(Object.fromEntries(state.read.map((r) => [r.channel, { lastTs: r.lastTs, muted: r.muted }])));
@@ -192,6 +195,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
 	useEffect(() => {
 		setEntries([]);
+		setLoaded(false);
 		setInbox([]);
 		setRead({});
 		void load();
@@ -404,7 +408,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 	const synced = useMemo(() => iconFromEntries(entries), [entries]);
 	const iconKey = JSON.stringify(synced ?? null);
 	useEffect(() => {
-		if (!workspace || !me || entries.length === 0) return;
+		if (!workspace || !me || !loaded) return;
 		if (synced !== undefined) {
 			if (JSON.stringify(getIcon(workspace.id)) !== JSON.stringify(synced)) setIcon(workspace.id, synced);
 		} else if (role === "Owner" || role === "Admin") {
@@ -412,7 +416,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 			if (mine) void post({ kind: "icon", channel: "workspace", body: JSON.stringify(mine) }).catch(() => {});
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [iconKey, workspace?.id, me, role, entries.length === 0]);
+	}, [iconKey, workspace?.id, me, role, loaded]);
 
 	// How the members look: colours and pictures they chose. Mine, set in Settings, is shared once and again when it changes.
 	useEffect(() => {
@@ -423,19 +427,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 		setProfiles(map);
 	}, [entries, name]);
 	useEffect(() => {
-		if (!workspace || !me || !name.trim() || entries.length === 0) return;
+		// Waits for the log to be read, not for it to have entries: where nobody has written anything yet, how this person looks must still be shared
+		if (!workspace || !me || !name.trim() || !loaded) return;
 		const share = () => {
 			const mine = getLocalProfile();
 			const published = profilesFromEntries(entries.filter((e) => e.author === me)).get(name.trim().toLowerCase()) ?? {};
 			if (!mine.color && !mine.image) return;
 			if ((mine.color ?? "") === (published.color ?? "") && (mine.image ?? "") === (published.image ?? "")) return;
-			void post({ kind: "profile", channel: "profiles", body: JSON.stringify(mine) }).catch(() => {});
+			void post({ kind: "profile", channel: "profiles", body: JSON.stringify(mine) }).catch((err) => console.error("[chat] Could not share how this person looks:", err));
 		};
 		share();
 		window.addEventListener("nexsync-profile", share);
 		return () => window.removeEventListener("nexsync-profile", share);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [entries, me, name, workspace?.id]);
+	}, [entries, me, name, workspace?.id, loaded]);
 
 	const act = useCallback<ChatContextType["act"]>(
 		async (action) => {

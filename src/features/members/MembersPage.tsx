@@ -29,6 +29,7 @@ import { canModerate, timeLeft } from "@/features/moderation/lib/moderation";
 import { systemNotice } from "@/features/announcements/lib/announcements";
 import { useChat } from "@/store/chat/ChatContext";
 import type { Member } from "@/types/workspace";
+import { renameAuthor } from "@/lib/insights";
 
 const ROLE_CONFIG: Record<
 	string,
@@ -204,6 +205,8 @@ export default function MembersPage() {
 			const updatedMetadata = {
 				...metadata,
 				members: { members: updatedMembers },
+				// What they did under the old name is theirs under the new one
+				activity: { ...metadata.activity, events: renameAuthor(metadata.activity.events, editingMember.name, name) },
 			};
 
 			await writeWorkspaceMetadata({

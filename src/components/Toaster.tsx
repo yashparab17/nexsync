@@ -8,6 +8,8 @@ import { t } from "@/i18n";
 import { readPopupsMuted } from "@/lib/popupPrefs";
 import { useNotifications } from "@/store/notifications/NotificationContext";
 
+// The corner pop-ups share; other things that appear there (the downloads) are put into it, so nothing lands on top of anything else
+export const TOAST_STACK = "toast-stack";
 const SHOW_MS = 6000;
 const MAX_SHOWN = 3;
 
@@ -40,7 +42,7 @@ export default function Toaster() {
 	}, [items]);
 
 	return (
-		<div role="status" aria-live="polite" className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
+		<div id={TOAST_STACK} role="status" aria-live="polite" className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
 			{toasts.map((toast) => (
 				<div key={toast.id} className="pointer-events-auto flex items-start justify-between gap-2 border bg-popover p-3 text-sm rounded-lg ring-1 ring-foreground/10 animate-in fade-in slide-in-from-bottom-2 motion-reduce:animate-none">
 					<p className="min-w-0 break-words">{toast.text}</p>

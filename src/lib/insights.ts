@@ -22,6 +22,13 @@ export function kindOf(e: ActivityEvent): Kind {
 export const UNKNOWN = "Unknown";
 export const authorOf = (e: ActivityEvent) => e.author?.trim() || UNKNOWN;
 
+// When a member changes their name, what they did under the old one is theirs under the new one; otherwise the charts count one person as two
+export function renameAuthor(events: ActivityEvent[], from: string, to: string): ActivityEvent[] {
+	const old = from.trim().toLowerCase();
+	if (!old || old === to.trim().toLowerCase()) return events;
+	return events.map((e) => (e.author?.trim().toLowerCase() === old ? { ...e, author: to } : e));
+}
+
 // Item events carry "task:<id>" or "card:<id>" as their target, so one item's history can be picked out
 export const itemTarget = (type: "task" | "card", id: string) => `${type}:${id}`;
 

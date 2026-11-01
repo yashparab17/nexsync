@@ -1,16 +1,20 @@
+import { createPortal } from "react-dom";
+
+import { TOAST_STACK } from "@/components/Toaster";
 import { IconButton } from "@/components/ui/icon-button";
 import { X } from "@/components/animate-icons";
 
 import { Button } from "@/components/ui/button";
 import { useP2P } from "@/store/p2p/P2PContext";
 
-// Floating list of file downloads in progress, with a cancel button for each
+// The list of file downloads in progress, with a cancel button for each. It sits in the corner under the pop-ups, in the same stack.
 export default function TransferTray() {
 	const { transfers, cancelTransfers } = useP2P();
 	if (transfers.length === 0) return null;
 
-	return (
-		<div className="fixed bottom-3 right-3 z-50 w-72 max-w-[calc(100vw-1.5rem)] space-y-2 border bg-card p-3 text-xs rounded-lg ring-1 ring-foreground/10">
+	const stack = document.getElementById(TOAST_STACK);
+	const tray = (
+		<div aria-live="off" className={stack ? "pointer-events-auto space-y-2 border bg-card p-3 text-xs rounded-lg ring-1 ring-foreground/10" : "fixed bottom-4 right-4 z-50 w-80 max-w-[calc(100vw-2rem)] space-y-2 border bg-card p-3 text-xs rounded-lg ring-1 ring-foreground/10"}>
 			<div className="flex items-center justify-between">
 				<span className="font-semibold">Downloading {transfers.length} file{transfers.length > 1 ? "s" : ""}</span>
 				{transfers.length > 1 && (
@@ -42,4 +46,5 @@ export default function TransferTray() {
 			})}
 		</div>
 	);
+	return stack ? createPortal(tray, stack) : tray;
 }

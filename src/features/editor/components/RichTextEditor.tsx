@@ -35,6 +35,10 @@ const schema = BlockNoteSchema.create({
 	blockSpecs: { paragraph, heading, bulletListItem, numberedListItem, checkListItem },
 });
 
+// A text note holds paragraphs, headings and lists and cannot hold a picture, so Markdown pasted into it stays the words it is. Read as
+// Markdown, a pasted embed such as ![name](assets/a.png) would become a picture block this editor has no place for, and vanish.
+const pasteHandler: NonNullable<Parameters<typeof useCreateBlockNote>[0]>["pasteHandler"] = ({ defaultPasteHandler }) => defaultPasteHandler({ plainTextAsMarkdown: false });
+
 // Rich-text editor for text notes (.txt). The file on disk holds the words and line breaks; formatting
 // lives in the shared document, so collaborators see it but the file itself stays plain text.
 export default function RichTextEditor({
@@ -55,6 +59,7 @@ export default function RichTextEditor({
 			collab
 				? withCollaboration({
 						schema,
+						pasteHandler,
 						// Given at creation, so it is in the view the editor makes once the shared copy has loaded
 						...(lens ? { extensions: [() => ({ key: "mergeLens", prosemirrorPlugins: [mergeLensPlugin(collab.doc, lens)] })] } : {}),
 						collaboration: {
@@ -63,7 +68,7 @@ export default function RichTextEditor({
 							provider: { awareness: collab.awareness },
 						},
 					})
-				: { schema },
+				: { schema, pasteHandler },
 		[collab, userName, lens],
 	);
 	const editor = useCreateBlockNote(options, [collab?.doc]);

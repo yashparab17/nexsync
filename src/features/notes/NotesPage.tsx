@@ -31,6 +31,8 @@ import { useCollapsed } from "@/hooks/useCollapsed";
 import { useReportItem } from "@/hooks/usePresence";
 import { useSyncedIn } from "@/hooks/useSyncedIn";
 import { isNoteFile } from "@/lib/editor/languages";
+import { Segmented } from "@/components/elements/SettingsParts";
+import { readStored, saveStored } from "@/lib/storage";
 import { positionsFor, summarize } from "@/features/notes/lib/board";
 import { noteTitle } from "@/features/notes/lib/links";
 import { pushRecent } from "@/lib/recentFiles";
@@ -94,6 +96,8 @@ export default function NotesPage() {
 	const [isNewOpen, setIsNewOpen] = useState(false);
 	useListKeys(isViewer ? undefined : () => { setNewTitle(""); setIsNewOpen(true); });
 	const [newTitle, setNewTitle] = useState("");
+	// What a new note is: Markdown (.md, written as source) or text (.txt, a rich-text note); a name that already ends in one of them decides it
+	const [newFormat, setNewFormat] = useState<"md" | "txt">(() => (readStored("nexsync.notes.format") === "md" ? "md" : "txt"));
 	const [deleting, setDeleting] = useState<WorkspaceFile | null>(null);
 	const [renaming, setRenaming] = useState<{ note: WorkspaceFile; value: string } | null>(null);
 	const [renameError, setRenameError] = useState("");
@@ -283,9 +287,8 @@ export default function NotesPage() {
 
 	const createNote = async (title: string) => {
 		if (isViewer || !workspacePath || !title.trim() || validateFileName(title.trim())) return;
-		// Notes are rich text; a name that ends in .md is made a .txt note, and Markdown files are made in the Editor
-		let filename = title.trim().replace(/[\\/]/g, "-").replace(/\.(md|markdown)$/i, "");
-		if (!isNoteFile(filename)) filename += ".txt";
+		let filename = title.trim().replace(/[\\/]/g, "-").replace(/\.markdown$/i, ".md");
+		if (!isNoteFile(filename)) filename += `.${newFormat}`;
 		const path = `/notes/${filename}`;
 		if (notes.some((n) => n.path === path)) return openNote(path);
 		try {
@@ -601,6 +604,18 @@ export default function NotesPage() {
 						className="space-y-4"
 					>
 						<DialogHeading icon={<Plus className="size-6" />} title="New Note" />
+						<Segmented
+							label="Format"
+							value={newFormat}
+							onChange={(f) => {
+								setNewFormat(f);
+								saveStored("nexsync.notes.format", f);
+							}}
+							options={[
+								{ value: "txt", label: "Text (.txt)" },
+								{ value: "md", label: "Markdown (.md)" },
+							]}
+						/>
 						<Input aria-label="Note title" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Title" aria-invalid={!!validateFileName(newTitle)} autoFocus />
 						{validateFileName(newTitle) && <FieldError>{validateFileName(newTitle)}</FieldError>}
 						<DialogFooter className="mt-2">
