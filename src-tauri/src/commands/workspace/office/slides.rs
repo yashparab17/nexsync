@@ -1224,7 +1224,7 @@ Then the numbers");
         let back = ungroup(&g).unwrap();
         let first: Shape = serde_json::from_str(&back[0]).unwrap();
         assert_eq!((back.len(), first.xfrm.unwrap().x, first.xfrm.unwrap().w), (2, 10.0, 100.0));
-        assert!(group(&[tb.clone()], 85).is_err() && ungroup(&tb).is_err());
+        assert!(group(std::slice::from_ref(&tb), 85).is_err() && ungroup(&tb).is_err());
         // A title slide moved to a layout with content gets its placeholders
         let content = layouts(&id).unwrap().into_iter().find(|l| l.name.to_lowercase().contains("content")).unwrap();
         let moved: Slide = serde_json::from_str(&apply_layout(&id, &slides[0], content.id, 500).unwrap()).unwrap();
