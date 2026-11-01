@@ -9,6 +9,7 @@ import "@blocknote/mantine/style.css";
 import { useSeedOnce } from "@/hooks/useSeedOnce";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
 import { colorOf } from "@/lib/collabColor";
+import { mergeLensPlugin, type LensStore } from "@/lib/editor/lensXml";
 import { blocksToPlainText, plainTextToBlocks } from "@/features/notes/lib/text";
 import { useThemeContext } from "@/store/ThemeContext";
 import Loading from "@/components/Loading";
@@ -22,6 +23,8 @@ interface RichTextEditorProps {
 	// Live P2P-synced document; the editor mirrors its "blocknote" fragment
 	collab?: CollabDoc | null;
 	userName?: string;
+	// The merge lens, switched on and off from outside
+	lens?: LensStore;
 	// Hands over a function that replaces the whole note, so an older version can be put back
 	onReady?: (replaceText: (text: string) => void) => void;
 }
@@ -40,6 +43,7 @@ export default function RichTextEditor({
 	readOnly = false,
 	collab = null,
 	userName = "You",
+	lens,
 	onReady,
 }: RichTextEditorProps) {
 	const { isDark } = useThemeContext();
@@ -51,6 +55,8 @@ export default function RichTextEditor({
 			collab
 				? withCollaboration({
 						schema,
+						// Given at creation, so it is in the view the editor makes once the shared copy has loaded
+						...(lens ? { extensions: [() => ({ key: "mergeLens", prosemirrorPlugins: [mergeLensPlugin(collab.doc, lens)] })] } : {}),
 						collaboration: {
 							fragment: collab.doc.getXmlFragment("blocknote"),
 							user: { name: userName, color: colorOf(userName) },
@@ -58,7 +64,7 @@ export default function RichTextEditor({
 						},
 					})
 				: { schema },
-		[collab, userName],
+		[collab, userName, lens],
 	);
 	const editor = useCreateBlockNote(options, [collab?.doc]);
 

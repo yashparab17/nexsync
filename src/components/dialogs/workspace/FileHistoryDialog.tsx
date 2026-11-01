@@ -12,6 +12,7 @@ import { listFileVersions, readFileVersion, readWorkspaceFile, recordFileVersion
 import { cn, formatBytes } from "@/lib/utils";
 import type { FileVersion } from "@/types/workspace";
 import Loading from "@/components/Loading";
+import HistoryScrubber from "@/components/dialogs/workspace/HistoryScrubber";
 
 const SOURCES: Record<string, string> = {
 	save: "Saved",
@@ -119,6 +120,7 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 	const [confirming, setConfirming] = useState(false);
 	const [restored, setRestored] = useState(false);
 	const [notice, setNotice] = useState<string | null>(null);
+	const [playing, setPlaying] = useState(false);
 
 	const load = useCallback(async () => {
 		try {
@@ -244,6 +246,18 @@ export default function FileHistoryDialog({ workspacePath, path, currentText, on
 						</ul>
 
 						<div className="flex min-w-0 flex-1 flex-col gap-3">
+							<HistoryScrubber
+								versions={versions ?? []}
+								selected={selected}
+								playing={playing}
+								onPlayingChange={setPlaying}
+								onSelect={(id) => {
+									setSelected(id);
+									setMode("in");
+									setConfirming(false);
+									setRestored(false);
+								}}
+							/>
 							{isText ? (
 								<>
 									<div className="flex flex-wrap items-center gap-3 text-xs">

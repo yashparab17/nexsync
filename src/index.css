@@ -965,6 +965,16 @@ select option:checked {
   box-shadow: -4px 0 0 0 color-mix(in oklch, var(--warning) 70%, transparent);
 }
 
+/* The merge lens in Notes and Documents: a block's author as a bar down its side, and the text where two people's writing was merged */
+.nx-lens-block {
+  box-shadow: inset 3px 0 0 var(--lens);
+  background-color: color-mix(in oklch, var(--lens) 7%, transparent);
+}
+.nx-lens-merge {
+  border-bottom: 2px dotted var(--foreground);
+  background-color: color-mix(in oklch, var(--warning) 22%, transparent);
+}
+
 /* A content control in a document: its words in a thin outline, so it is plain where a form field is */
 .doc-control {
   outline: 1px dotted color-mix(in oklch, var(--primary) 70%, transparent);

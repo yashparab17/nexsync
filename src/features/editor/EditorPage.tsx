@@ -433,7 +433,7 @@ export default function EditorPage() {
 		{ id: "problems", group: "View", label: "Show problems", icon: <AlertTriangle className="size-4" />, run: () => togglePanel("problems") },
 		{ id: "split", group: "View", label: sideOpen ? "Close the split" : "Open to the side", hint: "Ctrl \\", icon: <Columns3 className="size-4" />, run: toggleSide },
 		{ id: "preview", group: "View", label: previewOpen ? "Hide Markdown preview" : "Show Markdown preview", hint: "Ctrl Shift V", icon: <Eye className="size-4" />, run: () => canPreview && setPreview((v) => !v) },
-		{ id: "blame", group: "View", label: showBlame ? "Hide blame" : "Show blame", icon: <UsersRound className="size-4" />, run: () => setShowBlame((v) => !v) },
+		{ id: "blame", group: "View", label: showBlame ? "Hide merge lens" : "Show merge lens", icon: <UsersRound className="size-4" />, run: () => setShowBlame((v) => !v) },
 		{ id: "zoom-in", group: "View", label: "Larger text", hint: "Ctrl +", run: () => setEditorPrefs({ fontSize: Math.min(FONT_SIZE_RANGE.max, prefs.fontSize + 1) }) },
 		{ id: "zoom-out", group: "View", label: "Smaller text", hint: "Ctrl -", run: () => setEditorPrefs({ fontSize: Math.max(FONT_SIZE_RANGE.min, prefs.fontSize - 1) }) },
 		{ id: "zoom-reset", group: "View", label: "Reset text size", run: () => setEditorPrefs({ fontSize: DEFAULT_EDITOR_PREFS.fontSize }) },

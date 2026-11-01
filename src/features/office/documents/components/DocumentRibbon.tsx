@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, UsersRound } from "lucide-react";
 import {
 	AlignCenter,
 	AlignJustify,
@@ -120,6 +120,8 @@ export interface RibbonProps {
 	openAccessibility: () => void;
 	openChanges: () => void;
 	openApprovals: () => void;
+	// The merge lens: who wrote each paragraph, and where two people's writing was merged
+	lens: { on: boolean; merged: number; toggle: () => void };
 	openControl: () => void;
 	openSectionHeader: () => void;
 	// The document's own styles, beside the gallery's: of paragraphs, of letters and of tables
@@ -627,7 +629,10 @@ export default function DocumentRibbon(p: RibbonProps) {
 				<Group label="Compare">
 					<Big icon={GitCompareArrows} label="Compare" title="Compare this document with a saved version" onPress={p.openCompare} />
 				</Group>
-				<Group label="Accessibility">
+				<Group label="Authorship">
+						<Big icon={UsersRound} label={p.lens.merged ? `Merge Lens (${p.lens.merged})` : "Merge Lens"} title="Colour each paragraph by who wrote it, and mark where two people's writing was merged" active={p.lens.on} onPress={p.lens.toggle} />
+					</Group>
+					<Group label="Accessibility">
 					<Big icon={Accessibility} label="Check Accessibility" title="Find what makes the document hard to read with a screen reader" onPress={p.openAccessibility} />
 				</Group>
 				<Group label="Protect">

@@ -31,6 +31,8 @@ import { noteCss, parseFormats, type NoteFormats } from "@/features/office/docum
 import { notesToSend, referencesIn, withReferences, type NoteDef, type NoteWire } from "@/features/office/documents/lib/documentNotes";
 import { characterStyles, editedStyles, fromFile, galleryStyles, tableStyleCss, tableStyles, type StyleDef, type StyleIn, type StyleOut } from "@/features/office/documents/lib/documentStyles";
 import { useNotifications } from "@/store/notifications/NotificationContext";
+import { trackAuthor } from "@/lib/editor/blame";
+import { mergeLensPlugin, newLensStore } from "@/lib/editor/lensXml";
 import { lockedSectionsPlugin, newLockStore, sectionAt, sectionRanges } from "@/features/office/documents/lib/documentLocks";
 import { access, isRestriction, type Restriction } from "@/features/office/documents/lib/documentRestrict";
 import { useChat } from "@/store/chat/ChatContext";
@@ -209,6 +211,16 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 	const { notify } = useNotifications();
 	lockStore.onRefused = () => notify("This section is locked. Only an Owner or an Admin can change it.");
 	const commentStore = useMemo(newCommentStore, []);
+	const lensStore = useMemo(newLensStore, []);
+	const [lensOn, setLensOn] = useState(false);
+	const [merged, setMerged] = useState(0);
+	lensStore.onSpots = (spots) => setMerged(spots.length);
+	useEffect(() => {
+		lensStore.on = lensOn;
+		lensStore.refresh();
+	}, [lensStore, lensOn]);
+	// Record who this session belongs to once they edit, so the lens can name them
+	useEffect(() => trackAuthor(doc, author), [doc, author]);
 	const reviewStore = useMemo(() => newReviewStore(author, resolvedSetOf(doc.getMap<boolean>("resolvedChanges"))), [author, doc]);
 	const options = useMemo(
 		() =>
@@ -224,10 +236,11 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					() => ({ key: "docReview", prosemirrorPlugins: [suggestingPlugin(reviewStore), staleMarksPlugin(reviewStore)] }),
 					() => ({ key: "smartQuotes", prosemirrorPlugins: [smartQuotesPlugin] }),
 					() => ({ key: "listLevels", prosemirrorPlugins: [listLevelsPlugin] }),
+					() => ({ key: "mergeLens", prosemirrorPlugins: [mergeLensPlugin(doc, lensStore)] }),
 				],
 				collaboration: { fragment: doc.getXmlFragment("blocknote"), user: { name: author, color: colorOf(author) }, provider: { awareness: collab.awareness } },
 			}),
-		[doc, collab.awareness, author],
+		[doc, collab.awareness, author, lensStore],
 	);
 	const editor = useCreateBlockNote(options, [doc]);
 	const caretSectionLocked = lockedKeys.includes(caretSectionKey() ?? "");
@@ -936,6 +949,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					openCounts={() => setDialog("counts")}
 					openProofing={() => setDialog("proofing")}
 					review={review}
+					lens={{ on: lensOn, merged, toggle: () => setLensOn((on) => !on) }}
 					openCompare={() => setDialog("compare")}
 					openAccessibility={() => setDialog("accessibility")}
 					openChanges={() => setDialog("changes")}

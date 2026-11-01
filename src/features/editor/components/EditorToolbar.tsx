@@ -71,7 +71,7 @@ export default function EditorToolbar({ path, status, handle, showBlame, onToggl
 					<span className="mx-1 h-5 w-px bg-border" aria-hidden />
 				</>
 			)}
-			<Tool label={showBlame ? "Hide blame" : "Show blame"} pressed={showBlame} onPress={onToggleBlame}>
+			<Tool label={showBlame ? "Hide merge lens" : "Show merge lens"} pressed={showBlame} onPress={onToggleBlame}>
 				<UsersRound className="size-4" />
 			</Tool>
 			{canPreview && (

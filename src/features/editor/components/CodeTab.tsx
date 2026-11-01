@@ -34,6 +34,7 @@ import {
 	type BlameRange,
 	type Contribution,
 } from "@/lib/editor/blame";
+import { lensMarks, type MergeSpot } from "@/lib/editor/lens";
 import { branchDocId, listBranches } from "@/lib/branches";
 import { canFormat, formatCode, minimalChange } from "@/lib/editor/format";
 import type { LoadedLanguage } from "@/lib/editor/languages";
@@ -128,7 +129,13 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- the target is its project and file
 		[workspacePath, target?.project, target?.rel, lspOn],
 	);
-	const extensionsWithCoverage = useMemo(() => [...(coverage ? [...suggestionMarks, coverageGutter(coverage)] : suggestionMarks), ...(lspExt ? [lspExt] : [])], [suggestionMarks, coverage, lspExt]);
+	const [spots, setSpots] = useState<MergeSpot[]>([]);
+	// The merge lens: lines tinted by author, and the places where two people's text was merged
+	const lens = useMemo(() => (showBlame && collab ? lensMarks(collab.doc, collab.doc.getText("content"), setSpots) : null), [showBlame, collab]);
+	const extensionsWithCoverage = useMemo(
+		() => [...(coverage ? [...suggestionMarks, coverageGutter(coverage)] : suggestionMarks), ...(lspExt ? [lspExt] : []), ...(lens ? [lens] : [])],
+		[suggestionMarks, coverage, lspExt, lens],
+	);
 	const [blame, setBlame] = useState<{ ranges: BlameRange[]; people: Contribution[] } | null>(null);
 
 	// Read the file from disk; the shared document is seeded from it the first time it is opened
@@ -558,10 +565,10 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 				{!branch && comments.panel}
 
 				{showBlame && (
-					<CollapsiblePane id="code.blame" defaultWidth={256} label="who wrote each line" side="right">
+					<CollapsiblePane id="code.blame" defaultWidth={256} label="merge lens" side="right">
 					<aside className="w-64 shrink-0 space-y-4 overflow-y-auto p-3 text-xs">
 						{!blame || blame.people.length === 0 ? (
-							<p className="text-muted-foreground">Nothing to show yet. Blame appears once the file has content.</p>
+							<p className="text-muted-foreground">Nothing to show yet. The lens appears once the file has content.</p>
 						) : (
 							<>
 								<section className="space-y-2">
@@ -585,6 +592,23 @@ const CodeTab = forwardRef<CodeTabHandle, CodeTabProps>(function CodeTab({ path,
 											)}
 										</div>
 									))}
+								</section>
+								<section className="space-y-1">
+									<h3 className="font-semibold text-muted-foreground">Merged here</h3>
+									{spots.length === 0 ? (
+										<p className="text-muted-foreground">Nowhere. No two people wrote in the same spot at the same time.</p>
+									) : (
+										spots.map((spot) => {
+											const view = viewRef.current;
+											const line = view ? view.state.doc.lineAt(Math.min(spot.from, view.state.doc.length)).number : 1;
+											return (
+												<button key={`${spot.from}-${spot.to}`} type="button" onClick={() => jumpToLine(line)} className="flex w-full items-center gap-2 border-l-2 border-warning px-2 py-1 text-left hover:bg-muted/50">
+													<span className="min-w-0 flex-1 truncate">{spot.authors.join(" and ")}</span>
+													<span className="shrink-0 tabular-nums text-muted-foreground">Line {line}</span>
+												</button>
+											);
+										})
+									)}
 								</section>
 								<section className="space-y-1">
 									<h3 className="font-semibold text-muted-foreground">Blame</h3>

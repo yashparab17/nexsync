@@ -136,6 +136,7 @@ jobs:
                   app="$(ls *.AppImage)"
                   chmod +x "$app" && "./$app" --appimage-extract >/dev/null
                   find squashfs-root -name 'libwayland-*' -o -name 'libEGL*' -o -name 'libGL.*' -o -name 'libGL-*' -o -name 'libGLX*' -o -name 'libgbm*' | xargs -r rm -fv
+                  chmod -R a+rX squashfs-root
                   curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
                   chmod +x appimagetool
                   rm "$app"

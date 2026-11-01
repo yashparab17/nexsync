@@ -19,7 +19,7 @@ const TIPS = [
 	"In Quick open, > runs a command and : jumps to a line.",
 	"Vim keys are in Settings.",
 	"Ctrl Enter in Quick open opens a file beside this one.",
-	"Everyone edits the same file live. Blame shows who wrote a line.",
+	"Everyone edits the same file live. The merge lens shows who wrote each line and where two people's writing was merged.",
 	"Right-click a tab or file for more.",
 ];
 

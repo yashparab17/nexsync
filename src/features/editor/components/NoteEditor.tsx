@@ -1,7 +1,7 @@
 import { IconButton } from "@/components/ui/icon-button";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
-import { Check, Download, Eye, FileText, GitBranch, History, MessageSquareDiff, PanelRight, Type, Users } from "@/components/animate-icons";
+import { Check, Download, Eye, FileText, GitBranch, History, MessageSquareDiff, PanelRight, Type, Users, UsersRound } from "@/components/animate-icons";
 
 import CodeEditor from "@/features/editor/components/CodeEditor";
 import RichTextEditor from "@/features/editor/components/RichTextEditor";
@@ -18,6 +18,9 @@ import { ExpiryControl } from "@/components/elements/ExpiryBadge";
 import { useFileComments } from "@/features/editor/components/useFileComments";
 import { useCanComment } from "@/store/p2p/P2PContext";
 import { proposalMarks } from "@/lib/editor/proposalsView";
+import { trackAuthor } from "@/lib/editor/blame";
+import { lensMarks } from "@/lib/editor/lens";
+import { newLensStore } from "@/lib/editor/lensXml";
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { Button } from "@/components/ui/button";
 import { useAutoSnapshot } from "@/hooks/useAutoSnapshot";
@@ -107,9 +110,26 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 	const canComment = useCanComment();
 	const chat = useChat();
 	const comments = useFileComments({ path: docId ?? fileName, doc: isMarkdown && mainCollab && !branch ? mainCollab.doc : null, canComment });
+	// The merge lens: who wrote each part, and where two people's writing was merged. Markdown notes are shared text; text notes are blocks.
+	const [lensOn, setLensOn] = useState(false);
+	const [merged, setMerged] = useState(0);
+	const lens = useMemo(() => newLensStore(), []);
+	lens.onSpots = (spots) => setMerged(spots.length);
+	useEffect(() => {
+		lens.on = lensOn;
+		lens.refresh();
+		if (!lensOn) setMerged(0);
+	}, [lens, lensOn]);
+	// Record who this session belongs to once they edit, so the lens can name them
+	useEffect(() => (collab ? trackAuthor(collab.doc, userName) : undefined), [collab, userName]);
 	const markdownExtensions = useMemo(
-		() => [linkExtensions, comments.extension, ...(collab ? [proposalMarks(collab.doc, collab.doc.getText("content"), userName, !readOnly)] : [])],
-		[linkExtensions, comments.extension, collab, userName, readOnly],
+		() => [
+			linkExtensions,
+			comments.extension,
+			...(collab ? [proposalMarks(collab.doc, collab.doc.getText("content"), userName, !readOnly)] : []),
+			...(collab && lensOn ? [lensMarks(collab.doc, collab.doc.getText("content"), (spots) => setMerged(spots.length))] : []),
+		],
+		[linkExtensions, comments.extension, collab, userName, readOnly, lensOn],
 	);
 	const goToLine = (line: number) => {
 		const view = viewRef.current;
@@ -258,7 +278,12 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 									<Eye className="size-4" />
 								</IconButton>
 							)}
-							<ExpiryControl entity="file" id={docId} name={fileName} />
+							{collab && !branch && (
+									<IconButton size="xs" label={lensOn ? "Hide merge lens" : "Show merge lens"} pressed={lensOn} badge={merged} onPress={() => setLensOn((on) => !on)}>
+										<UsersRound className="size-4" />
+									</IconButton>
+								)}
+								<ExpiryControl entity="file" id={docId} name={fileName} />
 							<IconButton size="xs" label="History" onPress={() => setHistoryOpen(true)}>
 								<History className="size-4" />
 							</IconButton>
@@ -333,7 +358,8 @@ export default function NoteEditor({ fileName, initialContent, onSave, readOnly 
 						readOnly={readOnly}
 						collab={collab}
 						userName={userName}
-						onReady={onRichReady}
+						lens={lens}
+							onReady={onRichReady}
 					/>
 				)}
 				</div>
