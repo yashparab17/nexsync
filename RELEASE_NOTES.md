@@ -1,1 +1,1 @@
-Notes can be Markdown or text, profile pictures share reliably, renamed members keep their activity, reconnecting no longer downloads every file again, downloads show in the pop-up stack, slide show fixes.
+Documents no longer jump when you type past the end of a page: pages break as you write, and a block pushed to the next page stays there when you press Enter.

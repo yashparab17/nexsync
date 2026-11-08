@@ -1,7 +1,7 @@
 {
   "name": "nexsync",
   "private": true,
-  "version": "0.9.7",
+  "version": "0.9.8",
   "author": "Yash Parab, Dhruv Dinda",
   "license": "MIT",
   "type": "module",
