@@ -42,14 +42,14 @@ vi.mock("@tauri-apps/api/event", () => ({
 		return () => mocks.listeners.delete(name);
 	},
 }));
-vi.mock("@/lib/tauri", () => ({ deckRender: async () => ({ png: "AAAA", widthPt: 960, heightPt: 540, frames: [] }) }));
+
 vi.mock("@/features/office/slides/lib/deck", () => ({
 	readSlide: (_doc: unknown, k: string) => ({ id: k, hidden: k === "b", shapes: [] }),
 	notesOf: (s: { id: string }) => (s.id === "a" ? "Say hello first" : ""),
 	transitionOf: () => "none",
 }));
 
-const props = (over: object = {}) => ({ doc: new Y.Doc(), keys: ["a", "b", "c"], start: 0, baseId: "base", reregister: async () => "base", presenterView: false, slideSize: { w: 960, h: 540 }, onShow: vi.fn(), onClose: vi.fn(), ...over });
+const props = (over: object = {}) => ({ doc: new Y.Doc(), keys: ["a", "b", "c"], start: 0, deck: { id: "base", render: async () => ({ png: "AAAA", widthPt: 960, heightPt: 540, frames: [] }), layouts: async () => [], newSlide: async () => "", applyLayout: async () => "" }, presenterView: false, slideSize: { w: 960, h: 540 }, onShow: vi.fn(), onClose: vi.fn(), ...over });
 
 describe("the slide show", () => {
 	beforeEach(() => {

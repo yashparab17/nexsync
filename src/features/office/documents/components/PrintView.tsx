@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 
 import Loading from "@/components/Loading";
 import type { OfficeLayout } from "@/features/office/types";
-import { officeLayout, officePage } from "@/lib/tauri";
+import { officeLayout, officePage } from "@/features/office/lib/api";
 import { errorText } from "@/lib/utils";
 
 const SCALE = 1.5;

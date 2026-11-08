@@ -3,7 +3,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import SlideCanvas from "@/features/office/slides/components/SlideCanvas";
 import type { Frame } from "@/features/office/slides/lib/deck";
-import type { DeckRendered } from "@/lib/tauri";
+import type { DeckRendered } from "@/features/office/lib/api";
 
 afterEach(cleanup);
 

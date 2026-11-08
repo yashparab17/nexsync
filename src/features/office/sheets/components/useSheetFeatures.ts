@@ -30,7 +30,8 @@ import {
 } from "@/features/office/sheets/lib/sheet";
 import { extendRange, learnTransform, pivotAcross, TABLE_STYLES, tableLook } from "@/features/office/sheets/lib/sheetFill";
 import { cfLook, rangeStats, type RangeStats, checkEntry, duplicateRows, fillRange, goalSeek, inRange, pivot, seriesRange, splitText, type CfRule, type DvRule, type PivotFn } from "@/features/office/sheets/lib/sheetTools";
-import { getTasks, sheetCalculate } from "@/lib/tauri";
+import { getTasks } from "@/lib/tauri";
+import { sheetCalculate } from "@/features/office/lib/api";
 
 const LOCAL = "local-edit";
 

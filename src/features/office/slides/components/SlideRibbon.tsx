@@ -57,7 +57,7 @@ import { FONTS, PALETTE } from "@/features/office/documents/lib/documentFormat";
 import { FindPanel, TableCellsPanel } from "@/features/office/slides/components/SlidePanels";
 import type { AlignTo } from "@/features/office/slides/lib/arrange";
 import { Big, Choice, ColorButton, Gallery, GridPicker, Group, MenuItem, MenuRule, MenuTitle, Popover, Row, Rows, Sep, Small } from "@/features/office/shared/Ribbon";
-import type { ShapeEdit, SlideEdit, TableEdit } from "@/lib/tauri";
+import type { ShapeEdit, SlideEdit, TableEdit } from "@/features/office/lib/api";
 
 export const SHAPES: [string, string][] = [
 	["textBox", "Text Box"],

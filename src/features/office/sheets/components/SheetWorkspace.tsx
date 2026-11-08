@@ -71,7 +71,8 @@ import {
 	type SheetOut,
 } from "@/features/office/sheets/lib/sheet";
 import { cardRows, expandLive, taskRows } from "@/features/office/sheets/lib/liveRanges";
-import { getKanban, getTasks, sheetCalculate, sheetSave, sheetSort } from "@/lib/tauri";
+import { getKanban, getTasks } from "@/lib/tauri";
+import { sheetCalculate, sheetSave, sheetSort } from "@/features/office/lib/api";
 import { cn, errorText, formatBytes } from "@/lib/utils";
 
 const LOCAL = "local-edit";

@@ -5,7 +5,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 
 import { crisp, fitSlide, SHOW_END, SHOW_NAV, SHOW_READY, SHOW_STATE, type ShowNav, type ShowState } from "@/features/office/slides/lib/show";
-import { deckRender, type DeckRendered } from "@/lib/tauri";
+import { deckRender, type DeckRendered } from "@/features/office/lib/api";
 
 export default function AudienceView() {
 	const [state, setState] = useState<ShowState | null>(null);

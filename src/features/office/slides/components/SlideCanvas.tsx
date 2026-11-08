@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { dragged, type Frame, type Handle, type Xfrm } from "@/features/office/slides/lib/deck";
-import type { DeckRendered } from "@/lib/tauri";
+import type { DeckRendered } from "@/features/office/lib/api";
 import { cn } from "@/lib/utils";
 
 export interface OtherSelection {

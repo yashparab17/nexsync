@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import * as Y from "yjs";
 
 import { readSlide } from "@/features/office/slides/lib/deck";
+import type { DeckSession } from "@/features/office/slides/lib/useDeckSession";
 import { useSlideImage } from "@/features/office/slides/lib/useSlideImage";
 import { cn } from "@/lib/utils";
 
-export default function SlideSorter({ doc, keys, current, baseId, reregister, version, readOnly, onPick, onOpen, onMove }: { doc: Y.Doc; keys: string[]; current: string; baseId: string | null; reregister: () => Promise<string | null>; version: number; readOnly: boolean; onPick: (key: string) => void; onOpen: (key: string) => void; onMove: (key: string, to: number) => void }) {
+export default function SlideSorter({ doc, keys, current, deck, version, readOnly, onPick, onOpen, onMove }: { doc: Y.Doc; keys: string[]; current: string; deck: DeckSession; version: number; readOnly: boolean; onPick: (key: string) => void; onOpen: (key: string) => void; onMove: (key: string, to: number) => void }) {
 	const [drag, setDrag] = useState<string | null>(null);
 	const [over, setOver] = useState<number | null>(null);
 	return (
@@ -33,16 +34,16 @@ export default function SlideSorter({ doc, keys, current, baseId, reregister, ve
 					}}
 					className={cn("rounded-md", over === i && drag !== k && "ring-2 ring-primary")}
 				>
-					<Tile doc={doc} k={k} number={i + 1} baseId={baseId} reregister={reregister} version={version} current={k === current} onPick={() => onPick(k)} onOpen={() => onOpen(k)} />
+					<Tile doc={doc} k={k} number={i + 1} deck={deck} version={version} current={k === current} onPick={() => onPick(k)} onOpen={() => onOpen(k)} />
 				</li>
 			))}
 		</ol>
 	);
 }
 
-function Tile({ doc, k, number, baseId, reregister, version, current, onPick, onOpen }: { doc: Y.Doc; k: string; number: number; baseId: string | null; reregister: () => Promise<string | null>; version: number; current: boolean; onPick: () => void; onOpen: () => void }) {
+function Tile({ doc, k, number, deck, version, current, onPick, onOpen }: { doc: Y.Doc; k: string; number: number; deck: DeckSession; version: number; current: boolean; onPick: () => void; onOpen: () => void }) {
 	const slide = useMemo(() => readSlide(doc, k), [doc, k, version]); // eslint-disable-line react-hooks/exhaustive-deps
-	const { image } = useSlideImage(baseId, slide ? JSON.stringify(slide) : null, 0.4, reregister, 250);
+	const { image } = useSlideImage(deck, slide ? JSON.stringify(slide) : null, 0.4, 250);
 	return (
 		<button type="button" onClick={onPick} onDoubleClick={onOpen} onKeyDown={(e) => e.key === "Enter" && onOpen()} aria-current={current} aria-label={`Slide ${number}`} className="block w-full rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
 			<span className={cn("relative block bg-white", current ? "ring-2 ring-[var(--office)]" : "ring-1 ring-border", slide?.hidden === true && "opacity-50")} style={{ aspectRatio: "16 / 9" }}>

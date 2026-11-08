@@ -99,6 +99,8 @@ const previews: Record<StyleId, React.ReactNode> = {
 	code: <span className="font-mono text-[12px]">AaBbCc</span>,
 };
 
+export type RibbonDialog = "headerFooter" | "counts" | "proofing" | "compare" | "accessibility" | "changes" | "approvals" | "control" | "sectionHeader";
+
 export interface RibbonProps {
 	tab: string;
 	a: Actions;
@@ -111,19 +113,12 @@ export interface RibbonProps {
 	zoom: number;
 	setZoom: (z: number) => void;
 	openFind: (replace: boolean) => void;
-	openHeaderFooter: () => void;
-	openCounts: () => void;
-	openProofing: () => void;
+	// Opens one of the dialogs the ribbon asks for
+	openDialog: (dialog: RibbonDialog) => void;
 	comments: { open: boolean; count: number; canComment: boolean; start: () => void; toggle: () => void; next: () => void; previous: () => void };
 	review: { suggesting: boolean; count: number; toggle: () => void; accept: () => void; reject: () => void; acceptAll: () => void; rejectAll: () => void; next: () => void; previous: () => void };
-	openCompare: () => void;
-	openAccessibility: () => void;
-	openChanges: () => void;
-	openApprovals: () => void;
 	// The merge lens: who wrote each paragraph, and where two people's writing was merged
 	lens: { on: boolean; merged: number; toggle: () => void };
-	openControl: () => void;
-	openSectionHeader: () => void;
 	// The document's own styles, beside the gallery's: of paragraphs, of letters and of tables
 	styles: StyleDef[];
 	charStyles: StyleDef[];
@@ -387,8 +382,8 @@ export default function DocumentRibbon(p: RibbonProps) {
 					/>
 				</Group>
 				<Group label="Header & Footer">
-					<Big icon={PanelTop} label="Header & Footer" disabled={ro} active={p.hasHeaderFooter} onPress={p.openHeaderFooter} />
-					<Big icon={Hash} label="Page Number" disabled={ro} onPress={p.openHeaderFooter} />
+					<Big icon={PanelTop} label="Header & Footer" disabled={ro} active={p.hasHeaderFooter} onPress={() => p.openDialog("headerFooter")} />
+					<Big icon={Hash} label="Page Number" disabled={ro} onPress={() => p.openDialog("headerFooter")} />
 				</Group>
 				<Group label="Text">
 					<Rows>
@@ -407,7 +402,7 @@ export default function DocumentRibbon(p: RibbonProps) {
 									<MenuItem label="Word count" onPress={() => a.insertField("words", String(p.fieldValues().words))} />
 									<MenuItem label="Update all fields" onPress={() => a.updateFields({ title: p.fieldValues().title, author: p.fieldValues().author, date: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }), pages: String(p.fieldValues().pages), words: String(p.fieldValues().words) })} />
 									<MenuItem label="Text form field" onPress={a.formField} />
-									<MenuItem label="Content control…" onPress={p.openControl} />
+									<MenuItem label="Content control…" onPress={() => p.openDialog("control")} />
 								</>
 							}
 						/>
@@ -545,7 +540,7 @@ export default function DocumentRibbon(p: RibbonProps) {
 									{([1, 2, 3] as const).map((n) => (
 										<MenuItem key={n} label={n === 1 ? "One" : n === 2 ? "Two" : "Three"} checked={section.columns === n} onPress={() => a.setSection({ columns: n })} />
 									))}
-									<MenuItem label="Header & Footer…" onPress={p.openSectionHeader} />
+									<MenuItem label="Header & Footer…" onPress={() => p.openDialog("sectionHeader")} />
 									<MenuTitle>Starts</MenuTitle>
 									<MenuItem label="On a new page" checked={section.start === "next"} onPress={() => a.setSection({ start: "next" })} />
 									<MenuItem label="Continuous" checked={section.start === "cont"} onPress={() => a.setSection({ start: "cont" })} />
@@ -595,10 +590,10 @@ export default function DocumentRibbon(p: RibbonProps) {
 		return (
 			<>
 				<Group label="Proofing">
-					<Big icon={SpellCheck} label="Spelling & Grammar" onPress={p.openProofing} />
+					<Big icon={SpellCheck} label="Spelling & Grammar" onPress={() => p.openDialog("proofing")} />
 					<Big icon={SpellCheck} label="Underline Errors" active={p.view.spelling} onPress={() => p.setView({ spelling: !p.view.spelling })} />
 					<Big icon={Wand2} label="AutoCorrect" title="Put right common slips and curl quotes as you type; press to turn it off for you" active={auto} onPress={() => { setAutoCorrect(!auto); setAuto(!auto); }} />
-					<Big icon={Space} label="Word Count" onPress={p.openCounts} />
+					<Big icon={Space} label="Word Count" onPress={() => p.openDialog("counts")} />
 				</Group>
 				<Group label="Comments">
 					<Big icon={MessageSquareText} label="New Comment" disabled={!p.comments.canComment} title="Comment on the selected text" onPress={p.comments.start} />
@@ -620,20 +615,20 @@ export default function DocumentRibbon(p: RibbonProps) {
 						<Small icon={ChevronRight} label={p.review.count ? `Next (${p.review.count})` : "Next"} disabled={!p.review.count} onPress={p.review.next} />
 					</Rows>
 					<Rows>
-						<Small icon={ListTodo} label="Changes" title="List every change with who made it" onPress={p.openChanges} />
-						<Small icon={ShieldCheck} label="Approvals" title="Ask for a review, approve, and sign the document as it is" onPress={p.openApprovals} />
+						<Small icon={ListTodo} label="Changes" title="List every change with who made it" onPress={() => p.openDialog("changes")} />
+						<Small icon={ShieldCheck} label="Approvals" title="Ask for a review, approve, and sign the document as it is" onPress={() => p.openDialog("approvals")} />
 						<Small icon={Check} label="Accept All" disabled={p.readOnly || !p.review.count} onPress={p.review.acceptAll} />
 						<Small icon={XIcon} label="Reject All" disabled={p.readOnly || !p.review.count} onPress={p.review.rejectAll} />
 					</Rows>
 				</Group>
 				<Group label="Compare">
-					<Big icon={GitCompareArrows} label="Compare" title="Compare this document with a saved version" onPress={p.openCompare} />
+					<Big icon={GitCompareArrows} label="Compare" title="Compare this document with a saved version" onPress={() => p.openDialog("compare")} />
 				</Group>
 				<Group label="Authorship">
 						<Big icon={UsersRound} label={p.lens.merged ? `Merge Lens (${p.lens.merged})` : "Merge Lens"} title="Colour each paragraph by who wrote it, and mark where two people's writing was merged" active={p.lens.on} onPress={p.lens.toggle} />
 					</Group>
 					<Group label="Accessibility">
-					<Big icon={Accessibility} label="Check Accessibility" title="Find what makes the document hard to read with a screen reader" onPress={p.openAccessibility} />
+					<Big icon={Accessibility} label="Check Accessibility" title="Find what makes the document hard to read with a screen reader" onPress={() => p.openDialog("accessibility")} />
 				</Group>
 				<Group label="Protect">
 					<Big

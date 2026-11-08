@@ -1,86 +1,51 @@
-import { EmptyNote, PaneHeader, listRow } from "@/components/layout/Pane";
-import { FieldError, Notice } from "@/components/ui/notice";
-import { IconButton } from "@/components/ui/icon-button";
-import { SHEET_TEMPLATES } from "@/features/office/shared/templates";
-import { useNewParam } from "@/hooks/useNewParam";
-import { useSyncedIn } from "@/hooks/useSyncedIn";
-import { pushRecent } from "@/lib/recentFiles";
 // Sheets: spreadsheet files of the workspace (.xlsx and the formats it reads) opened as live shared workbooks. What people type and how
 // cells look is kept in a shared document; the cells' answers are worked out by the spreadsheet engine from that text, on every device alike.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { FilePlus, Upload } from "@/components/animate-icons";
-import CollapsiblePane, { LIST_WIDTH } from "@/components/layout/CollapsiblePane";
-import PresenceDots from "@/components/elements/PresenceDots";
-import { EmptyState, Page } from "@/components/layout/Page";
-import SheetWorkspace from "@/features/office/sheets/components/SheetWorkspace";
 import Loading from "@/components/Loading";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { readFileBase64 } from "@/features/assets/lib/uploadScale";
-import { useCollabDoc } from "@/hooks/useCollabDoc";
-import { useErrorLog } from "@/hooks/useErrorLog";
-import { useOpenParam } from "@/hooks/useOpenParam";
-import { useReportItem } from "@/hooks/usePresence";
-import { LAYOUT, isIn, placeIn } from "@/lib/workspaceLayout";
-import { isSpreadsheet } from "@/lib/editor/languages";
+import { EmptyState, Page } from "@/components/layout/Page";
+import { Notice } from "@/components/ui/notice";
+import SheetWorkspace from "@/features/office/sheets/components/SheetWorkspace";
 import type { SheetIn } from "@/features/office/sheets/lib/sheet";
-import { searchWorkspaceFiles, sheetOpen, sheetSave, writeWorkspaceBinaryFile } from "@/lib/tauri";
-import { errorText } from "@/lib/utils";
-import { safeUploadName, validateFileName } from "@/lib/validation";
-import { useIsViewer, useP2P } from "@/store/p2p/P2PContext";
-import { useWorkspace } from "@/store/workspace/WorkspaceContext";
+import { OfficeFileDialogs, OfficeFileList } from "@/features/office/shared/OfficeFileList";
+import { SHEET_TEMPLATES } from "@/features/office/shared/templates";
+import { type OfficeKind, useOfficeFiles } from "@/features/office/shared/useOfficeFiles";
+import { useCollabDoc } from "@/hooks/useCollabDoc";
 import { useMyName } from "@/hooks/useMyName";
+import { isSpreadsheet } from "@/lib/editor/languages";
+import { sheetOpen, sheetSave } from "@/features/office/lib/api";
+import { errorText } from "@/lib/utils";
+import { LAYOUT } from "@/lib/workspaceLayout";
+import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
-interface Book {
-	name: string;
-	rel: string;
-}
-const strip = (p: string) => p.replace(/^\/+/, "");
+const KIND: OfficeKind = {
+	page: "sheets",
+	folder: LAYOUT.sheets,
+	matches: isSpreadsheet,
+	ext: "xlsx",
+	noun: "workbook",
+	plural: "workbooks",
+	accept: ".xlsx,.xlsm,.xlsb,.xls,.ods,.csv,.tsv",
+	empty: "No workbooks yet. Make one, or add an .xlsx, .xls, .ods or .csv file.",
+	reject: "Choose a spreadsheet file (.xlsx, .xls, .ods, .csv).",
+};
 
 export default function SheetsPage() {
 	const { workspace } = useWorkspace();
-	const logError = useErrorLog();
-	const isViewer = useIsViewer();
-	const { viewersAt } = useP2P();
-	const synced = useSyncedIn(LAYOUT.sheets);
 	const workspacePath = workspace?.path ?? "";
 	const author = useMyName();
+	const files = useOfficeFiles({
+		kind: KIND,
+		make: (path, _name, template) => sheetSave(workspacePath, path, [{ name: "Sheet1", cells: (SHEET_TEMPLATES.find((t) => t.id === template) ?? SHEET_TEMPLATES[0]).cells }], "Sheet1"),
+	});
+	const { selected, notice, isViewer } = files;
 
-	const [books, setBooks] = useState<Book[] | null>(null);
-	const [query, setQuery] = useState("");
-	const [selected, setSelected] = useState<string | null>(null);
 	const [opened, setOpened] = useState<{ sheets: SheetIn[]; notes: string[] } | { error: string } | null>(null);
-	const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
-	const [creating, setCreating] = useState(false);
-	const [newName, setNewName] = useState("");
-	const [template, setTemplate] = useState("blank");
-	const fileInput = useRef<HTMLInputElement>(null);
-
-	const load = useCallback(() => {
-		if (!workspacePath) return;
-		searchWorkspaceFiles(workspacePath)
-			.then((all) => setBooks((all ?? []).filter((f) => isSpreadsheet(f.name) && isIn(f.path, LAYOUT.sheets)).map((f) => ({ name: f.name, rel: strip(f.path) })).sort((a, b) => a.name.localeCompare(b.name))))
-			.catch((err) => {
-				logError(err, { source: "sheets", workspace: workspacePath });
-				setBooks([]);
-			});
-	}, [workspacePath, logError]);
-	useEffect(load, [load, synced]);
-
-	useOpenParam((p) => setSelected(strip(p)), !!workspacePath);
-	useReportItem(selected);
-	useNewParam(() => setCreating(true), !!workspacePath && !isViewer);
-	useEffect(() => {
-		if (workspacePath && selected) pushRecent(workspacePath, selected);
-	}, [workspacePath, selected]);
 
 	// The file as the workbook gets it the first time; the shared copy takes over once there is one
 	useEffect(() => {
 		setOpened(null);
-		setNotice(null);
 		if (!workspacePath || !selected) return;
 		let live = true;
 		sheetOpen(workspacePath, selected)
@@ -92,80 +57,11 @@ export default function SheetsPage() {
 	}, [workspacePath, selected]);
 
 	const collab = useCollabDoc(workspacePath, opened && "sheets" in opened ? (selected ?? undefined) : undefined);
-	const flash = (ok: boolean, text: string) => setNotice({ ok, text });
-
-	const create = async () => {
-		const name = newName.trim();
-		if (!name || validateFileName(name) || !workspacePath) return;
-		const rel = placeIn(LAYOUT.sheets, `${name}.xlsx`);
-		if (books?.some((b) => b.rel.toLowerCase() === rel.toLowerCase())) return flash(false, "A workbook with that name exists.");
-		try {
-			await sheetSave(workspacePath, `${workspacePath.replace(/[\\/]+$/, "")}/${rel}`, [{ name: "Sheet1", cells: (SHEET_TEMPLATES.find((t) => t.id === template) ?? SHEET_TEMPLATES[0]).cells }], "Sheet1");
-			setCreating(false);
-			setNewName("");
-			load();
-			setSelected(rel);
-		} catch (err) {
-			flash(false, errorText(err, "The workbook could not be made."));
-		}
-	};
-
-	const addFile = async (file: File) => {
-		try {
-			const name = safeUploadName(file.name);
-			if (!isSpreadsheet(name)) return flash(false, "Choose a spreadsheet file (.xlsx, .xls, .ods, .csv).");
-			await writeWorkspaceBinaryFile(workspacePath, placeIn(LAYOUT.sheets, name), await readFileBase64(file));
-			load();
-			setSelected(placeIn(LAYOUT.sheets, name));
-		} catch (err) {
-			flash(false, errorText(err, "The file could not be added."));
-		}
-	};
-
-	const shownBooks = useMemo(() => (books ?? []).filter((b) => b.name.toLowerCase().includes(query.trim().toLowerCase())), [books, query]);
 
 	return (
 		<Page>
 			<div className="flex min-h-0 flex-1">
-				<CollapsiblePane id="sheets.list" defaultWidth={LIST_WIDTH} label="the list of workbooks">
-					<div className="flex shrink-0 flex-col bg-panel">
-					<PaneHeader label="Search workbooks" value={query} onChange={setQuery} placeholder="Search">
-						{!isViewer && (
-							<>
-								<input
-								ref={fileInput}
-								type="file"
-								accept=".xlsx,.xlsm,.xlsb,.xls,.ods,.csv,.tsv"
-								className="hidden"
-								onChange={(e) => {
-								const f = e.target.files?.[0];
-								e.target.value = "";
-								if (f) void addFile(f);
-								}}
-								/>
-								<IconButton size="xs" label="Add a file" onPress={() => fileInput.current?.click()}>
-									<Upload className="size-4" />
-								</IconButton>
-								<IconButton size="xs" label="New workbook" onPress={() => setCreating(true)}>
-									<FilePlus className="size-4" />
-								</IconButton>
-							</>
-						)}
-					</PaneHeader>
-					<nav aria-label="Workbooks" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5">
-					{books === null ? null : shownBooks.length === 0 ? (
-						<EmptyNote>{books.length === 0 ? "No workbooks yet. Make one, or add an .xlsx, .xls, .ods or .csv file." : "No workbook matches."}</EmptyNote>
-					) : (
-						shownBooks.map((b) => (
-							<button key={b.rel} type="button" aria-current={b.rel === selected} onClick={() => setSelected(b.rel)} className={listRow(b.rel === selected)}>
-																<span className="min-w-0 flex-1 truncate">{b.name}</span>
-								<PresenceDots names={viewersAt("sheets", b.rel)} />
-							</button>
-						))
-					)}
-				</nav>
-					</div>
-				</CollapsiblePane>
+				<OfficeFileList kind={KIND} files={files} />
 
 				<main className="flex min-h-0 min-w-0 flex-1 flex-col">
 					{notice && (
@@ -180,9 +76,7 @@ export default function SheetsPage() {
 					) : !opened ? (
 						<Loading className="h-48" />
 					) : "error" in opened ? (
-						<Notice className="m-6 max-w-md p-3">
-							{opened.error}
-						</Notice>
+						<Notice className="m-6 max-w-md p-3">{opened.error}</Notice>
 					) : collab ? (
 						<SheetWorkspace key={selected} collab={collab} opened={opened} name={selected.split("/").pop() ?? ""} rel={selected} workspacePath={workspacePath} author={author} readOnly={isViewer} />
 					) : (
@@ -191,36 +85,7 @@ export default function SheetsPage() {
 				</main>
 			</div>
 
-			{creating && (
-				<Dialog isOpen onOpenChange={(o) => !o && setCreating(false)} className="max-w-md">
-					<form
-						className="space-y-4"
-						onSubmit={(e) => {
-							e.preventDefault();
-							void create();
-						}}
-					>
-						<DialogHeading icon={<FilePlus className="size-6" />} title="New Workbook" />
-						<Input aria-label="Workbook name" autoFocus required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Title" aria-invalid={!!(newName && validateFileName(newName))} />
-						<select aria-label="Template" value={template} onChange={(e) => setTemplate(e.target.value)} className="h-9 w-full border bg-background px-2 text-sm">
-						{SHEET_TEMPLATES.map((t) => (
-							<option key={t.id} value={t.id}>
-								{t.label}
-							</option>
-						))}
-					</select>
-					{newName && validateFileName(newName) && <FieldError>{validateFileName(newName)}</FieldError>}
-						<DialogFooter className="mt-2">
-							<Button type="button" variant="outline" onPress={() => setCreating(false)}>
-								Cancel
-							</Button>
-							<Button type="submit" isDisabled={!newName.trim() || !!validateFileName(newName)}>
-								Create
-							</Button>
-						</DialogFooter>
-					</form>
-				</Dialog>
-			)}
+			<OfficeFileDialogs kind={KIND} files={files} templates={SHEET_TEMPLATES} />
 		</Page>
 	);
 }

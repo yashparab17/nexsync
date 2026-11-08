@@ -6,7 +6,7 @@ import CollapsiblePane from "@/components/layout/CollapsiblePane";
 
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download, FilePenLine, History, Info, Redo2, Save, Undo2, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 
 import Backstage from "@/features/office/shared/Backstage";
@@ -25,7 +25,8 @@ import { Button } from "@/components/ui/button";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
 import { colorOf } from "@/lib/collabColor";
 import { addShape, addSlide, arrange, cloneShape, deleteSlide, duplicateSlide, getBase, moveSlide, nextShapeId, notesOf, readSlide, readSlides, removeShape, runsIn, searchText, seed, setBase, setShape, setSlideMeta, slideKeys, slideOrder, textOf, timingOf, transitionOf, type ShapeJson, type SlideJson, type Xfrm } from "@/features/office/slides/lib/deck";
-import { deckAddPicture, deckApplyLayout, deckEditShape, deckEditSlide, deckEditTable, deckGroup, deckLayouts, deckNewShape, deckNewSlide, deckNewTable, deckRegister, deckReplace, deckSave, deckUngroup, type ShapeEdit, type SlideEdit, type TableEdit } from "@/lib/tauri";
+import { deckAddPicture, deckEditShape, deckEditSlide, deckEditTable, deckGroup, deckNewShape, deckNewTable, deckReplace, deckSave, deckUngroup, type ShapeEdit, type SlideEdit, type TableEdit } from "@/features/office/lib/api";
+import { useDeckSession, type DeckSession } from "@/features/office/slides/lib/useDeckSession";
 import { useSlideImage } from "@/features/office/slides/lib/useSlideImage";
 import { cn, errorText, formatBytes } from "@/lib/utils";
 
@@ -90,22 +91,11 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 	const slide = useMemo(() => (key ? readSlide(doc, key) : null), [doc, key, version]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// The deck's base lives on the backend while it is drawn
-	const [baseId, setBaseId] = useState<string | null>(null);
-	const reregister = useCallback(async () => {
-		const base = getBase(doc);
-		if (!base) return null;
-		const id = await deckRegister(base);
-		setBaseId(id);
-		return id;
-	}, [doc]);
-	const baseText = getBase(doc);
-	useEffect(() => {
-		if (baseText) void reregister().catch((e) => setNotice({ ok: false, text: errorText(e, "The deck could not be read.") }));
-	}, [baseText, reregister]);
+	const deck = useDeckSession(doc, (e) => setNotice({ ok: false, text: errorText(e, "The deck could not be read.") }));
 	const [layouts, setLayouts] = useState<{ id: number; name: string }[]>([]);
 	useEffect(() => {
-		if (baseId) deckLayouts(baseId).then(setLayouts).catch(() => setLayouts([]));
-	}, [baseId]);
+		if (deck.id) deck.layouts().then(setLayouts).catch(() => setLayouts([]));
+	}, [deck]);
 
 	// How wide the slide is drawn: what fits the work area, times the zoom
 	const stage = useRef<HTMLDivElement>(null);
@@ -139,7 +129,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 	const drawn = crisp((fit * zoom) / 100, slideSize.w, dpr);
 	const width = drawn.width;
 	const slideText = slide ? JSON.stringify(slide) : null;
-	const { image, error: drawError } = useSlideImage(baseId, slideText, drawn.scale, reregister);
+	const { image, error: drawError } = useSlideImage(deck, slideText, drawn.scale);
 	useEffect(() => {
 		if (image && (image.widthPt !== slideSize.w || image.heightPt !== slideSize.h)) setSlideSize({ w: image.widthPt, h: image.heightPt });
 	}, [image, slideSize]);
@@ -328,9 +318,9 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 
 	// Moving the slide to another layout: its placeholders follow the new layout and the ones it lacked are added
 	const changeLayout = async (layout: number) => {
-		if (!baseId || !slide || !key) return;
+		if (!deck.id || !slide || !key) return;
 		try {
-			const next = JSON.parse(await deckApplyLayout(baseId, JSON.stringify(slide), layout, nextShapeId(slide))) as SlideJson;
+			const next = JSON.parse(await deck.applyLayout(JSON.stringify(slide), layout, nextShapeId(slide))) as SlideJson;
 			const had = new Set(slide.shapes.map((s) => s.id));
 			edit(() => {
 				setSlideMeta(doc, key, next);
@@ -454,9 +444,9 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 	};
 
 	const newSlide = async (layout: number) => {
-		if (!baseId) return;
+		if (!deck.id) return;
 		try {
-			const s = JSON.parse(await deckNewSlide(baseId, layout)) as SlideJson;
+			const s = JSON.parse(await deck.newSlide(layout)) as SlideJson;
 			edit(() => setActiveKey(addSlide(doc, s, key ?? undefined)));
 		} catch (err) {
 			flash(false, errorText(err, "The slide could not be added."));
@@ -705,8 +695,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 							doc={doc}
 							keys={keys}
 							current={key}
-							baseId={baseId}
-							reregister={reregister}
+							deck={deck}
 							version={version}
 							readOnly={readOnly}
 							onPick={setActiveKey}
@@ -722,7 +711,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 					<ol aria-label="Slides" className="w-44 shrink-0 space-y-2 overflow-y-auto bg-[#f3f2f1] p-2 dark:bg-neutral-800">
 						{keys.map((k, i) => (
 							<li key={k}>
-								<Thumb doc={doc} k={k} baseId={baseId} reregister={reregister} current={k === key} number={i + 1} onPick={() => setActiveKey(k)} version={version} />
+								<Thumb doc={doc} k={k} deck={deck} current={k === key} number={i + 1} onPick={() => setActiveKey(k)} version={version} />
 							</li>
 						))}
 					</ol>
@@ -789,18 +778,18 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 					</div>
 				</div>
 			</div>
-			{presenting !== null && baseId && (
-				<SlideShow doc={doc} keys={keys} start={presenting} baseId={baseId} reregister={reregister} presenterView={presenterView} slideSize={slideSize} onShow={(i) => setActiveKey(keys[i])} onClose={() => setPresenting(null)} />
+			{presenting !== null && deck.id && (
+				<SlideShow doc={doc} keys={keys} start={presenting} deck={deck} presenterView={presenterView} slideSize={slideSize} onShow={(i) => setActiveKey(keys[i])} onClose={() => setPresenting(null)} />
 			)}
 		</OfficeFrame>
 	);
 }
 
 // A small picture of a slide in the list
-function Thumb({ doc, k, baseId, reregister, current, number, onPick, version }: { doc: Y.Doc; k: string; baseId: string | null; reregister: () => Promise<string | null>; current: boolean; number: number; onPick: () => void; version: number }) {
+function Thumb({ doc, k, deck, current, number, onPick, version }: { doc: Y.Doc; k: string; deck: DeckSession; current: boolean; number: number; onPick: () => void; version: number }) {
 	const s = useMemo(() => readSlide(doc, k), [doc, k, version]); // eslint-disable-line react-hooks/exhaustive-deps
 	const text = s ? JSON.stringify(s) : null;
-	const { image } = useSlideImage(baseId, text, 0.18, reregister, 250);
+	const { image } = useSlideImage(deck, text, 0.18, 250);
 	return (
 		<button type="button" onClick={onPick} aria-current={current} aria-label={`Slide ${number}`} className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--office)]">
 			<span className="flex items-start gap-1.5">

@@ -25,6 +25,8 @@ function gapRow(cells: number, px: number) {
 interface Pushes {
 	push: number[];
 	split: Split[];
+	// The id of each block, in document order, as the pushes were last given or followed the text
+	ids: string[];
 	// Built when the pushes change, not in `decorations`: the view asks for those on every update, and a new set each time has it
 	// compare every block's decorations again
 	set: DecorationSet;
@@ -61,14 +63,37 @@ function build(doc: PMNode, push: number[], split: Split[]): DecorationSet {
 	return DecorationSet.create(doc, decos);
 }
 
+const idsOf = (doc: PMNode): string[] => {
+	const ids: string[] = [];
+	doc.descendants((node) => {
+		const name = node.type.name;
+		if (name === "blockContainer") ids.push(node.attrs.id ?? "");
+		return name === "doc" || name === "blockGroup" || name === "blockContainer";
+	});
+	return ids;
+};
+const sameList = <T,>(a: T[], b: T[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
 export const pagePushPlugin: Plugin<Pushes> = new Plugin<Pushes>({
 	state: {
-		init: () => ({ push: [], split: [], set: DecorationSet.empty }),
+		init: () => ({ push: [], split: [], ids: [], set: DecorationSet.empty }),
 		apply: (tr, value) => {
-			const next = tr.getMeta("pagePush") as Omit<Pushes, "set"> | undefined;
-			if (next) return { ...next, set: build(tr.doc, next.push, next.split) };
-			// (an edit moves them along with the text until the pages are worked out again)
-			return tr.docChanged ? { ...value, set: value.set.map(tr.mapping, tr.doc) } : value;
+			const next = tr.getMeta("pagePush") as Pick<Pushes, "push" | "split"> | undefined;
+			if (next) return { ...next, ids: idsOf(tr.doc), set: build(tr.doc, next.push, next.split) };
+			if (!tr.docChanged) return value;
+			// An edit moves them along with the text until the pages are worked out again. But a block that is split (Enter) or joined loses
+			// its decoration, and its text would drop back a page until then; so the blocks are followed by their ids, and the decorations are
+			// drawn again when the blocks have changed (typing in a block changes none of that, and only moves the decorations along)
+			const ids = idsOf(tr.doc);
+			const moved = { ...value, set: value.set.map(tr.mapping, tr.doc) };
+			if (sameList(ids, value.ids) || ids.some((id) => !id)) return moved;
+			const at = new Map(value.ids.map((id, i) => [id, i] as const));
+			// (a block split in two has its id twice for a moment: the first half is the one that was pushed)
+			const seen = new Set<string>();
+			const from = ids.map((id) => (seen.has(id) ? -1 : (seen.add(id), at.get(id) ?? -1)));
+			const push = from.map((i) => value.push[i] ?? 0);
+			const split = from.map((i) => value.split[i] ?? null);
+			return { push, split, ids, set: build(tr.doc, push, split) };
 		},
 	},
 	props: {

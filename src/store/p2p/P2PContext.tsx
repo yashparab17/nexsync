@@ -32,6 +32,9 @@ import {
 	subscribeToActivityEvents,
 } from "@/store/workspace/WorkspaceContext";
 import { useNotifications } from "@/store/notifications/NotificationContext";
+import { useNetworkStatus } from "@/store/p2p/useNetworkStatus";
+import { useTransfers, type FileTransfer } from "@/store/p2p/useTransfers";
+import { useWorkspaceDeleted } from "@/store/p2p/useWorkspaceDeleted";
 import {
 	addTextCatchup,
 	getRules,
@@ -100,13 +103,7 @@ export interface SyncedFile {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const HANDOFF_TIMEOUT_MS = 60_000;
 
-// A file being downloaded from a peer
-export interface FileTransfer {
-	peerId: string;
-	relPath: string;
-	receivedBytes: number;
-	totalBytes: number;
-}
+export type { FileTransfer };
 
 // What the host sends a guest it wants to hand hosting to: the member list with the roles already swapped
 export interface HandoffOffer {
@@ -212,9 +209,9 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const hostUnreachableRef = useRef(false);
 	hostUnreachableRef.current = hostUnreachable;
 	const rejoiningRef = useRef(false);
-	const [network, setNetwork] = useState<p2p.NetworkStatus>({ online: navigator.onLine, detail: null });
+	const network = useNetworkStatus();
 	const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
-	const [workspaceDeleted, setWorkspaceDeleted] = useState(false);
+	const { workspaceDeleted, announceWorkspaceDeleted, dismissWorkspaceDeleted, markWorkspaceDeleted } = useWorkspaceDeleted();
 	// Read inside handlers: guests can now see other guests, so only the host may act on them
 	const selfNameRef = useRef<string | null>(null);
 	// Note catch-up steps run one at a time, so two updates to the same closed note cannot overwrite each other
@@ -230,9 +227,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	const [presence, setPresence] = useState<Record<string, PeerPresence>>({});
 	const myPresenceRef = useRef<Presence>(HERE);
 	const answerInventoryRef = useRef<(path: string, peerId: string, raw: string) => void>(() => {});
-	const [transfers, setTransfers] = useState<FileTransfer[]>([]);
-	// Set when the user cancels everything, so a snapshot download loop stops instead of starting the next file
-	const cancelledRef = useRef(false);
+	const { transfers, cancelTransfers, cancelledRef } = useTransfers();
 	const [handoffOffer, setHandoffOffer] = useState<HandoffOffer | null>(null);
 	// The guest the host is waiting on to answer a handoff, and how to deliver the answer
 	const handoffWaitRef = useRef<{ peerId: string; resolve: (ticket: string | null) => void } | null>(null);
@@ -397,19 +392,6 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 
 	// The OS knows the network changed before Iroh does: show offline at once, and make Iroh re-probe when it returns.
 	// The backend then confirms reachability of the relay itself and re-dials a lost host.
-	useEffect(() => {
-		const offNetwork = p2p.onNetwork(setNetwork);
-		const goOffline = () => setNetwork({ online: false, detail: "No network connection." });
-		const goOnline = () => p2p.networkChange().catch(() => {});
-		window.addEventListener("offline", goOffline);
-		window.addEventListener("online", goOnline);
-		p2p.networkStatus().then((status) => status && setNetwork(status)).catch(() => {});
-		return () => {
-			offNetwork();
-			window.removeEventListener("offline", goOffline);
-			window.removeEventListener("online", goOnline);
-		};
-	}, []);
 
 	// Leaving a workspace drops its collaborators so they can't reach the next one opened
 	const prevWorkspaceIdRef = useRef<string | null>(null);
@@ -933,7 +915,7 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 
 				case "WORKSPACE_DELETED":
 					// The backend only delivers this from the host we joined
-					setWorkspaceDeleted(true);
+					markWorkspaceDeleted();
 					break;
 
 				case "YDOC_INVENTORY": {
@@ -1182,27 +1164,6 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 	}, [markSynced]);
 
 	// Track every download in flight so the UI can show progress and offer to cancel
-	useEffect(() => {
-		const offProgress = p2p.onFileProgress((event) =>
-			setTransfers((prev) => [
-				...prev.filter((t) => !(t.peerId === event.peerId && t.relPath === event.relPath)),
-				{ peerId: event.peerId, relPath: event.relPath, receivedBytes: event.receivedBytes, totalBytes: event.totalBytes },
-			]),
-		);
-		const offEnded = p2p.onFileEnded((event) =>
-			setTransfers((prev) => prev.filter((t) => !(t.peerId === event.peerId && t.relPath === event.relPath))),
-		);
-		return () => {
-			offProgress();
-			offEnded();
-		};
-	}, []);
-
-	const cancelTransfers = useCallback(async (relPath?: string) => {
-		if (!relPath) cancelledRef.current = true;
-		await p2p.cancelTransfers(relPath).catch(() => 0);
-	}, []);
-
 	// Attach byte progress to the file currently being synced
 	useEffect(() => {
 		return p2p.onFileProgress((event) => {
@@ -1254,13 +1215,6 @@ export function P2PProvider({ children }: { children: React.ReactNode }) {
 		await p2p.resolveJoinRequest(requestId, approve).catch(() => false);
 	}, []);
 
-	// Tell every guest the workspace is being deleted, then give the message time to arrive
-	const announceWorkspaceDeleted = useCallback(async () => {
-		await p2p.sendMessage({ kind: "WORKSPACE_DELETED", timestamp: Date.now() }).catch(() => 0);
-		await new Promise((resolve) => setTimeout(resolve, 700));
-	}, []);
-
-	const dismissWorkspaceDeleted = useCallback(() => setWorkspaceDeleted(false), []);
 
 	const revokeInvite = useCallback(async () => {
 		setJoinRequests([]);

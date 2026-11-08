@@ -1,90 +1,61 @@
-import { EmptyNote, PaneHeader, listRow } from "@/components/layout/Pane";
-import { FieldError, Notice } from "@/components/ui/notice";
-import { IconButton } from "@/components/ui/icon-button";
-import { useNewParam } from "@/hooks/useNewParam";
-import { useSyncedIn } from "@/hooks/useSyncedIn";
-import { pushRecent } from "@/lib/recentFiles";
 // Slides: slide decks (.pptx) of the workspace, opened as live shared decks. The slides are drawn by the backend from the deck's pieces;
 // the frames over them select, move and resize shapes, and everyone with the deck open sees the changes as they are made.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { FilePlus, Upload } from "@/components/animate-icons";
-import CollapsiblePane, { LIST_WIDTH } from "@/components/layout/CollapsiblePane";
-import PresenceDots from "@/components/elements/PresenceDots";
-import { EmptyState, Page } from "@/components/layout/Page";
-import SlideWorkspace from "@/features/office/slides/components/SlideWorkspace";
 import Loading from "@/components/Loading";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { readFileBase64 } from "@/features/assets/lib/uploadScale";
+import { EmptyState, Page } from "@/components/layout/Page";
+import { Notice } from "@/components/ui/notice";
+import { OfficeFileDialogs, OfficeFileList } from "@/features/office/shared/OfficeFileList";
+import { type OfficeKind, useOfficeFiles } from "@/features/office/shared/useOfficeFiles";
+import SlideWorkspace from "@/features/office/slides/components/SlideWorkspace";
 import { useCollabDoc } from "@/hooks/useCollabDoc";
-import { useErrorLog } from "@/hooks/useErrorLog";
-import { useOpenParam } from "@/hooks/useOpenParam";
-import { useReportItem, useReportLine } from "@/hooks/usePresence";
-import { LAYOUT, isIn, placeIn } from "@/lib/workspaceLayout";
-import { isDeck } from "@/lib/editor/languages";
-import { deckNew, deckOpen, deckSave, searchWorkspaceFiles, writeWorkspaceBinaryFile } from "@/lib/tauri";
-import { errorText } from "@/lib/utils";
-import { safeUploadName, validateFileName } from "@/lib/validation";
-import { useIsViewer, useP2P } from "@/store/p2p/P2PContext";
-import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useMyName } from "@/hooks/useMyName";
+import { useReportLine } from "@/hooks/usePresence";
+import { isDeck } from "@/lib/editor/languages";
+import { deckNew, deckOpen, deckSave } from "@/features/office/lib/api";
+import { errorText } from "@/lib/utils";
+import { LAYOUT } from "@/lib/workspaceLayout";
+import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
-interface Deck {
-	name: string;
-	rel: string;
-}
-const strip = (p: string) => p.replace(/^\/+/, "");
+const KIND: OfficeKind = {
+	page: "slides",
+	folder: LAYOUT.slides,
+	matches: isDeck,
+	ext: "pptx",
+	noun: "deck",
+	plural: "decks",
+	accept: ".pptx,.pptm,.potx,.ppsx",
+	empty: "No decks yet. Make one, or add a .pptx file.",
+	reject: "Choose a .pptx file.",
+};
 
 export default function SlidesPage() {
 	const { workspace } = useWorkspace();
-	const logError = useErrorLog();
-	const isViewer = useIsViewer();
-	const { viewersAt } = useP2P();
-	const synced = useSyncedIn(LAYOUT.slides);
 	const workspacePath = workspace?.path ?? "";
 	const author = useMyName();
-
-	const [decks, setDecks] = useState<Deck[] | null>(null);
-	const [query, setQuery] = useState("");
-	const [selected, setSelected] = useState<string | null>(null);
-	const [opened, setOpened] = useState<{ base: string; slides: string[]; notes: string[] } | { error: string } | null>(null);
-	const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
-	const [creating, setCreating] = useState(false);
-	const [newName, setNewName] = useState("");
-	const fileInput = useRef<HTMLInputElement>(null);
-
-	const load = useCallback(() => {
-		if (!workspacePath) return;
-		searchWorkspaceFiles(workspacePath)
-			.then((all) => setDecks((all ?? []).filter((f) => isDeck(f.name) && isIn(f.path, LAYOUT.slides)).map((f) => ({ name: f.name, rel: strip(f.path) })).sort((a, b) => a.name.localeCompare(b.name))))
-			.catch((err) => {
-				logError(err, { source: "slides", workspace: workspacePath });
-				setDecks([]);
-			});
-	}, [workspacePath, logError]);
-	useEffect(load, [load, synced]);
-
 	// `?open=path#L3` opens a deck at slide 3 (someone presenting is followed this way)
 	const [wanted, setWanted] = useState<number | null>(null);
-	useOpenParam((v) => {
-		const [path, line] = v.split("#L");
-		setSelected(strip(path));
-		setWanted(Number(line) || null);
-	}, !!workspacePath);
-	useReportItem(selected);
-	useNewParam(() => setCreating(true), !!workspacePath && !isViewer);
-	useEffect(() => {
-		if (workspacePath && selected) pushRecent(workspacePath, selected);
-	}, [workspacePath, selected]);
+	const files = useOfficeFiles({
+		kind: KIND,
+		make: async (path) => {
+			const fresh = await deckNew();
+			await deckSave(workspacePath, path, fresh.parts.base, fresh.parts.slides);
+		},
+		openParam: (v) => {
+			const [path, line] = v.split("#L");
+			setWanted(Number(line) || null);
+			return path;
+		},
+	});
+	const { selected, notice, isViewer } = files;
+
+	const [opened, setOpened] = useState<{ base: string; slides: string[]; notes: string[] } | { error: string } | null>(null);
 	const [line, setLine] = useState<number | undefined>();
 	useReportLine(line);
 
 	useEffect(() => {
 		setOpened(null);
-		setNotice(null);
 		if (!workspacePath || !selected) return;
 		let live = true;
 		deckOpen(workspacePath, selected)
@@ -96,81 +67,11 @@ export default function SlidesPage() {
 	}, [workspacePath, selected]);
 
 	const collab = useCollabDoc(workspacePath, opened && "base" in opened ? (selected ?? undefined) : undefined);
-	const flash = (ok: boolean, text: string) => setNotice({ ok, text });
-
-	const create = async () => {
-		const name = newName.trim();
-		if (!name || validateFileName(name) || !workspacePath) return;
-		const rel = placeIn(LAYOUT.slides, `${name}.pptx`);
-		if (decks?.some((d) => d.rel.toLowerCase() === rel.toLowerCase())) return flash(false, "A deck with that name exists.");
-		try {
-			const fresh = await deckNew();
-			await deckSave(workspacePath, `${workspacePath.replace(/[\\/]+$/, "")}/${rel}`, fresh.parts.base, fresh.parts.slides);
-			setCreating(false);
-			setNewName("");
-			load();
-			setSelected(rel);
-		} catch (err) {
-			flash(false, errorText(err, "The deck could not be made."));
-		}
-	};
-
-	const addFile = async (file: File) => {
-		try {
-			const name = safeUploadName(file.name);
-			if (!isDeck(name)) return flash(false, "Choose a .pptx file.");
-			await writeWorkspaceBinaryFile(workspacePath, placeIn(LAYOUT.slides, name), await readFileBase64(file));
-			load();
-			setSelected(placeIn(LAYOUT.slides, name));
-		} catch (err) {
-			flash(false, errorText(err, "The file could not be added."));
-		}
-	};
-
-	const shownDecks = useMemo(() => (decks ?? []).filter((d) => d.name.toLowerCase().includes(query.trim().toLowerCase())), [decks, query]);
 
 	return (
 		<Page>
 			<div className="flex min-h-0 flex-1">
-				<CollapsiblePane id="slides.list" defaultWidth={LIST_WIDTH} label="the list of decks">
-					<div className="flex shrink-0 flex-col bg-panel">
-					<PaneHeader label="Search decks" value={query} onChange={setQuery} placeholder="Search">
-						{!isViewer && (
-							<>
-								<input
-								ref={fileInput}
-								type="file"
-								accept=".pptx,.pptm,.potx,.ppsx"
-								className="hidden"
-								onChange={(e) => {
-								const f = e.target.files?.[0];
-								e.target.value = "";
-								if (f) void addFile(f);
-								}}
-								/>
-								<IconButton size="xs" label="Add a file" onPress={() => fileInput.current?.click()}>
-									<Upload className="size-4" />
-								</IconButton>
-								<IconButton size="xs" label="New deck" onPress={() => setCreating(true)}>
-									<FilePlus className="size-4" />
-								</IconButton>
-							</>
-						)}
-					</PaneHeader>
-					<nav aria-label="Decks" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5">
-					{decks === null ? null : shownDecks.length === 0 ? (
-						<EmptyNote>{decks.length === 0 ? "No decks yet. Make one, or add a .pptx file." : "No deck matches."}</EmptyNote>
-					) : (
-						shownDecks.map((d) => (
-							<button key={d.rel} type="button" aria-current={d.rel === selected} onClick={() => setSelected(d.rel)} className={listRow(d.rel === selected)}>
-																<span className="min-w-0 flex-1 truncate">{d.name}</span>
-								<PresenceDots names={viewersAt("slides", d.rel)} />
-							</button>
-						))
-					)}
-				</nav>
-					</div>
-				</CollapsiblePane>
+				<OfficeFileList kind={KIND} files={files} />
 
 				<main className="flex min-h-0 min-w-0 flex-1 flex-col">
 					{notice && (
@@ -185,9 +86,7 @@ export default function SlidesPage() {
 					) : !opened ? (
 						<Loading className="h-48" />
 					) : "error" in opened ? (
-						<Notice className="m-6 max-w-md p-3">
-							{opened.error}
-						</Notice>
+						<Notice className="m-6 max-w-md p-3">{opened.error}</Notice>
 					) : collab ? (
 						<SlideWorkspace key={selected} collab={collab} opened={opened} name={selected.split("/").pop() ?? ""} rel={selected} workspacePath={workspacePath} readOnly={isViewer} author={author} startAt={wanted} onSlide={setLine} />
 					) : (
@@ -196,29 +95,7 @@ export default function SlidesPage() {
 				</main>
 			</div>
 
-			{creating && (
-				<Dialog isOpen onOpenChange={(o) => !o && setCreating(false)} className="max-w-md">
-					<form
-						className="space-y-4"
-						onSubmit={(e) => {
-							e.preventDefault();
-							void create();
-						}}
-					>
-						<DialogHeading icon={<FilePlus className="size-6" />} title="New Deck" />
-						<Input aria-label="Deck name" autoFocus required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Title" aria-invalid={!!(newName && validateFileName(newName))} />
-						{newName && validateFileName(newName) && <FieldError>{validateFileName(newName)}</FieldError>}
-						<DialogFooter className="mt-2">
-							<Button type="button" variant="outline" onPress={() => setCreating(false)}>
-								Cancel
-							</Button>
-							<Button type="submit" isDisabled={!newName.trim() || !!validateFileName(newName)}>
-								Create
-							</Button>
-						</DialogFooter>
-					</form>
-				</Dialog>
-			)}
+			<OfficeFileDialogs kind={KIND} files={files} />
 		</Page>
 	);
 }

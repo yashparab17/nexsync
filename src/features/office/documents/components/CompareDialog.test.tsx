@@ -2,8 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const officeFileLines = vi.fn(async (_p: string, _rel: string) => ["Shared line", "Only in the other"]);
-vi.mock("@/lib/tauri", () => ({
-	listFileVersions: async () => [],
+vi.mock("@/lib/tauri", () => ({ listFileVersions: async () => [] }));
+vi.mock("@/features/office/lib/api", () => ({
 	officeVersionLines: async () => [],
 	officeFileLines: (p: string, rel: string) => officeFileLines(p, rel),
 }));

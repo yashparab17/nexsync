@@ -16,6 +16,7 @@ import * as Y from "yjs";
 import { Button } from "@/components/ui/button";
 import { notesOf, readSlide, transitionOf } from "@/features/office/slides/lib/deck";
 import { AUDIENCE_LABEL, SHOW_END, SHOW_NAV, SHOW_READY, SHOW_STATE, clock, crisp, fitSlide, pickAudienceMonitor, type ShowNav, type ShowState } from "@/features/office/slides/lib/show";
+import type { DeckSession } from "@/features/office/slides/lib/useDeckSession";
 import { useSlideImage } from "@/features/office/slides/lib/useSlideImage";
 import { cn } from "@/lib/utils";
 
@@ -24,8 +25,7 @@ interface SlideShowProps {
 	keys: string[];
 	// Index in `keys` of the slide to start on
 	start: number;
-	baseId: string;
-	reregister: () => Promise<string | null>;
+	deck: DeckSession;
 	// Show the presenter view here and the slide alone in a second window
 	presenterView: boolean;
 	// The size of a slide in points, as the deck was last drawn
@@ -50,16 +50,16 @@ const useBox = () => {
 };
 
 // A slide drawn to fill a box
-function Fitted({ doc, k, baseId, reregister, box, slideSize, className }: { doc: Y.Doc; k: string | null; baseId: string; reregister: () => Promise<string | null>; box: { w: number; h: number }; slideSize: { w: number; h: number }; className?: string }) {
+function Fitted({ doc, k, deck, box, slideSize, className }: { doc: Y.Doc; k: string | null; deck: DeckSession; box: { w: number; h: number }; slideSize: { w: number; h: number }; className?: string }) {
 	const slide = useMemo(() => (k ? readSlide(doc, k) : null), [doc, k]);
 	const text = slide ? JSON.stringify(slide) : null;
 	const dpr = window.devicePixelRatio || 1;
 	const { scale, width } = crisp(fitSlide(box, slideSize.w, slideSize.h), slideSize.w, dpr);
-	const { image } = useSlideImage(box.w > 0 ? baseId : null, text, scale, reregister, 0);
+	const { image } = useSlideImage(box.w > 0 ? deck : null, text, scale, 0);
 	return image ? <img src={`data:image/png;base64,${image.png}`} alt="" draggable={false} style={{ width }} className={cn("select-none", className)} /> : null;
 }
 
-export default function SlideShow({ doc, keys, start, baseId, reregister, presenterView, slideSize, onShow, onClose }: SlideShowProps) {
+export default function SlideShow({ doc, keys, start, deck, presenterView, slideSize, onShow, onClose }: SlideShowProps) {
 	const shown = useMemo(() => keys.filter((k) => readSlide(doc, k)?.hidden !== true), []); // eslint-disable-line react-hooks/exhaustive-deps
 	const list = shown.length > 0 ? shown : keys;
 	const [i, setI] = useState(() => Math.max(0, Math.min(list.length - 1, list.indexOf(keys[start]) >= 0 ? list.indexOf(keys[start]) : 0)));
@@ -140,11 +140,11 @@ export default function SlideShow({ doc, keys, start, baseId, reregister, presen
 	// What the audience's window shows follows this one; it asks for the state when it opens
 	const stateRef = useRef<ShowState | null>(null);
 	useEffect(() => {
-		if (!presenterView || !slideJson) return;
-		const state: ShowState = { baseId, slide: slideJson, index: i, total: list.length, widthPt: slideSize.w, heightPt: slideSize.h, cover, moves };
+		if (!presenterView || !slideJson || !deck.id) return;
+		const state: ShowState = { baseId: deck.id, slide: slideJson, index: i, total: list.length, widthPt: slideSize.w, heightPt: slideSize.h, cover, moves };
 		stateRef.current = state;
 		void emit(SHOW_STATE, state).catch(() => {});
-	}, [presenterView, baseId, slideJson, i, list.length, slideSize.w, slideSize.h, cover, moves]);
+	}, [presenterView, deck.id, slideJson, i, list.length, slideSize.w, slideSize.h, cover, moves]);
 	useEffect(() => {
 		if (!presenterView) return;
 		const offs: (() => void)[] = [];
@@ -204,7 +204,7 @@ export default function SlideShow({ doc, keys, start, baseId, reregister, presen
 	if (!presenterView || audience === "failed" || audience === "single") {
 		return createPortal(
 			<div role="dialog" aria-label="Slide show" className="fixed inset-0 z-[1000] flex items-center justify-center" style={{ background: cover === "white" ? "#fff" : "#000" }} onClick={() => go(1)}>
-				{!cover && <Fitted doc={doc} k={key} baseId={baseId} reregister={reregister} box={screen} slideSize={slideSize} className={moves ? "animate-in fade-in duration-500" : undefined} />}
+				{!cover && <Fitted doc={doc} k={key} deck={deck} box={screen} slideSize={slideSize} className={moves ? "animate-in fade-in duration-500" : undefined} />}
 				<span className="pointer-events-none absolute right-3 bottom-2 font-mono text-xs text-white/50">
 					{typed ? `Go to ${typed}` : `${i + 1} / ${list.length}`}
 				</span>
@@ -240,7 +240,7 @@ export default function SlideShow({ doc, keys, start, baseId, reregister, presen
 			<div className="flex min-h-0 flex-1 gap-4 p-4">
 				<div className="flex min-w-0 flex-[3] flex-col gap-3">
 					<div ref={here.ref} className="relative flex min-h-0 flex-1 items-center justify-center">
-						<Fitted doc={doc} k={key} baseId={baseId} reregister={reregister} box={here.size} slideSize={slideSize} />
+						<Fitted doc={doc} k={key} deck={deck} box={here.size} slideSize={slideSize} />
 						{cover && <span className="absolute top-2 left-2 bg-black/70 px-2 py-0.5 text-xs">The audience sees a {cover} screen</span>}
 					</div>
 					<div className="flex items-center justify-center gap-3">
@@ -258,7 +258,7 @@ export default function SlideShow({ doc, keys, start, baseId, reregister, presen
 					<div>
 						<p className="mb-1 text-xs text-neutral-400">{next ? "Next" : "End of the show"}</p>
 						<div ref={nextBox.ref} className="flex aspect-video w-full items-center justify-center bg-neutral-900">
-							{next && <Fitted doc={doc} k={next} baseId={baseId} reregister={reregister} box={nextBox.size} slideSize={slideSize} />}
+							{next && <Fitted doc={doc} k={next} deck={deck} box={nextBox.size} slideSize={slideSize} />}
 						</div>
 					</div>
 					<div className="flex min-h-0 flex-1 flex-col">

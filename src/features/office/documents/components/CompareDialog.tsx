@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { compareLines, type Comparison } from "@/features/office/documents/lib/documentReview";
-import { listFileVersions, officeFileLines, officeVersionLines } from "@/lib/tauri";
+import { listFileVersions } from "@/lib/tauri";
+import { officeFileLines, officeVersionLines } from "@/features/office/lib/api";
 import type { FileVersion } from "@/types/workspace";
 
 // Compare: the open document against one of its saved versions, or against another document of the workspace, paragraph by paragraph and word by word. What the version had and the

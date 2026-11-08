@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
-import { sheetChart } from "@/lib/tauri";
+import { sheetChart } from "@/features/office/lib/api";
 import type { ChartPrim, ChartSpec, SheetIn } from "@/features/office/sheets/lib/sheet";
 
 const rgba = (c: [number, number, number, number]) => `rgba(${c[0]},${c[1]},${c[2]},${(c[3] / 255).toFixed(3)})`;

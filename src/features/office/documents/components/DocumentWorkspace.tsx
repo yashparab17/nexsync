@@ -34,8 +34,7 @@ import { useNotifications } from "@/store/notifications/NotificationContext";
 import { trackAuthor } from "@/lib/editor/blame";
 import { mergeLensPlugin, newLensStore } from "@/lib/editor/lensXml";
 import { lockedSectionsPlugin, newLockStore, sectionAt, sectionRanges } from "@/features/office/documents/lib/documentLocks";
-import { access, isRestriction, type Restriction } from "@/features/office/documents/lib/documentRestrict";
-import { useChat } from "@/store/chat/ChatContext";
+import { useDocumentAccess } from "@/features/office/documents/lib/useDocumentAccess";
 import AccessibilityDialog from "@/features/office/documents/components/AccessibilityDialog";
 import ControlDialog from "@/features/office/documents/components/ControlDialog";
 import { controlAt, formatControl, setControl, toggleCheckAt } from "@/features/office/documents/lib/documentControls";
@@ -54,7 +53,7 @@ import Loading from "@/components/Loading";
 import type { CollabDoc } from "@/hooks/useCollabDoc";
 import { useSeedOnce } from "@/hooks/useSeedOnce";
 import { colorOf } from "@/lib/collabColor";
-import { officeMargins } from "@/lib/tauri";
+import { officeMargins } from "@/features/office/lib/api";
 import { setupFromLayout } from "@/features/office/documents/lib/documentFormat";
 import { paginate } from "@/features/office/documents/lib/pagination";
 import { pagePushPlugin, pushesOf, setPushes, splitsOf } from "@/features/office/documents/lib/pagePush";
@@ -78,6 +77,8 @@ const TABS: RibbonTab[] = [
 
 // The space between two sheets on the screen, in pixels
 const PAGE_GAP = 24;
+// The least time between two works-out of where the pages break while the text is being changed, in milliseconds
+const PAGING_GAP = 120;
 
 const FORMATS = [
 	{ ext: "docx", label: "Word Document (.docx)" },
@@ -169,18 +170,7 @@ const zones = (text: string) => (text.includes("	") ? text.split("	").slice(0, 3
 function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, readOnly: baseReadOnly, inspect, canUpdateFile, onSaveCopy, onUpdateFile, notice, fileLayout, sourceId, onReload, history, canComment: baseCanComment = false, styles, notes: fileNotes }: Props) {
 	const doc = collab.doc;
 	// An Owner or Admin may make the document comments-only or read-only for the others; it is kept in the shared document
-	const chatRole = useChat().role;
-	const isAdmin = chatRole === "Owner" || chatRole === "Admin";
-	const settings = useMemo(() => doc.getMap<string>("docSettings"), [doc]);
-	const [restriction, setRestrictionState] = useState<Restriction>(() => (isRestriction(settings.get("restrict")) ? (settings.get("restrict") as Restriction) : "none"));
-	useEffect(() => {
-		const read = () => setRestrictionState(isRestriction(settings.get("restrict")) ? (settings.get("restrict") as Restriction) : "none");
-		read();
-		settings.observe(read);
-		return () => settings.unobserve(read);
-	}, [settings]);
-	const { readOnly, canComment } = access(restriction, isAdmin, { readOnly: baseReadOnly, canComment: baseCanComment });
-	const restricted = restriction !== "none" && !isAdmin;
+	const { isAdmin, readOnly, canComment, restriction, restricted, canSetRules, setRestriction, lockedKeys, toggleSectionLock } = useDocumentAccess(doc, { readOnly: baseReadOnly, canComment: baseCanComment });
 	// The section the caret is in, for the lock button
 	const caretSectionKey = (): string | null => {
 		try {
@@ -192,20 +182,6 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 	};
 	// Sections an Owner or Admin locked: the list is in the shared document, and each device refuses edits inside them
 	const lockStore = useMemo(newLockStore, []);
-	const [lockedKeys, setLockedKeys] = useState<string[]>([]);
-	useEffect(() => {
-		const read = () => {
-			try {
-				const list = JSON.parse(settings.get("lockedSections") ?? "[]");
-				setLockedKeys(Array.isArray(list) ? list.filter((k): k is string => typeof k === "string") : []);
-			} catch {
-				setLockedKeys([]);
-			}
-		};
-		read();
-		settings.observe(read);
-		return () => settings.unobserve(read);
-	}, [settings]);
 	lockStore.locked = new Set(lockedKeys);
 	lockStore.isAdmin = isAdmin;
 	const { notify } = useNotifications();
@@ -545,8 +521,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 		let timer: number | undefined;
 		// Every block, nested ones too, in document order
 		const outers = () => Array.from(el.querySelectorAll<HTMLElement>(".bn-editor .bn-block-outer"));
-		const run = () => {
-			timer = undefined;
+		const pass = () => {
 			// A minimized window has no size to lay pages out in; the resize that brings it back works them out
 			if (document.hidden || el.offsetWidth === 0) return;
 			setBodyHeight(el.offsetHeight);
@@ -622,11 +597,21 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 			setPushes(view, result.push, result.split);
 			setFlowPages(result.pages);
 		};
-		// Worked out once things have been still for a moment: a pass over a long document takes a while, and typing should not
-		// wait for one after every key
+		let last = 0;
+		const run = () => {
+			timer = undefined;
+			try {
+				pass();
+			} finally {
+				last = performance.now();
+			}
+		};
+		// Worked out at most every PAGING_GAP ms, counted from the end of the last pass (a pass over a long document takes a while, and
+		// typing should not wait for one after every key), and once more when the changes stop. Not once things have gone still: text
+		// typed without a pause would run past the page's end and then jump to the next page all at once.
 		const soon = () => {
-			if (timer !== undefined) clearTimeout(timer);
-			timer = window.setTimeout(run, 150);
+			if (timer !== undefined) return;
+			timer = window.setTimeout(run, Math.max(0, PAGING_GAP - (performance.now() - last)));
 		};
 		// Fonts arriving change the height of lines without touching the text, and the window changes how it wraps
 		const fonts = document.fonts;
@@ -944,30 +929,20 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 					setView={setView}
 					zoom={zoom}
 					setZoom={setZoom}
+					openDialog={setDialog}
 					openFind={(replace) => setFind({ replace, query: find?.query ?? "", with: find?.with ?? "", cs: false, rx: find?.rx ?? false, note: "" })}
-					openHeaderFooter={() => setDialog("headerFooter")}
-					openCounts={() => setDialog("counts")}
-					openProofing={() => setDialog("proofing")}
 					review={review}
 					lens={{ on: lensOn, merged, toggle: () => setLensOn((on) => !on) }}
-					openCompare={() => setDialog("compare")}
-					openAccessibility={() => setDialog("accessibility")}
-					openChanges={() => setDialog("changes")}
-					openApprovals={() => setDialog("approvals")}
-					openControl={() => setDialog("control")}
-					openSectionHeader={() => setDialog("sectionHeader")}
 					styles={galleryStyles(styleList)}
 					charStyles={characterStyles(styleList)}
 					tableStyles={tableStyles(styleList)}
-					restrict={{ value: restriction, canSet: isAdmin && !baseReadOnly, set: (r) => settings.set("restrict", r) }}
+					restrict={{ value: restriction, canSet: canSetRules, set: setRestriction }}
 					sectionLock={{
-						canSet: isAdmin && !baseReadOnly,
+						canSet: canSetRules,
 						locked: caretSectionLocked,
 						toggle: () => {
 							const key = caretSectionKey();
-							if (!key) return;
-							const next = lockedKeys.includes(key) ? lockedKeys.filter((k) => k !== key) : [...lockedKeys, key];
-							settings.set("lockedSections", JSON.stringify(next));
+							if (key) toggleSectionLock(key);
 						},
 					}}
 					copyOutline={() => void copyOutline()}
