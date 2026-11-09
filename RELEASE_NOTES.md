@@ -1,1 +1,1 @@
-Documents no longer jump when you type past the end of a page: pages break as you write, and a block pushed to the next page stays there when you press Enter.
+Narrow windows work better: the sidebar becomes a drawer and the search folds to an icon. Tasks and Kanban get quick-add, avatars and grouping. The Explorer can select several files, delete them together and move them by dragging. The dashboard shows what is waiting for you, the command palette can create things, the inbox is grouped with J/K triage, and the sidebar can be pinned and reordered. Text contrast is higher.
