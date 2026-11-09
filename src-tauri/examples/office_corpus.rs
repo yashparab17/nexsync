@@ -56,10 +56,13 @@ fn marks(bytes: &[u8]) -> Vec<(&'static str, usize)> {
         let end = text[i..].find("</mc:Fallback>").map_or(text.len(), |e| i + e + "</mc:Fallback>".len());
         text.replace_range(i..end, "");
     }
-    [("pictures", "<w:drawing"), ("old pictures", "<w:pict"), ("footnotes", "<w:footnoteReference"), ("endnotes", "<w:endnoteReference"), ("comments", "<w:commentReference"), ("links", "</w:hyperlink>"), ("sections", "<w:sectPr"), ("fields", "w:fldCharType=\"begin\""), ("bookmarks", "<w:bookmarkStart")]
+    // A VML picture (`w:pict`, older Word) may be written back as a drawing, so the two count together
+    let pictures = text.matches("<w:drawing").count() + text.matches("<w:pict").count();
+    let mut found = vec![("pictures", pictures)];
+    found.extend([("footnotes", "<w:footnoteReference"), ("endnotes", "<w:endnoteReference"), ("comments", "<w:commentReference"), ("links", "</w:hyperlink>"), ("sections", "<w:sectPr"), ("fields", "w:fldCharType=\"begin\""), ("bookmarks", "<w:bookmarkStart")]
         .into_iter()
-        .map(|(what, tag)| (what, text.matches(tag).count()))
-        .collect()
+        .map(|(what, tag)| (what, text.matches(tag).count())));
+    found
 }
 
 fn main() {

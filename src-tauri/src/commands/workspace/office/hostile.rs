@@ -113,3 +113,89 @@ fn table_structure_goes_through_a_docx_and_back() {
     let json = serde_json::to_string(&back.blocks).unwrap();
     assert!(json.contains("\"colspan\":2") && json.contains("\"rowspan\":2"), "{json}");
 }
+
+// ────────────────────────────
+// Sheets and slides: the same rules (refuse or show, never crash, hang or fetch)
+// ────────────────────────────
+
+/// A zip with the given parts
+fn zip_of(parts: &[(String, String)]) -> Vec<u8> {
+    use std::io::Write;
+    let mut buf = std::io::Cursor::new(Vec::new());
+    let mut w = zip::ZipWriter::new(&mut buf);
+    let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    for (name, text) in parts {
+        w.start_file(name.as_str(), opts).unwrap();
+        w.write_all(text.as_bytes()).unwrap();
+    }
+    w.finish().unwrap();
+    buf.into_inner()
+}
+
+/// Opens a hostile file with `open` on a thread and says whether it came back within 20 s, whatever it answered
+fn opens_within(open: fn(&str, &[u8]) -> bool, name: &'static str, bytes: Vec<u8>) -> bool {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = open(name, &bytes);
+        let _ = tx.send(());
+    });
+    rx.recv_timeout(std::time::Duration::from_secs(20)).is_ok()
+}
+
+fn open_sheet(name: &str, bytes: &[u8]) -> bool {
+    super::sheets::open(name, bytes).is_ok()
+}
+
+fn open_deck(name: &str, bytes: &[u8]) -> bool {
+    super::slides::open(name, bytes).is_ok()
+}
+
+/// Hostile parts for an xlsx and a pptx: the same bad XML in the places each reader looks first
+fn hostile_packages(xml: &str) -> Vec<(&'static str, Vec<u8>)> {
+    let ct = r#"<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#.to_string();
+    let rels = |t: &str, target: &str| format!(r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/{t}" Target="{target}"/></Relationships>"#);
+    vec![
+        ("h.xlsx", zip_of(&[("[Content_Types].xml".into(), ct.clone()), ("_rels/.rels".into(), rels("officeDocument", "xl/workbook.xml")), ("xl/workbook.xml".into(), xml.to_string())])),
+        ("h.pptx", zip_of(&[("[Content_Types].xml".into(), ct), ("_rels/.rels".into(), rels("officeDocument", "ppt/presentation.xml")), ("ppt/presentation.xml".into(), xml.to_string())])),
+    ]
+}
+
+#[test]
+fn sheets_and_slides_refuse_junk_and_truncated_files_without_dying() {
+    for (name, junk) in [("a.xlsx", Vec::new()), ("b.xlsx", b"not a zip".to_vec()), ("c.pptx", vec![0u8; 4096]), ("d.pptx", b"PK\x03\x04broken".to_vec())] {
+        let open: fn(&str, &[u8]) -> bool = if name.ends_with("xlsx") { open_sheet } else { open_deck };
+        assert!(opens_within(open, name, junk), "{name}");
+    }
+    // A real package cut short
+    for (name, good) in hostile_packages("<workbook/>") {
+        let open: fn(&str, &[u8]) -> bool = if name.ends_with("xlsx") { open_sheet } else { open_deck };
+        for cut in [10, good.len() / 2, good.len() - 5] {
+            assert!(opens_within(open, name, good[..cut].to_vec()), "{name} cut at {cut}");
+        }
+    }
+}
+
+#[test]
+fn an_entity_bomb_and_deep_nesting_in_a_workbook_or_deck_do_not_hang_or_overflow() {
+    let mut dtd = String::from(r#"<!DOCTYPE workbook [<!ENTITY a0 "aaaaaaaaaa">"#);
+    for i in 1..10 {
+        dtd.push_str(&format!(r#"<!ENTITY a{i} "{}">"#, format!("&a{};", i - 1).repeat(10)));
+    }
+    dtd.push_str("]>");
+    let bomb = format!("<?xml version=\"1.0\"?>{dtd}<workbook><sheets><sheet name=\"&a9;\"/></sheets></workbook>");
+    let deep = format!("<workbook>{}{}</workbook>", "<a>".repeat(30_000), "</a>".repeat(30_000));
+    for xml in [bomb, deep] {
+        for (name, bytes) in hostile_packages(&xml) {
+            let open: fn(&str, &[u8]) -> bool = if name.ends_with("xlsx") { open_sheet } else { open_deck };
+            assert!(opens_within(open, name, bytes), "{name}");
+        }
+    }
+}
+
+#[test]
+fn too_many_parts_in_a_workbook_or_deck_are_refused() {
+    let parts: Vec<(String, String)> = (0..20_001).map(|i| (format!("p{i}.xml"), "x".to_string())).collect();
+    let many = zip_of(&parts);
+    assert!(super::sheets::open("many.xlsx", &many).is_err());
+    assert!(super::slides::open("many.pptx", &many).is_err());
+}

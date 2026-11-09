@@ -644,7 +644,8 @@ fn data_url(bytes: &[u8]) -> Option<String> {
     } else if bytes.starts_with(b"<svg") || bytes.starts_with(b"<?xml") {
         "image/svg+xml"
     } else {
-        return None;
+        // Older documents hold Windows metafiles (.emf, .wmf), which a page cannot draw: they go in as SVG
+        return super::metafile::to_svg(bytes).map(|svg| format!("data:image/svg+xml;base64,{}", BASE64_STANDARD.encode(svg)));
     };
     Some(format!("data:{mime};base64,{}", BASE64_STANDARD.encode(bytes)))
 }

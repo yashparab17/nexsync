@@ -60,6 +60,7 @@ wordcraft-pdf = { git = "https://github.com/yashparab17/wordcraft", rev = "0b874
 wordcraft-proof = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
 wordcraft-layout = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
 wordcraft-render = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
+wordcraft-metafile = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
 wordcraft-fonts = { git = "https://github.com/yashparab17/wordcraft", rev = "0b87487778b27ff42454bb48cd9aef61c5176382" }
 # Spreadsheet engine and .xlsx files (Phase 21): GridCraft, by commit. MIT OR Apache-2.0; see THIRD_PARTY_NOTICES.md.
 gridcraft-engine = { git = "https://github.com/storytold/gridcraft", rev = "f1894c6da64d4326022ae644c767581816a23c2c" }

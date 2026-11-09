@@ -3989,6 +3989,7 @@ dependencies = [
  "wordcraft-fonts",
  "wordcraft-formats",
  "wordcraft-layout",
+ "wordcraft-metafile",
  "wordcraft-pdf",
  "wordcraft-proof",
  "wordcraft-render",

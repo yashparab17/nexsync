@@ -82,7 +82,7 @@ export default function DocumentsPage() {
 			const base = (selected.split("/").pop() ?? "document").replace(/\.[^.]+$/, "");
 			const dest = await save({ title: "Save a copy", defaultPath: `${base}.${format}`, filters: [{ name: format.toUpperCase(), extensions: [format] }] });
 			if (!dest) return;
-			const size = await officeExport(workspacePath, dest, html, title, anonymous ? "" : author, layout, state?.imported?.sourceId);
+			const size = await officeExport(workspacePath, dest, html, title, anonymous ? "" : author, layout, state?.imported?.sourceId, format === "docx" && ext !== "doc" ? password : null);
 			flash(true, `Saved a copy (${formatBytes(size)}).`);
 		} catch (err) {
 			flash(false, errorText(err, "The copy could not be saved."));
@@ -92,7 +92,7 @@ export default function DocumentsPage() {
 	const updateFile = async (html: string, layout: Layout, anonymous: boolean) => {
 		if (!selected) return;
 		try {
-			await officeExport(workspacePath, `${workspacePath.replace(/[\\/]+$/, "")}/${selected}`, html, title, anonymous ? "" : author, layout, state?.imported?.sourceId);
+			await officeExport(workspacePath, `${workspacePath.replace(/[\\/]+$/, "")}/${selected}`, html, title, anonymous ? "" : author, layout, state?.imported?.sourceId, ext === "docx" ? password : null);
 			flash(true, "The file now matches the document.");
 			load();
 		} catch (err) {

@@ -468,6 +468,18 @@ pub fn lines_of(name: &str, bytes: &[u8]) -> Result<Vec<String>, String> {
     catch_unwind(AssertUnwindSafe(|| super::compare::document_lines(&doc))).map_err(|_| "This version could not be read.".to_string())
 }
 
+/// How many drawing canvases (`lockedCanvas`, grouped shapes) the body of a .docx holds
+fn locked_canvases(bytes: &[u8]) -> usize {
+    use std::io::Read;
+    let Ok(mut z) = zip::ZipArchive::new(std::io::Cursor::new(bytes)) else { return 0 };
+    let Ok(f) = z.by_name("word/document.xml") else { return 0 };
+    let mut xml = String::new();
+    if f.take(MAX_FILE_BYTES).read_to_string(&mut xml).is_err() {
+        return 0;
+    }
+    xml.matches("graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/lockedCanvas\"").count()
+}
+
 /// What a file holds that a person should know before sharing it, and what the editor does not take from it
 fn inspect_file(ext: &str, package: bool, names: &[String], bytes: &[u8], doc: &wordcraft_doc::Document) -> Inspect {
     let mut inspect = inspect_of(doc);
@@ -478,6 +490,11 @@ fn inspect_file(ext: &str, package: bool, names: &[String], bytes: &[u8], doc: &
             if n > 0 {
                 inspect.embedded.push(format!("{n} {what}"));
             }
+        }
+        // A drawing canvas (shapes grouped on a canvas) is not read by the engine, so it would vanish without a word
+        let canvases = locked_canvases(bytes);
+        if canvases > 0 {
+            inspect.embedded.push(format!("{canvases} drawing canvas{}", if canvases == 1 { "" } else { "es" }));
         }
         inspect.external = external_targets(bytes, names);
         if inspect.macros {
@@ -887,10 +904,19 @@ pub fn recover_original(file: &std::path::Path, id: &str) {
     }
 }
 
+/// A .docx locked with a password (Word's agile encryption) when one is given; other formats cannot be and are refused rather than left open
+fn encrypt_if(ext: &str, bytes: Vec<u8>, password: Option<&str>) -> Result<Vec<u8>, String> {
+    match password.filter(|p| !p.is_empty()) {
+        None => Ok(bytes),
+        Some(p) if ext == "docx" => wordcraft_docx::encrypt(&bytes, p).map_err(|e| format!("The file could not be locked with the password: {e}")),
+        Some(_) => Err(format!("Only a .docx can be saved with a password, not a .{ext}.")),
+    }
+}
+
 /// Saves the editor's document as a file in the format its name ends in, at a place the person chose
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-pub async fn office_export(app_handle: tauri::AppHandle, path: String, dest: String, html: String, title: String, author: String, layout: Option<Layout>, source_id: Option<String>) -> Result<usize, String> {
+pub async fn office_export(app_handle: tauri::AppHandle, path: String, dest: String, html: String, title: String, author: String, layout: Option<Layout>, source_id: Option<String>, password: Option<String>) -> Result<usize, String> {
     validate_allowed_root(&app_handle, &path)?;
     let dest = crate::commands::workspace::export::check_destination(&path, &dest, EXPORTABLE)?;
     let ext = ext_of(&dest.to_string_lossy());
@@ -900,7 +926,8 @@ pub async fn office_export(app_handle: tauri::AppHandle, path: String, dest: Str
         if let Some(id) = source_id.as_deref() {
             recover_original(&from, id);
         }
-        export_with(&ext, &html, &title, &author, layout.as_ref(), source_id.as_deref())
+        let bytes = export_with(&ext, &html, &title, &author, layout.as_ref(), source_id.as_deref())?;
+        encrypt_if(&ext, bytes, password.as_deref())
     })
     .await.map_err(|e| e.to_string())??;
     super::keep_versions(&path, &dest, true, &[]);
@@ -921,6 +948,26 @@ pub async fn office_inspect(app_handle: tauri::AppHandle, path: String, rel: Str
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_pdf_embeds_the_fonts_it_uses_so_it_reads_the_same_on_any_computer() {
+        let _ = crate::lab::fonts::load_fonts();
+        let pdf = export("pdf", "<p>Embedded words</p>", "T", "", None).unwrap();
+        let text = String::from_utf8_lossy(&pdf);
+        assert!(text.contains("/FontFile"), "no font program in the PDF");
+    }
+
+    #[test]
+    fn a_docx_saved_with_a_password_opens_only_with_it_and_other_formats_are_refused() {
+        let plain = export("docx", "<p>Locked words</p>", "T", "", None).unwrap();
+        let locked = encrypt_if("docx", plain.clone(), Some("hunter2")).unwrap();
+        assert!(wordcraft_docx::is_encrypted(&locked) && !wordcraft_docx::is_encrypted(&plain));
+        assert!(wordcraft_docx::read_with_password(&locked, None).is_err());
+        assert!(wordcraft_docx::read_with_password(&locked, Some("wrong")).is_err());
+        assert!(wordcraft_docx::read_with_password(&locked, Some("hunter2")).is_ok());
+        assert_eq!(encrypt_if("docx", plain.clone(), Some("")).unwrap(), plain);
+        assert!(encrypt_if("pdf", plain, Some("x")).is_err());
+    }
+
     #[test]
     fn comments_are_written_on_their_words_with_replies() {
         use std::io::Read;

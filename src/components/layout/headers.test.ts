@@ -16,7 +16,7 @@ describe("workspace headers", () => {
 	it("keep the Office pages' search and new buttons in the list pane", () => {
 		for (const f of pages.filter((p) => /office[\/](documents|sheets|slides)[\/]\w+Page\.tsx$/.test(p))) {
 			const text = readFileSync(f, "utf8");
-			expect(text, f).toMatch(/<PaneHeader /);
+			expect(text, f).toMatch(/<PaneHeader |<OfficeFileList /);
 			expect(text, f).not.toMatch(/<Toolbar>\s*$/m);
 		}
 	});

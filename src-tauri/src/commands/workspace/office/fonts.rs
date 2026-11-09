@@ -78,6 +78,8 @@ pub const ALIASES: &[(&str, &str, Files)] = &[
     ("Aptos Serif", "Intos", files!("IntosSerif-Regular.ttf", "IntosSerif-Bold.ttf", "IntosSerif-Italic.ttf", "IntosSerif-BoldItalic.ttf")),
     // Cousine has Courier New's widths; the engine's list for it has no open mono font
     ("Courier New", "Cousine", files!("Cousine-Regular.ttf", "Cousine-Bold.ttf", "Cousine-Italic.ttf", "Cousine-BoldItalic.ttf")),
+    // Aptos Mono is a fixed-width face; no open font is built to its widths (not checked against Word), so Cousine only keeps the text fixed-width
+    ("Aptos Mono", "Cousine", files!("Cousine-Regular.ttf", "Cousine-Bold.ttf", "Cousine-Italic.ttf", "Cousine-BoldItalic.ttf")),
 ];
 
 /// The families an open font was added under, which the computer did not have, with the open font: a document set in one is laid out in it
@@ -150,12 +152,36 @@ pub fn load_cloud_fonts() -> usize {
 
 #[cfg(test)]
 mod tests {
+    /// The check a CI run makes of the bundled fonts: every font file is a real font, has its family's licence beside it, and is listed in the README
+    #[test]
+    fn every_bundled_font_has_its_licence_and_a_readme_entry() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/fonts");
+        let readme = std::fs::read_to_string(dir.join("README.md")).unwrap();
+        let licences: Vec<String> = std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| n.starts_with("OFL-")).collect();
+        let mut seen = 0;
+        for e in std::fs::read_dir(&dir).unwrap().flatten() {
+            let name = e.file_name().to_string_lossy().to_string();
+            if !name.ends_with(".ttf") {
+                continue;
+            }
+            seen += 1;
+            let bytes = std::fs::read(e.path()).unwrap();
+            assert!(bytes.starts_with(&[0, 1, 0, 0]) || bytes.starts_with(b"true"), "{name} is not a TrueType font");
+            let family = name.split(['-', '.']).next().unwrap();
+            // Intos, IntosDisplay, IntosNarrow and IntosSerif share one licence
+            let family = if family.starts_with("Intos") { "Intos" } else { family };
+            assert!(licences.iter().any(|l| l == &format!("OFL-{family}.txt")), "{name} has no licence file");
+            assert!(readme.contains(family), "{name} is not in the README");
+        }
+        assert!(seen >= 20, "{seen} font files");
+    }
+
     use super::*;
 
     #[test]
     fn the_bundled_fonts_are_all_real_faces_and_give_the_families_that_stand_in_for_word_s() {
         assert_eq!(BUNDLED.len(), 14);
-        assert_eq!(ALIASES.len(), 5);
+        assert_eq!(ALIASES.len(), 6);
         for (name, bytes) in BUNDLED.iter().chain(ALIASES.iter().flat_map(|(_, _, files)| files.iter())) {
             assert!(bytes.len() > 20_000 && matches!(&bytes[..4], [0, 1, 0, 0] | b"OTTO"), "{name} is a font file");
         }
