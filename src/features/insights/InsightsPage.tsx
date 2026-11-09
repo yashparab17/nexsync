@@ -70,7 +70,6 @@ export default function InsightsPage() {
 	const done = count((t) => t.status === "done");
 	const openTasks = tasks.length - done;
 	const people = byPerson.filter(([n]) => n !== "Unknown").length;
-	const finishedTotal = finished.reduce((n, [, c]) => n + c, 0);
 
 	return (
 		<Page>
@@ -128,7 +127,7 @@ export default function InsightsPage() {
 						<div className="grid grid-cols-2 gap-4 @4xl:col-span-2">
 							<Stat label="Actions recorded" value={events.length} trend={days.map((d) => d.count)} />
 							<Stat label="People active" value={people} />
-							<Stat label="Tasks finished" value={finishedTotal} />
+							<Stat label="Tasks finished" value={done} />
 							<Stat label="Tasks still open" value={openTasks} />
 						</div>
 						<Panel title="Task Progress" className="@4xl:col-span-2">
@@ -172,8 +171,8 @@ export default function InsightsPage() {
 						<Panel title="Actions by Person" className="@4xl:col-span-3">
 							<BarRows rows={byPerson.map(([label, n]) => ({ label, parts: [{ value: n, bg: "bg-primary", title: "Actions" }] }))} lead={(l) => <Avatar name={l} className="size-6 text-xs" />} empty="Nothing recorded yet." />
 						</Panel>
-						<Panel title="Tasks Finished" className="@4xl:col-span-3">
-							<BarRows rows={finished.map(([label, n]) => ({ label, parts: [{ value: n, bg: "bg-success", title: "Finished" }] }))} lead={(l) => <Avatar name={l} className="size-6 text-xs" />} empty="No task has been finished yet." />
+						<Panel title="Completions By Person" hint="Completions logged in the activity history" className="@4xl:col-span-3">
+							<BarRows rows={finished.map(([label, n]) => ({ label, parts: [{ value: n, bg: "bg-success", title: "Finished" }] }))} lead={(l) => <Avatar name={l} className="size-6 text-xs" />} empty="No completion has been logged yet." />
 						</Panel>
 						<Panel title="Open Work by Person" className="@4xl:col-span-3">
 							<BarRows

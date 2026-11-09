@@ -30,6 +30,7 @@ import { systemNotice } from "@/features/announcements/lib/announcements";
 import { useChat } from "@/store/chat/ChatContext";
 import type { Member } from "@/types/workspace";
 import { renameAuthor } from "@/lib/insights";
+import { isMemberOnline } from "@/lib/p2p/online";
 
 const ROLE_CONFIG: Record<
 	string,
@@ -129,8 +130,6 @@ export default function MembersPage() {
 	const members = metadata?.members.members ?? [];
 	// In a copy joined from someone else, the host manages the member list
 	const isJoinedCopy = selfName !== null;
-	const onlineIds = new Set(peers.map((p) => p.id));
-	const onlineNames = new Set(peers.map((p) => p.name.toLowerCase()));
 	// Roles a member may be moved to by this device: anything for the host, Editor or Viewer for an Admin guest
 	const rolesFor = (member: Member) => ASSIGNABLE_ROLES.filter((r) => canChangeRole(selfRole, member.role, r));
 	// Where a member is, by device key; on a joined copy the owner has no key in the list, and is the host we are connected to
@@ -279,7 +278,7 @@ export default function MembersPage() {
 				<Button variant="outline" size="sm" onPress={() => setIsInviteOpen(true)}>
 					<KeyRound className="size-4 text-info" />
 					Sharing & Invites
-					{peers.length > 0 && <span className="ml-1 flex size-2 animate-ping rounded-md bg-success" />}
+					{peers.length > 0 && <span className="ml-1 flex size-2 animate-ping rounded-md bg-success motion-reduce:animate-none" />}
 				</Button>
 				<Button
 					size="sm"
@@ -320,9 +319,7 @@ export default function MembersPage() {
 									const isYou = isJoinedCopy
 										? selfId ? member.deviceId === selfId : member.name === selfName
 										: isOwner;
-									const isOnline =
-										!isYou &&
-										(member.deviceId ? onlineIds.has(member.deviceId) : onlineNames.has(member.name.toLowerCase()));
+									const isOnline = !isYou && isMemberOnline(member, peers);
 									const canEdit = !isJoinedCopy || (!!member.deviceId && rolesFor(member).length > 0);
 									const here = presenceOf(member);
 									const peer = member.deviceId ? peers.find((p) => p.id === member.deviceId) : undefined;

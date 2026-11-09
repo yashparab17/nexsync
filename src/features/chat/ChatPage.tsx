@@ -31,6 +31,7 @@ import { createTask, getKanban, getTasks, listWorkspaceFiles, writeWorkspaceBina
 import { cn } from "@/lib/utils";
 import { useChat } from "@/store/chat/ChatContext";
 import { useP2P, useSelfRole } from "@/store/p2p/P2PContext";
+import { onlineMemberIds } from "@/lib/p2p/online";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { KanbanCard, Task, WorkspaceFile } from "@/types/workspace";
 
@@ -134,7 +135,7 @@ export default function ChatPage() {
 		[notes, navigate],
 	);
 
-	const online = useMemo(() => new Set([chat.myName, ...peers.map((p) => p.name)]), [chat.myName, peers]);
+	const online = useMemo(() => onlineMemberIds(members, peers, (m) => m.name === chat.myName), [members, chat.myName, peers]);
 
 	const attach = (files: File[]) => {
 		const room = MAX_ATTACHMENTS - pending.length;
@@ -293,7 +294,7 @@ export default function ChatPage() {
 					<Toolbar>
 						{dmPerson ? <Avatar name={dmPerson.name} className="size-6 text-xs" /> : <Hash className="size-5 shrink-0 text-muted-foreground" />}
 						<ToolbarTitle name={channel.name} />
-						{channel.topic && <span className="hidden min-w-0 flex-1 truncate border-l pl-3 font-mono text-[13px] text-muted-foreground @3xl:block">{channel.topic}</span>}
+						{channel.topic && <span title={channel.topic} className="hidden min-w-0 flex-1 truncate border-l pl-3 font-mono text-[13px] text-muted-foreground @3xl:block">{channel.topic}</span>}
 						<span className="flex-1" />
 						<div className="flex flex-wrap items-center justify-end gap-1">
 						<IconButton label={muted[channel.id] ? "Unmute channel" : "Mute channel"} onPress={() => chat.setMuted(channel.id, !muted[channel.id])} className="text-muted-foreground">

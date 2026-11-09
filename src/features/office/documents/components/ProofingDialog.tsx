@@ -44,7 +44,7 @@ export default function ProofingDialog({ text, replace, onClose, readOnly }: { t
 							{current.kind === "spelling" ? "Not in the dictionary" : "Grammar"} · {left.length} left
 						</p>
 						<p className="border bg-muted/40 px-3 py-2 text-base">
-							<span className={current.kind === "spelling" ? "text-destructive underline decoration-wavy" : "text-[#2B579A] underline decoration-double"}>{current.text}</span>
+							<span className={current.kind === "spelling" ? "text-destructive underline decoration-wavy" : "text-info underline decoration-double"}>{current.text}</span>
 						</p>
 						{current.message && <p className="text-muted-foreground">{current.message}</p>}
 						{current.suggestions.length > 0 ? (

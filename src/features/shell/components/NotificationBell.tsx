@@ -1,7 +1,8 @@
 // Header bell: what needs a look. Inside a workspace this is the inbox kept on disk (mentions, replies, and the notices the
 // app writes, such as a collaborator joining), so it is still there after a restart; elsewhere it is the session's list.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { groupInbox } from "@/features/shell/lib/inboxGroups";
 import { useNavigate } from "react-router-dom";
 import { History, Bell } from "@/components/animate-icons";
 
@@ -39,6 +40,9 @@ export default function NotificationBell() {
 	const [muted, setMuted] = useState(readPopupsMuted);
 	const [quiet, setQuiet] = useState(readQuiet);
 
+	const groups = useMemo(() => groupInbox(chat.inbox), [chat.inbox]);
+	const flat = useMemo(() => groups.flatMap((g) => g.items), [groups]);
+	const [cursor, setCursor] = useState<number | null>(null);
 	const review = useCatchUp();
 	const unread = (chat.active ? chat.inboxUnread : session.unread) + review.unread;
 	const empty = (chat.active ? chat.inbox.length === 0 : session.items.length === 0) && review.unread === 0;
@@ -56,6 +60,23 @@ export default function NotificationBell() {
 			</IconButton>
 			{review.review}
 			<Popover open={open} onClose={() => setOpen(false)} label="Notifications" className="w-96">
+				<div
+					onKeyDown={(e) => {
+						if (!chat.active || e.ctrlKey || e.metaKey || e.altKey || (e.target as HTMLElement).closest("input,textarea")) return;
+						const at = flat.findIndex((n) => n.id === cursor);
+						if (e.key === "j" || e.key === "k") {
+							e.preventDefault();
+							const next = flat[Math.min(Math.max((at < 0 ? (e.key === "j" ? -1 : flat.length) : at) + (e.key === "j" ? 1 : -1), 0), flat.length - 1)];
+							if (next) {
+								setCursor(next.id);
+								document.getElementById(`inbox-${next.id}`)?.focus();
+							}
+						} else if (e.key === "e" && at >= 0) {
+							e.preventDefault();
+							chat.markInboxRead([flat[at].id]);
+						}
+					}}
+				>
 						<div className="flex h-12 items-center justify-between border-b px-4">
 							<span className="text-sm font-semibold">Inbox</span>
 							<span className="flex items-center gap-3">
@@ -118,8 +139,12 @@ export default function NotificationBell() {
 								<button type="button" onClick={() => { setOpen(false); review.openReview(); }} className="cursor-pointer text-[13px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Look back at changes by others</button>
 							</div>
 						) : chat.active ? (
-							<ul className="max-h-96 overflow-y-auto">
-								{chat.inbox.map((n) => {
+							<div className="max-h-96 overflow-y-auto">
+							{groups.map((group) => (
+							<section key={group.key} aria-label={group.label}>
+							<h3 className="sticky top-0 border-b bg-popover px-4 py-1 font-mono text-[13px] text-muted-foreground">{group.label} / {group.items.length}</h3>
+							<ul>
+								{group.items.map((n) => {
 									const entryItem = n.kind === "mention" || n.kind === "reply" || n.kind === "follow" || n.kind === "dm" || n.kind === "announcement";
 									// What an Admin did about this member: the details are in the snippet as JSON
 									const detail = n.kind === "moderation" ? parseDetail(n.snippet) : {};
@@ -132,7 +157,7 @@ export default function NotificationBell() {
 									};
 									return (
 										<li key={n.id} className="border-b last:border-b-0">
-											<button type="button" onClick={go} className={cn("flex w-full cursor-pointer items-start gap-3 px-4 py-2 text-left hover:bg-muted/60", !n.read && "bg-primary/5")}>
+											<button type="button" id={`inbox-${n.id}`} onFocus={() => setCursor(n.id)} onClick={go} className={cn("flex w-full cursor-pointer items-start gap-3 px-4 py-2 text-left hover:bg-muted/60 focus-visible:bg-muted", !n.read && "bg-primary/5")}>
 												<span className={cn("mt-1.5 size-2 shrink-0 rounded-full", n.read ? "bg-transparent" : "bg-primary")} aria-hidden />
 												<span className="min-w-0 flex-1">
 													<span className="block text-sm">
@@ -154,6 +179,10 @@ export default function NotificationBell() {
 									);
 								})}
 							</ul>
+							</section>
+							))}
+							<p className="border-t px-4 py-2 font-mono text-[13px] text-muted-foreground">J / K move · Enter open · E mark read</p>
+							</div>
 						) : (
 							<ul className="max-h-96 overflow-y-auto">
 								{session.items.map((n) => (
@@ -164,6 +193,7 @@ export default function NotificationBell() {
 								))}
 							</ul>
 						)}
+				</div>
 			</Popover>
 		</div>
 	);

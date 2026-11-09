@@ -64,7 +64,7 @@ export default function TitleBar() {
 	];
 
 	return (
-		<header className="relative z-[60] grid h-11 shrink-0 select-none grid-cols-[minmax(0,1fr)_minmax(0,32rem)_minmax(0,1fr)] items-center">
+		<header className="relative z-[60] grid h-11 shrink-0 select-none grid-cols-[minmax(0,1fr)_minmax(0,32rem)_minmax(9rem,1fr)] items-center">
 			{/* The app, then back and forward once a workspace is open */}
 			<div data-tauri-drag-region className={cn("flex h-full min-w-0 items-center", IS_MAC && "pl-20")}>
 				{/* The logo sits over the sidebar's back button: the same 68px column as the icon rail */}
@@ -79,7 +79,7 @@ export default function TitleBar() {
 			{/* The search of a workspace sits in the middle column, so it is centred on the window whatever is at either side */}
 			<div id="titlebar-center" data-tauri-drag-region className="flex h-full min-w-0 items-center justify-center" />
 			<div data-tauri-drag-region className="flex h-full min-w-0 items-center justify-end">
-				<div id="titlebar-right" className="flex min-w-0 items-center gap-1 pr-1" />
+				<div id="titlebar-right" className="flex min-w-0 items-center gap-1 overflow-hidden pr-1" />
 				{!IS_MAC &&
 				controls.map(({ label, icon, run, danger }) => (
 					<button
@@ -89,7 +89,7 @@ export default function TitleBar() {
 						aria-label={label}
 						title={label}
 						className={cn(
-							"flex h-full w-12 items-center justify-center text-muted-foreground outline-none transition-colors focus-visible:bg-muted",
+							"flex h-full w-12 shrink-0 items-center justify-center text-muted-foreground outline-none transition-colors focus-visible:bg-muted",
 							danger ? "hover:bg-destructive hover:text-white focus-visible:bg-destructive focus-visible:text-white" : "hover:bg-muted hover:text-foreground",
 						)}
 					>

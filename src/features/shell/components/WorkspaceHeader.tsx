@@ -28,7 +28,7 @@ const SettingsPage = lazy(() => import("@/features/settings/SettingsPage"));
 
 // The workspace's controls, placed in the window bar through portals (see TitleBar): this renders no bar of its own
 export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOpenMenu?: () => void; menuOpen?: boolean }) {
-	const { peers, connectionStatus, network, link, hostName, hostUnreachable, syncProgress } = useP2P();
+	const { peers, connectionStatus, network, link, hostName, hostUnreachable, syncProgress, transfers } = useP2P();
 	const { workspace } = useWorkspace();
 	const [isP2POpen, setIsP2POpen] = useState(false);
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -85,7 +85,7 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 						<WorkspaceIconView id={workspace?.id} name={workspace?.name ?? ""} className="size-6 text-sm" />
 						<span className="mr-2 ml-1.5 max-w-[16rem] min-w-0 truncate text-sm font-semibold" title={workspace?.name}>{workspace?.name}</span>
 						{onOpenMenu && (
-							<IconButton size="md" onPress={onOpenMenu} label={t("nav.open")} aria-expanded={menuOpen} className="md:hidden">
+							<IconButton size="md" onPress={onOpenMenu} label={t("nav.open")} aria-expanded={menuOpen} className="lg:hidden">
 								<Menu className="size-5" />
 							</IconButton>
 						)}
@@ -108,7 +108,7 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 						<PresenceStrip />
 												<TalkButtons />
 						<NotificationBell />
-						<span title={status.title} className="inline-flex">
+						<span className="group relative inline-flex">
 <Button
 							variant="ghost"
 							size={status.label ? "sm" : "icon-sm"}
@@ -127,6 +127,22 @@ export default function WorkspaceHeader({ onOpenMenu, menuOpen = false }: { onOp
 								<span className={cn("absolute -top-0.5 -right-0.5 size-2", TONE_DOT[status.tone])} aria-hidden />
 							)}
 						</Button>
+						<div role="status" className="pointer-events-none absolute top-full right-0 z-[70] mt-1 hidden w-64 border bg-popover p-3 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 group-focus-within:block group-hover:block">
+							<p className="font-medium">{status.title}</p>
+							{peers.length > 0 ? (
+								<ul className="mt-2 space-y-1">
+									{peers.map((p) => (
+										<li key={p.id} className="flex items-center justify-between gap-2">
+											<span className="truncate">{p.name}</span>
+											<span className="shrink-0 font-mono text-[13px] text-muted-foreground">{p.connectionType === "relay" ? "relay" : "direct"} · {p.latencyMs} ms</span>
+										</li>
+									))}
+								</ul>
+							) : (
+								<p className="mt-2 text-muted-foreground">No one else is connected.</p>
+							)}
+							<p className="mt-2 font-mono text-[13px] text-muted-foreground">{transfers.length === 0 ? "Nothing waiting to arrive." : `${transfers.length} ${transfers.length === 1 ? "file" : "files"} still arriving.`}</p>
+						</div>
 </span>
 						<span title="Workspace settings" className="inline-flex">
 <IconButton size="md" onPress={() => setIsSettingsOpen(true)} label="Workspace settings">

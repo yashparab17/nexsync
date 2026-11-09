@@ -17,7 +17,7 @@ export default class ErrorBoundary extends Component<
 	ErrorBoundaryProps,
 	ErrorBoundaryState
 > {
-	state: ErrorBoundaryState = { hasError: false };
+	override state: ErrorBoundaryState = { hasError: false };
 
 	// Update state so the next render shows the fallback UI
 	static getDerivedStateFromError(): ErrorBoundaryState {
@@ -25,7 +25,7 @@ export default class ErrorBoundary extends Component<
 	}
 
 	// Log caught render error to app-level error log
-	componentDidCatch(error: Error, info: React.ErrorInfo) {
+	override componentDidCatch(error: Error, info: React.ErrorInfo) {
 		logError({
 			timestamp: new Date().toISOString(),
 			message: error.message || "A render error occurred in the UI.",
@@ -41,7 +41,7 @@ export default class ErrorBoundary extends Component<
 		this.setState({ hasError: false });
 	};
 
-	render() {
+	override render() {
 		if (this.state.hasError) {
 			return (
 				<div className="flex h-full items-center justify-center">

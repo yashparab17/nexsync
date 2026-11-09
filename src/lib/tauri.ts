@@ -769,6 +769,11 @@ export async function saveYjsDoc(
 	await invoke("save_yjs_doc_raw", state, { headers: { "x-workspace": encodeURIComponent(workspacePath), "x-doc": encodeURIComponent(docId) } });
 }
 
+// Move a file or folder into another folder of the workspace; resolves to its new relative path
+export function moveWorkspaceItem(path: string, relPath: string, destDir: string): Promise<string> {
+	return invoke<string>("move_workspace_item", { path, relPath, destDir });
+}
+
 // Move a Yjs document's binary CRDT state to a new doc id, e.g. after a file rename
 export function renameYjsDoc(
 	workspacePath: string,

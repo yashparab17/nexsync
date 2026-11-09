@@ -1049,7 +1049,7 @@ function DocumentWorkspace({ collab, initialBlocks, lists, name, title, author, 
 							)}
 						</nav>
 					)}
-					<div ref={scroller} onScroll={onScroll} className="min-w-0 flex-1 overflow-auto bg-[#e1dfdd] dark:bg-neutral-900">
+					<div ref={scroller} onScroll={onScroll} className="min-w-0 flex-1 overflow-auto bg-[color-mix(in_oklch,var(--foreground)_10%,var(--background))]">
 						{view.ruler && !view.focus && mode === "edit" && <Ruler widthPx={widthPx} box={box} zoom={zoom} />}
 						{seeding && (
 							<p role="status" className="sticky top-0 z-20 bg-[var(--office)] px-3 py-1 text-center text-xs text-white">
@@ -1317,7 +1317,7 @@ function Ruler({ widthPx, box, zoom }: { widthPx: number; box: ReturnType<typeof
 	const inches = box.width / 72;
 	const ticks = Array.from({ length: Math.floor(inches * 8) + 1 }, (_, i) => i);
 	return (
-		<div className="sticky top-0 z-10 flex justify-center bg-[#f3f2f1] pt-1 dark:bg-neutral-800" aria-hidden style={{ zoom: zoom / 100 }}>
+		<div className="sticky top-0 z-10 flex justify-center bg-muted pt-1" aria-hidden style={{ zoom: zoom / 100 }}>
 			<div className="relative h-5 border-x border-b bg-white text-[9px] text-neutral-500" style={{ width: widthPx }}>
 				<div className="absolute inset-y-0 left-0 bg-neutral-300" style={{ width: box.left * PX_PER_PT }} />
 				<div className="absolute inset-y-0 right-0 bg-neutral-300" style={{ width: box.right * PX_PER_PT }} />

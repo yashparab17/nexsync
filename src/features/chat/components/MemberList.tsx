@@ -8,13 +8,13 @@ import { cn } from "@/lib/utils";
 
 interface MemberListProps {
 	members: Member[];
-	online: Set<string>; // Names of the people who are here now
+	online: Set<string>; // Ids of the people who are here now
 	open?: boolean; // Folded away it stays mounted, so it can slide shut
 }
 
 export default function MemberList({ members, online, open = true }: MemberListProps) {
-	const here = members.filter((m) => online.has(m.name));
-	const away = members.filter((m) => !online.has(m.name));
+	const here = members.filter((m) => online.has(m.id));
+	const away = members.filter((m) => !online.has(m.id));
 	return (
 		<aside aria-label="Members" inert={!open} className={cn("glide hidden h-full shrink-0 overflow-hidden bg-panel @4xl:block", open ? "w-56" : "w-0")}>
 			<div className="flex h-full w-56 flex-col overflow-y-auto">

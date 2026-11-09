@@ -16,6 +16,8 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { p2p } from "@/lib/p2p";
 
+const LAST_FOLDER_KEY = "nexsync.join.lastFolder";
+
 interface JoinWorkspaceDialogProps {
 	children: ReactNode;
 }
@@ -34,6 +36,9 @@ export default function JoinWorkspaceDialog({
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [isSuccess, setIsSuccess] = useState(false);
+	const [touched, setTouched] = useState(false);
+	const ticketMissing = touched && !ticket.trim();
+	const folderMissing = touched && !workspaceParentPath.trim();
 
 	// Prefill the name saved in Settings
 	useEffect(() => {
@@ -46,7 +51,7 @@ export default function JoinWorkspaceDialog({
 	// Default storage location to user Documents directory
 	useEffect(() => {
 		documentDir()
-			.then((dir) => setWorkspaceParentPath(dir))
+			.then((dir) => setWorkspaceParentPath(localStorage.getItem(LAST_FOLDER_KEY) || dir))
 			.catch((err) => {
 				console.error("Failed to resolve Documents directory:", err);
 			});
@@ -72,8 +77,15 @@ export default function JoinWorkspaceDialog({
 	// Connect to the host, create a local copy of its workspace, then sync it
 	const handleJoinWorkspace = async () => {
 		const cleanTicket = ticket.trim();
-		if (!cleanTicket || !workspaceParentPath.trim() || isProcessing) {
+		if (!cleanTicket || !workspaceParentPath.trim()) {
+			setTouched(true);
 			return;
+		}
+		if (isProcessing) return;
+		try {
+			localStorage.setItem(LAST_FOLDER_KEY, workspaceParentPath.trim());
+		} catch {
+			// Remembering the folder is a convenience
 		}
 
 		try {
@@ -109,7 +121,7 @@ export default function JoinWorkspaceDialog({
 				wsInfo = await importWorkspace(targetPath);
 			}
 
-			await loadWorkspace(wsInfo as any);
+			await loadWorkspace(wsInfo);
 
 			// Pull the host's workspace into the new local copy; files keep downloading after we navigate
 			await requestWorkspaceSnapshot(peerId, wsInfo.path);
@@ -146,17 +158,20 @@ export default function JoinWorkspaceDialog({
 
 				<div className="flex flex-col gap-3">
 					<Field label="Invite or code" htmlFor="join-ticket">
-<Textarea id="join-ticket" placeholder="Invite or code" value={ticket} onChange={(e) => setTicket(e.target.value)} rows={3} className="font-mono text-xs break-all" autoFocus />
+<Textarea id="join-ticket" placeholder="Invite or code" value={ticket} onChange={(e) => setTicket(e.target.value)} rows={3} className="font-mono text-xs break-all" autoFocus aria-invalid={ticketMissing || undefined} aria-describedby={ticketMissing ? "join-ticket-error" : undefined} />
+{ticketMissing && <p id="join-ticket-error" className="mt-1 text-sm text-destructive">Paste the invite or 6-digit code from the host.</p>}
+<Button variant="outline" size="sm" className="mt-2 self-start" onPress={() => void navigator.clipboard?.readText().then((text) => text && setTicket(text.trim()), () => {})}>Paste from clipboard</Button>
 </Field>
 
 					<Field label="Save in" htmlFor="join-folder">
 <div className="flex gap-2">
-							<Input id="join-folder" value={workspaceParentPath} onChange={(e) => setWorkspaceParentPath(e.target.value)} placeholder="Choose a folder" className="font-mono text-xs" />
+							<Input id="join-folder" value={workspaceParentPath} onChange={(e) => setWorkspaceParentPath(e.target.value)} placeholder="Choose a folder" className="font-mono text-xs" aria-invalid={folderMissing || undefined} />
 							<Button variant="outline" onPress={pickDestinationFolder}>
 								<FolderOpen className="size-4" />
 								Browse
 							</Button>
 						</div>
+{folderMissing && <p className="mt-1 text-sm text-destructive">Choose a folder to save the workspace in.</p>}
 </Field>
 
 					<Field label="Your name" htmlFor="join-name">
@@ -173,7 +188,7 @@ export default function JoinWorkspaceDialog({
 
 				<DialogFooter>
 					<Button variant="outline" slot="close">Cancel</Button>
-					<Button onPress={handleJoinWorkspace} isDisabled={!ticket.trim() || !workspaceParentPath.trim() || isProcessing || isSuccess}>
+					<Button onPress={handleJoinWorkspace} isDisabled={isProcessing || isSuccess}>
 						{isProcessing ? (
 							<><RefreshCw className="size-4 animate-spin" />Connecting…</>
 						) : isSuccess ? (

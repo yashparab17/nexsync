@@ -568,7 +568,7 @@ label,
 
 /* Terminal / HUD layer. Rules frame the tiles; the accent takes over on hover and focus. */
 :root {
-  --fg-3: color-mix(in srgb, var(--foreground) 45%, var(--background));
+  --fg-3: color-mix(in srgb, var(--foreground) 60%, var(--background));
   --rule: color-mix(in oklch, var(--foreground) 16%, transparent);
 }
 

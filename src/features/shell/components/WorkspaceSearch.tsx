@@ -2,7 +2,7 @@ import { panelLook } from "@/components/ui/popover";
 import { routeOf } from "@/lib/p2p/presence";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { SquareKanban as KanbanSquare, Clock, Code2, Compass, File, FileText, ListTodo, Megaphone, MessageSquareText, X } from "@/components/animate-icons";
+import { SquareKanban as KanbanSquare, Clock, Search as SearchIcon, Code2, Compass, File, FileText, ListTodo, Megaphone, MessageSquareText, Plus, UsersRound, X } from "@/components/animate-icons";
 
 import { cn } from "@/lib/utils";
 import { isBinaryFile, isDocumentFile, isNoteFile, isDeck, isOfficeDocument, isSpreadsheet } from "@/lib/editor/languages";
@@ -15,7 +15,7 @@ import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 
 interface Hit {
 	key: string;
-	kind: "Note" | "Code" | "File" | "Asset" | "Task" | "Card" | "Message" | "Comment" | "Announcement" | "Go to";
+	kind: "Create" | "Person" | "Note" | "Code" | "File" | "Asset" | "Task" | "Card" | "Message" | "Comment" | "Announcement" | "Go to";
 	title: string;
 	sub: string;
 	to: string;
@@ -34,7 +34,7 @@ export function snippet(text: string, q: string): string {
 	return (s > 0 ? "…" : "") + text.slice(s, i + q.length + 60).replace(/\s+/g, " ");
 }
 
-const ICONS = { Note: FileText, Code: Code2, File, Asset: File, Task: ListTodo, Card: KanbanSquare, Message: MessageSquareText, Comment: MessageSquareText, Announcement: Megaphone, "Go to": Compass };
+const ICONS = { Create: Plus, Person: UsersRound, Note: FileText, Code: Code2, File, Asset: File, Task: ListTodo, Card: KanbanSquare, Message: MessageSquareText, Comment: MessageSquareText, Announcement: Megaphone, "Go to": Compass };
 
 // Pages the palette can jump to
 const PAGES: [string, string][] = [
@@ -57,9 +57,18 @@ const PAGES: [string, string][] = [
 	["Trash", "/workspace/trash"],
 	["Workspace settings", "/workspace/dashboard?settings=1"],
 ];
-const COMMANDS: Hit[] = PAGES.map(([title, to]) => ({ key: `go:${to}`, kind: "Go to", title, sub: "Open page", to }));
+// Things to make, found by typing "new", "create" or the thing's name
+const CREATE: [string, string][] = [
+	["New task", "/workspace/tasks?open=new"],
+	["New note", "/workspace/notes?open=new"],
+	["New kanban card", "/workspace/kanban?open=new"],
+];
+const COMMANDS: Hit[] = [
+	...CREATE.map(([title, to]): Hit => ({ key: `new:${to}`, kind: "Create", title, sub: "Create", to })),
+	...PAGES.map(([title, to]): Hit => ({ key: `go:${to}`, kind: "Go to", title, sub: "Open page", to })),
+];
 
-const FILTERS = ["All", "Note", "Task", "Card", "Message", "Comment", "Announcement", "Code", "File", "Asset", "Go to"] as const;
+const FILTERS = ["All", "Create", "Person", "Note", "Task", "Card", "Message", "Comment", "Announcement", "Code", "File", "Asset", "Go to"] as const;
 type Filter = (typeof FILTERS)[number];
 
 // Where in an item the words must be found
@@ -89,6 +98,17 @@ function writeRecent(workspaceId: string | undefined, hit: Hit) {
 	}
 }
 
+// Below this width the box folds into an icon and unfolds on click or Ctrl+K
+function useNarrow(max = 1000) {
+	const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < max);
+	useEffect(() => {
+		const on = () => setNarrow(window.innerWidth < max);
+		window.addEventListener("resize", on);
+		return () => window.removeEventListener("resize", on);
+	}, [max]);
+	return narrow;
+}
+
 // Header search: matches file names, task and kanban card titles/descriptions
 export default function WorkspaceSearch() {
 	const { workspace } = useWorkspace();
@@ -103,6 +123,15 @@ export default function WorkspaceSearch() {
 	const [recent, setRecent] = useState<Hit[]>([]);
 	const box = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
+	const narrow = useNarrow();
+	const [expanded, setExpanded] = useState(false);
+	const folded = narrow && !expanded;
+	useEffect(() => {
+		if (expanded) {
+			inputRef.current?.focus();
+			inputRef.current?.select();
+		}
+	}, [expanded]);
 
 	// Rebuild the index each time the box is focused so results are never stale
 	// ... but not more than every 20 seconds, so a big workspace is not re-read on every click into the box
@@ -172,9 +201,16 @@ export default function WorkspaceSearch() {
 		[chat.announcements, chat.me, chat.role],
 	);
 
+	// Members open their page in Members; the chat has no direct-message route to jump to
+	const members = useWorkspace().metadata?.members.members;
+	const peopleIndex = useMemo(
+		() => (members ?? []).map((m): Hit => ({ key: `p:${m.id}`, kind: "Person", title: m.name, sub: `${m.role.toLowerCase()} · open Members`, to: "/workspace/members" })),
+		[members],
+	);
+
 	const q = query.trim().toLowerCase();
 	const results = q
-		? [...COMMANDS, ...index, ...chatIndex, ...announcementIndex]
+		? [...COMMANDS, ...peopleIndex, ...index, ...chatIndex, ...announcementIndex]
 				.filter((h) => filter === "All" || h.kind === filter)
 				.map((h) => {
 					const inTitle = h.title.toLowerCase().includes(q);
@@ -188,14 +224,17 @@ export default function WorkspaceSearch() {
 				.slice(0, MAX_RESULTS)
 				.map((r) => r.hit)
 		: filter === "All"
-			? recent
-			: [];
+			? recent.length > 0 ? recent : COMMANDS.slice(0, 6)
+			: COMMANDS.filter((h) => h.kind === filter);
 
 	useEffect(() => setActive(0), [query, filter, scope]);
 
 	useEffect(() => {
 		const close = (e: MouseEvent) => {
-			if (!box.current?.contains(e.target as Node)) setOpen(false);
+			if (!box.current?.contains(e.target as Node)) {
+				setOpen(false);
+				setExpanded(false);
+			}
 		};
 		document.addEventListener("mousedown", close);
 		return () => document.removeEventListener("mousedown", close);
@@ -206,6 +245,7 @@ export default function WorkspaceSearch() {
 		const onKey = (e: KeyboardEvent) => {
 			if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "k") {
 				e.preventDefault();
+				setExpanded(true);
 				inputRef.current?.focus();
 				inputRef.current?.select();
 			}
@@ -225,16 +265,21 @@ export default function WorkspaceSearch() {
 		if (e.key === "ArrowDown") { e.preventDefault(); setActive((i) => Math.min(i + 1, results.length - 1)); }
 		else if (e.key === "ArrowUp") { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
 		else if (e.key === "Enter" && results[active]) go(results[active]);
-		else if (e.key === "Escape") setOpen(false);
+		else if (e.key === "Escape") { setOpen(false); setExpanded(false); }
 	};
 
 	const listId = "workspace-search-results";
-	const showList = open && (q || recent.length > 0);
+	const showList = open && (q || filter === "All" || COMMANDS.some((h) => h.kind === filter));
 	const mod = IS_MAC ? "⌘" : "Ctrl";
 
 	return (
-		<div ref={box} className="relative w-full max-w-md">
-			<div className={cn("flex h-7 items-center gap-2 rounded-md bg-input px-3 field-focus", "hover:bg-muted")}>
+		<div ref={box} className={cn("relative max-w-md", folded ? "w-auto" : "w-full")}>
+			{folded && (
+				<button type="button" onClick={() => setExpanded(true)} aria-label={`Search workspace (${mod} K)`} title={`Search (${mod} K)`} className="flex size-7 items-center justify-center rounded-md bg-input text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+					<SearchIcon className="size-4" />
+				</button>
+			)}
+			<div className={cn("flex h-7 items-center gap-2 rounded-md bg-input px-3 field-focus", "hover:bg-muted", folded && "hidden")}>
 				<span className="shrink-0 font-mono text-sm text-primary" aria-hidden>&gt;</span>
 				<input
 					ref={inputRef}
@@ -278,7 +323,7 @@ export default function WorkspaceSearch() {
 					<ul id={listId} role="listbox" aria-label="Results" className="max-h-96 overflow-y-auto py-1">
 						{!q && results.length > 0 && (
 							<li role="presentation" className="flex items-center gap-2 px-3 pt-2 pb-1 font-mono text-[13px] text-muted-foreground">
-								<Clock className="size-3.5" /> Recent
+								<Clock className="size-3.5" /> {recent.length > 0 ? "Recent" : "Suggestions"}
 							</li>
 						)}
 						{results.length === 0 ? (

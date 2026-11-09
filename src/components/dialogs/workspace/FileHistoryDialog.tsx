@@ -65,8 +65,8 @@ export function DiffView({ diff }: { diff: DiffResult }) {
 						role="row"
 						className={cn("flex", row.kind === "add" && "bg-success/10", row.kind === "del" && "bg-destructive/10")}
 					>
-						<span className="w-10 shrink-0 select-none px-1 text-right text-muted-foreground/60">{row.oldLine ?? ""}</span>
-						<span className="w-10 shrink-0 select-none px-1 text-right text-muted-foreground/60">{row.newLine ?? ""}</span>
+						<span className="w-10 shrink-0 select-none px-1 text-right text-fg-3">{row.oldLine ?? ""}</span>
+						<span className="w-10 shrink-0 select-none px-1 text-right text-fg-3">{row.newLine ?? ""}</span>
 						<span className="w-4 shrink-0 select-none text-center text-muted-foreground">{row.kind === "add" ? "+" : row.kind === "del" ? "-" : ""}</span>
 						<span className="min-w-0 flex-1 whitespace-pre-wrap break-all pr-2">
 							{row.segments

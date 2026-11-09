@@ -193,6 +193,7 @@ export default function NotesPage() {
 
 	// Deep link from workspace search or a [[link]] chip; Markdown notes open in the Editor
 	useOpenParam((path) => {
+		if (path === "new") return void createNote(`Note ${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}`);
 		if (notes.some((n) => n.path === path)) openNote(path);
 		else if (!isNoteFile(path)) navigate(`/workspace/editor?open=${encodeURIComponent(path)}`, { replace: true });
 	}, !loading);
@@ -501,6 +502,9 @@ export default function NotesPage() {
 						{segment("board", "Board", <LayoutGrid className="size-3.5" />)}
 						{segment("graph", "Graph", <Network className="size-3.5" />)}
 					</div>
+					{view === "note" && selectedPath && viewersAt("notes", rel(selectedPath)).length > 0 && (
+						<div className="flex shrink-0 items-center border-l px-2"><PresenceDots names={viewersAt("notes", rel(selectedPath))} doing="in this note" /></div>
+					)}
 				</Toolbar>
 
 				<div className="min-h-0 flex-1">

@@ -46,10 +46,10 @@ class NumberMarker extends GutterMarker {
 	constructor(private readonly text: string) {
 		super();
 	}
-	eq(other: NumberMarker) {
+	override eq(other: NumberMarker) {
 		return other.text === this.text;
 	}
-	toDOM() {
+	override toDOM() {
 		return document.createTextNode(this.text);
 	}
 }

@@ -10,13 +10,17 @@ import AnnouncementStrip from "@/features/announcements/components/AnnouncementS
 import { Button } from "@/components/ui/button";
 import { Page, PageBody, Panel } from "@/components/layout/Page";
 import Toolbar from "@/components/layout/Toolbar";
-import Art from "@/components/elements/Art";
 import { DEFAULT_LAYOUT, loadLayout, moveTile, saveLayout, type DashboardLayout, type TileId, type TileSize } from "@/lib/dashboardLayout";
 import { formatAction } from "@/lib/insights";
 import { useRecent } from "@/lib/recentFiles";
 import { useRuns } from "@/features/projects/lib/projectRuns";
 import { getTasks, loadConfig, projectRuns, projectsList } from "@/lib/tauri";
 import { cn, timeAgo } from "@/lib/utils";
+import { onlineMemberIds } from "@/lib/p2p/online";
+import { useChat } from "@/store/chat/ChatContext";
+import { chatHits } from "@/features/chat/lib/search";
+import { routeForChannel } from "@/features/chat/lib/routes";
+import { mentions } from "@/lib/comments";
 import { useP2P } from "@/store/p2p/P2PContext";
 import { useWorkspace } from "@/store/workspace/WorkspaceContext";
 import type { Task } from "@/types/workspace";
@@ -39,7 +43,8 @@ const openPath = (file: string) => `/workspace/${/\.(md|txt)$/i.test(file) ? "no
 // Workspace overview: where to continue, who is here, what is due, what changed
 export default function DashboardPage() {
 	const { workspace, metadata, stats, refreshMetadata, refreshStats } = useWorkspace();
-	const { peers, nameOf } = useP2P();
+	const { peers } = useP2P();
+	const chat = useChat();
 	const navigate = useNavigate();
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [me, setMe] = useState("");
@@ -92,7 +97,7 @@ export default function DashboardPage() {
 	// Files opened in the Editor or Notes on this device, newest first
 	const recent = useRecent(workspace?.path);
 	const members = metadata?.members.members ?? [];
-	const online = useMemo(() => new Set([me, ...peers.filter((p) => p.status === "connected").map((p) => nameOf(p.id))]), [me, peers, nameOf]);
+	const online = useMemo(() => onlineMemberIds(members, peers, (m) => m.name === me), [members, peers, me]);
 	const due = useMemo(
 		() => tasks.filter((t) => t.status !== "done" && t.due_date).sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1)).slice(0, 5),
 		[tasks],
@@ -104,13 +109,40 @@ export default function DashboardPage() {
 	const late = open.filter((t) => t.due_date && t.due_date < today).length;
 	const goTo = (path: string) => () => navigate(path);
 
+	// Where an activity row leads: an item ("task:<id>"), or a file path; null when it points nowhere
+	const targetRoute = (target?: string): string | null => {
+		if (!target) return null;
+		if (target.startsWith("task:")) return `/workspace/tasks?open=${encodeURIComponent(target.slice(5))}`;
+		if (target.startsWith("card:")) return `/workspace/kanban?open=${encodeURIComponent(target.slice(5))}`;
+		if (target.startsWith("/")) return openPath(target);
+		return null;
+	};
+
+	// What is waiting for me: tasks given to me, and messages or comments that name me
+	const myMemberId = members.find((m) => m.name === me)?.id;
+	const assignedToMe = myMemberId ? open.filter((t) => t.assignee_id === myMemberId).slice(0, 4) : [];
+	const mentionedMe = useMemo(
+		() =>
+			chat.myName
+				? chatHits(chat.entries, chat.people)
+						.filter((h) => h.name !== chat.myName && mentions(h.text, chat.myName))
+						.slice(0, 4)
+				: [],
+		[chat.entries, chat.people, chat.myName],
+	);
+
 	const tiles: Record<TileId, ReactNode> = {
 		pickup: (
 				<Panel title="Pick Up Where You Left Off" flush={recent.length > 0} className="h-full">
 					{recent.length === 0 ? (
 						<div className="flex h-full flex-col items-center justify-center gap-4 py-6 text-center">
-							<Art name="welcome-back" className="h-40 w-64 max-w-full" />
-							<p className="text-sm text-muted-foreground">Files you open show up here, so you can jump back in.</p>
+							<p className="text-sm text-muted-foreground">Nothing opened yet. Start with one of these:</p>
+							<div className="flex flex-wrap justify-center gap-2">
+								<Button size="sm" onPress={goTo("/workspace/notes")}>New note</Button>
+								<Button size="sm" variant="outline" onPress={goTo("/workspace/tasks")}>Add a task</Button>
+								<Button size="sm" variant="outline" onPress={goTo("/workspace/members")}>Invite someone</Button>
+								<Button size="sm" variant="outline" onPress={goTo("/workspace/explorer")}>Browse files</Button>
+							</div>
 						</div>
 					) : (
 						<ul className="divide-y">
@@ -176,10 +208,10 @@ export default function DashboardPage() {
 				</Panel>
 		),
 		people: (
-				<Panel title="People" hint={`${[...online].filter((n) => members.some((m) => m.name === n)).length} online`} flush className="h-full">
+				<Panel title="People" hint={`${online.size} online`} flush className="h-full">
 					<ul className="divide-y">
 						{members.slice(0, 4).map((m) => {
-							const here = online.has(m.name);
+							const here = online.has(m.id);
 							return (
 								<li key={m.id} className="flex min-h-14 items-center gap-3 px-4 py-2">
 									<Avatar name={m.name} className={cn("size-8", !here && "opacity-50")} />
@@ -209,11 +241,13 @@ export default function DashboardPage() {
 						<ul className="divide-y">
 							{activity.slice(0, 6).map((event) => {
 								const Icon = eventIcon(event.target_type, event.action);
+								const route = targetRoute(event.target);
 								return (
-									<li key={event.id} className="flex items-center gap-3 px-4 py-3">
+									<li key={event.id} className={cn("flex items-center gap-3 px-4 py-3", route && "cursor-pointer hover:bg-muted focus-within:bg-muted")} onClick={route ? () => navigate(route) : undefined}>
 										{event.author ? <Avatar name={event.author} className="size-7 text-xs" /> : <span className="flex size-7 shrink-0 items-center justify-center bg-muted text-muted-foreground"><Icon className="size-4" /></span>}
 										<div className="min-w-0 flex-1">
 											<p className="truncate text-sm">
+												{route && <button type="button" onClick={(e) => { e.stopPropagation(); navigate(route); }} className="sr-only focus:not-sr-only focus:underline">Open</button>}
 												<span className="font-medium">{event.author ?? formatAction(event.action)}</span>
 												{event.author && <span className="text-muted-foreground"> {formatAction(event.action).toLowerCase()}</span>}
 											</p>
@@ -226,6 +260,32 @@ export default function DashboardPage() {
 						</ul>
 					)}
 				</Panel>
+		),
+		mine: (
+			<Panel title="For You" flush={assignedToMe.length + mentionedMe.length > 0} className="h-full">
+				{assignedToMe.length + mentionedMe.length === 0 ? (
+					<p className="text-sm text-muted-foreground">Nothing is waiting for you. Tasks assigned to you and messages that mention you show up here.</p>
+				) : (
+					<ul className="divide-y">
+						{assignedToMe.map((t) => (
+							<li key={`t:${t.id}`}>
+								<button type="button" onClick={() => navigate(`/workspace/tasks?open=${encodeURIComponent(t.id)}`)} className="flex w-full flex-col px-4 py-3 text-left outline-none hover:bg-muted focus-visible:bg-muted">
+									<span className="font-mono text-[13px] text-muted-foreground">Assigned to you</span>
+									<span className="truncate text-sm font-medium">{t.title}</span>
+								</button>
+							</li>
+						))}
+						{mentionedMe.map((h) => (
+							<li key={`m:${h.id}`}>
+								<button type="button" onClick={() => navigate(routeForChannel(h.channel))} className="flex w-full flex-col px-4 py-3 text-left outline-none hover:bg-muted focus-visible:bg-muted">
+									<span className="font-mono text-[13px] text-muted-foreground">Mentioned you · {h.name}</span>
+									<span className="truncate text-sm">{h.text}</span>
+								</button>
+							</li>
+						))}
+					</ul>
+				)}
+			</Panel>
 		),
 		projects: (
 			<Tile title="Projects" value={projectStats.count} onClick={goTo("/workspace/projects")} className="h-full">
@@ -289,7 +349,7 @@ export default function DashboardPage() {
 	);
 }
 
-const TITLES: Record<TileId, string> = { pickup: "Pick Up Where You Left Off", tasks: "Open Tasks", files: "Files", due: "Due Soon", people: "People", activity: "Activity", cards: "Kanban Cards", projects: "Projects" };
+const TITLES: Record<TileId, string> = { pickup: "Pick Up Where You Left Off", tasks: "Open Tasks", files: "Files", due: "Due Soon", people: "People", activity: "Activity", cards: "Kanban Cards", projects: "Projects", mine: "For You" };
 
 // Where each size starts from at the narrow, medium and wide container widths; every tile then grows to share what is left of its row
 const SPAN: Record<TileSize, string> = {

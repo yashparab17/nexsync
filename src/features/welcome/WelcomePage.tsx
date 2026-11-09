@@ -22,6 +22,7 @@ import ThemeToggle from "@/components/elements/ThemeToggle";
 
 
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Dialog } from "@/components/ui/dialog";
 
 const Settings = lazy(() => import("@/features/app-settings/AppSettingsPage"));
@@ -162,6 +163,7 @@ export default function Welcome() {
 
 	return (
 		<div className="flex min-h-full flex-col rounded-t-xl bg-background window-edge px-8 py-6 2xl:px-16">
+			<a href="#welcome-main" className="sr-only z-50 bg-primary px-3 py-2 text-sm text-primary-foreground focus:not-sr-only focus:absolute focus:top-2 focus:left-2">Skip to workspaces</a>
 			<header className="flex items-center justify-between">
 				<div className="flex items-center gap-3">
 					<img src={isDark ? logo_white : logo_black} alt="" className="size-9" />
@@ -171,14 +173,14 @@ export default function Welcome() {
 				<div className="flex items-center gap-1">
 					
 					<ThemeToggle />
-					<Button variant="ghost" size="icon" onPress={() => setSettingsOpen(true)} aria-label="Application Settings">
+					<IconButton size="md" onPress={() => setSettingsOpen(true)} label="Application settings">
 						<SettingsIcon className="size-5" />
-					</Button>
+					</IconButton>
 				</div>
 			</header>
 
 			{/* The window is the canvas: content fills it up to a wide cap, centred in both directions */}
-			<main className="flex flex-1 items-center justify-center py-12">
+			<main id="welcome-main" tabIndex={-1} className="flex flex-1 outline-none items-center justify-center py-12">
 				<div className="grid w-full max-w-[88rem] gap-12 xl:grid-cols-[minmax(0,1fr)_24rem] xl:gap-16">
 					<div className="flex min-w-0 flex-col gap-10">
 						<div>
@@ -199,7 +201,17 @@ export default function Welcome() {
 							: recentWorkspaces.length === 0 ?
 								<div className="frame flex flex-col items-center gap-4 p-8 text-center text-muted-foreground sm:flex-row sm:text-left">
 									<Art name="welcome" className="h-44 w-72 max-w-full shrink-0" />
-									<p>No workspaces yet. Create one, or join a teammate with their ticket.</p>
+									<div className="flex flex-col gap-3">
+										<p>No workspaces yet. Create one, or join a teammate with their ticket.</p>
+										<div className="flex flex-wrap justify-center gap-2 sm:justify-start">
+											<CreateWorkspaceDialog>
+												<Button><FolderPlus className="size-4" />Create</Button>
+											</CreateWorkspaceDialog>
+											<JoinWorkspaceDialog>
+												<Button variant="outline"><UsersRound className="size-4" />Join</Button>
+											</JoinWorkspaceDialog>
+										</div>
+									</div>
 								</div>
 							:	<div className="flex flex-col gap-8">
 									{own.length > 0 && <WorkspaceCards title={joined.length > 0 ? `Yours / ${own.length}` : null} list={own} onOpen={handleOpenWorkspace} />}

@@ -114,14 +114,14 @@ export default function Workspace() {
 		<div className="flex h-full">
 			{/* Sidebar */}
 			{!sidebarHidden && (
-				<div className="hidden h-full md:block">
+				<div className="hidden h-full lg:block">
 					<WorkspaceSidebar />
 				</div>
 			)}
 
 			{/* Drawer version of the sidebar for narrow windows */}
 			{navOpen && (
-				<div className="fixed inset-0 z-40 flex md:hidden">
+				<div className="fixed inset-0 z-40 flex lg:hidden">
 					<div className="relative h-full animate-in slide-in-from-left duration-200 motion-reduce:animate-none">
 						<WorkspaceSidebar expanded onNavigate={() => setNavOpen(false)} />
 					</div>
@@ -134,7 +134,7 @@ export default function Workspace() {
 					<DropOverlay show={dragging} title="Drop to sort into the workspace" hint="Pictures go to Assets, Word files to Documents, notes to Notes, the rest to Others" />
 					{dropNotice.node}
 				{sidebarHidden && (
-					<button type="button" aria-label="Show the sidebar" title="Show the sidebar (Ctrl+\)" onClick={toggleSidebar} className="absolute top-1/2 left-0 z-30 hidden h-10 w-4 -translate-y-1/2 items-center justify-center rounded-r-sm border border-l-0 bg-background text-muted-foreground opacity-60 shadow-sm outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring md:flex">
+					<button type="button" aria-label="Show the sidebar" title="Show the sidebar (Ctrl+\)" onClick={toggleSidebar} className="absolute top-1/2 left-0 z-30 hidden h-10 w-4 -translate-y-1/2 items-center justify-center rounded-r-sm border border-l-0 bg-background text-muted-foreground opacity-60 shadow-sm outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring lg:flex">
 						<PanelLeftOpen className="size-3" />
 					</button>
 				)}

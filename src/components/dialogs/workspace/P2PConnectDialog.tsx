@@ -401,7 +401,7 @@ title={r.text}
 					<div className="space-y-3">
 						{peers.length === 0 ? (
 							<div className="flex flex-col items-center gap-2 py-8 text-center">
-								<Radio className="size-8 text-muted-foreground/50" />
+								<Radio className="size-8 text-fg-3" />
 								<p className="text-sm font-medium">No one is connected</p>
 								<p className="text-sm text-muted-foreground">Invite someone, or join with an invite.</p>
 								<div className="mt-2 flex gap-2">

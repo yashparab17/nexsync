@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChecklistEditor, DueBadge, TagChip, TagInput } from "@/components/elements/PlanningFields";
 import { collectTags, endPosition, planMove } from "@/lib/planning";
 import { cn } from "@/lib/utils";
+import Avatar from "@/components/elements/Avatar";
 
 import { useListKeys } from "@/hooks/useListKeys";
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -237,6 +238,37 @@ export default function KanbanPage() {
 		}
 	};
 
+	// A title typed at the foot of a column: Enter adds the card to the end of it
+	const [quick, setQuick] = useState<Record<string, string>>({});
+	const handleQuickCard = async (colId: string) => {
+		const title = (quick[colId] ?? "").trim().slice(0, MAX_TITLE);
+		if (isViewer || !workspace?.path || !title) return;
+		const now = new Date().toISOString();
+		const newCard: KanbanCard = {
+			id: crypto.randomUUID(),
+			column_id: colId,
+			title,
+			description: "",
+			position: endPosition(columns.find((c) => c.id === colId)?.cards ?? []),
+			tags: [],
+			checklist: [],
+			created_at: now,
+			updated_at: now,
+		};
+		setQuick((q) => ({ ...q, [colId]: "" }));
+		try {
+			await createKanbanCard({ path: workspace.path, card: newCard });
+			publishDataChange({ entity: "card", op: "upsert", card: newCard });
+			await addActivityEvent("Created card", `Created card "${newCard.title}"`, itemTarget("card", newCard.id), "kanban");
+			await loadKanban();
+			await refreshMetadata();
+		} catch (err) {
+			console.error("Failed to create card:", err);
+			logError(err, { source: "kanban" });
+			setQuick((q) => ({ ...q, [colId]: title }));
+		}
+	};
+
 	// Open Edit Card Modal
 	const handleOpenEditCard = (card: KanbanCard) => {
 		setEditingCard(card);
@@ -250,6 +282,7 @@ export default function KanbanPage() {
 
 	// Deep link from workspace search
 	useOpenParam((id) => {
+		if (id === "new") return void (canChange && columns[0] && openNewCard(columns[0].id));
 		const card = columns.flatMap((c) => c.cards).find((k) => k.id === id);
 		if (card) handleOpenEditCard(card);
 	}, !loading);
@@ -684,7 +717,12 @@ export default function KanbanPage() {
 																{card.checklist.filter((i) => i.done).length}/{card.checklist.length}
 															</span>
 														)}
-														{card.assignee_id && <span>{memberName(card.assignee_id)}</span>}
+														{card.assignee_id && (
+															<span title={memberName(card.assignee_id)} className="inline-flex items-center">
+																<Avatar name={memberName(card.assignee_id)} className="size-5 text-[11px]" />
+																<span className="sr-only">{memberName(card.assignee_id)}</span>
+															</span>
+														)}
 														{(card.tags ?? []).map((tag) => (
 															<TagChip
 																key={tag}
@@ -736,6 +774,22 @@ export default function KanbanPage() {
 								</div>
 
 								{/* Add Card Quick Button */}
+								{canChange && (
+									<input
+										value={quick[col.id] ?? ""}
+										maxLength={MAX_TITLE}
+										onChange={(e) => setQuick((q) => ({ ...q, [col.id]: e.target.value }))}
+										onKeyDown={(e) => {
+											if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+												e.preventDefault();
+												void handleQuickCard(col.id);
+											}
+										}}
+										aria-label={`Quick add a card to ${col.title}`}
+										placeholder="Type a title, press Enter"
+										className="mx-2 mb-1 h-8 border border-input bg-input px-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+									/>
+								)}
 								{canChange && (
 									<Button
 										variant="ghost"

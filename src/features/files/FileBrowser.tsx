@@ -12,13 +12,15 @@ import { useNavigate } from "react-router-dom";
 
 // Icons
 import { Loader2 } from "lucide-react";
+import { FolderOpen } from "@/components/animate-icons";
+import PresenceDots from "@/components/elements/PresenceDots";
 import { ChevronRight, ChevronUp, ExternalLink, FilePlus, FolderPlus, History, LayoutGrid, ListFilter, Pencil, Plus, RefreshCw, Trash2 } from "@/components/animate-icons";
 
 // Components
 import FileHistoryDialog from "@/components/dialogs/workspace/FileHistoryDialog";
 import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
 import FileKindIcon, { FolderKindIcon } from "@/features/editor/components/FileKindIcon";
-import { cn, formatBytes } from "@/lib/utils";
+import { cn, errorText, formatBytes } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -39,6 +41,7 @@ import {
 	createWorkspaceFolder,
 	deleteWorkspaceItem,
 	listWorkspaceFiles,
+	moveWorkspaceItem,
 	openWorkspaceFile,
 	renameWorkspaceItem,
 	renameYjsDoc,
@@ -159,6 +162,11 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 	const [view, setViewState] = useState<ViewMode>(readView);
 	const [filter, setFilter] = useState("");
 	const [selected, setSelected] = useState<string | null>(null);
+	// Entries ticked for a bulk action (Ctrl or Shift click, or the tick box), by path
+	const [marked, setMarked] = useState<Set<string>>(new Set());
+	const [bulkDelete, setBulkDelete] = useState(false);
+	const [bulkMove, setBulkMove] = useState(false);
+	const [dropOn, setDropOn] = useState<string | null>(null);
 	const menu = useContextMenu();
 	const listRef = useRef<HTMLUListElement>(null);
 	const setView = (next: ViewMode) => {
@@ -195,7 +203,7 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 	}, [loadEntries]);
 
 	// Reload the listing when a collaborator's changes arrive
-	const { lastSyncedFile } = useP2P();
+	const { lastSyncedFile, presence, nameOf, transfers } = useP2P();
 	useEffect(() => {
 		if (lastSyncedFile) void loadEntries();
 	}, [lastSyncedFile]);
@@ -421,6 +429,7 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 	}, [entries, filter, sort]);
 	useEffect(() => {
 		setSelected(null);
+		setMarked(new Set());
 		setFilter("");
 	}, [currentDir]);
 
@@ -489,6 +498,89 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 
 	const folderCount = entries.filter((e) => e.is_dir).length;
 
+	// Who has a file open, and whether it is still arriving from a collaborator
+	const viewersOf = (entry: WorkspaceFile) =>
+		Object.entries(presence)
+			.filter(([, p]) => p.item && toRelPath(p.item) === toRelPath(entry.path))
+			.map(([who]) => nameOf(who));
+	const arriving = (entry: WorkspaceFile) => transfers.find((t) => toRelPath(t.relPath) === toRelPath(entry.path));
+
+	const markedEntries = shown.filter((e) => marked.has(e.path));
+	const toggleMark = (entry: WorkspaceFile) =>
+		setMarked((cur) => {
+			const next = new Set(cur);
+			if (!next.delete(entry.path)) next.add(entry.path);
+			return next;
+		});
+	const markRange = (entry: WorkspaceFile) => {
+		const from = shown.findIndex((x) => x.path === selected);
+		const to = shown.findIndex((x) => x.path === entry.path);
+		if (from < 0 || to < 0) return toggleMark(entry);
+		setMarked(new Set(shown.slice(Math.min(from, to), Math.max(from, to) + 1).map((x) => x.path)));
+	};
+	const clickEntry = (e: React.MouseEvent, entry: WorkspaceFile) => {
+		if (e.shiftKey) markRange(entry);
+		else if (e.ctrlKey || e.metaKey) toggleMark(entry);
+		else setMarked(new Set());
+		setSelected(entry.path);
+	};
+
+	// Move entries into a folder (rel path, "" for the top); the same calls rename uses keep history and shared notes with the file
+	const moveEntries = async (paths: string[], destDir: string) => {
+		if (isViewer || !workspacePath) return;
+		let moved = 0;
+		let failed = "";
+		for (const path of paths) {
+			const rel = toRelPath(path);
+			if (getParentDir(rel) === destDir) continue;
+			const item = entries.find((x) => toRelPath(x.path) === rel);
+			try {
+				const newRel = await moveWorkspaceItem(workspacePath, rel, destDir);
+				moved++;
+				if (item && !item.is_dir) renameYjsDoc(workspacePath, rel, newRel).catch(() => {});
+				addActivityEvent("Moved item", `Moved ${item?.name ?? rel} to /${destDir}`, `/${newRel}`, item?.is_dir ? "folder" : "file");
+			} catch (err) {
+				failed = errorText(err, "Couldn't move it.");
+				logError(err, { source: "files", workspace: workspacePath });
+			}
+		}
+		notice.show(failed ? `Moved ${moved}. ${failed}` : moved ? `Moved ${moved} ${moved === 1 ? "item" : "items"} to ${destDir ? `/${destDir}` : "the top"}.` : "Already there.");
+		setMarked(new Set());
+		void loadEntries();
+		void refreshStats();
+	};
+
+	const deleteMarked = async () => {
+		if (isViewer || !workspacePath) return;
+		for (const entry of markedEntries) {
+			try {
+				await deleteWorkspaceItem(workspacePath, toRelPath(entry.path));
+				addActivityEvent("Deleted item", `Deleted ${entry.name}${entry.is_dir ? "/" : ""}`, undefined, entry.is_dir ? "folder" : "file");
+			} catch (err) {
+				logError(err, { source: "files", workspace: workspacePath });
+			}
+		}
+		setBulkDelete(false);
+		setMarked(new Set());
+		void loadEntries();
+		void refreshStats();
+	};
+
+	const DRAG_TYPE = "application/x-nexsync-paths";
+	const canDropOn = (e: React.DragEvent) => !isViewer && e.dataTransfer.types.includes(DRAG_TYPE);
+	const dropInto = (e: React.DragEvent, destDir: string) => {
+		if (!canDropOn(e)) return;
+		e.preventDefault();
+		e.stopPropagation();
+		setDropOn(null);
+		try {
+			const paths = JSON.parse(e.dataTransfer.getData(DRAG_TYPE)) as string[];
+			void moveEntries(paths, destDir);
+		} catch {
+			// Not ours
+		}
+	};
+
 	return (
 		<div {...dropProps} className="relative flex h-full min-h-0 flex-col bg-background">
 			<DropOverlay show={dragging} title={currentDir ? `Drop to add to ${currentDir}` : "Drop into a folder"} hint={currentDir ? undefined : "Open a folder first"} />
@@ -505,8 +597,12 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 							<button
 								type="button"
 								aria-current={i === crumbs.length - 1 ? "page" : undefined}
+								onDragOver={(e) => canDropOn(e) && (e.preventDefault(), setDropOn(`crumb:${crumb.dir}`))}
+								onDragLeave={() => setDropOn(null)}
+								onDrop={(e) => dropInto(e, crumb.dir)}
 								className={cn(
 									"max-w-[16rem] truncate px-2 py-0.5 font-mono outline-none transition-colors focus-visible:bg-muted",
+									dropOn === `crumb:${crumb.dir}` && "bg-primary/20 text-foreground",
 									i === crumbs.length - 1 ? "font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
 								)}
 								onClick={() => navigateToDir(crumb.dir)}
@@ -542,6 +638,21 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 					</>
 				)}
 			</Toolbar>
+
+			{markedEntries.length > 0 && !isViewer && (
+				<div className="flex items-center gap-2 border-b bg-primary/10 px-4 py-1.5 text-sm" role="toolbar" aria-label="Selected items">
+					<span className="font-medium">{markedEntries.length} selected</span>
+					<Button variant="outline" size="sm" onPress={() => setBulkMove(true)}>
+						<FolderOpen data-icon="inline-start" className="size-4" />
+						Move to…
+					</Button>
+					<Button variant="outline" size="sm" onPress={() => setBulkDelete(true)}>
+						<Trash2 data-icon="inline-start" className="size-4 text-destructive" />
+						Delete
+					</Button>
+					<Button variant="ghost" size="sm" className="ml-auto" onPress={() => setMarked(new Set())}>Clear</Button>
+				</div>
+			)}
 
 			{/* Listing */}
 			<div className="min-h-0 flex-1 overflow-auto" onContextMenu={(e) => e.target === e.currentTarget && entryMenu(e, null)} onClick={(e) => e.target === e.currentTarget && setSelected(null)}>
@@ -597,20 +708,46 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 										id={`file-${entry.path}`}
 										data-path={entry.path}
 										role="option"
-										aria-selected={active}
-										onClick={() => setSelected(entry.path)}
+										aria-selected={active || marked.has(entry.path)}
+										draggable={!isViewer}
+										onDragStart={(e) => {
+											const paths = marked.has(entry.path) ? markedEntries.map((x) => x.path) : [entry.path];
+											e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(paths));
+											e.dataTransfer.effectAllowed = "move";
+										}}
+										onDragEnd={() => setDropOn(null)}
+										onDragOver={(e) => entry.is_dir && canDropOn(e) && (e.preventDefault(), setDropOn(entry.path))}
+										onDragLeave={() => setDropOn(null)}
+										onDrop={(e) => entry.is_dir && dropInto(e, toRelPath(entry.path))}
+										onClick={(e) => clickEntry(e, entry)}
 										onDoubleClick={() => openEntry(entry)}
 										onContextMenu={(e) => entryMenu(e, entry)}
 										className={cn(
 											"group min-w-0 cursor-default select-none",
 											view === "grid"
-												? cn("flex flex-col items-center gap-2 border p-4 text-center", active ? "border-primary bg-primary/10" : "border-transparent hover:bg-muted/50")
-												: cn("grid grid-cols-[minmax(0,1fr)_7rem_6rem_11rem] items-center gap-4 border-b px-4 py-2", active ? "bg-primary/10 shadow-[inset_2px_0_0_var(--primary)]" : "hover:bg-muted/50"),
+												? cn("flex flex-col items-center gap-2 border p-4 text-center", active || marked.has(entry.path) ? "border-primary bg-primary/10" : "border-transparent hover:bg-muted/50", dropOn === entry.path && "border-dashed bg-primary/20")
+												: cn("grid grid-cols-[minmax(0,1fr)_7rem_6rem_11rem] items-center gap-4 border-b px-4 py-2", active || marked.has(entry.path) ? "bg-primary/10 shadow-[inset_2px_0_0_var(--primary)]" : "hover:bg-muted/50", dropOn === entry.path && "bg-primary/20 outline-2 -outline-offset-2 outline-dashed outline-primary"),
 										)}
 									>
 										<span className={cn("flex min-w-0 items-center gap-3", view === "grid" && "w-full flex-col")}>
+											{!isViewer && view === "list" && (
+												<input
+													type="checkbox"
+													checked={marked.has(entry.path)}
+													onChange={() => toggleMark(entry)}
+													onClick={(e) => e.stopPropagation()}
+													aria-label={`Select ${entry.name}`}
+													className={cn("size-4 shrink-0 accent-[var(--primary)]", marked.size === 0 && !active && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100")}
+												/>
+											)}
 											{entry.is_dir ? <FolderKindIcon name={entry.name} className={view === "grid" ? "size-10" : "size-5"} /> : <FileKindIcon name={entry.name} className={view === "grid" ? "size-10" : "size-5"} />}
 											<span title={entry.name} className={cn("min-w-0 text-sm", view === "grid" ? "line-clamp-2 w-full text-center break-all" : "truncate font-medium")}>{entry.name}</span>
+											<PresenceDots names={viewersOf(entry)} doing="in this file" />
+											{arriving(entry) && (
+												<span className="shrink-0 border border-info/40 bg-info/10 px-1.5 font-mono text-[11px] text-info" title="Still arriving from a collaborator">
+													syncing {arriving(entry)!.totalBytes > 0 ? `${Math.round((arriving(entry)!.receivedBytes / arriving(entry)!.totalBytes) * 100)}%` : ""}
+												</span>
+											)}
 										</span>
 										{view === "list" && (
 											<>
@@ -643,6 +780,32 @@ export default function FileBrowser({ mode = "explorer" }: { mode?: "explorer" |
 			</div>
 
 			{menu.menu}
+
+			<Dialog isOpen={bulkDelete} onOpenChange={setBulkDelete}>
+				<DialogHeading icon={<Trash2 className="size-6" />} tone="danger" title={`Delete ${markedEntries.length} items`} description={<>Move the selected items to the Trash? You can restore them from there.</>} />
+				<DialogFooter>
+					<DialogClose variant="outline">Cancel</DialogClose>
+					<Button variant="destructive" onPress={() => void deleteMarked()}>
+						<Trash2 data-icon="inline-start" className="size-4" />
+						Delete
+					</Button>
+				</DialogFooter>
+			</Dialog>
+
+			<Dialog isOpen={bulkMove} onOpenChange={setBulkMove}>
+				<DialogHeading icon={<FolderOpen className="size-6" />} title={`Move ${markedEntries.length} items`} description={<>Choose where they go.</>} />
+				<ul className="max-h-64 overflow-auto border">
+					{!atRoot && (
+						<li><button type="button" className="w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setBulkMove(false); void moveEntries(markedEntries.map((x) => x.path), parentDir); }}>.. (up one folder)</button></li>
+					)}
+					{shown.filter((x) => x.is_dir && !marked.has(x.path)).map((f) => (
+						<li key={f.path}><button type="button" className="w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setBulkMove(false); void moveEntries(markedEntries.map((x) => x.path), toRelPath(f.path)); }}>{f.name}</button></li>
+					))}
+				</ul>
+				<DialogFooter>
+					<DialogClose variant="outline">Cancel</DialogClose>
+				</DialogFooter>
+			</Dialog>
 
 			{/* Create / Rename Dialog */}
 			<Dialog

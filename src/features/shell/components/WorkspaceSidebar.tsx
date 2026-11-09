@@ -1,6 +1,9 @@
 // React
 import { AnimateIcon, Code2, FileText, Monitor, Table, Files, Network, FolderClose, FolderTree, ListTodo, MessageSquareText, Megaphone, StickyNote } from "@/components/animate-icons";
-import { useCallback, useState, type ElementType } from "react";
+import { useCallback, useEffect, useState, type DragEvent, type ElementType, type MouseEvent as ReactMouseEvent } from "react";
+import { useContextMenu, type MenuEntry } from "@/components/elements/ContextMenu";
+import { useRecent } from "@/lib/recentFiles";
+import { applyOrder, loadPrefs, moveBefore, savePrefs, shift, togglePin, type SidebarPrefs } from "@/lib/sidebarPrefs";
 
 // React Router
 import { NavLink, useNavigate } from "react-router-dom";
@@ -159,6 +162,8 @@ export const bottomNavigation: NavigationItem[] = [
 ];
 
 const FOLDED_KEY = "nexsync.sidebar.folded";
+const NAV_DRAG = "application/x-nexsync-nav";
+const fileRoute = (file: string) => `/workspace/${/\.(md|txt)$/i.test(file) ? "notes" : "editor"}?open=${encodeURIComponent(`/${file.replace(/^\/+/, "")}`)}`;
 const DEFAULT_WIDTH = 256;
 const readFolded = (): string[] => {
 	try {
@@ -176,7 +181,13 @@ const COLLAPSE_BELOW = 150;
 const MIN_OPEN = 200;
 
 // Sidebar navigation link component
-function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; expanded: boolean; onNavigate?: () => void }) {
+interface Arrange {
+	onMenu: (e: ReactMouseEvent) => void;
+	onDragStart: (e: DragEvent) => void;
+	onDrop: (e: DragEvent) => void;
+}
+
+function NavigationItem({ item, expanded, onNavigate, arrange }: { item: NavigationItem; expanded: boolean; onNavigate?: () => void; arrange?: Arrange }) {
 	const Icon = item.icon;
 	const { viewersAt } = useP2P();
 	const { totalUnread, announcements, me, now } = useChat();
@@ -191,15 +202,24 @@ function NavigationItem({ item, expanded, onNavigate }: { item: NavigationItem; 
 			<NavLink
 				to={item.path}
 				end={item.end}
-				onClick={onNavigate}
+				onContextMenu={arrange?.onMenu}
+				draggable={!!arrange}
+				onDragStart={arrange?.onDragStart}
+				onDragOver={(e) => arrange && e.dataTransfer.types.includes(NAV_DRAG) && e.preventDefault()}
+				onDrop={arrange?.onDrop}
+				onClick={() => {
+					setHot(false);
+					onNavigate?.();
+				}}
 				onMouseEnter={() => setHot(true)}
 				onMouseLeave={() => setHot(false)}
-				onFocus={() => setHot(true)}
+				// Only keyboard focus keeps the item lit; a clicked item would otherwise stay highlighted after the pointer left
+				onFocus={(e) => setHot(e.currentTarget.matches(":focus-visible"))}
 				onBlur={() => setHot(false)}
 				className={({ isActive }) =>
 					cn(
 						"relative flex w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
-												isActive ? "bg-primary/10 text-primary before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:bg-primary" : "text-foreground hover:bg-muted",
+												isActive ? "bg-primary/10 text-primary before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:bg-primary" : "text-foreground hover:bg-muted focus-visible:bg-muted",
 					)
 				}
 				title={t(item.label)}
@@ -244,7 +264,17 @@ function UserCard({ showLabels }: { showLabels: boolean }) {
 
 // `expanded` is the drawer on small windows: full width with labels, and `onNavigate` closes it after a choice
 export default function WorkspaceSidebar({ expanded = false, onNavigate }: { expanded?: boolean; onNavigate?: () => void }) {
-	const { clearWorkspace } = useWorkspace();
+	const { clearWorkspace, workspace } = useWorkspace();
+	const wsId = workspace?.id ?? "";
+	const [prefs, setPrefs] = useState<SidebarPrefs>(() => loadPrefs(wsId));
+	useEffect(() => setPrefs(loadPrefs(wsId)), [wsId]);
+	const arrangeMenu = useContextMenu();
+	const recent = useRecent(workspace?.path);
+	const [dragPath, setDragPath] = useState<string | null>(null);
+	const update = (next: SidebarPrefs) => {
+		setPrefs(next);
+		if (wsId) savePrefs(wsId, next);
+	};
 	const navigate = useNavigate();
 	// How wide the sidebar is when open, remembered on this device; groups with a label can be folded away
 	const [width, setWidth] = usePanelSize("sidebar", DEFAULT_WIDTH, MIN_OPEN, 380);
@@ -273,6 +303,41 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 	}, []);
 	// The drawer on small windows always shows labels
 	const showLabels = expanded || !collapsed;
+
+	// Pinned pages lead; every other group keeps its pages in the order the person dragged them to
+	const pinnedItems = prefs.pinned.map((p) => navigation.find((n) => n.path === p) ?? bottomNavigation.find((n) => n.path === p)).filter((n): n is NavigationItem => !!n);
+	const groups: { id: string; label?: MessageKey; title?: string; items: NavigationItem[] }[] = [
+		...(pinnedItems.length ? [{ id: "pinned", title: "Pinned", items: pinnedItems }] : []),
+		...navGroups
+			.map((g) => ({ ...g, items: applyOrder(g.items.filter((i) => !prefs.pinned.includes(i.path)), prefs.order[g.id]) }))
+			.filter((g) => g.items.length > 0),
+	];
+	const arrangeFor = (group: { id: string; items: NavigationItem[] }, item: NavigationItem): Arrange => {
+		const paths = group.items.map((i) => i.path);
+		const save = (next: string[]) => update(group.id === "pinned" ? { ...prefs, pinned: next } : { ...prefs, order: { ...prefs.order, [group.id]: next } });
+		return {
+			onDragStart: (e) => {
+				e.dataTransfer.setData(NAV_DRAG, item.path);
+				e.dataTransfer.effectAllowed = "move";
+				setDragPath(item.path);
+			},
+			onDrop: (e) => {
+				if (!e.dataTransfer.types.includes(NAV_DRAG) || !dragPath) return;
+				e.preventDefault();
+				save(moveBefore(paths, dragPath, item.path));
+				setDragPath(null);
+			},
+			onMenu: (e) => {
+				const pinned = prefs.pinned.includes(item.path);
+				const entries: MenuEntry[] = [
+					{ label: pinned ? "Unpin from top" : "Pin to top", onSelect: () => update(togglePin(prefs, item.path)) },
+					{ label: "Move up", disabled: paths.indexOf(item.path) <= 0, onSelect: () => save(shift(paths, item.path, -1)) },
+					{ label: "Move down", disabled: paths.indexOf(item.path) >= paths.length - 1, onSelect: () => save(shift(paths, item.path, 1)) },
+				];
+				arrangeMenu.open(e, entries);
+			},
+		};
+	};
 	// Unload workspace and return to Welcome view
 	const handleBackToWelcome = async () => {
 		await clearWorkspace();
@@ -326,10 +391,26 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 
 			{/* Main Navigation */}
 			<nav aria-label={t("nav.main")} className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", showLabels ? "gap-4 p-3" : "gap-2 p-3")}>
-				{navGroups.map((group, i) => {
+				{showLabels && recent.length > 0 && (
+					<div className="flex flex-col gap-0.5">
+						<button type="button" aria-expanded={!folded.includes("recent")} onClick={() => toggleGroup("recent")} className="flex items-center gap-2 px-3 pb-1 text-left font-mono text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:text-foreground">
+							<ChevronDown className={cn("size-3 transition-transform", folded.includes("recent") && "-rotate-90")} aria-hidden />
+							Recent files
+						</button>
+						{!folded.includes("recent") &&
+							recent.slice(0, 4).map((file) => (
+								<button key={file} type="button" title={file} onClick={() => { navigate(fileRoute(file)); onNavigate?.(); }} className="flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:bg-muted">
+									<FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+									<span className="truncate">{file.split("/").pop()}</span>
+								</button>
+							))}
+					</div>
+				)}
+				{groups.map((group, i) => {
 					const open = !group.label || !showLabels || !folded.includes(group.id);
 					return (
 						<div key={group.id} className={cn("flex flex-col gap-0.5", !showLabels && i > 0 && "border-t border-foreground/15 pt-2")}>
+							{group.title && showLabels && <div className="px-3 pb-1 font-mono text-xs text-muted-foreground">{group.title}</div>}
 							{group.label && showLabels && (
 								<button
 									type="button"
@@ -343,7 +424,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 							)}
 								<div className="glide-rows" data-folded={!open} inert={!open}>
 									<div className="flex min-h-0 flex-col gap-0.5 overflow-hidden">
-										{group.items.map((item) => <NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} />)}
+										{group.items.map((item) => <NavigationItem key={item.path} item={item} expanded={showLabels} onNavigate={onNavigate} arrange={arrangeFor(group, item)} />)}
 									</div>
 								</div>
 						</div>
@@ -360,6 +441,7 @@ export default function WorkspaceSidebar({ expanded = false, onNavigate }: { exp
 
 			{/* You: who this device is in the workspace */}
 			<UserCard showLabels={showLabels} />
+			{arrangeMenu.menu}
 		</aside>
 
 			{/* The sidebar edge: drag it to change the width, narrow enough and it folds to icons; double-click to reset */}

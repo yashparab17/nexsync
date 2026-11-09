@@ -565,7 +565,7 @@ export default function AssetsPage() {
 										) : preview?.kind === "text" && !isRemote ? (
 											<div className="flex h-full w-full flex-col gap-2 overflow-hidden border bg-muted/40 p-3">
 												<pre className="min-h-0 flex-1 overflow-hidden font-mono text-xs leading-snug break-words whitespace-pre-wrap text-muted-foreground">{preview.text}</pre>
-												<span className="font-mono text-xs text-muted-foreground/70">{ext}</span>
+												<span className="font-mono text-xs text-fg-3">{ext}</span>
 											</div>
 										) : (
 											<div className={cn("flex h-full w-full flex-col items-center justify-center gap-2 border bg-muted/40", isRemote && "border border-dashed border-warning/60 bg-transparent")}>

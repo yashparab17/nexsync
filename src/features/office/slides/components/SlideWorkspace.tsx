@@ -708,7 +708,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 					)}
 					<div className={cn("flex min-h-0 min-w-0 flex-1", view.sorter && "hidden")}>
 					<CollapsiblePane id="slides.thumbs" defaultWidth={176} label="the slide list">
-					<ol aria-label="Slides" className="w-44 shrink-0 space-y-2 overflow-y-auto bg-[#f3f2f1] p-2 dark:bg-neutral-800">
+					<ol aria-label="Slides" className="w-44 shrink-0 space-y-2 overflow-y-auto bg-muted p-2">
 						{keys.map((k, i) => (
 							<li key={k}>
 								<Thumb doc={doc} k={k} deck={deck} current={k === key} number={i + 1} onPick={() => setActiveKey(k)} version={version} />
@@ -717,7 +717,7 @@ export default function SlideWorkspace({ collab, opened, name, rel, workspacePat
 					</ol>
 					</CollapsiblePane>
 					<div className="flex min-w-0 flex-1 flex-col">
-						<div ref={stage} className="flex min-h-0 flex-1 overflow-auto bg-[#e6e6e6] p-6 dark:bg-neutral-900"><div className="m-auto">
+						<div ref={stage} className="flex min-h-0 flex-1 overflow-auto bg-[color-mix(in_oklch,var(--foreground)_10%,var(--background))] p-6"><div className="m-auto">
 							{image ? (
 								<SlideCanvas
 									image={image}

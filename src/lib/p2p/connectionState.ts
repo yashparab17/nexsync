@@ -1,5 +1,4 @@
-// What the connection button in the window bar says. Most of the time it says nothing: a dot of the right colour is enough, and a word
-// appears only when something needs the person's attention.
+// What the connection button in the window bar says: a dot of the right colour and a short word, so the state is never a guess.
 
 export interface ConnectionInput {
 	online: boolean;
@@ -18,7 +17,7 @@ export type Tone = "ok" | "idle" | "busy" | "warn" | "bad";
 export interface ConnectionView {
 	key: "offline" | "connecting" | "syncing" | "host-away-members" | "host-away-alone" | "connected" | "idle";
 	tone: Tone;
-	// Shown beside the dot; empty when the dot says it all
+	// Shown beside the dot
 	label: string;
 	// The sentence for the tooltip and for screen readers
 	title: string;
@@ -36,8 +35,8 @@ export function connectionView(i: ConnectionInput): ConnectionView {
 		return { key: "host-away-alone", tone: "warn", label: "Host away", title: `${host} is offline. Your copy keeps working, and it tries again by itself. Your changes are shared when ${host} is back.` };
 	}
 	if (i.status === "connecting" || i.status === "reconnecting") return { key: "connecting", tone: "busy", label: i.status === "reconnecting" ? "Reconnecting" : "Connecting", title: "Connecting to the other devices." };
-	if (i.connected > 0) return { key: "connected", tone: "ok", label: "", title: `${i.connected} ${i.connected === 1 ? "person" : "people"} connected.` };
-	return { key: "idle", tone: "idle", label: "", title: "Not shared right now. Open Collaborate to invite someone." };
+	if (i.connected > 0) return { key: "connected", tone: "ok", label: "Synced", title: `${i.connected} ${i.connected === 1 ? "person" : "people"} connected.` };
+	return { key: "idle", tone: "idle", label: "Local", title: "Not shared right now. Open Collaborate to invite someone." };
 }
 
 export const TONE_DOT: Record<Tone, string> = {

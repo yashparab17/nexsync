@@ -1,4 +1,3 @@
-import { Caption } from "@/components/layout/Pane";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { MAX_TITLE } from "@/lib/validation";
@@ -6,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState, type ElementType } from "rea
 import { Plus, Trash2, AlertCircle, AlertTriangle, CalendarDays, CircleCheck as CheckCircle2, Clock, List, Pencil, } from "@/components/animate-icons";
 
 import { EmptyState } from "@/components/layout/Page";
-import Toolbar, { ToolbarSearch, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
+import Toolbar, { ToolbarSearch, ToolbarSelect, ToolbarSwitch, ToolbarTabs } from "@/components/layout/Toolbar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogFooter, DialogHeading } from "@/components/ui/dialog";
 import { DateField } from "@/components/ui/date-field";
@@ -16,6 +15,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { DueBadge, TagChip, TagInput } from "@/components/elements/PlanningFields";
 import TaskCalendar from "@/components/elements/TaskCalendar";
 import { collectTags } from "@/lib/planning";
+import Avatar from "@/components/elements/Avatar";
+import { Popover } from "@/components/ui/popover";
+import { parseQuickAdd } from "@/lib/quickAdd";
 
 import { useListKeys } from "@/hooks/useListKeys";
 import { useErrorLog } from "@/hooks/useErrorLog";
@@ -129,6 +131,10 @@ export default function TasksPage() {
 	const [tagFilter, setTagFilter] = useState<string | null>(null);
 	const [view, setView] = useState<"list" | "calendar">("list");
 	const [formSubmitting, setFormSubmitting] = useState(false);
+	const [titleTouched, setTitleTouched] = useState(false);
+	const [groupBy, setGroupBy] = useState<"none" | "status" | "assignee" | "due">("none");
+	const [tagsOpen, setTagsOpen] = useState(false);
+	const [quickTitle, setQuickTitle] = useState("");
 
 	// Fetch Tasks from SQLite backend
 	const loadTasks = useCallback(async () => {
@@ -164,6 +170,7 @@ export default function TasksPage() {
 		setFormDueDate("");
 		setFormTags([]);
 		setFormAssignee("");
+		setTitleTouched(false);
 		setIsCreateOpen(true);
 	};
 	useListKeys(isViewer ? undefined : handleOpenCreate);
@@ -182,6 +189,7 @@ export default function TasksPage() {
 
 	// Deep link from workspace search
 	useOpenParam((id) => {
+		if (id === "new") return void (!isViewer && handleOpenCreate());
 		const task = tasks.find((t) => t.id === id);
 		if (task) handleOpenEdit(task);
 	}, !loading);
@@ -189,7 +197,11 @@ export default function TasksPage() {
 	// Submit Create task
 	const handleCreateSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (isViewer || !workspace?.path || !formTitle.trim()) return;
+		if (!formTitle.trim()) {
+			setTitleTouched(true);
+			return;
+		}
+		if (isViewer || !workspace?.path) return;
 
 		try {
 			setFormSubmitting(true);
@@ -261,6 +273,37 @@ export default function TasksPage() {
 			logError(err, { source: "tasks" });
 		} finally {
 			setFormSubmitting(false);
+		}
+	};
+
+	// A title typed in the row above the list: Enter makes the task; #tag, !high and @fri set its fields
+	const handleQuickAdd = async () => {
+		const parsed = parseQuickAdd(quickTitle);
+		if (isViewer || !workspace?.path || !parsed.title) return;
+		const now = new Date().toISOString();
+		const newTask: Task = {
+			id: crypto.randomUUID(),
+			title: parsed.title.slice(0, MAX_TITLE),
+			description: "",
+			status: "todo",
+			priority: parsed.priority ?? "medium",
+			due_date: parsed.due ? new Date(parsed.due).toISOString() : undefined,
+			tags: parsed.tags,
+			created_at: now,
+			updated_at: now,
+		};
+		const typed = quickTitle;
+		setQuickTitle("");
+		try {
+			await createTask({ path: workspace.path, task: newTask });
+			publishDataChange({ entity: "task", op: "upsert", task: newTask });
+			await addActivityEvent("Created task", `Created task: ${newTask.title}`, itemTarget("task", newTask.id), "task");
+			await loadTasks();
+			await refreshMetadata();
+		} catch (err) {
+			console.error("Failed to create task:", err);
+			logError(err, { source: "tasks" });
+			setQuickTitle(typed);
 		}
 	};
 
@@ -392,6 +435,25 @@ export default function TasksPage() {
 
 	const allTags = useMemo(() => collectTags(tasks), [tasks]);
 
+	const groups = useMemo(() => {
+		if (groupBy === "none") return [{ key: "all", label: "", tasks: filteredTasks }];
+		const today = new Date().toISOString().slice(0, 10);
+		const weekEnd = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+		const keyOf = (t: Task) =>
+			groupBy === "status" ? t.status
+			: groupBy === "assignee" ? t.assignee_id ?? ""
+			: !t.due_date ? "none" : t.due_date.slice(0, 10) < today && t.status !== "done" ? "overdue" : t.due_date.slice(0, 10) <= weekEnd ? "week" : "later";
+		const order = groupBy === "status" ? ["todo", "in_progress", "done"] : groupBy === "due" ? ["overdue", "week", "later", "none"] : [];
+		const labelOf = (k: string) =>
+			groupBy === "status" ? STATUS_CONFIG[k as TaskStatus].label
+			: groupBy === "assignee" ? (k ? members.find((m) => m.id === k)?.name ?? "a removed member" : "Unassigned")
+			: ({ overdue: "Overdue", week: "Due this week", later: "Later", none: "No due date" } as Record<string, string>)[k] ?? k;
+		const byKey = new Map<string, Task[]>();
+		for (const t of filteredTasks) byKey.set(keyOf(t), [...(byKey.get(keyOf(t)) ?? []), t]);
+		const keys = [...byKey.keys()].sort((a, b) => (order.length ? order.indexOf(a) - order.indexOf(b) : labelOf(a).localeCompare(labelOf(b))));
+		return keys.map((k) => ({ key: k, label: labelOf(k), tasks: byKey.get(k)! }));
+	}, [filteredTasks, groupBy, members]);
+
 	// Stats Computations
 	const stats = useMemo(() => {
 		const total = tasks.length;
@@ -406,11 +468,13 @@ export default function TasksPage() {
 		<>
 			<div>
 				<Label htmlFor={`${prefix}-assignee`}>Assignee</Label>
+				<div className="relative">
+				{formAssignee && members.some((m) => m.id === formAssignee) && <Avatar name={memberName(formAssignee)} className="pointer-events-none absolute top-1/2 left-2 mt-0.5 size-6 -translate-y-1/2 text-xs" />}
 				<select
 					id={`${prefix}-assignee`}
 					value={formAssignee}
 					onChange={(e) => setFormAssignee(e.target.value)}
-					className="mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+					className={cn("mt-1 flex h-10 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring", formAssignee && "pl-10")}
 				>
 					<option value="">Unassigned</option>
 					{members.map((m) => (
@@ -419,6 +483,7 @@ export default function TasksPage() {
 						</option>
 					))}
 				</select>
+				</div>
 			</div>
 			<div>
 				<Label htmlFor={`${prefix}-tags`}>Tags</Label>
@@ -462,6 +527,30 @@ export default function TasksPage() {
 						{ value: "low", label: "Low", title: "Low priority" },
 					]}
 				/>
+				<ToolbarSelect
+					label="Group by"
+					value={groupBy}
+					onChange={setGroupBy}
+					active={groupBy !== "none"}
+					options={[
+						{ value: "none", label: "No grouping" },
+						{ value: "status", label: "Group: status" },
+						{ value: "assignee", label: "Group: assignee" },
+						{ value: "due", label: "Group: due date" },
+					]}
+				/>
+				{allTags.length > 0 && (
+					<span className="relative inline-flex">
+						<Button variant="outline" size="sm" onPress={() => setTagsOpen((o) => !o)} aria-expanded={tagsOpen}>
+							Tags{tagFilter ? `: #${tagFilter}` : ""}
+						</Button>
+						<Popover open={tagsOpen} onClose={() => setTagsOpen(false)} label="Tag filter" className="flex max-w-80 flex-wrap gap-1.5 p-3">
+							{allTags.map((tag) => (
+								<TagChip key={tag} tag={tag} active={tagFilter === tag} onClick={() => { setTagFilter(tagFilter === tag ? null : tag); setTagsOpen(false); }} />
+							))}
+						</Popover>
+					</span>
+				)}
 				<ToolbarSwitch
 					label="View"
 					value={view}
@@ -479,12 +568,23 @@ export default function TasksPage() {
 				)}
 			</Toolbar>
 
-			{allTags.length > 0 && (
-				<Toolbar variant="sub" className="gap-2 overflow-x-auto">
-					<Caption>tags</Caption>
-					{allTags.map((tag) => (
-						<TagChip key={tag} tag={tag} active={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)} />
-					))}
+			{!isViewer && view === "list" && (
+				<Toolbar variant="sub" className="gap-2">
+					<Plus className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+					<input
+						value={quickTitle}
+						maxLength={MAX_TITLE + 40}
+						onChange={(e) => setQuickTitle(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+								e.preventDefault();
+								void handleQuickAdd();
+							}
+						}}
+						aria-label="Quick add a task"
+						placeholder="Add a task and press Enter. Try: Fix login #bug !high @fri"
+						className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+					/>
 				</Toolbar>
 			)}
 
@@ -517,8 +617,12 @@ export default function TasksPage() {
 						{filtering ? "Nothing matches the search or filters." : "Create one to start tracking what needs doing."}
 					</EmptyState>
 				) : (
-					<ul className="divide-y">
-						{filteredTasks.map((task) => {
+					<div>
+						{groups.map((g) => (
+							<section key={g.key} aria-label={g.label || undefined}>
+								{g.label && <h2 className="sticky top-0 z-10 flex items-center gap-2 border-b bg-background px-3 py-1.5 font-mono text-[13px] text-muted-foreground">{g.label} / {g.tasks.length}</h2>}
+								<ul className="divide-y">
+									{g.tasks.map((task) => {
 							const statusConf = STATUS_CONFIG[task.status];
 							const priorityConf = PRIORITY_CONFIG[task.priority];
 							const StatusIcon = statusConf.icon;
@@ -563,7 +667,12 @@ export default function TasksPage() {
 
 									<div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm text-muted-foreground">
 										<RuleFlag violations={task.violations} />
-										{task.assignee_id && <span className="max-w-32 truncate">{memberName(task.assignee_id)}</span>}
+										{task.assignee_id && (
+											<span title={memberName(task.assignee_id)} className="flex items-center">
+												<Avatar name={memberName(task.assignee_id)} className="size-6 text-xs" />
+												<span className="sr-only">{memberName(task.assignee_id)}</span>
+											</span>
+										)}
 										{(task.tags ?? []).map((tag) => (
 											<TagChip key={tag} tag={tag} active={tagFilter === tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)} />
 										))}
@@ -582,8 +691,11 @@ export default function TasksPage() {
 									</div>
 								</li>
 							);
-						})}
-					</ul>
+									})}
+								</ul>
+							</section>
+						))}
+					</div>
 				)}
 			</div>
 
@@ -603,13 +715,15 @@ export default function TasksPage() {
 								<Input
 									id="create-title"
 									maxLength={MAX_TITLE}
-									required
 									value={formTitle}
 									onChange={(e) => setFormTitle(e.target.value)}
 									placeholder="Title"
 									className="mt-1"
 									autoFocus
+									aria-invalid={titleTouched && !formTitle.trim() ? true : undefined}
+									aria-describedby={titleTouched && !formTitle.trim() ? "create-title-error" : undefined}
 								/>
+								{titleTouched && !formTitle.trim() && <p id="create-title-error" className="mt-1 text-sm text-destructive">Title is required.</p>}
 							</div>
 
 							<div>
@@ -676,7 +790,7 @@ export default function TasksPage() {
 							</Button>
 							<Button
 								type="submit"
-								isDisabled={formSubmitting || !formTitle.trim()}
+								isDisabled={formSubmitting}
 							>
 								{formSubmitting ? "Creating…" : "Create Task"}
 							</Button>

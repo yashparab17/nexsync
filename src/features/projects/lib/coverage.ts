@@ -104,10 +104,10 @@ class Mark extends GutterMarker {
 	constructor(readonly covered: boolean) {
 		super();
 	}
-	eq(other: Mark) {
+	override eq(other: Mark) {
 		return other.covered === this.covered;
 	}
-	toDOM() {
+	override toDOM() {
 		const el = document.createElement("span");
 		el.title = this.covered ? "Reached by the tests" : "Not reached by the tests";
 		el.style.cssText = `display:block;width:3px;height:100%;margin-left:1px;background:var(${this.covered ? "--success" : "--destructive"});opacity:.85`;

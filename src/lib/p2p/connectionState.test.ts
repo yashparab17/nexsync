@@ -7,8 +7,8 @@ const view = (o: Partial<ConnectionInput>) => connectionView({ ...base, ...o });
 
 describe("connection button", () => {
 	it("says nothing when things are fine, whether or not anyone is there", () => {
-		expect(view({})).toMatchObject({ key: "idle", label: "" });
-		expect(view({ status: "connected", connected: 2, link: "host", hostName: "Ana" })).toMatchObject({ key: "connected", tone: "ok", label: "" });
+		expect(view({})).toMatchObject({ key: "idle", label: "Local" });
+		expect(view({ status: "connected", connected: 2, link: "host", hostName: "Ana" })).toMatchObject({ key: "connected", tone: "ok", label: "Synced" });
 	});
 
 	it("says the host is away when a joined copy works with the other members, or alone", () => {

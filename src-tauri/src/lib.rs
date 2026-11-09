@@ -133,6 +133,7 @@ pub fn run() {
             commands::workspace::purge_trash_item,
             commands::workspace::empty_trash,
             commands::workspace::rename_workspace_item,
+            commands::workspace::move_workspace_item,
 
             // Workspace registry & session restoration
             commands::workspace::get_recent_workspaces,

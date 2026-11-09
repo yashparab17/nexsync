@@ -198,6 +198,39 @@ pub fn rename_workspace_item(
     Ok(())
 }
 
+/// Moves a workspace file or directory into another folder of the same workspace; returns its new relative path
+#[tauri::command(async)]
+pub fn move_workspace_item(
+    app_handle: tauri::AppHandle,
+    path: String,
+    rel_path: String,
+    dest_dir: String,
+) -> Result<String, String> {
+    validate_allowed_root(&app_handle, &path)?;
+
+    let target = crate::commands::path_utils::resolve_workspace_path(&path, &rel_path)?;
+    let dest = crate::commands::path_utils::resolve_workspace_path(&path, &dest_dir)?;
+    if !target.exists() {
+        return Err(format!("Item not found: /{rel_path}"));
+    }
+    if !dest.is_dir() {
+        return Err("The destination is not a folder.".to_string());
+    }
+    if dest.starts_with(&target) {
+        return Err("A folder cannot be moved into itself.".to_string());
+    }
+    let name = target.file_name().ok_or("Invalid item path.")?.to_string_lossy().to_string();
+    let new_path = dest.join(&name);
+    if new_path.exists() {
+        return Err(format!("An item named `{name}` already exists there."));
+    }
+    fs::rename(&target, &new_path).map_err(|e| e.to_string())?;
+    let dir = dest_dir.trim_matches('/');
+    let new_rel = if dir.is_empty() { name } else { format!("{dir}/{name}") };
+    let _ = super::versions::rename_path(&path, &rel_path, &new_rel);
+    Ok(new_rel)
+}
+
 /// Moves a file or directory into the workspace trash
 #[tauri::command(async)]
 pub fn delete_workspace_item(app_handle: tauri::AppHandle, path: String, rel_path: String) -> Result<(), String> {

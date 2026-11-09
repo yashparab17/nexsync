@@ -21,7 +21,7 @@ class ProposalWidget extends WidgetType {
 		super();
 	}
 
-	eq(other: ProposalWidget) {
+	override eq(other: ProposalWidget) {
 		return other.p.id === this.p.id && other.p.text === this.p.text && other.stale === this.stale && other.canEdit === this.canEdit;
 	}
 
@@ -58,7 +58,7 @@ class ProposalWidget extends WidgetType {
 		return wrap;
 	}
 
-	ignoreEvent() {
+	override ignoreEvent() {
 		return true;
 	}
 }

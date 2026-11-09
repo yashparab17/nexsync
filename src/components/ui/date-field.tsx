@@ -17,7 +17,10 @@ import {
 	Popover,
 } from "react-aria-components";
 
+import { useState } from "react";
+
 import { cn } from "@/lib/utils";
+import { parseNaturalDate } from "@/lib/naturalDate";
 
 // "YYYY-MM-DD", or nothing for a value that is empty or not a date
 function toDate(value: string) {
@@ -47,8 +50,12 @@ export function DateField({
 	noPast?: boolean;
 	"aria-label"?: string;
 }) {
+	const [open, setOpen] = useState(false);
+	const [typed, setTyped] = useState("");
+	const parsed = parseNaturalDate(typed);
+	const taken = parsed && (!noPast || parsed >= today(getLocalTimeZone()).toString()) ? parsed : null;
 	return (
-		<DatePicker aria-label={ariaLabel} minValue={noPast ? today(getLocalTimeZone()) : undefined} value={toDate(value)} onChange={(d) => onChange(d ? d.toString() : "")} className={cn("group", className)}>
+		<DatePicker isOpen={open} onOpenChange={setOpen} aria-label={ariaLabel} minValue={noPast ? today(getLocalTimeZone()) : undefined} value={toDate(value)} onChange={(d) => onChange(d ? d.toString() : "")} className={cn("group", className)}>
 			<Group
 				id={id}
 				className="flex h-10 w-full items-center border border-input bg-input pl-3 text-sm focus-within:ring-2 focus-within:ring-ring"
@@ -77,6 +84,22 @@ export function DateField({
 			</Group>
 			<Popover placement="bottom end" className="z-[70] border border-border bg-popover p-3 text-popover-foreground rounded-lg ring-1 ring-foreground/10">
 				<Dialog className="outline-none">
+					<input
+						value={typed}
+						onChange={(e) => setTyped(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" && taken) {
+								e.preventDefault();
+								onChange(taken);
+								setTyped("");
+								setOpen(false);
+							}
+						}}
+						aria-label="Type a date"
+						placeholder="Type: fri, tomorrow, next week"
+						className="mb-1 h-8 w-full border border-input bg-input px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					/>
+					<p className="mb-2 h-4 text-xs text-muted-foreground" aria-live="polite">{typed ? (taken ? `Press Enter for ${taken}` : "Not a date I know") : ""}</p>
 					<Calendar>
 						<header className="mb-2 flex items-center justify-between">
 							<Button slot="previous" className={navButton}>

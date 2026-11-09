@@ -651,7 +651,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 						}
 					/>
 				</div>
-				<div role="tablist" aria-label="Sheets" className="flex items-center gap-1 border-t bg-[#f3f2f1] px-2 py-1 dark:bg-neutral-800">
+				<div role="tablist" aria-label="Sheets" className="flex items-center gap-1 border-t bg-muted px-2 py-1">
 					{sheets.map((s) =>
 						renaming?.id === s.id ? (
 							<form
@@ -676,7 +676,7 @@ export default function SheetWorkspace({ collab, opened, name, rel, workspacePat
 								aria-selected={s.id === sheet.id}
 								onClick={() => setActiveId(s.id)}
 								onDoubleClick={() => !readOnly && setRenaming({ id: s.id, value: s.name })}
-								className={cn("px-3 py-0.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring", s.id === sheet.id ? "border-b-2 border-[#217346] bg-white font-semibold text-[#217346] dark:bg-neutral-900" : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10")}
+								className={cn("px-3 py-0.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring", s.id === sheet.id ? "border-b-2 border-primary bg-background font-semibold text-primary" : "text-muted-foreground hover:bg-foreground/10")}
 							>
 								{s.name}
 							</button>

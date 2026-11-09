@@ -1,3 +1,4 @@
+import PresenceDots from "@/components/elements/PresenceDots";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FieldError } from "@/components/ui/notice";
 import { EDITOR_FOLDERS } from "@/lib/workspaceLayout";
@@ -651,6 +652,9 @@ export default function EditorPage() {
 						panelOpen={showPanel}
 						onTogglePanel={() => togglePanel()}
 					/>
+					{current && viewersAt("editor", current).length > 0 && (
+						<div className="flex shrink-0 items-center border-l px-2"><PresenceDots names={viewersAt("editor", current)} doing="in this file" /></div>
+					)}
 					</Toolbar>
 
 					<div className="relative min-h-0 flex-1">
